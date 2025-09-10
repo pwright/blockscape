@@ -57,8 +57,6 @@
   <input id="search" type="text" placeholder="Search…" />
   <label class="pill">JSON file <input id="file" type="file" accept=".json,.txt" /></label>
   <button id="clear">Clear selection</button>
-  <button id="exportPng">Export PNG</button>
-  <button id="exportSvg">Export SVG</button>
   <div class="legend">
     <span><span class="dot ddep"></span> deps</span>
     <span><span class="dot drev"></span> dependents</span>
@@ -374,49 +372,8 @@
     });
   });
 
-  // Export
-  document.getElementById('exportPng').onclick = () => {
-    console.log("[Blockscape] export PNG");
-    // render foreignObject snapshot
-    html2canvas(app).then(canvas => {
-      const link = document.createElement('a');
-      link.download = 'blockscape.png';
-      link.href = canvas.toDataURL('image/png');
-      link.click();
-    });
-  };
-  document.getElementById('exportSvg').onclick = () => {
-    console.log("[Blockscape] export SVG");
-    // Quick SVG: tiles as rounded rects with text (no logos)
-    const svg = exportSvgApprox();
-    const blob = new Blob([svg], {type:'image/svg+xml;charset=utf-8'});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url; a.download='blockscape.svg'; a.click();
-    URL.revokeObjectURL(url);
-  };
 
-  // Minimal html2canvas (inline, small) for PNG export
-  // Source: https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js (trimmed cannot; include as external)
-  const s = document.createElement('script');
-  s.src = "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js";
-  document.head.appendChild(s);
 
-  function exportSvgApprox(){
-    const tiles = Array.from(app.querySelectorAll('.tile'));
-    const rects = tiles.map(t => ({ r: t.getBoundingClientRect(), name: t.querySelector('.name').textContent, cls: t.className }));
-    const w = window.innerWidth, h = document.body.scrollHeight;
-    let svg = [`<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">`];
-    svg.push(`<rect width="100%" height="100%" fill="white"/>`);
-    rects.forEach(x => {
-      const fill = x.cls.includes('external') ? '#f3f4f6' : '#ffffff';
-      const stroke = x.cls.includes('dep') ? '#1d4ed8' : x.cls.includes('revdep') ? '#b91c1c' : '#e5e7eb';
-      svg.push(`<rect x="${x.r.left}" y="${x.r.top}" width="${x.r.width}" height="${x.r.height}" rx="10" ry="10" fill="${fill}" stroke="${stroke}" />`);
-      svg.push(`<text x="${x.r.left + x.r.width/2}" y="${x.r.top + x.r.height - 10}" font-size="11" text-anchor="middle" fill="#111827">${escapeXml(x.name)}</text>`);
-    });
-    svg.push(`</svg>`);
-    return svg.join('');
-  }
-  function escapeXml(s){ return s.replace(/[&<>"']/g, (m)=>({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&apos;" }[m])); }
 
   // Bootstrap: load seed
   (function bootstrap(){
