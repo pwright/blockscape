@@ -87,10 +87,14 @@
       "id": "sites",
       "title": "Sites",
       "items": [
-        { "id": "site-k8s",     "name": "Kubernetes Site", "deps": ["link", "collector", "listener"] },
-        { "id": "site-podman",  "name": "Podman Site",     "deps": ["link", "collector", "listener"] },
-        { "id": "site-docker",  "name": "Docker Site",     "deps": ["link", "collector", "listener"] },
-        { "id": "site-systemd", "name": "systemd Site",    "deps": ["link", "collector", "listener"] }
+      {
+        "id": "site-k8s",
+        "name": "Kubernetes Site", 
+        "logo": "logos/k8s.svg",
+        "deps": ["link", "collector", "listener"]
+      },  { "id": "site-podman",  "name": "Podman Site",     "logo": "logos/Podman.svg", "deps": ["link", "collector", "listener"] },
+        { "id": "site-docker",  "name": "Docker Site",     "logo": "logos/Docker.svg", "deps": ["link", "collector", "listener"] },
+        { "id": "site-systemd", "name": "systemd Site",    "logo": "logos/systemd.svg", "deps": ["link", "collector", "listener"] }
       ]
     },
     {
@@ -159,6 +163,35 @@
     return { m, fwd, rev, reusedLocal, seen };
   }
 
+  function generateLetterImage(text) {
+    const canvas = document.createElement('canvas');
+    const size = 44; // Match the logo size
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    
+    // Background circle
+    ctx.fillStyle = '#f3f4f6';
+    ctx.beginPath();
+    ctx.arc(size/2, size/2, size/2 - 2, 0, 2 * Math.PI);
+    ctx.fill();
+    
+    // Border
+    ctx.strokeStyle = '#d1d5db';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    
+    // Text
+    const letter = text.charAt(0).toUpperCase();
+    ctx.fillStyle = '#6b7280';
+    ctx.font = `bold ${size * 0.5}px system-ui, -apple-system, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(letter, size/2, size/2);
+    
+    return canvas.toDataURL('image/png');
+  }
+
   function render() {
     console.log("[Blockscape] rendering categories=", model.m.categories.length);
     app.innerHTML = "";
@@ -192,8 +225,14 @@
 
         const img = document.createElement('img');
         img.className = 'logo';
-        if (it.logo) { img.src = it.logo; img.alt = it.name; }
-        else { img.alt = ""; img.style.opacity = .2; img.src = "data:image/gif;base64,R0lGODlhAQABAAAAACw="; }
+        if (it.logo) { 
+          img.src = it.logo; 
+          img.alt = it.name; 
+        } else { 
+          img.alt = ""; 
+          img.style.opacity = .2; 
+          img.src = generateLetterImage(it.name || it.id); 
+        }
 
         const nm = document.createElement('div');
         nm.className = 'name';
