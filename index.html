@@ -1,529 +1,732 @@
 <!doctype html>
 <html lang="en">
+
 <head>
-<meta charset="utf-8" />
-<title>Blockscape — simple landscape-style tiles</title>
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<style>
-  :root {
-    --tile: 104px;
-    --gap: 10px;
-    --radius: 10px;
-    --fg: #222;
-    --muted: #666;
-    --bg: #fff;
-    --line: #e5e7eb;
-    --dep: #1d4ed8;          /* downstream deps */
-    --revdep: #b91c1c;       /* upstream dependents */
-    --reused: #b45309;       /* reused badge */
-    --external: #6b7280;     /* external border */
-  }
-  html, body { height: 100%; margin: 0; background: var(--bg); color: var(--fg); font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Arial; }
-  header { position: sticky; top: 0; background: rgba(255,255,255,.9); backdrop-filter: blur(6px); border-bottom:1px solid var(--line); padding: .5rem .75rem; display:flex; align-items:center; gap:.5rem; z-index:10; }
-  header h1 { font-size: 14px; margin: 0 .5rem 0 0; font-weight: 600; letter-spacing:.2px; }
-  input[type="text"]{ height:32px; padding:0 .5rem; border:1px solid var(--line); border-radius:999px; width:260px; }
-  button, label.pill { height:32px; padding:0 .75rem; background:#f9fafb; border:1px solid var(--line); border-radius:999px; cursor:pointer; }
-  .pill input[type=file]{ display:none; }
-  main { padding: .75rem; }
-  .category { margin: .75rem 0 1.25rem 0; }
-  .cat-head { display:flex; align-items:center; gap:.5rem; margin-bottom:.4rem; }
-  .cat-title { font-size: 13px; font-weight:600; text-transform: uppercase; letter-spacing:.4px; color:#374151; }
-  .grid { position:relative; display:grid; grid-auto-rows: var(--tile); grid-template-columns: repeat(auto-fill, minmax(var(--tile), 1fr)); gap: var(--gap); padding: var(--gap) 0; border-top:1px dashed #eaecef; }
-  .tile { position:relative; background:#fff; border:1px solid #e5e7eb; border-radius: var(--radius); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:.35rem; cursor:grab; transition: box-shadow .15s ease, transform .05s ease, border-color .15s ease; }
-  .tile:hover { box-shadow: 0 2px 10px rgba(0,0,0,.06); }
-  .tile:active { transform: translateY(1px); }
-  .tile.dragging { opacity: 0.5; cursor: grabbing; transform: rotate(5deg); }
-  .tile.drag-over { border-color: var(--dep); box-shadow: 0 0 0 2px var(--dep) inset; }
-  .grid.drag-active { background: rgba(29, 78, 216, 0.05); }
-  .logo { width: 44px; height: 44px; object-fit: contain; opacity:.95; }
-  .name { font-size: 11px; text-align:center; line-height:1.1; padding: 0 .35rem .25rem; }
-  .badge { position:absolute; top:6px; right:6px; font-size:10px; background:#fff7ed; color:var(--reused); border:1px solid #fed7aa; border-radius:999px; padding:.05rem .35rem; display:none; }
-  .tile.reused .badge { display:inline-block; }
-  .tile.external { border-style: dashed; border-color:#cbd5e1; color:#374151; }
-  .tile.dep    { box-shadow: 0 0 0 2px var(--dep) inset; border-color: var(--dep); }
-  .tile.revdep { box-shadow: 0 0 0 2px var(--revdep) inset; border-color: var(--revdep); }
-  .tile.selected { outline: 2px solid #111827; outline-offset: 1px; }
-  .muted { color: var(--muted); }
-  .svg-layer { position:absolute; inset:0; pointer-events:none; }
-  .legend { margin-left:auto; font-size:12px; color:#374151; display:flex; gap:.5rem; align-items:center; }
-  .dot{ width:.7rem; height:.7rem; border-radius:50%; display:inline-block; border:1px solid #999; }
-  .ddep{ background:#dbeafe; border-color:var(--dep); }
-  .drev{ background:#fee2e2; border-color:var(--revdep); }
-  .dreused{ background:#ffedd5; border-color:var(--reused); }
-  .dext{ background:#f3f4f6; border-color:var(--external); }
-  .sr-only{ position:absolute; left:-10000px; }
-</style>
+  <meta charset="utf-8" />
+  <title>Blockscape — simple landscape-style tiles</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root {
+      --tile: 104px;
+      --gap: 10px;
+      --radius: 10px;
+      --fg: #222;
+      --muted: #666;
+      --bg: #fff;
+      --line: #e5e7eb;
+      --dep: #1d4ed8;
+      /* downstream deps */
+      --revdep: #b91c1c;
+      /* upstream dependents */
+      --reused: #b45309;
+      /* reused badge */
+      --external: #6b7280;
+      /* external border */
+    }
+
+    html,
+    body {
+      height: 100%;
+      margin: 0;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Arial;
+    }
+
+    header {
+      position: sticky;
+      top: 0;
+      background: rgba(255, 255, 255, .9);
+      backdrop-filter: blur(6px);
+      border-bottom: 1px solid var(--line);
+      padding: .5rem .75rem;
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+      z-index: 10;
+    }
+
+    header h1 {
+      font-size: 14px;
+      margin: 0 .5rem 0 0;
+      font-weight: 600;
+      letter-spacing: .2px;
+    }
+
+    input[type="text"] {
+      height: 32px;
+      padding: 0 .5rem;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      width: 260px;
+    }
+
+    button,
+    label.pill {
+      height: 32px;
+      padding: 0 .75rem;
+      background: #f9fafb;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      cursor: pointer;
+    }
+
+    .pill input[type=file] {
+      display: none;
+    }
+
+    main {
+      padding: .75rem;
+    }
+
+    .category {
+      margin: .75rem 0 1.25rem 0;
+    }
+
+    .cat-head {
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+      margin-bottom: .4rem;
+    }
+
+    .cat-title {
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .4px;
+      color: #374151;
+    }
+
+    .grid {
+      position: relative;
+      display: grid;
+      grid-auto-rows: var(--tile);
+      grid-template-columns: repeat(auto-fill, minmax(var(--tile), 1fr));
+      gap: var(--gap);
+      padding: var(--gap) 0;
+      border-top: 1px dashed #eaecef;
+    }
+
+    .tile {
+      position: relative;
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: var(--radius);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: .35rem;
+      cursor: grab;
+      transition: box-shadow .15s ease, transform .05s ease, border-color .15s ease;
+    }
+
+    .tile:hover {
+      box-shadow: 0 2px 10px rgba(0, 0, 0, .06);
+    }
+
+    .tile:active {
+      transform: translateY(1px);
+    }
+
+    .tile.dragging {
+      opacity: 0.5;
+      cursor: grabbing;
+      transform: rotate(5deg);
+    }
+
+    .tile.drag-over {
+      border-color: var(--dep);
+      box-shadow: 0 0 0 2px var(--dep) inset;
+    }
+
+    .grid.drag-active {
+      background: rgba(29, 78, 216, 0.05);
+    }
+
+    .logo {
+      width: 44px;
+      height: 44px;
+      object-fit: contain;
+      opacity: .95;
+    }
+
+    .name {
+      font-size: 11px;
+      text-align: center;
+      line-height: 1.1;
+      padding: 0 .35rem .25rem;
+    }
+
+    .badge {
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      font-size: 10px;
+      background: #fff7ed;
+      color: var(--reused);
+      border: 1px solid #fed7aa;
+      border-radius: 999px;
+      padding: .05rem .35rem;
+      display: none;
+    }
+
+    .tile.reused .badge {
+      display: inline-block;
+    }
+
+    .tile.external {
+      border-style: dashed;
+      border-color: #cbd5e1;
+      color: #374151;
+    }
+
+    .tile.dep {
+      box-shadow: 0 0 0 2px var(--dep) inset;
+      border-color: var(--dep);
+    }
+
+    .tile.revdep {
+      box-shadow: 0 0 0 2px var(--revdep) inset;
+      border-color: var(--revdep);
+    }
+
+    .tile.selected {
+      outline: 2px solid #111827;
+      outline-offset: 1px;
+    }
+
+    .muted {
+      color: var(--muted);
+    }
+
+    .svg-layer {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+
+    .legend {
+      margin-left: auto;
+      font-size: 12px;
+      color: #374151;
+      display: flex;
+      gap: .5rem;
+      align-items: center;
+    }
+
+    .dot {
+      width: .7rem;
+      height: .7rem;
+      border-radius: 50%;
+      display: inline-block;
+      border: 1px solid #999;
+    }
+
+    .ddep {
+      background: #dbeafe;
+      border-color: var(--dep);
+    }
+
+    .drev {
+      background: #fee2e2;
+      border-color: var(--revdep);
+    }
+
+    .dreused {
+      background: #ffedd5;
+      border-color: var(--reused);
+    }
+
+    .dext {
+      background: #f3f4f6;
+      border-color: var(--external);
+    }
+
+    .sr-only {
+      position: absolute;
+      left: -10000px;
+    }
+  </style>
 </head>
+
 <body>
-<header>
-  <h1>Blockscape</h1>
-  <input id="search" type="text" placeholder="Search…" />
-  <label class="pill">JSON file <input id="file" type="file" accept=".json,.txt" /></label>
-  <button id="clear">Clear selection</button>
-  <div class="legend">
-    <span><span class="dot ddep"></span> enables</span>
-    <span><span class="dot drev"></span> dependents</span>
-    <span><span class="dot dreused"></span> reused</span>
-    <span><span class="dot dext"></span> external</span>
-  </div>
-</header>
+  <header>
+    <h1>Blockscape</h1>
+    <input id="search" type="text" placeholder="Search…" />
+    <label class="pill">JSON file <input id="file" type="file" accept=".json,.txt" /></label>
+    <button id="clear">Clear selection</button>
+    <div class="legend">
+      <span><span class="dot ddep"></span> enables</span>
+      <span><span class="dot drev"></span> dependents</span>
+      <span><span class="dot dreused"></span> reused</span>
+      <span><span class="dot dext"></span> external</span>
+    </div>
+  </header>
 
-<details style="margin:.5rem .75rem;">
-  <summary style="cursor:pointer;">Paste JSON here (schema below)</summary>
-  <div class="muted" style="font-size:12px;margin:.25rem 0 .5rem 0">
-    Schema: <code>{ categories:[{id, title, items:[{id,name,logo?,external?,deps:[] }]}] }</code>
-  </div>
-  <div style="display:flex;gap:.5rem;align-items:flex-start;">
-    <textarea id="jsonBox" style="flex:1;height:160px;font-family:ui-monospace,Consolas,monospace;resize:vertical;"></textarea>
-    <button id="load" style="height:32px;padding:0 .75rem;background:#f9fafb;border:1px solid var(--line);border-radius:999px;cursor:pointer;white-space:nowrap;">Load JSON</button>
-  </div>
-</details>
+  <details style="margin:.5rem .75rem;">
+    <summary style="cursor:pointer;">Paste JSON here (schema below)</summary>
+    <div class="muted" style="font-size:12px;margin:.25rem 0 .5rem 0">
+      Schema: <code>{ categories:[{id, title, items:[{id,name,logo?,external?,deps:[] }]}] }</code>
+    </div>
+    <div style="display:flex;gap:.5rem;align-items:flex-start;">
+      <textarea id="jsonBox"
+        style="flex:1;height:160px;font-family:ui-monospace,Consolas,monospace;resize:vertical;"></textarea>
+      <button id="load"
+        style="height:32px;padding:0 .75rem;background:#f9fafb;border:1px solid var(--line);border-radius:999px;cursor:pointer;white-space:nowrap;">Load
+        JSON</button>
+    </div>
+  </details>
 
-<main id="app" aria-live="polite"></main>
+  <main id="app" aria-live="polite"></main>
 
-<template id="seed">
-{
-  "categories": [
+  <template id="seed">
     {
-      "id": "sites",
-      "title": "Router sites",
-      "items": [
-      {
-        "id": "site-k8s",
-        "name": "Kubernetes Site", 
-        "logo": "logos/k8s.svg",
-        "deps": ["link", "connector", "attachedconnector", "listener"]
-      },  { "id": "site-podman",  "name": "Podman Site",     "logo": "logos/Podman.svg", "deps": ["link", "connector", "listener"] },
-        { "id": "site-docker",  "name": "Docker Site",     "logo": "logos/Docker.svg", "deps": ["link", "connector", "listener"] },
-        { "id": "site-systemd", "name": "systemd Site",    "logo": "logos/systemd.svg", "deps": ["link", "connector", "listener"] }
-      ]
+    "categories": [
+    
+    {
+    "id": "endpoints",
+    "title": "Endpoints",
+    "items": [
+    { "id": "server", "name": "Server", "deps": [] },
+    { "id": "client", "name": "Client", "deps": [] }
+    ]
     },
     {
-      "id": "links",
-      "title": "Linking sites",
-      "items": [
-        { "id": "tokens",      "name": "Token issue and redeem",   "logo": "logos/skupper-logo.svg",    "deps": ["link"] },
-        { "id": "link", "name": "Link", "logo": "logos/skupper-logo.svg", "deps": [] }
-      ]
+    "id": "exposure",
+    "title": "Exposing services",
+    "items": [
+    { "id": "connector", "name": "connector", "logo": "logos/skupper-logo.svg", "deps": ["server"] },
+    { "id": "listener", "name": "Listener", "logo": "logos/skupper-logo.svg", "deps": ["client"] },
+    { "id": "attachedconnector", "name": "Attached connector", "logo": "logos/skupper-logo.svg", "deps": ["server"] }
+    ]
     },
     {
-      "id": "exposure",
-      "title": "Exposing services",
-      "items": [
-        { "id": "connector", "name": "connector", "logo": "logos/skupper-logo.svg", "deps": ["server"] },
-        { "id": "listener",  "name": "Listener", "logo": "logos/skupper-logo.svg",  "deps": ["client"] },
-        { "id": "attachedconnector",  "name": "Attached connector", "logo": "logos/skupper-logo.svg",  "deps": ["server"] }
-      ]
+    "id": "links",
+    "title": "Linking sites",
+    "items": [
+    
+    { "id": "tokenissue", "name": "Token issue", "logo": "logos/skupper-logo.svg", "deps": [] },
+    { "id": "tokenredeem", "name": "Token redeem", "logo": "logos/skupper-logo.svg", "deps": ["link"] },
+    { "id": "link", "name": "Link", "logo": "logos/skupper-logo.svg", "deps": [] }
+    ]
     },
     {
-      "id": "endpoints",
-      "title": "Endpoints",
-      "items": [
-        { "id": "server", "name": "Server", "deps": [] },
-        { "id": "client", "name": "Client", "deps": [] }
-      ]
+    "id": "sites", "title": "Router sites",
+    "items": [
+    { "id": "site-k8s", "name": "Kubernetes Site", "logo": "logos/k8s.svg", "deps": ["link", "connector",
+    "attachedconnector", "listener", "tokenissue", "tokenredeem"]
+    }, { "id": "site-podman", "name": "Podman Site", "logo": "logos/Podman.svg", "deps": ["link", "connector",
+    "listener", "tokenredeem"] },
+    { "id": "site-docker", "name": "Docker Site", "logo": "logos/Docker.svg", "deps": ["link", "connector", "listener", "tokenredeem"]
+    },
+    { "id": "site-systemd", "name": "systemd Site", "logo": "logos/systemd.svg", "deps": ["link", "connector",
+    "listener", "tokenredeem"] }
+    ]
     }
-  ],
-  "links": []
-}
-</template>
-
-<svg id="overlay" class="svg-layer"></svg>
-
-<script>
-  console.log("[Blockscape] init");
-
-  const jsonBox = document.getElementById('jsonBox');
-  jsonBox.value = document.getElementById('seed').innerHTML.trim();
-
-  const app = document.getElementById('app');
-  const overlay = document.getElementById('overlay');
-
-  let model = null;
-  let index = new Map();        // id -> {el, catId, rect}
-  let reverse = new Map();      // id -> Set(dependents)
-  let forward = new Map();      // id -> Set(deps)
-  let reused = new Set();       // nodes with in-degree >= 2
-  let selection = null;
-
-  function parse(txt) {
-    console.log("[Blockscape] parsing json length=", txt.length);
-    const m = JSON.parse(txt);
-    // Normalize: build adjacency from items.deps + top-level links (optional)
-    const fwd = new Map();
-    const rev = new Map();
-    const seen = new Set();
-
-    m.categories.forEach(c => c.items.forEach(it => {
-      seen.add(it.id);
-      const deps = new Set(it.deps || []);
-      (m.links || []).forEach(l => { if (l.from === it.id) deps.add(l.to); });
-      fwd.set(it.id, deps);
-      deps.forEach(d => {
-        if (!rev.has(d)) rev.set(d, new Set());
-        rev.get(d).add(it.id);
-      });
-    }));
-
-    // compute reused (in-degree>=2)
-    const reusedLocal = new Set();
-    rev.forEach((dependents, node) => { if ((dependents?.size || 0) >= 2) reusedLocal.add(node); });
-
-    return { m, fwd, rev, reusedLocal, seen };
-  }
-
-  function generateLetterImage(text) {
-    const canvas = document.createElement('canvas');
-    const size = 44; // Match the logo size
-    canvas.width = size;
-    canvas.height = size;
-    const ctx = canvas.getContext('2d');
+    ]
     
-    // Background circle
-    ctx.fillStyle = '#f3f4f6';
-    ctx.beginPath();
-    ctx.arc(size/2, size/2, size/2 - 2, 0, 2 * Math.PI);
-    ctx.fill();
-    
-    // Border
-    ctx.strokeStyle = '#d1d5db';
-    ctx.lineWidth = 1;
-    ctx.stroke();
-    
-    // Text
-    const letter = text.charAt(0).toUpperCase();
-    ctx.fillStyle = '#6b7280';
-    ctx.font = `bold ${size * 0.5}px system-ui, -apple-system, sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(letter, size/2, size/2);
-    
-    return canvas.toDataURL('image/png');
-  }
+    }
+  </template>
 
-  function render() {
-    console.log("[Blockscape] rendering categories=", model.m.categories.length);
-    app.innerHTML = "";
-    index.clear();
+  <svg id="overlay" class="svg-layer"></svg>
 
-    // container for overlay sizing
-    const containerRect = app.getBoundingClientRect();
-    overlay.setAttribute("width", window.innerWidth);
-    overlay.setAttribute("height", window.innerHeight);
+  <script>
+    console.log("[Blockscape] init");
 
-    model.m.categories.forEach(cat => {
-      const section = document.createElement('section');
-      section.className = 'category';
-      section.dataset.cat = cat.id;
+    const jsonBox = document.getElementById('jsonBox');
+    jsonBox.value = document.getElementById('seed').innerHTML.trim();
 
-      const head = document.createElement('div');
-      head.className = 'cat-head';
-      head.innerHTML = `<div class="cat-title">${escapeHtml(cat.title || cat.id)}</div>
+    const app = document.getElementById('app');
+    const overlay = document.getElementById('overlay');
+
+    let model = null;
+    let index = new Map();        // id -> {el, catId, rect}
+    let reverse = new Map();      // id -> Set(dependents)
+    let forward = new Map();      // id -> Set(deps)
+    let reused = new Set();       // nodes with in-degree >= 2
+    let selection = null;
+
+    function parse(txt) {
+      console.log("[Blockscape] parsing json length=", txt.length);
+      const m = JSON.parse(txt);
+      // Normalize: build adjacency from items.deps + top-level links (optional)
+      const fwd = new Map();
+      const rev = new Map();
+      const seen = new Set();
+
+      m.categories.forEach(c => c.items.forEach(it => {
+        seen.add(it.id);
+        const deps = new Set(it.deps || []);
+        (m.links || []).forEach(l => { if (l.from === it.id) deps.add(l.to); });
+        fwd.set(it.id, deps);
+        deps.forEach(d => {
+          if (!rev.has(d)) rev.set(d, new Set());
+          rev.get(d).add(it.id);
+        });
+      }));
+
+      // compute reused (in-degree>=2)
+      const reusedLocal = new Set();
+      rev.forEach((dependents, node) => { if ((dependents?.size || 0) >= 2) reusedLocal.add(node); });
+
+      return { m, fwd, rev, reusedLocal, seen };
+    }
+
+    function generateLetterImage(text) {
+      const canvas = document.createElement('canvas');
+      const size = 44; // Match the logo size
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext('2d');
+
+      // Background circle
+      ctx.fillStyle = '#f3f4f6';
+      ctx.beginPath();
+      ctx.arc(size / 2, size / 2, size / 2 - 2, 0, 2 * Math.PI);
+      ctx.fill();
+
+      // Border
+      ctx.strokeStyle = '#d1d5db';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      // Text
+      const letter = text.charAt(0).toUpperCase();
+      ctx.fillStyle = '#6b7280';
+      ctx.font = `bold ${size * 0.5}px system-ui, -apple-system, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(letter, size / 2, size / 2);
+
+      return canvas.toDataURL('image/png');
+    }
+
+    function render() {
+      console.log("[Blockscape] rendering categories=", model.m.categories.length);
+      app.innerHTML = "";
+      index.clear();
+
+      // container for overlay sizing
+      const containerRect = app.getBoundingClientRect();
+      overlay.setAttribute("width", window.innerWidth);
+      overlay.setAttribute("height", window.innerHeight);
+
+      model.m.categories.forEach(cat => {
+        const section = document.createElement('section');
+        section.className = 'category';
+        section.dataset.cat = cat.id;
+
+        const head = document.createElement('div');
+        head.className = 'cat-head';
+        head.innerHTML = `<div class="cat-title">${escapeHtml(cat.title || cat.id)}</div>
                         <div class="muted" style="font-size:12px">${cat.items.length} items</div>`;
-      section.appendChild(head);
+        section.appendChild(head);
 
-      const grid = document.createElement('div');
-      grid.className = 'grid';
-      section.appendChild(grid);
+        const grid = document.createElement('div');
+        grid.className = 'grid';
+        section.appendChild(grid);
 
-      cat.items.forEach(it => {
-        const tile = document.createElement('div');
-        tile.className = 'tile' + (it.external ? ' external' : '');
-        tile.tabIndex = 0;
-        tile.dataset.id = it.id;
+        cat.items.forEach(it => {
+          const tile = document.createElement('div');
+          tile.className = 'tile' + (it.external ? ' external' : '');
+          tile.tabIndex = 0;
+          tile.dataset.id = it.id;
 
-        const img = document.createElement('img');
-        img.className = 'logo';
-        if (it.logo) { 
-          img.src = it.logo; 
-          img.alt = it.name; 
-        } else { 
-          img.alt = ""; 
-          img.style.opacity = .2; 
-          img.src = generateLetterImage(it.name || it.id); 
+          const img = document.createElement('img');
+          img.className = 'logo';
+          if (it.logo) {
+            img.src = it.logo;
+            img.alt = it.name;
+          } else {
+            img.alt = "";
+            img.style.opacity = .2;
+            img.src = generateLetterImage(it.name || it.id);
+          }
+
+          const nm = document.createElement('div');
+          nm.className = 'name';
+          nm.textContent = it.name || it.id;
+
+          const badge = document.createElement('div');
+          badge.className = 'badge';
+          badge.textContent = 'reused';
+
+          tile.appendChild(img);
+          tile.appendChild(nm);
+          tile.appendChild(badge);
+          grid.appendChild(tile);
+
+          index.set(it.id, { el: tile, catId: cat.id, rect: null });
+        });
+
+        app.appendChild(section);
+      });
+
+      // mark reused
+      model.reusedLocal.forEach(id => {
+        const hit = index.get(id);
+        if (hit) {
+          hit.el.classList.add('reused');
+          hit.el.querySelector('.badge').style.display = 'inline-block';
         }
-
-        const nm = document.createElement('div');
-        nm.className = 'name';
-        nm.textContent = it.name || it.id;
-
-        const badge = document.createElement('div');
-        badge.className = 'badge';
-        badge.textContent = 'reused';
-
-        tile.appendChild(img);
-        tile.appendChild(nm);
-        tile.appendChild(badge);
-        grid.appendChild(tile);
-
-        index.set(it.id, { el: tile, catId: cat.id, rect: null });
       });
 
-      app.appendChild(section);
-    });
+      wireEvents();
+      reflowRects();
+      drawLinks(); // initial draw (none selected)
+    }
 
-    // mark reused
-    model.reusedLocal.forEach(id => {
-      const hit = index.get(id);
-      if (hit) {
-        hit.el.classList.add('reused');
-        hit.el.querySelector('.badge').style.display = 'inline-block';
-      }
-    });
+    function wireEvents() {
+      app.querySelectorAll('.tile').forEach(t => {
+        t.addEventListener('click', () => {
+          const id = t.dataset.id;
+          console.log("[Blockscape] click", id);
+          if (selection === id) { clearSelection(); return; }
+          select(id);
+        });
+        t.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); t.click(); }
+        });
 
-    wireEvents();
-    reflowRects();
-    drawLinks(); // initial draw (none selected)
-  }
-
-  function wireEvents() {
-    app.querySelectorAll('.tile').forEach(t => {
-      t.addEventListener('click', () => {
-        const id = t.dataset.id;
-        console.log("[Blockscape] click", id);
-        if (selection === id) { clearSelection(); return; }
-        select(id);
+        // Drag and drop events
+        t.draggable = true;
+        t.addEventListener('dragstart', handleDragStart);
+        t.addEventListener('dragend', handleDragEnd);
       });
-      t.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); t.click(); }
+
+      app.querySelectorAll('.grid').forEach(grid => {
+        grid.addEventListener('dragover', handleDragOver);
+        grid.addEventListener('drop', handleDrop);
+        grid.addEventListener('dragenter', handleDragEnter);
+        grid.addEventListener('dragleave', handleDragLeave);
       });
-      
-      // Drag and drop events
-      t.draggable = true;
-      t.addEventListener('dragstart', handleDragStart);
-      t.addEventListener('dragend', handleDragEnd);
-    });
-    
-    app.querySelectorAll('.grid').forEach(grid => {
-      grid.addEventListener('dragover', handleDragOver);
-      grid.addEventListener('drop', handleDrop);
-      grid.addEventListener('dragenter', handleDragEnter);
-      grid.addEventListener('dragleave', handleDragLeave);
-    });
-    
-    window.addEventListener('resize', () => { reflowRects(); drawLinks(); });
-    document.getElementById('clear').onclick = () => clearSelection();
-  }
 
-  function reflowRects() {
-    index.forEach((v, id) => {
-      v.rect = v.el.getBoundingClientRect();
-    });
-  }
+      window.addEventListener('resize', () => { reflowRects(); drawLinks(); });
+      document.getElementById('clear').onclick = () => clearSelection();
+    }
 
-  function select(id) {
-    selection = id;
-    clearStyles();
-    const deps = Array.from(model.fwd.get(id) || []);
-    const revs = Array.from(model.rev.get(id) || []);
-    console.log("[Blockscape] selecting id=", id, "deps=", deps, "revs=", revs);
+    function reflowRects() {
+      index.forEach((v, id) => {
+        v.rect = v.el.getBoundingClientRect();
+      });
+    }
 
-    const sel = index.get(id); if (sel) sel.el.classList.add('selected');
-    deps.forEach(d => { const hit = index.get(d); if (hit) hit.el.classList.add('dep'); });
-    revs.forEach(r => { const hit = index.get(r); if (hit) hit.el.classList.add('revdep'); });
+    function select(id) {
+      selection = id;
+      clearStyles();
+      const deps = Array.from(model.fwd.get(id) || []);
+      const revs = Array.from(model.rev.get(id) || []);
+      console.log("[Blockscape] selecting id=", id, "deps=", deps, "revs=", revs);
 
-    drawLinks();
-  }
+      const sel = index.get(id); if (sel) sel.el.classList.add('selected');
+      deps.forEach(d => { const hit = index.get(d); if (hit) hit.el.classList.add('dep'); });
+      revs.forEach(r => { const hit = index.get(r); if (hit) hit.el.classList.add('revdep'); });
 
-  function clearSelection() {
-    selection = null;
-    clearStyles();
-    drawLinks();
-  }
+      drawLinks();
+    }
 
-  function clearStyles() {
-    app.querySelectorAll('.tile').forEach(t => t.classList.remove('dep','revdep','selected'));
-  }
+    function clearSelection() {
+      selection = null;
+      clearStyles();
+      drawLinks();
+    }
 
-  function drawLinks() {
-    // Draw subtle connectors only for current selection to keep it readable.
-    while (overlay.firstChild) overlay.removeChild(overlay.firstChild);
-    if (!selection) return;
+    function clearStyles() {
+      app.querySelectorAll('.tile').forEach(t => t.classList.remove('dep', 'revdep', 'selected'));
+    }
 
-    const fromRect = index.get(selection)?.rect;
-    if (!fromRect) return;
+    function drawLinks() {
+      // Draw subtle connectors only for current selection to keep it readable.
+      while (overlay.firstChild) overlay.removeChild(overlay.firstChild);
+      if (!selection) return;
 
-    const toList = new Set([...(model.fwd.get(selection) || []), ...(model.rev.get(selection) || [])]);
-    toList.forEach(to => {
-      const target = index.get(to);
-      if (!target || !target.rect) return;
-      const a = center(fromRect);
-      const b = center(target.rect);
-      const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-      const c1x = (a.x + b.x) / 2, c1y = a.y;
-      const c2x = (a.x + b.x) / 2, c2y = b.y;
-      const isDep = (model.fwd.get(selection) || new Set()).has(to);
-      path.setAttribute("d", `M ${a.x},${a.y} C ${c1x},${c1y} ${c2x},${c2y} ${b.x},${b.y}`);
-      path.setAttribute("fill", "none");
-      path.setAttribute("stroke", isDep ? "var(--dep)" : "var(--revdep)");
-      path.setAttribute("stroke-opacity", "0.45");
-      path.setAttribute("stroke-width", "2");
-      path.setAttribute("vector-effect", "non-scaling-stroke");
-      overlay.appendChild(path);
-    });
-  }
+      const fromRect = index.get(selection)?.rect;
+      if (!fromRect) return;
 
-  function center(r) { return { x: r.left + r.width/2, y: r.top + r.height/2 }; }
+      const toList = new Set([...(model.fwd.get(selection) || []), ...(model.rev.get(selection) || [])]);
+      toList.forEach(to => {
+        const target = index.get(to);
+        if (!target || !target.rect) return;
+        const a = center(fromRect);
+        const b = center(target.rect);
+        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        const c1x = (a.x + b.x) / 2, c1y = a.y;
+        const c2x = (a.x + b.x) / 2, c2y = b.y;
+        const isDep = (model.fwd.get(selection) || new Set()).has(to);
+        path.setAttribute("d", `M ${a.x},${a.y} C ${c1x},${c1y} ${c2x},${c2y} ${b.x},${b.y}`);
+        path.setAttribute("fill", "none");
+        path.setAttribute("stroke", isDep ? "var(--dep)" : "var(--revdep)");
+        path.setAttribute("stroke-opacity", "0.45");
+        path.setAttribute("stroke-width", "2");
+        path.setAttribute("vector-effect", "non-scaling-stroke");
+        overlay.appendChild(path);
+      });
+    }
 
-  function escapeHtml(s){ return s.replace(/[&<>"']/g, (m)=>({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;" }[m])); }
+    function center(r) { return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }
 
-  // Drag and drop handlers
-  let draggedElement = null;
-  let draggedItemId = null;
-  let draggedCategoryId = null;
+    function escapeHtml(s) { return s.replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[m])); }
 
-  function handleDragStart(e) {
-    draggedElement = e.target;
-    draggedItemId = e.target.dataset.id;
-    draggedCategoryId = e.target.closest('.category').dataset.cat;
-    
-    e.target.classList.add('dragging');
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', JSON.stringify({
-      itemId: draggedItemId,
-      categoryId: draggedCategoryId
-    }));
-    
-    // Add visual feedback to all grids in the same category
-    const category = e.target.closest('.category');
-    const grid = category.querySelector('.grid');
-    grid.classList.add('drag-active');
-    
-    console.log("[Blockscape] drag start", draggedItemId, "from", draggedCategoryId);
-  }
+    // Drag and drop handlers
+    let draggedElement = null;
+    let draggedItemId = null;
+    let draggedCategoryId = null;
 
-  function handleDragEnd(e) {
-    e.target.classList.remove('dragging');
-    
-    // Remove visual feedback from all grids
-    app.querySelectorAll('.grid').forEach(grid => {
-      grid.classList.remove('drag-active');
-    });
-    
-    // Clear drag over states
-    app.querySelectorAll('.tile').forEach(tile => {
-      tile.classList.remove('drag-over');
-    });
-    
-    draggedElement = null;
-    draggedItemId = null;
-    draggedCategoryId = null;
-  }
+    function handleDragStart(e) {
+      draggedElement = e.target;
+      draggedItemId = e.target.dataset.id;
+      draggedCategoryId = e.target.closest('.category').dataset.cat;
 
-  function handleDragOver(e) {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-  }
+      e.target.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', JSON.stringify({
+        itemId: draggedItemId,
+        categoryId: draggedCategoryId
+      }));
 
-  function handleDragEnter(e) {
-    e.preventDefault();
-    const grid = e.target.closest('.grid');
-    if (grid) {
+      // Add visual feedback to all grids in the same category
+      const category = e.target.closest('.category');
+      const grid = category.querySelector('.grid');
       grid.classList.add('drag-active');
-    }
-  }
 
-  function handleDragLeave(e) {
-    // Only remove drag-active if we're leaving the grid entirely
-    const grid = e.target.closest('.grid');
-    if (grid && !grid.contains(e.relatedTarget)) {
-      grid.classList.remove('drag-active');
+      console.log("[Blockscape] drag start", draggedItemId, "from", draggedCategoryId);
     }
-  }
 
-  function handleDrop(e) {
-    e.preventDefault();
-    
-    const targetGrid = e.target.closest('.grid');
-    const targetCategory = targetGrid.closest('.category');
-    const targetCategoryId = targetCategory.dataset.cat;
-    
-    if (!draggedItemId || !targetCategoryId) return;
-    
-    // Only allow dropping within the same category
-    if (draggedCategoryId !== targetCategoryId) {
-      console.log("[Blockscape] drop rejected - different category");
-      return;
+    function handleDragEnd(e) {
+      e.target.classList.remove('dragging');
+
+      // Remove visual feedback from all grids
+      app.querySelectorAll('.grid').forEach(grid => {
+        grid.classList.remove('drag-active');
+      });
+
+      // Clear drag over states
+      app.querySelectorAll('.tile').forEach(tile => {
+        tile.classList.remove('drag-over');
+      });
+
+      draggedElement = null;
+      draggedItemId = null;
+      draggedCategoryId = null;
     }
-    
-    // Find the target position based on mouse position
-    const tiles = Array.from(targetGrid.querySelectorAll('.tile'));
-    const targetTile = tiles.find(tile => {
-      const rect = tile.getBoundingClientRect();
-      return e.clientY < rect.top + rect.height / 2;
-    });
-    
-    // Reorder items in the model
-    reorderItem(draggedItemId, targetTile ? targetTile.dataset.id : null, targetCategoryId);
-    
-    // Re-render to update the display
-    render();
-    
-    console.log("[Blockscape] drop completed", draggedItemId, "in", targetCategoryId);
-  }
 
-  function reorderItem(itemId, targetItemId, categoryId) {
-    const category = model.m.categories.find(cat => cat.id === categoryId);
-    if (!category) return;
-    
-    const itemIndex = category.items.findIndex(item => item.id === itemId);
-    if (itemIndex === -1) return;
-    
-    // Remove item from current position
-    const [movedItem] = category.items.splice(itemIndex, 1);
-    
-    if (targetItemId) {
-      // Insert before target item
-      const targetIndex = category.items.findIndex(item => item.id === targetItemId);
-      if (targetIndex !== -1) {
-        category.items.splice(targetIndex, 0, movedItem);
+    function handleDragOver(e) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+    }
+
+    function handleDragEnter(e) {
+      e.preventDefault();
+      const grid = e.target.closest('.grid');
+      if (grid) {
+        grid.classList.add('drag-active');
+      }
+    }
+
+    function handleDragLeave(e) {
+      // Only remove drag-active if we're leaving the grid entirely
+      const grid = e.target.closest('.grid');
+      if (grid && !grid.contains(e.relatedTarget)) {
+        grid.classList.remove('drag-active');
+      }
+    }
+
+    function handleDrop(e) {
+      e.preventDefault();
+
+      const targetGrid = e.target.closest('.grid');
+      const targetCategory = targetGrid.closest('.category');
+      const targetCategoryId = targetCategory.dataset.cat;
+
+      if (!draggedItemId || !targetCategoryId) return;
+
+      // Only allow dropping within the same category
+      if (draggedCategoryId !== targetCategoryId) {
+        console.log("[Blockscape] drop rejected - different category");
+        return;
+      }
+
+      // Find the target position based on mouse position
+      const tiles = Array.from(targetGrid.querySelectorAll('.tile'));
+      const targetTile = tiles.find(tile => {
+        const rect = tile.getBoundingClientRect();
+        return e.clientY < rect.top + rect.height / 2;
+      });
+
+      // Reorder items in the model
+      reorderItem(draggedItemId, targetTile ? targetTile.dataset.id : null, targetCategoryId);
+
+      // Re-render to update the display
+      render();
+
+      console.log("[Blockscape] drop completed", draggedItemId, "in", targetCategoryId);
+    }
+
+    function reorderItem(itemId, targetItemId, categoryId) {
+      const category = model.m.categories.find(cat => cat.id === categoryId);
+      if (!category) return;
+
+      const itemIndex = category.items.findIndex(item => item.id === itemId);
+      if (itemIndex === -1) return;
+
+      // Remove item from current position
+      const [movedItem] = category.items.splice(itemIndex, 1);
+
+      if (targetItemId) {
+        // Insert before target item
+        const targetIndex = category.items.findIndex(item => item.id === targetItemId);
+        if (targetIndex !== -1) {
+          category.items.splice(targetIndex, 0, movedItem);
+        } else {
+          category.items.push(movedItem);
+        }
       } else {
+        // Insert at end
         category.items.push(movedItem);
       }
-    } else {
-      // Insert at end
-      category.items.push(movedItem);
     }
-  }
 
-  // Controls
-  document.getElementById('load').onclick = () => {
-    try {
-      const parsed = parse(jsonBox.value);
-      model = parsed;
-      forward = parsed.fwd; reverse = parsed.rev; reused = parsed.reusedLocal;
-      render();
-    } catch (e) {
-      console.error("[Blockscape] load error:", e);
-      alert("JSON parse/render error (see console).");
-    }
-  };
+    // Controls
+    document.getElementById('load').onclick = () => {
+      try {
+        const parsed = parse(jsonBox.value);
+        model = parsed;
+        forward = parsed.fwd; reverse = parsed.rev; reused = parsed.reusedLocal;
+        render();
+      } catch (e) {
+        console.error("[Blockscape] load error:", e);
+        alert("JSON parse/render error (see console).");
+      }
+    };
 
-  document.getElementById('file').onchange = async (e) => {
-    const f = e.target.files[0]; if (!f) return;
-    const txt = await f.text();
-    jsonBox.value = txt;
-    document.getElementById('load').click();
-  };
+    document.getElementById('file').onchange = async (e) => {
+      const f = e.target.files[0]; if (!f) return;
+      const txt = await f.text();
+      jsonBox.value = txt;
+      document.getElementById('load').click();
+    };
 
-  document.getElementById('search').addEventListener('input', (e) => {
-    const q = e.target.value.trim().toLowerCase();
-    console.log("[Blockscape] search:", q);
-    app.querySelectorAll('.tile').forEach(t => {
-      const name = t.querySelector('.name').textContent.toLowerCase();
-      t.style.opacity = (!q || name.includes(q)) ? 1 : .2;
+    document.getElementById('search').addEventListener('input', (e) => {
+      const q = e.target.value.trim().toLowerCase();
+      console.log("[Blockscape] search:", q);
+      app.querySelectorAll('.tile').forEach(t => {
+        const name = t.querySelector('.name').textContent.toLowerCase();
+        t.style.opacity = (!q || name.includes(q)) ? 1 : .2;
+      });
     });
-  });
 
 
 
 
-  // Bootstrap: load seed
-  (function bootstrap(){
-    const parsed = parse(jsonBox.value);
-    model = parsed; forward = parsed.fwd; reverse = parsed.rev; reused = parsed.reusedLocal;
-    render();
-  })();
-</script>
+    // Bootstrap: load seed
+    (function bootstrap() {
+      const parsed = parse(jsonBox.value);
+      model = parsed; forward = parsed.fwd; reverse = parsed.rev; reused = parsed.reusedLocal;
+      render();
+    })();
+  </script>
 </body>
+
 </html>
