@@ -29,9 +29,12 @@
   .cat-head { display:flex; align-items:center; gap:.5rem; margin-bottom:.4rem; }
   .cat-title { font-size: 13px; font-weight:600; text-transform: uppercase; letter-spacing:.4px; color:#374151; }
   .grid { position:relative; display:grid; grid-auto-rows: var(--tile); grid-template-columns: repeat(auto-fill, minmax(var(--tile), 1fr)); gap: var(--gap); padding: var(--gap) 0; border-top:1px dashed #eaecef; }
-  .tile { position:relative; background:#fff; border:1px solid #e5e7eb; border-radius: var(--radius); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:.35rem; cursor:pointer; transition: box-shadow .15s ease, transform .05s ease, border-color .15s ease; }
+  .tile { position:relative; background:#fff; border:1px solid #e5e7eb; border-radius: var(--radius); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:.35rem; cursor:grab; transition: box-shadow .15s ease, transform .05s ease, border-color .15s ease; }
   .tile:hover { box-shadow: 0 2px 10px rgba(0,0,0,.06); }
   .tile:active { transform: translateY(1px); }
+  .tile.dragging { opacity: 0.5; cursor: grabbing; transform: rotate(5deg); }
+  .tile.drag-over { border-color: var(--dep); box-shadow: 0 0 0 2px var(--dep) inset; }
+  .grid.drag-active { background: rgba(29, 78, 216, 0.05); }
   .logo { width: 44px; height: 44px; object-fit: contain; opacity:.95; }
   .name { font-size: 11px; text-align:center; line-height:1.1; padding: 0 .35rem .25rem; }
   .badge { position:absolute; top:6px; right:6px; font-size:10px; background:#fff7ed; color:var(--reused); border:1px solid #fed7aa; border-radius:999px; padding:.05rem .35rem; display:none; }
@@ -58,7 +61,7 @@
   <label class="pill">JSON file <input id="file" type="file" accept=".json,.txt" /></label>
   <button id="clear">Clear selection</button>
   <div class="legend">
-    <span><span class="dot ddep"></span> deps</span>
+    <span><span class="dot ddep"></span> enables</span>
     <span><span class="dot drev"></span> dependents</span>
     <span><span class="dot dreused"></span> reused</span>
     <span><span class="dot dext"></span> external</span>
@@ -89,10 +92,10 @@
         "id": "site-k8s",
         "name": "Kubernetes Site", 
         "logo": "logos/k8s.svg",
-        "deps": ["link", "collector", "listener"]
-      },  { "id": "site-podman",  "name": "Podman Site",     "logo": "logos/Podman.svg", "deps": ["link", "collector", "listener"] },
-        { "id": "site-docker",  "name": "Docker Site",     "logo": "logos/Docker.svg", "deps": ["link", "collector", "listener"] },
-        { "id": "site-systemd", "name": "systemd Site",    "logo": "logos/systemd.svg", "deps": ["link", "collector", "listener"] }
+        "deps": ["link", "connector", "attachedconnector", "listener"]
+      },  { "id": "site-podman",  "name": "Podman Site",     "logo": "logos/Podman.svg", "deps": ["link", "connector", "listener"] },
+        { "id": "site-docker",  "name": "Docker Site",     "logo": "logos/Docker.svg", "deps": ["link", "connector", "listener"] },
+        { "id": "site-systemd", "name": "systemd Site",    "logo": "logos/systemd.svg", "deps": ["link", "connector", "listener"] }
       ]
     },
     {
@@ -107,16 +110,17 @@
       "id": "exposure",
       "title": "Exposing services",
       "items": [
-        { "id": "collector", "name": "Collector", "logo": "logos/skupper-logo.svg", "deps": ["server"] },
-        { "id": "listener",  "name": "Listener", "logo": "logos/skupper-logo.svg",  "deps": ["client"] }
+        { "id": "connector", "name": "connector", "logo": "logos/skupper-logo.svg", "deps": ["server"] },
+        { "id": "listener",  "name": "Listener", "logo": "logos/skupper-logo.svg",  "deps": ["client"] },
+        { "id": "attachedconnector",  "name": "Attached connector", "logo": "logos/skupper-logo.svg",  "deps": ["server"] }
       ]
     },
     {
       "id": "endpoints",
       "title": "Endpoints",
       "items": [
-        { "id": "client", "name": "Client", "deps": [] },
-        { "id": "server", "name": "Server", "deps": [] }
+        { "id": "server", "name": "Server", "deps": [] },
+        { "id": "client", "name": "Client", "deps": [] }
       ]
     }
   ],
@@ -283,7 +287,20 @@
       t.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); t.click(); }
       });
+      
+      // Drag and drop events
+      t.draggable = true;
+      t.addEventListener('dragstart', handleDragStart);
+      t.addEventListener('dragend', handleDragEnd);
     });
+    
+    app.querySelectorAll('.grid').forEach(grid => {
+      grid.addEventListener('dragover', handleDragOver);
+      grid.addEventListener('drop', handleDrop);
+      grid.addEventListener('dragenter', handleDragEnter);
+      grid.addEventListener('dragleave', handleDragLeave);
+    });
+    
     window.addEventListener('resize', () => { reflowRects(); drawLinks(); });
     document.getElementById('clear').onclick = () => clearSelection();
   }
@@ -349,6 +366,125 @@
   function center(r) { return { x: r.left + r.width/2, y: r.top + r.height/2 }; }
 
   function escapeHtml(s){ return s.replace(/[&<>"']/g, (m)=>({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;" }[m])); }
+
+  // Drag and drop handlers
+  let draggedElement = null;
+  let draggedItemId = null;
+  let draggedCategoryId = null;
+
+  function handleDragStart(e) {
+    draggedElement = e.target;
+    draggedItemId = e.target.dataset.id;
+    draggedCategoryId = e.target.closest('.category').dataset.cat;
+    
+    e.target.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', JSON.stringify({
+      itemId: draggedItemId,
+      categoryId: draggedCategoryId
+    }));
+    
+    // Add visual feedback to all grids in the same category
+    const category = e.target.closest('.category');
+    const grid = category.querySelector('.grid');
+    grid.classList.add('drag-active');
+    
+    console.log("[Blockscape] drag start", draggedItemId, "from", draggedCategoryId);
+  }
+
+  function handleDragEnd(e) {
+    e.target.classList.remove('dragging');
+    
+    // Remove visual feedback from all grids
+    app.querySelectorAll('.grid').forEach(grid => {
+      grid.classList.remove('drag-active');
+    });
+    
+    // Clear drag over states
+    app.querySelectorAll('.tile').forEach(tile => {
+      tile.classList.remove('drag-over');
+    });
+    
+    draggedElement = null;
+    draggedItemId = null;
+    draggedCategoryId = null;
+  }
+
+  function handleDragOver(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  }
+
+  function handleDragEnter(e) {
+    e.preventDefault();
+    const grid = e.target.closest('.grid');
+    if (grid) {
+      grid.classList.add('drag-active');
+    }
+  }
+
+  function handleDragLeave(e) {
+    // Only remove drag-active if we're leaving the grid entirely
+    const grid = e.target.closest('.grid');
+    if (grid && !grid.contains(e.relatedTarget)) {
+      grid.classList.remove('drag-active');
+    }
+  }
+
+  function handleDrop(e) {
+    e.preventDefault();
+    
+    const targetGrid = e.target.closest('.grid');
+    const targetCategory = targetGrid.closest('.category');
+    const targetCategoryId = targetCategory.dataset.cat;
+    
+    if (!draggedItemId || !targetCategoryId) return;
+    
+    // Only allow dropping within the same category
+    if (draggedCategoryId !== targetCategoryId) {
+      console.log("[Blockscape] drop rejected - different category");
+      return;
+    }
+    
+    // Find the target position based on mouse position
+    const tiles = Array.from(targetGrid.querySelectorAll('.tile'));
+    const targetTile = tiles.find(tile => {
+      const rect = tile.getBoundingClientRect();
+      return e.clientY < rect.top + rect.height / 2;
+    });
+    
+    // Reorder items in the model
+    reorderItem(draggedItemId, targetTile ? targetTile.dataset.id : null, targetCategoryId);
+    
+    // Re-render to update the display
+    render();
+    
+    console.log("[Blockscape] drop completed", draggedItemId, "in", targetCategoryId);
+  }
+
+  function reorderItem(itemId, targetItemId, categoryId) {
+    const category = model.m.categories.find(cat => cat.id === categoryId);
+    if (!category) return;
+    
+    const itemIndex = category.items.findIndex(item => item.id === itemId);
+    if (itemIndex === -1) return;
+    
+    // Remove item from current position
+    const [movedItem] = category.items.splice(itemIndex, 1);
+    
+    if (targetItemId) {
+      // Insert before target item
+      const targetIndex = category.items.findIndex(item => item.id === targetItemId);
+      if (targetIndex !== -1) {
+        category.items.splice(targetIndex, 0, movedItem);
+      } else {
+        category.items.push(movedItem);
+      }
+    } else {
+      // Insert at end
+      category.items.push(movedItem);
+    }
+  }
 
   // Controls
   document.getElementById('load').onclick = () => {
