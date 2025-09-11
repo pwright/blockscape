@@ -83,7 +83,7 @@
   "categories": [
     {
       "id": "sites",
-      "title": "Sites",
+      "title": "Router sites",
       "items": [
       {
         "id": "site-k8s",
@@ -96,17 +96,24 @@
       ]
     },
     {
-      "id": "runtime",
-      "title": "Runtime Primitives",
+      "id": "links",
+      "title": "Linking sites",
       "items": [
-        { "id": "link",      "name": "Link",      "deps": [] },
-        { "id": "collector", "name": "Collector", "deps": ["server"] },
-        { "id": "listener",  "name": "Listener",  "deps": ["client"] }
+        { "id": "tokens",      "name": "Token issue and redeem",   "logo": "logos/skupper-logo.svg",    "deps": ["link"] },
+        { "id": "link", "name": "Link", "logo": "logos/skupper-logo.svg", "deps": [] }
       ]
     },
     {
-      "id": "roles",
-      "title": "Endpoint Roles",
+      "id": "exposure",
+      "title": "Exposing services",
+      "items": [
+        { "id": "collector", "name": "Collector", "logo": "logos/skupper-logo.svg", "deps": ["server"] },
+        { "id": "listener",  "name": "Listener", "logo": "logos/skupper-logo.svg",  "deps": ["client"] }
+      ]
+    },
+    {
+      "id": "endpoints",
+      "title": "Endpoints",
       "items": [
         { "id": "client", "name": "Client", "deps": [] },
         { "id": "server", "name": "Server", "deps": [] }
