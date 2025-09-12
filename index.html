@@ -3,7 +3,7 @@
 
 <head>
   <meta charset="utf-8" />
-  <title>Blockscape — simple landscape-style tiles</title>
+  <title>Blockscape — landscape tiles with WTG mapping</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
     :root {
@@ -15,17 +15,13 @@
       --bg: #fff;
       --line: #e5e7eb;
       --dep: #1d4ed8;
-      /* downstream deps */
       --revdep: #b91c1c;
-      /* upstream dependents */
       --reused: #b45309;
-      /* reused badge */
       --external: #6b7280;
-      /* external border */
+      --cols: 24; /* number of evolution columns in map mode */
     }
 
-    html,
-    body {
+    html, body {
       height: 100%;
       margin: 0;
       background: var(--bg);
@@ -61,8 +57,7 @@
       width: 260px;
     }
 
-    button,
-    label.pill {
+    button, label.pill {
       height: 32px;
       padding: 0 .75rem;
       background: #f9fafb;
@@ -71,17 +66,11 @@
       cursor: pointer;
     }
 
-    .pill input[type=file] {
-      display: none;
-    }
+    .pill input[type=file] { display: none; }
 
-    main {
-      padding: .75rem;
-    }
+    main { padding: .75rem; }
 
-    .category {
-      margin: .75rem 0 1.25rem 0;
-    }
+    .category { margin: .75rem 0 1.25rem 0; }
 
     .cat-head {
       display: flex;
@@ -98,6 +87,7 @@
       color: #374151;
     }
 
+    /* Default grid (unmapped / landscape) */
     .grid {
       position: relative;
       display: grid;
@@ -106,6 +96,14 @@
       gap: var(--gap);
       padding: var(--gap) 0;
       border-top: 1px dashed #eaecef;
+      align-items: stretch;
+    }
+
+    /* Map mode grid: fixed columns across evolution axis */
+    .grid.map-mode {
+      grid-template-columns: repeat(var(--cols), minmax(44px, 1fr));
+      grid-auto-rows: var(--tile);
+      grid-auto-flow: dense; /* allow explicit placements to pack cleanly */
     }
 
     .tile {
@@ -122,132 +120,43 @@
       transition: box-shadow .15s ease, transform .05s ease, border-color .15s ease;
     }
 
-    .tile:hover {
-      box-shadow: 0 2px 10px rgba(0, 0, 0, .06);
-    }
+    .tile:hover { box-shadow: 0 2px 10px rgba(0, 0, 0, .06); }
+    .tile:active { transform: translateY(1px); }
+    .tile.dragging { opacity: 0.5; cursor: grabbing; transform: rotate(5deg); }
+    .tile.drag-over { border-color: var(--dep); box-shadow: 0 0 0 2px var(--dep) inset; }
+    .grid.drag-active { background: rgba(29, 78, 216, 0.05); }
 
-    .tile:active {
-      transform: translateY(1px);
-    }
+    /* Disable dragging UX in map mode */
+    .grid.map-mode .tile { cursor: default; }
 
-    .tile.dragging {
-      opacity: 0.5;
-      cursor: grabbing;
-      transform: rotate(5deg);
-    }
-
-    .tile.drag-over {
-      border-color: var(--dep);
-      box-shadow: 0 0 0 2px var(--dep) inset;
-    }
-
-    .grid.drag-active {
-      background: rgba(29, 78, 216, 0.05);
-    }
-
-    .logo {
-      width: 44px;
-      height: 44px;
-      object-fit: contain;
-      opacity: .95;
-    }
-
-    .name {
-      font-size: 11px;
-      text-align: center;
-      line-height: 1.1;
-      padding: 0 .35rem .25rem;
-    }
+    .logo { width: 44px; height: 44px; object-fit: contain; opacity: .95; }
+    .name { font-size: 11px; text-align: center; line-height: 1.1; padding: 0 .35rem .25rem; }
 
     .badge {
-      position: absolute;
-      top: 6px;
-      right: 6px;
-      font-size: 10px;
-      background: #fff7ed;
-      color: var(--reused);
-      border: 1px solid #fed7aa;
-      border-radius: 999px;
-      padding: .05rem .35rem;
-      display: none;
+      position: absolute; top: 6px; right: 6px;
+      font-size: 10px; background: #fff7ed; color: var(--reused);
+      border: 1px solid #fed7aa; border-radius: 999px; padding: .05rem .35rem; display: none;
     }
+    .tile.reused .badge { display: inline-block; }
 
-    .tile.reused .badge {
-      display: inline-block;
-    }
+    .tile.external { border-style: dashed; border-color: #cbd5e1; color: #374151; }
+    .tile.dep { box-shadow: 0 0 0 2px var(--dep) inset; border-color: var(--dep); }
+    .tile.revdep { box-shadow: 0 0 0 2px var(--revdep) inset; border-color: var(--revdep); }
+    .tile.selected { outline: 2px solid #111827; outline-offset: 1px; }
+    .muted { color: var(--muted); }
 
-    .tile.external {
-      border-style: dashed;
-      border-color: #cbd5e1;
-      color: #374151;
-    }
-
-    .tile.dep {
-      box-shadow: 0 0 0 2px var(--dep) inset;
-      border-color: var(--dep);
-    }
-
-    .tile.revdep {
-      box-shadow: 0 0 0 2px var(--revdep) inset;
-      border-color: var(--revdep);
-    }
-
-    .tile.selected {
-      outline: 2px solid #111827;
-      outline-offset: 1px;
-    }
-
-    .muted {
-      color: var(--muted);
-    }
-
-    .svg-layer {
-      position: absolute;
-      inset: 0;
-      pointer-events: none;
-    }
+    .svg-layer { position: absolute; inset: 0; pointer-events: none; }
 
     .legend {
-      margin-left: auto;
-      font-size: 12px;
-      color: #374151;
-      display: flex;
-      gap: .5rem;
-      align-items: center;
+      margin-left: auto; font-size: 12px; color: #374151;
+      display: flex; gap: .5rem; align-items: center;
     }
-
-    .dot {
-      width: .7rem;
-      height: .7rem;
-      border-radius: 50%;
-      display: inline-block;
-      border: 1px solid #999;
-    }
-
-    .ddep {
-      background: #dbeafe;
-      border-color: var(--dep);
-    }
-
-    .drev {
-      background: #fee2e2;
-      border-color: var(--revdep);
-    }
-
-    .dreused {
-      background: #ffedd5;
-      border-color: var(--reused);
-    }
-
-    .dext {
-      background: #f3f4f6;
-      border-color: var(--external);
-    }
-
-    .sr-only {
-      position: absolute;
-      left: -10000px;
-    }
+    .dot { width: .7rem; height: .7rem; border-radius: 50%; display: inline-block; border: 1px solid #999; }
+    .ddep { background: #dbeafe; border-color: var(--dep); }
+    .drev { background: #fee2e2; border-color: var(--revdep); }
+    .dreused { background: #ffedd5; border-color: var(--reused); }
+    .dext { background: #f3f4f6; border-color: var(--external); }
+    .sr-only { position: absolute; left: -10000px; }
   </style>
 </head>
 
@@ -256,6 +165,7 @@
     <h1>Blockscape</h1>
     <input id="search" type="text" placeholder="Search…" />
     <label class="pill">JSON file <input id="file" type="file" accept=".json,.txt" /></label>
+    <button id="mapbtn" aria-pressed="false" title="Toggle Wardley mapping">Map</button>
     <button id="clear">Clear selection</button>
     <div class="legend">
       <span><span class="dot ddep"></span> enables</span>
@@ -268,7 +178,7 @@
   <details style="margin:.5rem .75rem;">
     <summary style="cursor:pointer;">Paste JSON here (schema below)</summary>
     <div class="muted" style="font-size:12px;margin:.25rem 0 .5rem 0">
-      Schema: <code>{ categories:[{id, title, items:[{id,name,logo?,external?,deps:[] }]}] }</code>
+      Schema: <code>{ categories:[{id, title, items:[{id,name,logo?,external?,deps:[], wtg? }]}] }</code>
     </div>
     <div style="display:flex;gap:.5rem;align-items:flex-start;">
       <textarea id="jsonBox"
@@ -282,58 +192,63 @@
   <main id="app" aria-live="polite"></main>
 
   <template id="seed">
+{
+  "categories": [
     {
-    "categories": [
-    
-    {
-    "id": "endpoints",
-    "title": "Endpoints",
-    "items": [
-    { "id": "server", "name": "Server", "deps": [] },
-    { "id": "client", "name": "Client", "deps": [] }
-    ]
+      "id": "endpoints",
+      "title": "Endpoints",
+      "items": [
+        { "id": "server", "name": "Server", "deps": [], "wtg": "|x...|...|...|...|" },
+        { "id": "client", "name": "Client", "deps": [], "wtg": "|...|x..|...|...|" }
+      ]
     },
     {
-    "id": "exposure",
-    "title": "Exposing services",
-    "items": [
-    { "id": "connector", "name": "connector", "logo": "logos/skupper-logo.svg", "deps": ["server"] },
-    { "id": "listener", "name": "Listener", "logo": "logos/skupper-logo.svg", "deps": ["client"] },
-    { "id": "attachedconnector", "name": "Attached connector", "logo": "logos/skupper-logo.svg", "deps": ["server"] }
-    ]
+      "id": "exposure",
+      "title": "Exposing services",
+      "items": [
+        { "id": "connector", "name": "connector", "logo": "logos/skupper-logo.svg", "deps": ["server"], "wtg": "--x---" },
+        { "id": "listener", "name": "Listener", "logo": "logos/skupper-logo.svg", "deps": ["client"], "wtg": "---x--" },
+        { "id": "attachedconnector", "name": "Attached connector", "logo": "logos/skupper-logo.svg", "deps": ["server"], "wtg": "----x-" }
+      ]
     },
     {
-    "id": "links",
-    "title": "Linking sites",
-    "items": [
-    
-    { "id": "tokenissue", "name": "Token issue", "logo": "logos/skupper-logo.svg", "deps": [] },
-    { "id": "tokenredeem", "name": "Token redeem", "logo": "logos/skupper-logo.svg", "deps": ["link"] },
-    { "id": "link", "name": "Link", "logo": "logos/skupper-logo.svg", "deps": [] }
-    ]
+      "id": "links",
+      "title": "Linking sites",
+      "items": [
+        { "id": "tokenissue", "name": "Token issue", "logo": "logos/skupper-logo.svg", "deps": [], "wtg": "|..x.|...|...|...|" },
+        { "id": "tokenredeem", "name": "Token redeem", "logo": "logos/skupper-logo.svg", "deps": ["link"], "wtg": "|...|..x|...|...|" },
+        { "id": "link", "name": "Link", "logo": "logos/skupper-logo.svg", "deps": [], "wtg": "-----x" }
+      ]
     },
     {
-    "id": "sites", "title": "Router sites",
-    "items": [
-    { "id": "site-k8s", "name": "Kubernetes Site", "logo": "logos/k8s.svg", "deps": ["link", "connector",
-    "attachedconnector", "listener", "tokenissue", "tokenredeem"]
-    }, { "id": "site-podman", "name": "Podman Site", "logo": "logos/Podman.svg", "deps": ["link", "connector",
-    "listener", "tokenredeem"] },
-    { "id": "site-docker", "name": "Docker Site", "logo": "logos/Docker.svg", "deps": ["link", "connector", "listener", "tokenredeem"]
-    },
-    { "id": "site-systemd", "name": "systemd Site", "logo": "logos/systemd.svg", "deps": ["link", "connector",
-    "listener", "tokenredeem"] }
-    ]
+      "id": "sites",
+      "title": "Router sites",
+      "items": [
+        { "id": "site-k8s", "name": "Kubernetes Site", "logo": "logos/k8s.svg",
+          "deps": ["link","connector","attachedconnector","listener","tokenissue","tokenredeem"],
+          "wtg": "|...|...|.x.|...|" },
+        { "id": "site-podman", "name": "Podman Site", "logo": "logos/Podman.svg",
+          "deps": ["link","connector","listener","tokenredeem"],
+          "wtg": "|...|...|..x|...|" },
+        { "id": "site-docker", "name": "Docker Site", "logo": "logos/Docker.svg",
+          "deps": ["link","connector","listener","tokenredeem"],
+          "wtg": "----x-" },
+        { "id": "site-systemd", "name": "systemd Site", "logo": "logos/systemd.svg",
+          "deps": ["link","connector","listener","tokenredeem"],
+          "wtg": "-----x" }
+      ]
     }
-    ]
-    
-    }
+  ]
+}
   </template>
 
   <svg id="overlay" class="svg-layer"></svg>
 
   <script>
     console.log("[Blockscape] init");
+
+    const WTG_COLUMNS = 24; // evolution resolution across the width
+    let isMapped = false;
 
     const jsonBox = document.getElementById('jsonBox');
     jsonBox.value = document.getElementById('seed').innerHTML.trim();
@@ -342,16 +257,15 @@
     const overlay = document.getElementById('overlay');
 
     let model = null;
-    let index = new Map();        // id -> {el, catId, rect}
-    let reverse = new Map();      // id -> Set(dependents)
-    let forward = new Map();      // id -> Set(deps)
-    let reused = new Set();       // nodes with in-degree >= 2
+    let index = new Map();   // id -> {el, catId, rect}
+    let reverse = new Map(); // id -> Set(dependents)
+    let forward = new Map(); // id -> Set(deps)
+    let reused = new Set();  // nodes with in-degree >= 2
     let selection = null;
 
     function parse(txt) {
       console.log("[Blockscape] parsing json length=", txt.length);
       const m = JSON.parse(txt);
-      // Normalize: build adjacency from items.deps + top-level links (optional)
       const fwd = new Map();
       const rev = new Map();
       const seen = new Set();
@@ -367,7 +281,6 @@
         });
       }));
 
-      // compute reused (in-degree>=2)
       const reusedLocal = new Set();
       rev.forEach((dependents, node) => { if ((dependents?.size || 0) >= 2) reusedLocal.add(node); });
 
@@ -376,40 +289,47 @@
 
     function generateLetterImage(text) {
       const canvas = document.createElement('canvas');
-      const size = 44; // Match the logo size
-      canvas.width = size;
-      canvas.height = size;
+      const size = 44;
+      canvas.width = size; canvas.height = size;
       const ctx = canvas.getContext('2d');
-
-      // Background circle
       ctx.fillStyle = '#f3f4f6';
-      ctx.beginPath();
-      ctx.arc(size / 2, size / 2, size / 2 - 2, 0, 2 * Math.PI);
-      ctx.fill();
-
-      // Border
-      ctx.strokeStyle = '#d1d5db';
-      ctx.lineWidth = 1;
-      ctx.stroke();
-
-      // Text
+      ctx.beginPath(); ctx.arc(size/2, size/2, size/2 - 2, 0, 2*Math.PI); ctx.fill();
+      ctx.strokeStyle = '#d1d5db'; ctx.lineWidth = 1; ctx.stroke();
       const letter = text.charAt(0).toUpperCase();
       ctx.fillStyle = '#6b7280';
       ctx.font = `bold ${size * 0.5}px system-ui, -apple-system, sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(letter, size / 2, size / 2);
-
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(letter, size/2, size/2);
       return canvas.toDataURL('image/png');
     }
 
+    function wtgFraction(wtg) {
+      if (!wtg) return null;
+      let s = String(wtg).trim();
+      if (!s) return null;
+      // Allow full WTG bars or compact form like --x---
+      // Keep only fillers (.-), x/X; drop pipes and spaces
+      s = s.replace(/\|/g, '').replace(/[^\.\-xX]/g, '');
+      const idx = s.indexOf('x') !== -1 ? s.indexOf('x') : s.indexOf('X');
+      if (idx < 0) return null;
+      const n = s.length;
+      if (n <= 1) return 0;
+      const frac = idx / (n - 1);
+      return Math.max(0, Math.min(1, frac));
+    }
+
+    function colFromWTG(wtg, cols) {
+      const f = wtgFraction(wtg);
+      if (f === null) return null;
+      const col = 1 + Math.round(f * (cols - 1));
+      return Math.max(1, Math.min(cols, col));
+    }
+
     function render() {
-      console.log("[Blockscape] rendering categories=", model.m.categories.length);
+      console.log("[Blockscape] rendering categories=", model.m.categories.length, "mapped=", isMapped);
       app.innerHTML = "";
       index.clear();
 
-      // container for overlay sizing
-      const containerRect = app.getBoundingClientRect();
       overlay.setAttribute("width", window.innerWidth);
       overlay.setAttribute("height", window.innerHeight);
 
@@ -420,30 +340,35 @@
 
         const head = document.createElement('div');
         head.className = 'cat-head';
-        head.innerHTML = `<div class="cat-title">${escapeHtml(cat.title || cat.id)}</div>
-                        <div class="muted" style="font-size:12px">${cat.items.length} items</div>`;
+
+        const count = document.createElement('div');
+        count.className = 'muted';
+        count.style.fontSize = '12px';
+        count.textContent = `${cat.items.length} items`;
+
+        head.innerHTML = `<div class="cat-title">${escapeHtml(cat.title || cat.id)}</div>`;
+        head.appendChild(count);
         section.appendChild(head);
 
         const grid = document.createElement('div');
-        grid.className = 'grid';
+        grid.className = 'grid' + (isMapped ? ' map-mode' : '');
+        grid.style.setProperty('--cols', WTG_COLUMNS);
         section.appendChild(grid);
+
+        // In map mode, we stack tiles vertically when they share the same column.
+        const colHeights = new Map(); // col -> next available row index (1-based)
 
         cat.items.forEach(it => {
           const tile = document.createElement('div');
           tile.className = 'tile' + (it.external ? ' external' : '');
           tile.tabIndex = 0;
           tile.dataset.id = it.id;
+          if (it.wtg) tile.title = `WTG: ${it.wtg}`;
 
           const img = document.createElement('img');
           img.className = 'logo';
-          if (it.logo) {
-            img.src = it.logo;
-            img.alt = it.name;
-          } else {
-            img.alt = "";
-            img.style.opacity = .2;
-            img.src = generateLetterImage(it.name || it.id);
-          }
+          if (it.logo) { img.src = it.logo; img.alt = it.name; }
+          else { img.alt = ""; img.style.opacity = .2; img.src = generateLetterImage(it.name || it.id); }
 
           const nm = document.createElement('div');
           nm.className = 'name';
@@ -457,6 +382,20 @@
           tile.appendChild(nm);
           tile.appendChild(badge);
           grid.appendChild(tile);
+
+          // Explicit placement in map mode
+          if (isMapped) {
+            const col = colFromWTG(it.wtg, WTG_COLUMNS);
+            if (col !== null) {
+              const row = (colHeights.get(col) || 1);
+              colHeights.set(col, row + 1);
+              tile.style.gridColumn = `${col} / span 1`;
+              tile.style.gridRow = `${row}`;
+              console.log(`[Blockscape] place "${it.id}" wtg="${it.wtg}" -> frac=${wtgFraction(it.wtg)} col=${col} row=${row}`);
+            } else {
+              console.log(`[Blockscape] "${it.id}" has no valid wtg, placing by flow`);
+            }
+          }
 
           index.set(it.id, { el: tile, catId: cat.id, rect: null });
         });
@@ -475,7 +414,7 @@
 
       wireEvents();
       reflowRects();
-      drawLinks(); // initial draw (none selected)
+      drawLinks();
     }
 
     function wireEvents() {
@@ -490,28 +429,28 @@
           if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); t.click(); }
         });
 
-        // Drag and drop events
-        t.draggable = true;
-        t.addEventListener('dragstart', handleDragStart);
-        t.addEventListener('dragend', handleDragEnd);
+        // Drag only when NOT in map mode
+        t.draggable = !isMapped;
+        if (!isMapped) {
+          t.addEventListener('dragstart', handleDragStart);
+          t.addEventListener('dragend', handleDragEnd);
+        }
       });
 
       app.querySelectorAll('.grid').forEach(grid => {
-        grid.addEventListener('dragover', handleDragOver);
-        grid.addEventListener('drop', handleDrop);
-        grid.addEventListener('dragenter', handleDragEnter);
-        grid.addEventListener('dragleave', handleDragLeave);
+        if (!isMapped) {
+          grid.addEventListener('dragover', handleDragOver);
+          grid.addEventListener('drop', handleDrop);
+          grid.addEventListener('dragenter', handleDragEnter);
+          grid.addEventListener('dragleave', handleDragLeave);
+        }
       });
 
       window.addEventListener('resize', () => { reflowRects(); drawLinks(); });
       document.getElementById('clear').onclick = () => clearSelection();
     }
 
-    function reflowRects() {
-      index.forEach((v, id) => {
-        v.rect = v.el.getBoundingClientRect();
-      });
-    }
+    function reflowRects() { index.forEach((v) => { v.rect = v.el.getBoundingClientRect(); }); }
 
     function select(id) {
       selection = id;
@@ -527,18 +466,10 @@
       drawLinks();
     }
 
-    function clearSelection() {
-      selection = null;
-      clearStyles();
-      drawLinks();
-    }
-
-    function clearStyles() {
-      app.querySelectorAll('.tile').forEach(t => t.classList.remove('dep', 'revdep', 'selected'));
-    }
+    function clearSelection() { selection = null; clearStyles(); drawLinks(); }
+    function clearStyles() { app.querySelectorAll('.tile').forEach(t => t.classList.remove('dep','revdep','selected')); }
 
     function drawLinks() {
-      // Draw subtle connectors only for current selection to keep it readable.
       while (overlay.firstChild) overlay.removeChild(overlay.firstChild);
       if (!selection) return;
 
@@ -565,14 +496,11 @@
       });
     }
 
-    function center(r) { return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }
-
+    function center(r) { return { x: r.left + r.width/2, y: r.top + r.height/2 }; }
     function escapeHtml(s) { return s.replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[m])); }
 
-    // Drag and drop handlers
-    let draggedElement = null;
-    let draggedItemId = null;
-    let draggedCategoryId = null;
+    // Drag and drop handlers (disabled in map mode)
+    let draggedElement = null, draggedItemId = null, draggedCategoryId = null;
 
     function handleDragStart(e) {
       draggedElement = e.target;
@@ -581,12 +509,8 @@
 
       e.target.classList.add('dragging');
       e.dataTransfer.effectAllowed = 'move';
-      e.dataTransfer.setData('text/plain', JSON.stringify({
-        itemId: draggedItemId,
-        categoryId: draggedCategoryId
-      }));
+      e.dataTransfer.setData('text/plain', JSON.stringify({ itemId: draggedItemId, categoryId: draggedCategoryId }));
 
-      // Add visual feedback to all grids in the same category
       const category = e.target.closest('.category');
       const grid = category.querySelector('.grid');
       grid.classList.add('drag-active');
@@ -596,71 +520,41 @@
 
     function handleDragEnd(e) {
       e.target.classList.remove('dragging');
-
-      // Remove visual feedback from all grids
-      app.querySelectorAll('.grid').forEach(grid => {
-        grid.classList.remove('drag-active');
-      });
-
-      // Clear drag over states
-      app.querySelectorAll('.tile').forEach(tile => {
-        tile.classList.remove('drag-over');
-      });
-
-      draggedElement = null;
-      draggedItemId = null;
-      draggedCategoryId = null;
+      app.querySelectorAll('.grid').forEach(grid => grid.classList.remove('drag-active'));
+      app.querySelectorAll('.tile').forEach(tile => tile.classList.remove('drag-over'));
+      draggedElement = null; draggedItemId = null; draggedCategoryId = null;
     }
 
-    function handleDragOver(e) {
-      e.preventDefault();
-      e.dataTransfer.dropEffect = 'move';
-    }
-
+    function handleDragOver(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }
     function handleDragEnter(e) {
       e.preventDefault();
       const grid = e.target.closest('.grid');
-      if (grid) {
-        grid.classList.add('drag-active');
-      }
+      if (grid) grid.classList.add('drag-active');
     }
-
     function handleDragLeave(e) {
-      // Only remove drag-active if we're leaving the grid entirely
       const grid = e.target.closest('.grid');
-      if (grid && !grid.contains(e.relatedTarget)) {
-        grid.classList.remove('drag-active');
-      }
+      if (grid && !grid.contains(e.relatedTarget)) grid.classList.remove('drag-active');
     }
 
     function handleDrop(e) {
       e.preventDefault();
-
       const targetGrid = e.target.closest('.grid');
       const targetCategory = targetGrid.closest('.category');
       const targetCategoryId = targetCategory.dataset.cat;
-
       if (!draggedItemId || !targetCategoryId) return;
 
-      // Only allow dropping within the same category
       if (draggedCategoryId !== targetCategoryId) {
-        console.log("[Blockscape] drop rejected - different category");
-        return;
+        console.log("[Blockscape] drop rejected - different category"); return;
       }
 
-      // Find the target position based on mouse position
       const tiles = Array.from(targetGrid.querySelectorAll('.tile'));
       const targetTile = tiles.find(tile => {
         const rect = tile.getBoundingClientRect();
         return e.clientY < rect.top + rect.height / 2;
       });
 
-      // Reorder items in the model
       reorderItem(draggedItemId, targetTile ? targetTile.dataset.id : null, targetCategoryId);
-
-      // Re-render to update the display
       render();
-
       console.log("[Blockscape] drop completed", draggedItemId, "in", targetCategoryId);
     }
 
@@ -671,19 +565,12 @@
       const itemIndex = category.items.findIndex(item => item.id === itemId);
       if (itemIndex === -1) return;
 
-      // Remove item from current position
       const [movedItem] = category.items.splice(itemIndex, 1);
-
       if (targetItemId) {
-        // Insert before target item
         const targetIndex = category.items.findIndex(item => item.id === targetItemId);
-        if (targetIndex !== -1) {
-          category.items.splice(targetIndex, 0, movedItem);
-        } else {
-          category.items.push(movedItem);
-        }
+        if (targetIndex !== -1) category.items.splice(targetIndex, 0, movedItem);
+        else category.items.push(movedItem);
       } else {
-        // Insert at end
         category.items.push(movedItem);
       }
     }
@@ -692,8 +579,7 @@
     document.getElementById('load').onclick = () => {
       try {
         const parsed = parse(jsonBox.value);
-        model = parsed;
-        forward = parsed.fwd; reverse = parsed.rev; reused = parsed.reusedLocal;
+        model = parsed; forward = parsed.fwd; reverse = parsed.rev; reused = parsed.reusedLocal;
         render();
       } catch (e) {
         console.error("[Blockscape] load error:", e);
@@ -717,8 +603,14 @@
       });
     });
 
-
-
+    document.getElementById('mapbtn').addEventListener('click', () => {
+      isMapped = !isMapped;
+      const btn = document.getElementById('mapbtn');
+      btn.textContent = isMapped ? "Unmap" : "Map";
+      btn.setAttribute('aria-pressed', isMapped ? 'true' : 'false');
+      console.log("[Blockscape] map mode toggled:", isMapped);
+      render();
+    });
 
     // Bootstrap: load seed
     (function bootstrap() {
@@ -728,5 +620,4 @@
     })();
   </script>
 </body>
-
 </html>
