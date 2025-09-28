@@ -15,13 +15,9 @@
       --bg: #fff;
       --line: #e5e7eb;
       --dep: #1d4ed8;
-      /* downstream deps */
       --revdep: #b91c1c;
-      /* upstream dependents */
       --reused: #b45309;
-      /* reused badge */
       --external: #6b7280;
-      /* external border */
     }
 
     html,
@@ -44,6 +40,7 @@
       align-items: center;
       gap: .5rem;
       z-index: 10;
+      flex-wrap: wrap;
     }
 
     header h1 {
@@ -58,7 +55,16 @@
       padding: 0 .5rem;
       border: 1px solid var(--line);
       border-radius: 999px;
-      width: 260px;
+      width: 220px;
+    }
+
+    select {
+      height: 32px;
+      padding: 0 .5rem;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fff;
+      max-width: 320px;
     }
 
     button,
@@ -69,6 +75,7 @@
       border: 1px solid var(--line);
       border-radius: 999px;
       cursor: pointer;
+      white-space: nowrap;
     }
 
     .pill input[type=file] {
@@ -254,9 +261,19 @@
 <body>
   <header>
     <h1>Blockscape</h1>
+    <a href="https://github.com/pwright/blockscape" target="_blank" style="display: inline-flex; align-items: center; text-decoration: none; margin-right: .5rem;" title="View on GitHub">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="color: var(--muted);">
+        <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+      </svg>
+    </a>
     <input id="search" type="text" placeholder="Search…" />
-    <label class="pill">JSON file <input id="file" type="file" accept=".json,.txt" /></label>
+    <label class="pill">Add JSON files <input id="file" type="file" accept=".json,.txt" multiple /></label>
+
+    <!-- NEW: model chooser + management -->
+    <select id="modelSelect" title="Active model"></select>
+    <button id="removeModel" title="Remove selected model">Remove</button>
     <button id="clear">Clear selection</button>
+
     <div class="legend">
       <span><span class="dot ddep"></span> enables</span>
       <span><span class="dot drev"></span> dependents</span>
@@ -266,16 +283,18 @@
   </header>
 
   <details style="margin:.5rem .75rem;">
-    <summary style="cursor:pointer;">Paste JSON here (schema below)</summary>
+    <summary style="cursor:pointer;">Paste / edit JSON for the <b>active</b> model (schema below)</summary>
     <div class="muted" style="font-size:12px;margin:.25rem 0 .5rem 0">
-      Schema: <code>{ categories:[{id, title, items:[{id,name,logo?,external?,deps:[] }]}] }</code>
+      Schema: <code>{ categories:[{id, title, items:[{id,name,logo?,external?,deps:[] }]}], links?:[{from,to}] }</code><br />
+      You can paste multiple objects separated by <code>---</code> to append several models. A single object replaces only when you click “Replace active with JSON”.
     </div>
     <div style="display:flex;gap:.5rem;align-items:flex-start;">
       <textarea id="jsonBox"
         style="flex:1;height:160px;font-family:ui-monospace,Consolas,monospace;resize:vertical;"></textarea>
-      <button id="load"
-        style="height:32px;padding:0 .75rem;background:#f9fafb;border:1px solid var(--line);border-radius:999px;cursor:pointer;white-space:nowrap;">Load
-        JSON</button>
+      <div style="display:flex;flex-direction:column;gap:.4rem;">
+        <button id="appendFromBox">Append model(s)</button>
+        <button id="replaceActive">Replace active with JSON</button>
+      </div>
     </div>
   </details>
 
@@ -283,50 +302,173 @@
 
   <template id="seed">
     {
-    "categories": [
-    
-    {
-    "id": "endpoints",
-    "title": "Endpoints",
-    "items": [
-    { "id": "server", "name": "Server", "deps": [] },
-    { "id": "client", "name": "Client", "deps": [] }
-    ]
-    },
-    {
-    "id": "exposure",
-    "title": "Exposing services",
-    "items": [
-    { "id": "connector", "name": "connector", "logo": "logos/skupper-logo.svg", "deps": ["server"] },
-    { "id": "listener", "name": "Listener", "logo": "logos/skupper-logo.svg", "deps": ["client"] },
-    { "id": "attachedconnector", "name": "Attached connector", "logo": "logos/skupper-logo.svg", "deps": ["server"] }
-    ]
-    },
-    {
-    "id": "links",
-    "title": "Linking sites",
-    "items": [
-    
-    { "id": "tokenissue", "name": "Token issue", "logo": "logos/skupper-logo.svg", "deps": [] },
-    { "id": "tokenredeem", "name": "Token redeem", "logo": "logos/skupper-logo.svg", "deps": ["link"] },
-    { "id": "link", "name": "Link", "logo": "logos/skupper-logo.svg", "deps": [] }
-    ]
-    },
-    {
-    "id": "sites", "title": "Router sites",
-    "items": [
-    { "id": "site-k8s", "name": "Kubernetes Site", "logo": "logos/k8s.svg", "deps": ["link", "connector",
-    "attachedconnector", "listener", "tokenissue", "tokenredeem"]
-    }, { "id": "site-podman", "name": "Podman Site", "logo": "logos/Podman.svg", "deps": ["link", "connector",
-    "listener", "tokenredeem"] },
-    { "id": "site-docker", "name": "Docker Site", "logo": "logos/Docker.svg", "deps": ["link", "connector", "listener", "tokenredeem"]
-    },
-    { "id": "site-systemd", "name": "systemd Site", "logo": "logos/systemd.svg", "deps": ["link", "connector",
-    "listener", "tokenredeem"] }
-    ]
+      "categories": [
+        {
+          "id": "communication",
+          "title": "Communication Effects",
+          "items": [
+            {
+              "id": "glance_comprehension",
+              "name": "Glanceable Landscape",
+              "deps": [
+                "value_visibility_axis",
+                "legend_minimal"
+              ]
+            },
+            {
+              "id": "story_clusters",
+              "name": "Story Clusters",
+              "deps": [
+                "layout_engine",
+                "model_components"
+              ]
+            },
+            {
+              "id": "review_alignment",
+              "name": "Shared Understanding (SME/Product)",
+              "deps": [
+                "glance_comprehension",
+                "story_clusters"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "inputs",
+          "title": "Inputs",
+          "items": [
+            {
+              "id": "domain_json",
+              "name": "Domain JSON",
+              "deps": []
+            },
+            {
+              "id": "assets_logos",
+              "name": "Logos & Icons",
+              "deps": []
+            }
+          ]
+        },
+        {
+          "id": "modeling",
+          "title": "Modeling",
+          "items": [
+            {
+              "id": "model_components",
+              "name": "Components & Categories",
+              "deps": [
+                "domain_json"
+              ]
+            },
+            {
+              "id": "model_dependencies",
+              "name": "Dependencies",
+              "deps": [
+                "model_components"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "rendering",
+          "title": "Rendering & Semantics",
+          "items": [
+            {
+              "id": "layout_engine",
+              "name": "Layout Engine",
+              "deps": [
+                "model_components",
+                "model_dependencies"
+              ]
+            },
+            {
+              "id": "value_visibility_axis",
+              "name": "Vertical Position = Visible Value",
+              "deps": [
+                "layout_engine"
+              ]
+            },
+            {
+              "id": "evolution_axis",
+              "name": "Horizontal Evolution (Optional)",
+              "deps": [
+                "layout_engine"
+              ]
+            },
+            {
+              "id": "legend_minimal",
+              "name": "Minimal Legend/Keys",
+              "deps": [
+                "layout_engine",
+                "assets_logos"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "outputs",
+          "title": "Outputs",
+          "items": [
+            {
+              "id": "export_graphic",
+              "name": "Export (SVG/PNG)",
+              "deps": [
+                "layout_engine"
+              ]
+            },
+            {
+              "id": "embed_docs",
+              "name": "Embed in Docs/Slides",
+              "deps": [
+                "export_graphic"
+              ]
+            }
+          ]
+        }
+      ]
     }
-    ]
-    
+      </template>
+
+  <template id="skupper">
+    {
+      "categories": [
+        {
+          "id": "endpoints",
+          "title": "Endpoints",
+          "items": [
+            { "id": "server", "name": "Server", "deps": [] },
+            { "id": "client", "name": "Client", "deps": [] }
+          ]
+        },
+        {
+          "id": "exposure",
+          "title": "Exposing services",
+          "items": [
+            { "id": "connector", "name": "connector", "logo": "logos/skupper-logo.svg", "deps": ["server"] },
+            { "id": "listener", "name": "Listener", "logo": "logos/skupper-logo.svg", "deps": ["client"] },
+            { "id": "attachedconnector", "name": "Attached connector", "logo": "logos/skupper-logo.svg", "deps": ["server"] }
+          ]
+        },
+        {
+          "id": "links",
+          "title": "Linking sites",
+          "items": [
+            { "id": "tokenissue", "name": "Token issue", "logo": "logos/skupper-logo.svg", "deps": [] },
+            { "id": "tokenredeem", "name": "Token redeem", "logo": "logos/skupper-logo.svg", "deps": ["link"] },
+            { "id": "link", "name": "Link", "logo": "logos/skupper-logo.svg", "deps": [] }
+          ]
+        },
+        {
+          "id": "sites",
+          "title": "Router sites",
+          "items": [
+            { "id": "site-k8s", "name": "Kubernetes Site", "logo": "logos/k8s.svg", "deps": ["link","connector","attachedconnector","listener","tokenissue","tokenredeem"] },
+            { "id": "site-podman", "name": "Podman Site", "logo": "logos/Podman.svg", "deps": ["link","connector","listener","tokenredeem"] },
+            { "id": "site-docker", "name": "Docker Site", "logo": "logos/Docker.svg", "deps": ["link","connector","listener","tokenredeem"] },
+            { "id": "site-systemd", "name": "systemd Site", "logo": "logos/systemd.svg", "deps": ["link","connector","listener","tokenredeem"] }
+          ]
+        }
+      ]
     }
   </template>
 
@@ -336,30 +478,83 @@
     console.log("[Blockscape] init");
 
     const jsonBox = document.getElementById('jsonBox');
-    jsonBox.value = document.getElementById('seed').innerHTML.trim();
-
     const app = document.getElementById('app');
     const overlay = document.getElementById('overlay');
+    const modelSelect = document.getElementById('modelSelect');
 
-    let model = null;
-    let index = new Map();        // id -> {el, catId, rect}
-    let reverse = new Map();      // id -> Set(dependents)
-    let forward = new Map();      // id -> Set(deps)
-    let reused = new Set();       // nodes with in-degree >= 2
+    // Show the seed in the editor initially.
+    jsonBox.value = document.getElementById('seed').innerHTML.trim();
+
+    // ===== State =====
+    /** @type {{id:string,title:string,data:any}[]} */
+    let models = [];
+    let activeIndex = -1;
+
+    let model = null;           // parsed result of active model: { m, fwd, rev, reusedLocal, seen }
+    let index = new Map();      // id -> {el, catId, rect}
     let selection = null;
 
-    function parse(txt) {
-      console.log("[Blockscape] parsing json length=", txt.length);
-      const m = JSON.parse(txt);
-      // Normalize: build adjacency from items.deps + top-level links (optional)
+    // ===== Utilities =====
+    function uid() { return Math.random().toString(36).slice(2, 10); }
+
+    function setActive(i) {
+      if (i < 0 || i >= models.length) {
+        console.warn("[Blockscape] setActive called with out-of-range index:", i);
+        return;
+      }
+      activeIndex = i;
+      console.log("[Blockscape] active model:", models[i].title, "(index", i + " )");
+      updateModelSelect();
+      loadActiveIntoEditor();
+      rebuildFromActive();
+    }
+
+    function updateModelSelect() {
+      modelSelect.innerHTML = "";
+      models.forEach((m, i) => {
+        const opt = document.createElement('option');
+        opt.value = String(i);
+        opt.textContent = `${i + 1}. ${m.title}`;
+        modelSelect.appendChild(opt);
+      });
+      if (activeIndex >= 0) modelSelect.value = String(activeIndex);
+    }
+
+    function loadActiveIntoEditor() {
+      if (activeIndex < 0) { jsonBox.value = ""; return; }
+      jsonBox.value = JSON.stringify(models[activeIndex].data, null, 2);
+    }
+
+    function tryParseJson(txt) { try { return JSON.parse(txt); } catch { return null; } }
+
+    // Accept 1) object, 2) array-of-objects, 3) '---' separated objects
+    function normalizeToModelsFromText(txt, titleBase = "Pasted") {
+      const trimmed = (txt || "").trim();
+      if (!trimmed) return [];
+      const parsed = tryParseJson(trimmed);
+      if (parsed) return (Array.isArray(parsed) ? parsed : [parsed]).map((o, idx) => ({
+        id: uid(),
+        title: `${titleBase} #${idx + 1}`,
+        data: o
+      }));
+      const parts = trimmed.split(/^\s*---\s*$/m).map(s => s.trim()).filter(Boolean);
+      return parts.map((p, i) => ({
+        id: uid(),
+        title: `${titleBase} #${i + 1}`,
+        data: JSON.parse(p)
+      }));
+    }
+
+    function parse(mObj) {
+      console.log("[Blockscape] parsing model; categories=", (mObj?.categories || []).length);
       const fwd = new Map();
       const rev = new Map();
       const seen = new Set();
 
-      m.categories.forEach(c => c.items.forEach(it => {
+      (mObj.categories || []).forEach(c => (c.items || []).forEach(it => {
         seen.add(it.id);
         const deps = new Set(it.deps || []);
-        (m.links || []).forEach(l => { if (l.from === it.id) deps.add(l.to); });
+        (mObj.links || []).forEach(l => { if (l.from === it.id) deps.add(l.to); });
         fwd.set(it.id, deps);
         deps.forEach(d => {
           if (!rev.has(d)) rev.set(d, new Set());
@@ -367,49 +562,34 @@
         });
       }));
 
-      // compute reused (in-degree>=2)
       const reusedLocal = new Set();
       rev.forEach((dependents, node) => { if ((dependents?.size || 0) >= 2) reusedLocal.add(node); });
-
-      return { m, fwd, rev, reusedLocal, seen };
+      return { m: mObj, fwd, rev, reusedLocal, seen };
     }
 
     function generateLetterImage(text) {
       const canvas = document.createElement('canvas');
-      const size = 44; // Match the logo size
-      canvas.width = size;
-      canvas.height = size;
+      const size = 44;
+      canvas.width = size; canvas.height = size;
       const ctx = canvas.getContext('2d');
-
-      // Background circle
       ctx.fillStyle = '#f3f4f6';
-      ctx.beginPath();
-      ctx.arc(size / 2, size / 2, size / 2 - 2, 0, 2 * Math.PI);
-      ctx.fill();
-
-      // Border
-      ctx.strokeStyle = '#d1d5db';
-      ctx.lineWidth = 1;
-      ctx.stroke();
-
-      // Text
-      const letter = text.charAt(0).toUpperCase();
+      ctx.beginPath(); ctx.arc(size/2, size/2, size/2 - 2, 0, 2*Math.PI); ctx.fill();
+      ctx.strokeStyle = '#d1d5db'; ctx.lineWidth = 1; ctx.stroke();
+      const letter = (text || '?').charAt(0).toUpperCase();
       ctx.fillStyle = '#6b7280';
       ctx.font = `bold ${size * 0.5}px system-ui, -apple-system, sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(letter, size / 2, size / 2);
-
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(letter, size/2, size/2);
       return canvas.toDataURL('image/png');
     }
 
+    // ===== Render =====
     function render() {
+      if (!model) return;
       console.log("[Blockscape] rendering categories=", model.m.categories.length);
       app.innerHTML = "";
       index.clear();
 
-      // container for overlay sizing
-      const containerRect = app.getBoundingClientRect();
       overlay.setAttribute("width", window.innerWidth);
       overlay.setAttribute("height", window.innerHeight);
 
@@ -421,14 +601,14 @@
         const head = document.createElement('div');
         head.className = 'cat-head';
         head.innerHTML = `<div class="cat-title">${escapeHtml(cat.title || cat.id)}</div>
-                        <div class="muted" style="font-size:12px">${cat.items.length} items</div>`;
+                          <div class="muted" style="font-size:12px">${(cat.items || []).length} items</div>`;
         section.appendChild(head);
 
         const grid = document.createElement('div');
         grid.className = 'grid';
         section.appendChild(grid);
 
-        cat.items.forEach(it => {
+        (cat.items || []).forEach(it => {
           const tile = document.createElement('div');
           tile.className = 'tile' + (it.external ? ' external' : '');
           tile.tabIndex = 0;
@@ -436,14 +616,8 @@
 
           const img = document.createElement('img');
           img.className = 'logo';
-          if (it.logo) {
-            img.src = it.logo;
-            img.alt = it.name;
-          } else {
-            img.alt = "";
-            img.style.opacity = .2;
-            img.src = generateLetterImage(it.name || it.id);
-          }
+          if (it.logo) { img.src = it.logo; img.alt = it.name || it.id; }
+          else { img.alt = ""; img.style.opacity = .2; img.src = generateLetterImage(it.name || it.id); }
 
           const nm = document.createElement('div');
           nm.className = 'name';
@@ -464,7 +638,6 @@
         app.appendChild(section);
       });
 
-      // mark reused
       model.reusedLocal.forEach(id => {
         const hit = index.get(id);
         if (hit) {
@@ -475,7 +648,7 @@
 
       wireEvents();
       reflowRects();
-      drawLinks(); // initial draw (none selected)
+      drawLinks();
     }
 
     function wireEvents() {
@@ -489,8 +662,6 @@
         t.addEventListener('keydown', (e) => {
           if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); t.click(); }
         });
-
-        // Drag and drop events
         t.draggable = true;
         t.addEventListener('dragstart', handleDragStart);
         t.addEventListener('dragend', handleDragEnd);
@@ -507,11 +678,7 @@
       document.getElementById('clear').onclick = () => clearSelection();
     }
 
-    function reflowRects() {
-      index.forEach((v, id) => {
-        v.rect = v.el.getBoundingClientRect();
-      });
-    }
+    function reflowRects() { index.forEach((v) => { v.rect = v.el.getBoundingClientRect(); }); }
 
     function select(id) {
       selection = id;
@@ -519,26 +686,16 @@
       const deps = Array.from(model.fwd.get(id) || []);
       const revs = Array.from(model.rev.get(id) || []);
       console.log("[Blockscape] selecting id=", id, "deps=", deps, "revs=", revs);
-
       const sel = index.get(id); if (sel) sel.el.classList.add('selected');
       deps.forEach(d => { const hit = index.get(d); if (hit) hit.el.classList.add('dep'); });
       revs.forEach(r => { const hit = index.get(r); if (hit) hit.el.classList.add('revdep'); });
-
       drawLinks();
     }
 
-    function clearSelection() {
-      selection = null;
-      clearStyles();
-      drawLinks();
-    }
-
-    function clearStyles() {
-      app.querySelectorAll('.tile').forEach(t => t.classList.remove('dep', 'revdep', 'selected'));
-    }
+    function clearSelection() { selection = null; clearStyles(); drawLinks(); }
+    function clearStyles() { app.querySelectorAll('.tile').forEach(t => t.classList.remove('dep', 'revdep', 'selected')); }
 
     function drawLinks() {
-      // Draw subtle connectors only for current selection to keep it readable.
       while (overlay.firstChild) overlay.removeChild(overlay.firstChild);
       if (!selection) return;
 
@@ -566,16 +723,13 @@
     }
 
     function center(r) { return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }
-
     function escapeHtml(s) { return s.replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[m])); }
 
-    // Drag and drop handlers
-    let draggedElement = null;
+    // ===== Drag and drop reorder (per model) =====
     let draggedItemId = null;
     let draggedCategoryId = null;
 
     function handleDragStart(e) {
-      draggedElement = e.target;
       draggedItemId = e.target.dataset.id;
       draggedCategoryId = e.target.closest('.category').dataset.cat;
 
@@ -586,7 +740,6 @@
         categoryId: draggedCategoryId
       }));
 
-      // Add visual feedback to all grids in the same category
       const category = e.target.closest('.category');
       const grid = category.querySelector('.grid');
       grid.classList.add('drag-active');
@@ -596,118 +749,150 @@
 
     function handleDragEnd(e) {
       e.target.classList.remove('dragging');
-
-      // Remove visual feedback from all grids
-      app.querySelectorAll('.grid').forEach(grid => {
-        grid.classList.remove('drag-active');
-      });
-
-      // Clear drag over states
-      app.querySelectorAll('.tile').forEach(tile => {
-        tile.classList.remove('drag-over');
-      });
-
-      draggedElement = null;
+      app.querySelectorAll('.grid').forEach(grid => grid.classList.remove('drag-active'));
+      app.querySelectorAll('.tile').forEach(tile => tile.classList.remove('drag-over'));
       draggedItemId = null;
       draggedCategoryId = null;
     }
 
-    function handleDragOver(e) {
-      e.preventDefault();
-      e.dataTransfer.dropEffect = 'move';
-    }
-
+    function handleDragOver(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }
     function handleDragEnter(e) {
       e.preventDefault();
       const grid = e.target.closest('.grid');
-      if (grid) {
-        grid.classList.add('drag-active');
-      }
+      if (grid) grid.classList.add('drag-active');
     }
-
     function handleDragLeave(e) {
-      // Only remove drag-active if we're leaving the grid entirely
       const grid = e.target.closest('.grid');
-      if (grid && !grid.contains(e.relatedTarget)) {
-        grid.classList.remove('drag-active');
-      }
+      if (grid && !grid.contains(e.relatedTarget)) grid.classList.remove('drag-active');
     }
 
     function handleDrop(e) {
       e.preventDefault();
-
       const targetGrid = e.target.closest('.grid');
       const targetCategory = targetGrid.closest('.category');
       const targetCategoryId = targetCategory.dataset.cat;
 
       if (!draggedItemId || !targetCategoryId) return;
-
-      // Only allow dropping within the same category
       if (draggedCategoryId !== targetCategoryId) {
         console.log("[Blockscape] drop rejected - different category");
         return;
       }
 
-      // Find the target position based on mouse position
       const tiles = Array.from(targetGrid.querySelectorAll('.tile'));
       const targetTile = tiles.find(tile => {
         const rect = tile.getBoundingClientRect();
         return e.clientY < rect.top + rect.height / 2;
       });
 
-      // Reorder items in the model
       reorderItem(draggedItemId, targetTile ? targetTile.dataset.id : null, targetCategoryId);
-
-      // Re-render to update the display
       render();
-
       console.log("[Blockscape] drop completed", draggedItemId, "in", targetCategoryId);
     }
 
     function reorderItem(itemId, targetItemId, categoryId) {
-      const category = model.m.categories.find(cat => cat.id === categoryId);
+      if (activeIndex < 0) return;
+      const mobj = models[activeIndex].data;
+      const category = (mobj.categories || []).find(cat => cat.id === categoryId);
       if (!category) return;
 
-      const itemIndex = category.items.findIndex(item => item.id === itemId);
+      const itemIndex = (category.items || []).findIndex(item => item.id === itemId);
       if (itemIndex === -1) return;
 
-      // Remove item from current position
       const [movedItem] = category.items.splice(itemIndex, 1);
-
       if (targetItemId) {
-        // Insert before target item
         const targetIndex = category.items.findIndex(item => item.id === targetItemId);
-        if (targetIndex !== -1) {
-          category.items.splice(targetIndex, 0, movedItem);
-        } else {
-          category.items.push(movedItem);
-        }
+        if (targetIndex !== -1) category.items.splice(targetIndex, 0, movedItem);
+        else category.items.push(movedItem);
       } else {
-        // Insert at end
         category.items.push(movedItem);
       }
+      // keep editor in sync
+      loadActiveIntoEditor();
+      rebuildFromActive();
     }
 
-    // Controls
-    document.getElementById('load').onclick = () => {
+    // ===== Controls =====
+
+    // Append models from textarea
+    document.getElementById('appendFromBox').onclick = () => {
       try {
-        const parsed = parse(jsonBox.value);
-        model = parsed;
-        forward = parsed.fwd; reverse = parsed.rev; reused = parsed.reusedLocal;
-        render();
+        const appended = normalizeToModelsFromText(jsonBox.value, "Pasted");
+        if (!appended.length) { alert("No valid JSON found to append."); return; }
+        console.log("[Blockscape] appending", appended.length, "model(s)");
+        models.push(...appended);
+        if (activeIndex === -1) setActive(0); else { updateModelSelect(); }
       } catch (e) {
-        console.error("[Blockscape] load error:", e);
-        alert("JSON parse/render error (see console).");
+        console.error("[Blockscape] append error:", e);
+        alert("Append error (see console).");
       }
     };
 
-    document.getElementById('file').onchange = async (e) => {
-      const f = e.target.files[0]; if (!f) return;
-      const txt = await f.text();
-      jsonBox.value = txt;
-      document.getElementById('load').click();
+    // Replace active model data with JSON from textarea
+    document.getElementById('replaceActive').onclick = () => {
+      if (activeIndex < 0) { alert("No active model selected."); return; }
+      try {
+        const obj = JSON.parse(jsonBox.value);
+        models[activeIndex].data = obj;
+        console.log("[Blockscape] replaced active model:", models[activeIndex].title);
+        rebuildFromActive();
+      } catch (e) {
+        console.error("[Blockscape] replace error:", e);
+        alert("JSON parse error (see console).");
+      }
     };
 
+    // Load files: each text may be single object, array, or --- separated
+    document.getElementById('file').onchange = async (e) => {
+      const files = Array.from(e.target.files || []);
+      if (!files.length) return;
+      try {
+        console.log("[Blockscape] reading", files.length, "file(s)");
+        for (const f of files) {
+          const txt = await f.text();
+          const entries = normalizeToModelsFromText(txt, f.name.replace(/\.[^.]+$/, '') || "File");
+          if (!entries.length) {
+            console.warn("[Blockscape] no models in file:", f.name);
+            continue;
+          }
+          // Ensure file-derived entries use filename as title base
+          models.push(...entries.map((en, i) => ({ ...en, title: entries.length > 1 ? `${f.name} #${i + 1}` : f.name })));
+        }
+        if (activeIndex === -1 && models.length) setActive(0);
+        else updateModelSelect();
+      } catch (err) {
+        console.error("[Blockscape] file load error:", err);
+        alert("File load error (see console).");
+      } finally {
+        e.target.value = ""; // allow re-selecting the same files
+      }
+    };
+
+    // Switch active model
+    modelSelect.addEventListener('change', (e) => {
+      const i = parseInt(e.target.value, 10);
+      if (!Number.isInteger(i)) return;
+      setActive(i);
+    });
+
+    // Remove selected model
+    document.getElementById('removeModel').onclick = () => {
+      if (activeIndex < 0) return;
+      console.log("[Blockscape] removing model:", models[activeIndex].title);
+      models.splice(activeIndex, 1);
+      if (!models.length) {
+        activeIndex = -1;
+        model = null;
+        app.innerHTML = "";
+        overlay.innerHTML = "";
+        jsonBox.value = "";
+        updateModelSelect();
+        return;
+      }
+      const next = Math.min(activeIndex, models.length - 1);
+      setActive(next);
+    };
+
+    // Search filter
     document.getElementById('search').addEventListener('input', (e) => {
       const q = e.target.value.trim().toLowerCase();
       console.log("[Blockscape] search:", q);
@@ -717,14 +902,28 @@
       });
     });
 
+    // Helpers
+    function rebuildFromActive() {
+      if (activeIndex < 0) return;
+      try {
+        const parsed = parse(models[activeIndex].data);
+        model = parsed;
+        render();
+      } catch (e) {
+        console.error("[Blockscape] rebuild error (active model likely malformed):", e);
+        alert("Active model parse/render error (see console).");
+      }
+    }
 
-
-
-    // Bootstrap: load seed
+    // Bootstrap with both templates
     (function bootstrap() {
-      const parsed = parse(jsonBox.value);
-      model = parsed; forward = parsed.fwd; reverse = parsed.rev; reused = parsed.reusedLocal;
-      render();
+      const seedObj = JSON.parse(document.getElementById('seed').innerHTML.trim());
+      const skupperObj = JSON.parse(document.getElementById('skupper').innerHTML.trim());
+      
+      models.push({ id: uid(), title: "Seed Template", data: seedObj });
+      models.push({ id: uid(), title: "Skupper Template", data: skupperObj });
+      
+      setActive(0);
     })();
   </script>
 </body>
