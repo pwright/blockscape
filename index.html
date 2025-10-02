@@ -285,7 +285,7 @@
   <details style="margin:.5rem .75rem;">
     <summary style="cursor:pointer;">Paste / edit JSON for the <b>active</b> model (schema below)</summary>
     <div class="muted" style="font-size:12px;margin:.25rem 0 .5rem 0">
-      Schema: <code>{ categories:[{id, title, items:[{id,name,logo?,external?,deps:[] }]}], links?:[{from,to}] }</code><br />
+      Schema: <code>{ categories:[{id, title, items:[{id,name,logo?,external?,color?,deps:[] }]}], links?:[{from,to}] }</code><br />
       You can paste multiple objects separated by <code>---</code> to append several models. A single object replaces only when you click “Replace active with JSON”.
     </div>
     <div style="display:flex;gap:.5rem;align-items:flex-start;">
@@ -402,24 +402,25 @@
           "title": "Outputs",
           "items": [
             {
-              "id": "export_graphic",
-              "name": "Export (SVG/PNG)",
+              "id": "guideframe",
+              "name": "Video creation",
               "deps": [
-                "layout_engine"
+ 
               ]
             },
             {
-              "id": "embed_docs",
-              "name": "Embed in Docs/Slides",
+              "id": "website",
+              "name": "Website",
               "deps": [
-                "export_graphic"
+                "layout_engine"
               ]
             }
+
           ]
         }
       ]
     }
-      </template>
+  </template>
 
   <template id="skupper">
     {
@@ -488,6 +489,36 @@
 
     // ===== Utilities =====
     function uid() { return Math.random().toString(36).slice(2, 10); }
+
+    // --- NEW: letter → color mapping and helpers ---
+    // Letter → color mapping (tailwind-ish palette). G => green.
+    const LETTER_COLOR_MAP = {
+      A: '#ef4444', B: '#3b82f6', C: '#06b6d4', D: '#a855f7',
+      E: '#f59e0b', F: '#f97316', G: '#22c55e', H: '#84cc16',
+      I: '#10b981', J: '#14b8a6', K: '#0ea5e9', L: '#60a5fa',
+      M: '#8b5cf6', N: '#d946ef', O: '#f43f5e', P: '#e11d48',
+      Q: '#dc2626', R: '#f59e0b', S: '#eab308', T: '#a3e635',
+      U: '#22d3ee', V: '#38bdf8', W: '#818cf8', X: '#a78bfa',
+      Y: '#f472b6', Z: '#fb7185'
+    };
+
+    // Prefer explicit item.color (if present), else map by first letter.
+    function getBadgeColor(text, explicit) {
+      if (explicit && /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(explicit)) return explicit;
+      const ch = (text || '?').charAt(0).toUpperCase();
+      return LETTER_COLOR_MAP[ch] || '#9ca3af'; // fallback gray
+    }
+
+    // Compute readable letter color (black/white) against bg
+    function idealTextColor(bgHex) {
+      const hex = bgHex.replace('#', '');
+      const expanded = hex.length === 3 ? hex.split('').map(c=>c+c).join('') : hex;
+      const bigint = parseInt(expanded, 16);
+      const r = (bigint >> 16) & 255, g = (bigint >> 8) & 255, b = bigint & 255;
+      // luminance (sRGB)
+      const L = 0.2126*Math.pow(r/255,2.2) + 0.7152*Math.pow(g/255,2.2) + 0.0722*Math.pow(b/255,2.2);
+      return L > 0.35 ? '#111111' : '#ffffff';
+    }
 
     function setActive(i) {
       if (i < 0 || i >= models.length) {
@@ -559,19 +590,35 @@
       return { m: mObj, fwd, rev, reusedLocal, seen };
     }
 
-    function generateLetterImage(text) {
+    // --- MODIFIED: color-aware letter image ---
+    function generateLetterImage(text, explicitColor) {
+      console.log("[Blockscape] generateLetterImage for:", text);
       const canvas = document.createElement('canvas');
       const size = 44;
       canvas.width = size; canvas.height = size;
       const ctx = canvas.getContext('2d');
-      ctx.fillStyle = '#f3f4f6';
-      ctx.beginPath(); ctx.arc(size/2, size/2, size/2 - 2, 0, 2*Math.PI); ctx.fill();
-      ctx.strokeStyle = '#d1d5db'; ctx.lineWidth = 1; ctx.stroke();
+
       const letter = (text || '?').charAt(0).toUpperCase();
-      ctx.fillStyle = '#6b7280';
+      const bg = getBadgeColor(text, explicitColor);
+      const fg = idealTextColor(bg);
+
+      // Circle
+      ctx.fillStyle = bg;
+      ctx.beginPath();
+      ctx.arc(size/2, size/2, size/2 - 2, 0, 2*Math.PI);
+      ctx.fill();
+
+      // Subtle ring
+      ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      // Letter
+      ctx.fillStyle = fg;
       ctx.font = `bold ${size * 0.5}px system-ui, -apple-system, sans-serif`;
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText(letter, size/2, size/2);
+
       return canvas.toDataURL('image/png');
     }
 
@@ -608,8 +655,13 @@
 
           const img = document.createElement('img');
           img.className = 'logo';
-          if (it.logo) { img.src = it.logo; img.alt = it.name || it.id; }
-          else { img.alt = ""; img.style.opacity = .2; img.src = generateLetterImage(it.name || it.id); }
+          if (it.logo) {
+            img.src = it.logo; img.alt = it.name || it.id;
+          } else {
+            img.alt = "";
+            img.style.opacity = 1; // colored letter icon is the intended visual
+            img.src = generateLetterImage(it.name || it.id, it.color); // supports optional per-item color
+          }
 
           const nm = document.createElement('div');
           nm.className = 'name';
