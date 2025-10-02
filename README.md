@@ -12,13 +12,19 @@ A simple, interactive web application for creating and visualizing landscape-sty
 - **Template System**: Built-in templates for common domains
 - **Responsive Design**: Works on desktop and mobile devices
 
+See https://pwright.github.io/blockscape/ and try switching from:
+
+* Seed Template - attempts to show components of this project
+* Skupper Template - shows components of skupper.io
+
 ## Quick Start
 
 1. Open `index.html` in your web browser
-2. Use the built-in templates or create your own JSON model
-3. Drag tiles to reorder within categories
-4. Click tiles to see dependency relationships
-5. Use the search box to filter components
+2. Use the [prompt](./template-generation-prompt.md) to generate json for your domain.
+3. Open https://pwright.github.io/blockscape/ and paste json to *Append model*.
+4. Drag tiles to reorder within categories
+5. Click tiles to see dependency relationships
+6. Use the search box to filter components
 
 ## JSON Schema
 
