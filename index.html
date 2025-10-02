@@ -316,8 +316,8 @@
               ]
             },
             {
-              "id": "story_clusters",
-              "name": "Story Clusters",
+              "id": "component_values",
+              "name": "Component Values",
               "deps": [
                 "layout_engine",
                 "model_components"
@@ -325,10 +325,10 @@
             },
             {
               "id": "review_alignment",
-              "name": "Shared Understanding (SME/Product)",
+              "name": "Shared Understanding",
               "deps": [
                 "glance_comprehension",
-                "story_clusters"
+                "component_values"
               ]
             }
           ]
@@ -338,13 +338,13 @@
           "title": "Inputs",
           "items": [
             {
-              "id": "domain_json",
-              "name": "Domain JSON",
+              "id": "domain_prompt",
+              "name": "Domain Prompt",
               "deps": []
             },
             {
-              "id": "assets_logos",
-              "name": "Logos & Icons",
+              "id": "domain_json",
+              "name": "Domain JSON",
               "deps": []
             }
           ]
@@ -355,7 +355,7 @@
           "items": [
             {
               "id": "model_components",
-              "name": "Components & Categories",
+              "name": "Components and Categories",
               "deps": [
                 "domain_json"
               ]
@@ -371,7 +371,7 @@
         },
         {
           "id": "rendering",
-          "title": "Rendering & Semantics",
+          "title": "Rendering",
           "items": [
             {
               "id": "layout_engine",
@@ -393,14 +393,6 @@
               "name": "Horizontal Evolution (Optional)",
               "deps": [
                 "layout_engine"
-              ]
-            },
-            {
-              "id": "legend_minimal",
-              "name": "Minimal Legend/Keys",
-              "deps": [
-                "layout_engine",
-                "assets_logos"
               ]
             }
           ]
