@@ -304,6 +304,7 @@
 
   <template id="seed">
     {
+      "abstract": "Blockscape is a tool for visualizing value chains and dependency relationships. It can be used to visualize the value chain of a project, a product, or a service. It can also be used to visualize the dependencies between different components of a project.<br>The tool enables users to understand dependencies, relationships, and value chains within a domain.<br>This blockscape shows the valuescape of blockscape.<br>You can choose other data from the 'Seed Template' pulldown.<br>Or load data from a URL.<br>Select an item to see its dependencies.",
       "categories": [
         {
           "id": "communication",
@@ -591,6 +592,15 @@
 
       overlay.setAttribute("width", window.innerWidth);
       overlay.setAttribute("height", window.innerHeight);
+
+      // Add abstract if present
+      if (model.m.abstract) {
+        const abstractDiv = document.createElement('div');
+        abstractDiv.className = 'abstract';
+        abstractDiv.style.cssText = 'font-size: 12px; color: var(--muted); margin: 0 0 1rem 0; line-height: 1.4; padding: 0.5rem 0.75rem; background: #f9fafb; border-radius: 6px; border-left: 3px solid var(--dep);';
+        abstractDiv.innerHTML = model.m.abstract;
+        app.appendChild(abstractDiv);
+      }
 
       model.m.categories.forEach(cat => {
         const section = document.createElement('section');
