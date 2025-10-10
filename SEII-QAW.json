@@ -1,4 +1,5 @@
 {
+  "abstract": "This blockscape visualizes quality attributes for QAW (Quality Attribute Workshop) sessions, based on the SEII (Software Engineering Institute International) framework.<br>It presents key quality characteristics including Availability, Modifiability, Performance, Security, Testability, Usability, Interoperability, Portability, Maintainability, and Deployability.<br>Each characteristic contains multiple sub-characteristics that define specific aspects of software quality. The dependencies between these characteristics show how different quality aspects influence and enable each other.<br>This visualization helps QAW participants understand the relationships between different quality attributes and how they contribute to overall software quality during architecture design discussions.<br>You can choose other data from the 'Seed Template' pulldown.<br>Or load data from a URL.<br>Select an item to see its dependencies.",
   "categories": [
     {
       "id": "availability",
@@ -12,22 +13,30 @@
         {
           "id": "fault_recovery",
           "name": "Fault Recovery",
-          "deps": ["fault_detection"]
+          "deps": [
+            "fault_detection"
+          ]
         },
         {
           "id": "redundancy_management",
           "name": "Redundancy Management",
-          "deps": ["fault_recovery"]
+          "deps": [
+            "fault_recovery"
+          ]
         },
         {
           "id": "monitoring",
           "name": "Monitoring and Alerting",
-          "deps": ["fault_detection"]
+          "deps": [
+            "fault_detection"
+          ]
         },
         {
           "id": "reconfiguration",
           "name": "Dynamic Reconfiguration",
-          "deps": ["fault_recovery"]
+          "deps": [
+            "fault_recovery"
+          ]
         }
       ]
     },
@@ -43,22 +52,30 @@
         {
           "id": "change_propagation_control",
           "name": "Change Propagation Control",
-          "deps": ["change_localization"]
+          "deps": [
+            "change_localization"
+          ]
         },
         {
           "id": "component_replacement",
           "name": "Component Replacement",
-          "deps": ["change_propagation_control"]
+          "deps": [
+            "change_propagation_control"
+          ]
         },
         {
           "id": "extension_points",
           "name": "Extension Points",
-          "deps": ["change_localization"]
+          "deps": [
+            "change_localization"
+          ]
         },
         {
           "id": "configuration_management",
           "name": "Configuration Management",
-          "deps": ["change_propagation_control"]
+          "deps": [
+            "change_propagation_control"
+          ]
         }
       ]
     },
@@ -74,12 +91,16 @@
         {
           "id": "throughput",
           "name": "Throughput",
-          "deps": ["response_time"]
+          "deps": [
+            "response_time"
+          ]
         },
         {
           "id": "latency",
           "name": "Latency",
-          "deps": ["response_time"]
+          "deps": [
+            "response_time"
+          ]
         },
         {
           "id": "resource_utilization",
@@ -89,12 +110,17 @@
         {
           "id": "load_management",
           "name": "Load Management",
-          "deps": ["resource_utilization"]
+          "deps": [
+            "resource_utilization"
+          ]
         },
         {
           "id": "scalability",
           "name": "Scalability",
-          "deps": ["throughput", "load_management"]
+          "deps": [
+            "throughput",
+            "load_management"
+          ]
         }
       ]
     },
@@ -110,27 +136,37 @@
         {
           "id": "authorization",
           "name": "Authorization",
-          "deps": ["authentication"]
+          "deps": [
+            "authentication"
+          ]
         },
         {
           "id": "confidentiality",
           "name": "Confidentiality",
-          "deps": ["authorization"]
+          "deps": [
+            "authorization"
+          ]
         },
         {
           "id": "integrity",
           "name": "Integrity",
-          "deps": ["authorization"]
+          "deps": [
+            "authorization"
+          ]
         },
         {
           "id": "non_repudiation",
           "name": "Non-repudiation",
-          "deps": ["integrity"]
+          "deps": [
+            "integrity"
+          ]
         },
         {
           "id": "auditing",
           "name": "Auditing and Logging",
-          "deps": ["authorization"]
+          "deps": [
+            "authorization"
+          ]
         }
       ]
     },
@@ -151,17 +187,24 @@
         {
           "id": "instrumentation",
           "name": "Instrumentation",
-          "deps": ["observability"]
+          "deps": [
+            "observability"
+          ]
         },
         {
           "id": "test_isolation",
           "name": "Test Isolation",
-          "deps": ["controllability"]
+          "deps": [
+            "controllability"
+          ]
         },
         {
           "id": "automated_testing",
           "name": "Automated Testing",
-          "deps": ["instrumentation", "test_isolation"]
+          "deps": [
+            "instrumentation",
+            "test_isolation"
+          ]
         }
       ]
     },
@@ -177,7 +220,9 @@
         {
           "id": "operability",
           "name": "Operability",
-          "deps": ["learnability"]
+          "deps": [
+            "learnability"
+          ]
         },
         {
           "id": "understandability",
@@ -187,12 +232,16 @@
         {
           "id": "accessibility",
           "name": "Accessibility",
-          "deps": ["operability"]
+          "deps": [
+            "operability"
+          ]
         },
         {
           "id": "user_feedback",
           "name": "User Feedback",
-          "deps": ["operability"]
+          "deps": [
+            "operability"
+          ]
         }
       ]
     },
@@ -208,17 +257,23 @@
         {
           "id": "data_exchange",
           "name": "Data Exchange Formats",
-          "deps": ["protocol_compliance"]
+          "deps": [
+            "protocol_compliance"
+          ]
         },
         {
           "id": "interface_adaptation",
           "name": "Interface Adaptation",
-          "deps": ["data_exchange"]
+          "deps": [
+            "data_exchange"
+          ]
         },
         {
           "id": "api_stability",
           "name": "API Stability",
-          "deps": ["protocol_compliance"]
+          "deps": [
+            "protocol_compliance"
+          ]
         }
       ]
     },
@@ -234,17 +289,23 @@
         {
           "id": "installability",
           "name": "Installability",
-          "deps": ["environment_independence"]
+          "deps": [
+            "environment_independence"
+          ]
         },
         {
           "id": "replaceability",
           "name": "Replaceability",
-          "deps": ["environment_independence"]
+          "deps": [
+            "environment_independence"
+          ]
         },
         {
           "id": "adaptability",
           "name": "Adaptability",
-          "deps": ["environment_independence"]
+          "deps": [
+            "environment_independence"
+          ]
         }
       ]
     },
@@ -265,17 +326,23 @@
         {
           "id": "change_management",
           "name": "Change Management Process",
-          "deps": ["analyzability"]
+          "deps": [
+            "analyzability"
+          ]
         },
         {
           "id": "tool_support",
           "name": "Tool Support and Automation",
-          "deps": ["modularity"]
+          "deps": [
+            "modularity"
+          ]
         },
         {
           "id": "reusability",
           "name": "Reusability",
-          "deps": ["modularity"]
+          "deps": [
+            "modularity"
+          ]
         }
       ]
     },
@@ -291,22 +358,30 @@
         {
           "id": "rollback",
           "name": "Rollback and Recovery",
-          "deps": ["automation"]
+          "deps": [
+            "automation"
+          ]
         },
         {
           "id": "configuration",
           "name": "Configuration Management",
-          "deps": ["automation"]
+          "deps": [
+            "automation"
+          ]
         },
         {
           "id": "monitoring_deploy",
           "name": "Deployment Monitoring",
-          "deps": ["automation"]
+          "deps": [
+            "automation"
+          ]
         },
         {
           "id": "scalability_deploy",
           "name": "Horizontal and Vertical Scaling",
-          "deps": ["automation"]
+          "deps": [
+            "automation"
+          ]
         }
       ]
     }

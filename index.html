@@ -587,6 +587,7 @@
     function render() {
       if (!model) return;
       console.log("[Blockscape] rendering categories=", model.m.categories.length);
+      console.log("[Blockscape] model.m has abstract?", !!model.m.abstract, "- value:", model.m.abstract ? model.m.abstract.substring(0, 50) + "..." : "none");
       app.innerHTML = "";
       index.clear();
 
@@ -595,11 +596,15 @@
 
       // Add abstract if present
       if (model.m.abstract) {
+        console.log("[Blockscape] Creating abstract div");
         const abstractDiv = document.createElement('div');
         abstractDiv.className = 'abstract';
         abstractDiv.style.cssText = 'font-size: 12px; color: var(--muted); margin: 0 0 1rem 0; line-height: 1.4; padding: 0.5rem 0.75rem; background: #f9fafb; border-radius: 6px; border-left: 3px solid var(--dep);';
         abstractDiv.innerHTML = model.m.abstract;
         app.appendChild(abstractDiv);
+        console.log("[Blockscape] Abstract div appended to DOM");
+      } else {
+        console.log("[Blockscape] No abstract found in model.m");
       }
 
       model.m.categories.forEach(cat => {
