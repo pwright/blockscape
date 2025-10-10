@@ -267,6 +267,8 @@
       </svg>
     </a>
     <input id="search" type="text" placeholder="Search…" />
+    <input id="urlInput" type="text" placeholder="Load JSON from URL…" style="width: 200px;" />
+    <button id="loadUrl">Load URL</button>
     <label class="pill">Add JSON files <input id="file" type="file" accept=".json,.txt" multiple /></label>
 
     <!-- NEW: model chooser + management -->
@@ -422,48 +424,6 @@
     }
   </template>
 
-  <template id="skupper">
-    {
-      "categories": [
-        {
-          "id": "endpoints",
-          "title": "Endpoints",
-          "items": [
-            { "id": "server", "name": "Server", "deps": [] },
-            { "id": "client", "name": "Client", "deps": [] }
-          ]
-        },
-        {
-          "id": "exposure",
-          "title": "Exposing services",
-          "items": [
-            { "id": "connector", "name": "connector", "logo": "logos/skupper-logo.svg", "deps": ["server"] },
-            { "id": "listener", "name": "Listener", "logo": "logos/skupper-logo.svg", "deps": ["client"] },
-            { "id": "attachedconnector", "name": "Attached connector", "logo": "logos/skupper-logo.svg", "deps": ["server"] }
-          ]
-        },
-        {
-          "id": "links",
-          "title": "Linking sites",
-          "items": [
-            { "id": "tokenissue", "name": "Token issue", "logo": "logos/skupper-logo.svg", "deps": [] },
-            { "id": "tokenredeem", "name": "Token redeem", "logo": "logos/skupper-logo.svg", "deps": ["link"] },
-            { "id": "link", "name": "Link", "logo": "logos/skupper-logo.svg", "deps": [] }
-          ]
-        },
-        {
-          "id": "sites",
-          "title": "Router sites",
-          "items": [
-            { "id": "site-k8s", "name": "Kubernetes Site", "logo": "logos/k8s.svg", "deps": ["link","connector","attachedconnector","listener","tokenissue","tokenredeem"] },
-            { "id": "site-podman", "name": "Podman Site", "logo": "logos/Podman.svg", "deps": ["link","connector","listener","tokenredeem"] },
-            { "id": "site-docker", "name": "Docker Site", "logo": "logos/Docker.svg", "deps": ["link","connector","listener","tokenredeem"] },
-            { "id": "site-systemd", "name": "systemd Site", "logo": "logos/systemd.svg", "deps": ["link","connector","listener","tokenredeem"] }
-          ]
-        }
-      ]
-    }
-  </template>
 
   <svg id="overlay" class="svg-layer"></svg>
 
@@ -946,6 +906,25 @@
       });
     });
 
+    // Load from URL
+    document.getElementById('loadUrl').addEventListener('click', async () => {
+      const url = document.getElementById('urlInput').value.trim();
+      if (!url) {
+        alert("Please enter a URL");
+        return;
+      }
+      await loadFromUrl(url);
+      document.getElementById('urlInput').value = ''; // Clear input after successful load
+    });
+
+    // Allow Enter key in URL input
+    document.getElementById('urlInput').addEventListener('keydown', async (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        document.getElementById('loadUrl').click();
+      }
+    });
+
     // Helpers
     function rebuildFromActive() {
       if (activeIndex < 0) return;
@@ -959,13 +938,62 @@
       }
     }
 
-    // Bootstrap with both templates
-    (function bootstrap() {
+    // Load JSON files from same directory (for static hosting)
+    async function loadJsonFiles() {
+      const jsonFiles = ['ility.json', 'ISO-IEC-25010.json', 'SEII-QAW.json'];
+      
+      for (const filename of jsonFiles) {
+        try {
+          const response = await fetch(filename);
+          if (response.ok) {
+            const data = await response.json();
+            models.push({ 
+              id: uid(), 
+              title: filename.replace('.json', ''), 
+              data: data 
+            });
+            console.log("[Blockscape] loaded", filename);
+          }
+        } catch (error) {
+          console.log("[Blockscape] could not load", filename, "- this is normal for file:// protocol");
+        }
+      }
+    }
+
+    // Load JSON from custom URL
+    async function loadFromUrl(url) {
+      try {
+        console.log("[Blockscape] loading from URL:", url);
+        const response = await fetch(url);
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        const data = await response.json();
+        const filename = url.split('/').pop().replace('.json', '') || 'URL Model';
+        models.push({ 
+          id: uid(), 
+          title: filename, 
+          data: data 
+        });
+        console.log("[Blockscape] loaded from URL:", filename);
+        updateModelSelect();
+        if (activeIndex === -1) setActive(0);
+        return true;
+      } catch (error) {
+        console.error("[Blockscape] URL load error:", error);
+        alert(`Failed to load JSON from URL: ${error.message}`);
+        return false;
+      }
+    }
+
+    // Bootstrap with seed template
+    (async function bootstrap() {
       const seedObj = JSON.parse(document.getElementById('seed').innerHTML.trim());
-      const skupperObj = JSON.parse(document.getElementById('skupper').innerHTML.trim());
       
       models.push({ id: uid(), title: "Seed Template", data: seedObj });
-      models.push({ id: uid(), title: "Skupper Template", data: skupperObj });
+      
+      // Try to load JSON files from same directory
+      await loadJsonFiles();
       
       setActive(0);
     })();
