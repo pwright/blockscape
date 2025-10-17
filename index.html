@@ -655,11 +655,13 @@
     }
 
     .item-preview {
+      --item-preview-width: min(420px, calc(100vw - 2 * var(--space-md)));
+      --item-preview-height: min(70vh, calc(100vh - 2 * var(--space-md)));
       position: fixed;
       display: flex;
       flex-direction: column;
-      width: min(420px, calc(100vw - 2 * var(--space-md)));
-      max-height: 70vh;
+      width: var(--item-preview-width);
+      max-height: var(--item-preview-height);
       background: var(--blockscape-surface);
       border: 1px solid var(--blockscape-border);
       border-radius: var(--radius-md);
@@ -669,6 +671,11 @@
       pointer-events: none;
       transition: opacity var(--transition), transform var(--transition);
       z-index: 999;
+    }
+
+    .item-preview--expanded {
+      --item-preview-width: min(630px, calc(100vw - 2 * var(--space-md)));
+      --item-preview-height: min(calc(100vh - 2 * var(--space-md)), 1200px);
     }
 
     .item-preview.is-visible {
@@ -1364,7 +1371,7 @@
 
     function hidePreview() {
       if (!preview) return;
-      preview.classList.remove('is-visible', 'item-preview--has-frame');
+      preview.classList.remove('is-visible', 'item-preview--has-frame', 'item-preview--expanded');
       preview.setAttribute('aria-hidden', 'true');
       preview.hidden = true;
     }
@@ -1403,21 +1410,23 @@
       const id = tile.dataset.id;
       const displayName = tile.querySelector('.name')?.textContent || id || 'Preview';
       const filename = id ? `${id}.html` : '';
+      const filepath = filename ? `items/${filename}` : '';
       const requestId = ++previewRequestId;
 
       previewTitle.textContent = displayName;
       previewBody.innerHTML = '<div class="item-preview__status">Loading…</div>';
       preview.classList.remove('item-preview--has-frame');
+      preview.classList.add('item-preview--expanded');
       showPreviewAt(event.clientX, event.clientY);
 
-      if (!filename) {
+      if (!filepath) {
         previewBody.innerHTML = '<div class="item-preview__status">Preview unavailable for this item.</div>';
         positionPreview(previewAnchor.x, previewAnchor.y);
         return;
       }
 
       try {
-        const response = await fetch(filename, { cache: 'no-cache' });
+        const response = await fetch(filepath, { cache: 'no-cache' });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const html = await response.text();
         if (requestId !== previewRequestId) return;
@@ -1438,7 +1447,7 @@
       } catch (error) {
         if (requestId !== previewRequestId) return;
         previewBody.innerHTML = `<div class="item-preview__status">No preview available for <strong>${escapeHtml(displayName)}</strong>.</div>`;
-        console.warn(`[Blockscape] preview unavailable for ${filename}`, error);
+        console.warn(`[Blockscape] preview unavailable for ${filepath}`, error);
         positionPreview(previewAnchor.x, previewAnchor.y);
       }
     }

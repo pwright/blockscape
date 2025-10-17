@@ -21,8 +21,10 @@ describe('Model preview context menu', () => {
     cy.get('#itemPreview .item-preview__title')
       .should('contain', 'Credibility');
 
-    cy.get('#itemPreview .item-preview__body')
-      .should('contain', 'credibility.html');
+    cy.get('#itemPreview .item-preview__frame')
+      .should('exist')
+      .invoke('attr', 'srcdoc')
+      .should('contain', 'Skupper');
 
     cy.get('#itemPreview .item-preview__close').click();
     cy.get('#itemPreview').should('have.attr', 'hidden');

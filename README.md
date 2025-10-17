@@ -25,6 +25,7 @@ See https://pwright.github.io/blockscape/ and try switching from:
 4. Drag tiles to reorder within categories
 5. Click tiles to see dependency relationships
 6. Use the search box to filter components
+7. Right click item to see html items, see [items](items/README.md)
 
 ## JSON Schema
 
@@ -45,12 +46,6 @@ Blockscape uses a simple JSON schema to define landscape models:
           "external": true
         }
       ]
-    }
-  ],
-  "links": [
-    {
-      "from": "source-item-id",
-      "to": "target-item-id"
     }
   ]
 }
@@ -80,8 +75,11 @@ Blockscape uses a simple JSON schema to define landscape models:
 
 The application includes two example templates:
 
-1. **Seed Template**: A generic value chain template showing communication effects, inputs, modeling, rendering, and outputs
-2. **Skupper Template**: A specific example for the Skupper networking project
+1. **Blockscape**: A generic value chain template showing communication effects, inputs, modeling, rendering, and outputs
+2. **NFR**: Explore non functional requirements
+3. **ISO-IEC-25010**
+4. **SEII-QAW**
+
 
 ## Usage
 
@@ -109,6 +107,7 @@ The application includes two example templates:
 ```
 blockscape/
 ├── index.html              # Main application file
+├── items/                  # Supporting html files
 ├── logos/                  # Logo assets
 │   ├── Docker.svg
 │   ├── k8s.svg
