@@ -128,6 +128,18 @@ This is a client-side only application with no build process required. Simply op
 1. Add SVG files to the `logos/` directory
 2. Reference them in your JSON model using the path `"logos/filename.svg"`
 
+### End-to-end Test
+
+Right-click previews are covered by a Cypress test.
+
+1. Install dependencies with `npm install`
+2. Start a static server in one terminal: `npm run serve`
+3. Run the test in another terminal:
+   - Headless: `npm run cypress:run`
+   - Interactive: `npm run cypress:open`
+
+The spec `cypress/e2e/model-preview.cy.js` visits `index.html`, switches to another model, and asserts that the preview popup opens on right-click.
+
 ## License
 
 This project is open source. See the GitHub repository for license details.

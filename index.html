@@ -654,6 +654,90 @@
       border: 0;
     }
 
+    .item-preview {
+      position: fixed;
+      display: flex;
+      flex-direction: column;
+      width: min(420px, calc(100vw - 2 * var(--space-md)));
+      max-height: 70vh;
+      background: var(--blockscape-surface);
+      border: 1px solid var(--blockscape-border);
+      border-radius: var(--radius-md);
+      box-shadow: var(--color-shadow);
+      opacity: 0;
+      transform: translateY(4px);
+      pointer-events: none;
+      transition: opacity var(--transition), transform var(--transition);
+      z-index: 999;
+    }
+
+    .item-preview.is-visible {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+    }
+
+    .item-preview__header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-xs);
+      padding: var(--space-xs) var(--space-sm);
+      border-bottom: 1px solid var(--color-border);
+      background: var(--color-surface-muted);
+      font-size: var(--font-size-xs);
+      font-weight: var(--font-weight-semibold);
+    }
+
+    .item-preview__title {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      flex: 1 1 auto;
+    }
+
+    .item-preview__close {
+      border: none;
+      background: transparent;
+      color: var(--color-muted);
+      cursor: pointer;
+      font-size: 1.25rem;
+      line-height: 1;
+      border-radius: var(--radius-sm);
+      padding: 0 var(--space-2xs);
+    }
+
+    .item-preview__close:hover,
+    .item-preview__close:focus-visible {
+      color: var(--blockscape-foreground);
+      background: var(--color-surface-muted);
+      outline: none;
+    }
+
+    .item-preview__body {
+      flex: 1 1 auto;
+      overflow: auto;
+      padding: var(--space-sm);
+      background: var(--blockscape-surface);
+      font-size: var(--font-size-xs);
+      line-height: 1.4;
+    }
+
+    .item-preview__frame {
+      width: 100%;
+      height: 100%;
+      border: none;
+      display: block;
+    }
+
+    .item-preview--has-frame .item-preview__body {
+      padding: 0;
+    }
+
+    .item-preview__status {
+      color: var(--color-muted);
+    }
+
     @media (max-width: 1024px) {
       .blockscape-toolbar {
         padding: var(--space-sm) var(--space-md);
@@ -915,8 +999,17 @@
     }
   </template>
 
-
   <svg id="overlay" class="svg-layer"></svg>
+
+  <div id="itemPreview" class="item-preview" hidden aria-hidden="true">
+    <div class="item-preview__header">
+      <span class="item-preview__title">Preview</span>
+      <button type="button" class="item-preview__close" aria-label="Close preview">&times;</button>
+    </div>
+    <div class="item-preview__body">
+      <div class="item-preview__status">Right-click a tile to see related notes.</div>
+    </div>
+  </div>
 
   <script>
     console.log("[Blockscape] init");
@@ -925,6 +1018,10 @@
     const app = document.getElementById('app');
     const overlay = document.getElementById('overlay');
     const modelList = document.getElementById('modelList');
+    const preview = document.getElementById('itemPreview');
+    const previewTitle = preview.querySelector('.item-preview__title');
+    const previewBody = preview.querySelector('.item-preview__body');
+    const previewClose = preview.querySelector('.item-preview__close');
 
     // Show the seed in the editor initially.
     jsonBox.value = document.getElementById('seed').innerHTML.trim();
@@ -937,6 +1034,8 @@
     let model = null;           // parsed result of active model: { m, fwd, rev, reusedLocal, seen }
     let index = new Map();      // id -> {el, catId, rect}
     let selection = null;
+    let previewRequestId = 0;
+    let previewAnchor = { x: 0, y: 0 };
 
     // ===== Utilities =====
     function uid() { return Math.random().toString(36).slice(2, 10); }
@@ -972,6 +1071,7 @@
     }
 
     function setActive(i) {
+      hidePreview();
       if (i < 0 || i >= models.length) {
         console.warn("[Blockscape] setActive called with out-of-range index:", i);
         return;
@@ -1188,7 +1288,9 @@
 
     function wireEvents() {
       app.querySelectorAll('.tile').forEach(t => {
-        t.addEventListener('click', () => {
+        t.addEventListener('click', (event) => {
+          if (typeof event.button === 'number' && event.button !== 0) return;
+          hidePreview();
           const id = t.dataset.id;
           console.log("[Blockscape] click", id);
           if (selection === id) { clearSelection(); return; }
@@ -1260,11 +1362,128 @@
     function center(r) { return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }
     function escapeHtml(s) { return s.replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[m])); }
 
+    function hidePreview() {
+      if (!preview) return;
+      preview.classList.remove('is-visible', 'item-preview--has-frame');
+      preview.setAttribute('aria-hidden', 'true');
+      preview.hidden = true;
+    }
+
+    function showPreviewAt(x, y) {
+      if (!preview) return;
+      previewAnchor = { x, y };
+      preview.hidden = false;
+      preview.setAttribute('aria-hidden', 'false');
+      preview.classList.add('is-visible');
+      positionPreview(x, y);
+    }
+
+    function positionPreview(x, y) {
+      if (!preview) return;
+      const margin = 12;
+      preview.style.left = `${x + margin}px`;
+      preview.style.top = `${y + margin}px`;
+      const rect = preview.getBoundingClientRect();
+      let left = rect.left;
+      let top = rect.top;
+      if (rect.right > window.innerWidth - margin) {
+        left = Math.max(margin, window.innerWidth - rect.width - margin);
+      }
+      if (rect.bottom > window.innerHeight - margin) {
+        top = Math.max(margin, window.innerHeight - rect.height - margin);
+      }
+      preview.style.left = `${left}px`;
+      preview.style.top = `${top}px`;
+    }
+
+    async function handleTileContextMenu(event, tile) {
+      if (!preview) return;
+      event.stopPropagation();
+      event.preventDefault();
+      const id = tile.dataset.id;
+      const displayName = tile.querySelector('.name')?.textContent || id || 'Preview';
+      const filename = id ? `${id}.html` : '';
+      const requestId = ++previewRequestId;
+
+      previewTitle.textContent = displayName;
+      previewBody.innerHTML = '<div class="item-preview__status">Loading…</div>';
+      preview.classList.remove('item-preview--has-frame');
+      showPreviewAt(event.clientX, event.clientY);
+
+      if (!filename) {
+        previewBody.innerHTML = '<div class="item-preview__status">Preview unavailable for this item.</div>';
+        positionPreview(previewAnchor.x, previewAnchor.y);
+        return;
+      }
+
+      try {
+        const response = await fetch(filename, { cache: 'no-cache' });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const html = await response.text();
+        if (requestId !== previewRequestId) return;
+        const trimmed = html.trim();
+        if (!trimmed) {
+          previewBody.innerHTML = `<div class="item-preview__status">No content in <code>${escapeHtml(filename)}</code>.</div>`;
+          positionPreview(previewAnchor.x, previewAnchor.y);
+          return;
+        }
+        const frame = document.createElement('iframe');
+        frame.className = 'item-preview__frame';
+        frame.title = `${displayName} details`;
+        frame.srcdoc = html;
+        previewBody.innerHTML = '';
+        previewBody.appendChild(frame);
+        preview.classList.add('item-preview--has-frame');
+        positionPreview(previewAnchor.x, previewAnchor.y);
+      } catch (error) {
+        if (requestId !== previewRequestId) return;
+        previewBody.innerHTML = `<div class="item-preview__status">No preview available for <strong>${escapeHtml(displayName)}</strong>.</div>`;
+        console.warn(`[Blockscape] preview unavailable for ${filename}`, error);
+        positionPreview(previewAnchor.x, previewAnchor.y);
+      }
+    }
+
+    if (previewClose) {
+      previewClose.addEventListener('click', hidePreview);
+    }
+
+    if (app) {
+      app.addEventListener('contextmenu', (event) => {
+        const tile = event.target.closest('.tile');
+        if (!tile || !app.contains(tile)) return;
+        handleTileContextMenu(event, tile);
+      });
+    }
+
+    document.addEventListener('click', (event) => {
+      if (typeof event.button === 'number' && event.button !== 0) return;
+      if (!preview || preview.hidden) return;
+      if (preview.contains(event.target)) return;
+      hidePreview();
+    });
+
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && preview && !preview.hidden) {
+        hidePreview();
+      }
+    });
+
+    window.addEventListener('resize', () => {
+      if (!preview || preview.hidden) return;
+      positionPreview(previewAnchor.x, previewAnchor.y);
+    });
+
+    window.addEventListener('scroll', () => {
+      if (!preview || preview.hidden) return;
+      hidePreview();
+    }, true);
+
     // ===== Drag and drop reorder (per model) =====
     let draggedItemId = null;
     let draggedCategoryId = null;
 
     function handleDragStart(e) {
+      hidePreview();
       draggedItemId = e.target.dataset.id;
       draggedCategoryId = e.target.closest('.category').dataset.cat;
 

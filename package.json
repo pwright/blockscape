@@ -1,0 +1,14 @@
+{
+  "name": "blockscape",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "serve": "http-server -c-1 -p 4173 .",
+    "cypress:open": "cypress open",
+    "cypress:run": "cypress run"
+  },
+  "devDependencies": {
+    "cypress": "^13.7.3",
+    "http-server": "^14.1.1"
+  }
+}
