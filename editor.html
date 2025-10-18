@@ -6,35 +6,658 @@
   <title>Blockscape JSON Editor</title>
   <style>
     :root {
-      --bg: #0f1222;
-      --panel: #171a2b;
-      --panel-2: #1e2238;
-      --text: #e6e9f2;
-      --muted: #a9b0c7;
-      --accent: #6aa9ff;
-      --danger: #ff5d6c;
-      --ok: #40d39c;
-      --warn: #ffcc66;
-      --border: #2b3050;
+      color-scheme: light;
+      --space-2xs: 0.2rem;
+      --space-xs: 0.35rem;
+      --space-sm: 0.5rem;
+      --space-md: 0.75rem;
+      --space-lg: 1.25rem;
+      --space-xl: 2rem;
+      --space-2xl: 3rem;
+
+      --radius-sm: 6px;
+      --radius-md: 10px;
+      --radius-lg: 16px;
+
+      --font-text: "Inter", "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+      --font-mono: "JetBrains Mono", "Fira Code", monospace;
+      --font-size-xs: 0.75rem;
+      --font-size-sm: 0.875rem;
+      --font-size-md: 1rem;
+      --font-size-lg: 1.2rem;
+      --font-weight-regular: 400;
+      --font-weight-medium: 500;
+      --font-weight-semibold: 600;
+      --font-weight-bold: 700;
+
+      --color-text: #1f2937;
+      --color-muted: #6b7280;
+      --color-border: #d8dde8;
+      --color-border-strong: #c3cad7;
+      --color-surface: #ffffff;
+      --color-surface-muted: #f4f6fb;
+      --color-surface-subtle: #eef2f8;
+      --color-shadow: 0 18px 36px -22px rgba(15, 23, 42, 0.45);
+
+      --color-primary: #2563eb;
+      --color-primary-soft: #e3edff;
+      --color-danger: #dc2626;
+      --color-danger-soft: #fde4e2;
+      --color-warning: #f97316;
+      --color-warning-soft: #ffe8d6;
+      --color-success: #059669;
+      --color-success-soft: #d1fae5;
+
+      --transition: 160ms ease;
+
+      --blockscape-tile: 6.5rem;
+      --blockscape-gap: var(--space-md);
+      --blockscape-radius: var(--radius-lg);
+      --blockscape-foreground: var(--color-text);
+      --blockscape-muted: var(--color-muted);
+      --blockscape-border: var(--color-border);
+      --blockscape-surface: var(--color-surface);
+      --blockscape-surface-alt: var(--color-surface-muted);
     }
-    * { box-sizing: border-box }
-    html, body { height: 100% }
+
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      height: 100%;
+    }
+
     body {
       margin: 0;
-      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Arial, "Apple Color Emoji", "Segoe UI Emoji";
-      background: var(--bg);
-      color: var(--text);
-      display: grid;
-      grid-template-rows: auto 1fr auto;
-      gap: 10px;
+      background: var(--color-surface-subtle);
+      color: var(--color-text);
+      font-family: var(--font-text);
+      -webkit-font-smoothing: antialiased;
     }
-    header, footer { padding: 10px 12px; background: var(--panel); border-bottom: 1px solid var(--border) }
-    header h1 { font-size: 18px; margin: 0 }
-    header .small { color: var(--muted); font-size: 12px }
-    main { display: grid; gap: 12px; grid-template-columns: 320px 1fr; padding: 12px; align-items: start }
-    @media (max-width: 1100px) {
-      main { grid-template-columns: 1fr }
-      .detail {
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6 {
+      font-weight: var(--font-weight-semibold);
+      margin: 0;
+    }
+
+    .pf-v5-c-page {
+      min-height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .pf-v5-c-page__header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: var(--color-surface);
+      box-shadow: 0 1px 0 var(--color-border);
+    }
+
+    .blockscape-masthead {
+      border-bottom: none;
+    }
+
+    .blockscape-toolbar {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: var(--space-md);
+      padding: var(--space-sm) var(--space-lg);
+      width: min(1180px, 100%);
+      margin: 0 auto;
+    }
+
+    .blockscape-brand {
+      display: inline-flex;
+      align-items: baseline;
+      gap: var(--space-xs);
+      font-weight: var(--font-weight-bold);
+      font-size: var(--font-size-lg);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .blockscape-brand h1 {
+      font: inherit;
+    }
+
+    .brand-sub {
+      font-size: var(--font-size-sm);
+      font-weight: var(--font-weight-medium);
+      letter-spacing: normal;
+      text-transform: none;
+      color: var(--color-muted);
+    }
+
+    .blockscape-toolbar__controls {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: var(--space-sm);
+      flex: 1 1 auto;
+      justify-content: flex-end;
+      min-width: 280px;
+    }
+
+    .blockscape-toolbar__controls .pf-v5-c-button,
+    .blockscape-toolbar__controls button,
+    .blockscape-toolbar__controls label {
+      flex: 0 0 auto;
+    }
+
+    .blockscape-editor__meta {
+      font-size: var(--font-size-xs);
+      font-weight: var(--font-weight-medium);
+      color: var(--blockscape-muted);
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-xs);
+      white-space: nowrap;
+    }
+
+    .pf-v5-c-page__main {
+      flex: 1 1 auto;
+    }
+
+    .blockscape-content {
+      display: flex;
+      gap: var(--space-lg);
+      width: min(1180px, calc(100% - 2 * var(--space-lg)));
+      margin: 0 auto;
+      padding: var(--space-lg) 0 var(--space-xl);
+      align-items: flex-start;
+    }
+
+    .blockscape-sidebar {
+      flex: 0 0 260px;
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-md);
+    }
+
+    .blockscape-editor__detail {
+      flex: 1 1 auto;
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-lg);
+      position: sticky;
+      top: calc(var(--space-xl) + 3rem);
+      max-height: calc(100vh - var(--space-xl) - 3rem);
+      overflow-y: auto;
+      padding-right: var(--space-xs);
+    }
+
+    .card {
+      background: var(--blockscape-surface);
+      border: 1px solid var(--blockscape-border);
+      border-radius: var(--radius-md);
+      padding: var(--space-md);
+      box-shadow: var(--color-shadow);
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-sm);
+    }
+
+    .selectable {
+      cursor: pointer;
+      border-radius: var(--radius-sm);
+      border: 1px solid transparent;
+      background: var(--blockscape-surface-alt);
+      padding: var(--space-sm);
+      transition: border-color var(--transition), background var(--transition), box-shadow var(--transition);
+    }
+
+    .selectable:hover {
+      border-color: var(--color-border-strong);
+      background: var(--color-surface-muted);
+      box-shadow: 0 12px 24px -20px rgba(15, 23, 42, 0.45);
+    }
+
+    .selectable:focus-visible {
+      outline: none;
+      border-color: var(--color-primary);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
+      background: var(--color-primary-soft);
+    }
+
+    .category-grid {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-sm);
+    }
+
+    .cat {
+      background: var(--blockscape-surface);
+      border: 1px solid var(--blockscape-border);
+      border-radius: var(--radius-md);
+      padding: var(--space-md);
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-sm);
+      transition: border-color var(--transition), box-shadow var(--transition), background var(--transition);
+      box-shadow: 0 14px 32px -24px rgba(15, 23, 42, 0.5);
+    }
+
+    .cat:hover {
+      border-color: var(--color-border-strong);
+      background: var(--color-surface-muted);
+      box-shadow: var(--color-shadow);
+    }
+
+    .cat.drag-over {
+      border-color: var(--color-primary);
+      background: var(--color-primary-soft);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
+    }
+
+    .cat-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-sm);
+    }
+
+    .cat-title {
+      display: flex;
+      align-items: center;
+      gap: var(--space-xs);
+      font-weight: var(--font-weight-semibold);
+      color: var(--blockscape-foreground);
+    }
+
+    .item-list {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-xs);
+    }
+
+    .item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: var(--space-sm);
+      padding: var(--space-sm);
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--blockscape-border);
+      background: var(--blockscape-surface-alt);
+      transition: border-color var(--transition), background var(--transition), box-shadow var(--transition);
+      box-shadow: 0 10px 26px -22px rgba(15, 23, 42, 0.4);
+    }
+
+    .item:hover {
+      border-color: var(--color-border-strong);
+      background: var(--color-surface-muted);
+    }
+
+    .item.drag-over {
+      border-color: var(--color-primary);
+      background: var(--color-primary-soft);
+      box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.18);
+    }
+
+    .item-body {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+
+    .item-name {
+      flex: 1 1 auto;
+      min-width: 0;
+      font-weight: var(--font-weight-medium);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .item-actions {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2xs);
+    }
+
+    .item-actions .pf-v5-c-button {
+      padding: 0.25rem;
+      border-radius: var(--radius-sm);
+      border-color: var(--color-border);
+      background: transparent;
+      color: var(--color-muted);
+    }
+
+    .item-actions .pf-v5-c-button:hover:not([disabled]) {
+      color: var(--color-primary);
+      border-color: var(--color-primary);
+      background: var(--color-primary-soft);
+    }
+
+    .item-actions .pf-v5-c-button[disabled] {
+      opacity: 0.5;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+
+    .item-actions svg {
+      display: block;
+    }
+
+    .item.selected,
+    .cat.selected {
+      border-color: var(--color-primary);
+      background: var(--color-primary-soft);
+      box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.18);
+    }
+
+    .cat[draggable="true"],
+    .item[draggable="true"] {
+      cursor: grab;
+    }
+
+    .cat[draggable="true"]:active,
+    .item[draggable="true"]:active {
+      cursor: grabbing;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-2xs);
+      padding: 0.1rem 0.55rem;
+      border-radius: 999px;
+      border: 1px solid var(--blockscape-border);
+      background: var(--blockscape-surface-alt);
+      font-size: var(--font-size-xs);
+      font-weight: var(--font-weight-medium);
+      color: var(--blockscape-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .row {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      flex-wrap: wrap;
+    }
+
+    .grow {
+      flex: 1 1 auto;
+    }
+
+    .muted {
+      color: var(--blockscape-muted);
+    }
+
+    button,
+    .pf-v5-c-button,
+    label.pf-v5-c-button {
+      appearance: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-xs);
+      border-radius: 999px;
+      border: 1px solid var(--color-border);
+      padding: 0.45rem 1rem;
+      font-size: var(--font-size-sm);
+      font-weight: var(--font-weight-semibold);
+      line-height: 1;
+      cursor: pointer;
+      transition: background var(--transition), border-color var(--transition), color var(--transition), box-shadow var(--transition);
+      background: var(--color-surface-muted);
+      color: var(--blockscape-foreground);
+    }
+
+    button:hover,
+    .pf-v5-c-button:hover,
+    label.pf-v5-c-button:hover {
+      border-color: var(--color-border-strong);
+      background: #e5e9f4;
+      box-shadow: 0 8px 18px -16px rgba(15, 23, 42, 0.35);
+    }
+
+    button:focus-visible,
+    .pf-v5-c-button:focus-visible,
+    label.pf-v5-c-button:focus-visible {
+      outline: none;
+      border-color: var(--color-primary);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
+    }
+
+    .pf-m-primary {
+      background: var(--color-primary);
+      border-color: var(--color-primary);
+      color: #fff;
+    }
+
+    .pf-m-primary:hover {
+      background: #1d4fd7;
+      border-color: #1d4fd7;
+    }
+
+    .pf-m-tertiary {
+      background: transparent;
+      border-color: var(--color-border);
+      color: var(--color-muted);
+    }
+
+    .pf-m-tertiary:hover {
+      color: var(--blockscape-foreground);
+      border-color: var(--color-border-strong);
+      background: var(--color-surface-muted);
+    }
+
+    .pf-m-plain {
+      border: none;
+      padding: 0.35rem;
+      background: transparent;
+      color: var(--color-muted);
+    }
+
+    .pf-m-plain:hover {
+      background: var(--color-surface-muted);
+      color: var(--blockscape-foreground);
+      box-shadow: none;
+    }
+
+    .btn-danger {
+      background: var(--color-danger-soft);
+      border-color: var(--color-danger);
+      color: var(--color-danger);
+    }
+
+    .btn-danger:hover {
+      background: #fbd1cf;
+      border-color: #b91c1c;
+    }
+
+    .blockscape-file {
+      position: relative;
+      overflow: hidden;
+    }
+
+    .blockscape-file input[type="file"] {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+    }
+
+    input[type="text"],
+    input[type="url"],
+    input[type="color"],
+    textarea,
+    select {
+      width: 100%;
+      background: var(--color-surface);
+      color: inherit;
+      border: 1px solid var(--color-border);
+      padding: 0.55rem 0.8rem;
+      border-radius: var(--radius-sm);
+      font-size: var(--font-size-sm);
+      font-family: inherit;
+      transition: border-color var(--transition), box-shadow var(--transition), background var(--transition);
+    }
+
+    input[type="color"] {
+      padding: 0.3rem;
+      height: 2.5rem;
+    }
+
+    textarea {
+      min-height: 8rem;
+      resize: vertical;
+    }
+
+    textarea#jsonArea {
+      min-height: 20rem;
+      font-family: var(--font-mono);
+      font-size: var(--font-size-sm);
+      line-height: 1.4;
+      background: var(--blockscape-surface-alt);
+    }
+
+    select[multiple] {
+      min-height: 8rem;
+    }
+
+    input[type="text"]:focus-visible,
+    input[type="url"]:focus-visible,
+    input[type="color"]:focus-visible,
+    textarea:focus-visible,
+    select:focus-visible {
+      outline: none;
+      border-color: var(--color-primary);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.18);
+      background: var(--color-primary-soft);
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-xs);
+      margin-bottom: var(--space-sm);
+    }
+
+    .field:last-child {
+      margin-bottom: 0;
+    }
+
+    .field-label {
+      font-size: var(--font-size-xs);
+      font-weight: var(--font-weight-semibold);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--blockscape-muted);
+    }
+
+    .detail-section {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-md);
+    }
+
+    .detail-section h2 {
+      font-size: var(--font-size-md);
+    }
+
+    .deps {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-xs);
+    }
+
+    .dep {
+      font-size: var(--font-size-xs);
+      padding: 0.15rem 0.55rem;
+      border-radius: 999px;
+      border: 1px solid var(--blockscape-border);
+      background: var(--blockscape-surface-alt);
+      color: var(--blockscape-foreground);
+    }
+
+    .status {
+      white-space: pre-wrap;
+      font-family: var(--font-mono);
+      font-size: var(--font-size-xs);
+      color: var(--blockscape-muted);
+    }
+
+    .status.error {
+      color: var(--color-danger);
+    }
+
+    .status.ok {
+      color: var(--color-success);
+    }
+
+    .kbd {
+      padding: 0.1rem 0.4rem;
+      border: 1px solid var(--color-border);
+      background: var(--color-surface-muted);
+      border-radius: var(--radius-sm);
+      font-family: var(--font-mono);
+      font-size: var(--font-size-xs);
+      color: var(--blockscape-foreground);
+    }
+
+    .kbd-hint {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2xs);
+      font-size: var(--font-size-xs);
+    }
+
+    footer {
+      padding: var(--space-sm) var(--space-lg) var(--space-lg);
+      background: var(--color-surface);
+      border-top: 1px solid var(--color-border);
+      font-size: var(--font-size-xs);
+      color: var(--color-muted);
+      text-align: center;
+    }
+
+    @media (max-width: 1024px) {
+      .blockscape-toolbar {
+        justify-content: center;
+      }
+
+      .blockscape-toolbar__controls {
+        justify-content: center;
+      }
+
+      .blockscape-editor__meta {
+        width: 100%;
+        justify-content: center;
+      }
+
+      .blockscape-content {
+        flex-direction: column;
+        width: calc(100% - 2 * var(--space-lg));
+      }
+
+      .blockscape-sidebar {
+        width: 100%;
+      }
+
+      .blockscape-editor__detail {
         position: static;
         max-height: none;
         overflow: visible;
@@ -42,127 +665,118 @@
       }
     }
 
-    /* LEFT: master list */
-    .master { display: grid; gap: 12px; align-content: start }
-    .detail {
-      display: grid;
-      gap: 12px;
-      align-content: start;
-      position: sticky;
-      top: 12px;
-      align-self: start;
-      max-height: calc(100vh - 36px);
-      overflow-y: auto;
-      padding-right: 4px;
+    @media (max-width: 640px) {
+      .blockscape-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .blockscape-toolbar__controls {
+        width: 100%;
+        gap: var(--space-xs);
+      }
+
+      .blockscape-toolbar__controls .pf-v5-c-button,
+      .blockscape-toolbar__controls button,
+      .blockscape-toolbar__controls label {
+        flex: 1 1 auto;
+      }
+
+      .blockscape-editor__meta {
+        white-space: normal;
+      }
     }
-    .toolbar { display: flex; gap: 8px; flex-wrap: wrap }
-    button, .btn { cursor: pointer; border: 1px solid var(--border); background: var(--panel-2); color: var(--text); padding: 6px 10px; border-radius: 8px; font-weight: 600 }
-    button:hover { border-color: var(--accent) }
-    .btn-danger { background: #31161b; border-color: #5a1f27; color: #ff9aa3 }
-    .btn-ok { background: #163127; border-color: #2b5a46; color: #9cf2cd }
-    .btn-warn { background: #2f2a0e; border-color: #665c1c; color: #ffe199 }
-    .row { display: flex; gap: 8px; align-items: center }
-    .grow { flex: 1 }
-    input[type="text"], input[type="url"], input[type="color"], textarea, select {
-      width: 100%; background: var(--panel-2); color: var(--text); border: 1px solid var(--border);
-      padding: 7px 9px; border-radius: 8px; font-size: 14px; outline: none
-    }
-    textarea { min-height: 86px; resize: vertical }
-
-    .card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 10px; }
-    .selectable { cursor: pointer; border-radius: 10px; padding: 8px; border: 1px solid transparent; background: var(--panel-2); transition: border-color 0.15s ease, background-color 0.15s ease; }
-    .selectable:hover { border-color: var(--accent); }
-    .cat { border: 1px solid var(--border); border-radius: 12px; padding: 8px; background: #15182a; display: grid; gap: 8px }
-    .cat[draggable="true"] { cursor: grab }
-    .cat-header { display:flex; align-items:center; gap:8px; justify-content: space-between; }
-    .cat-title { display:flex; gap:8px; align-items:center }
-    .item-list { display: grid; gap: 6px }
-    .item { background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px; padding: 8px; display:flex; justify-content: space-between; align-items:center }
-    .item[draggable="true"] { cursor: grab }
-    .selected { border-color: var(--accent); background: #1a2642; }
-    .drag-over { outline: 2px dashed var(--accent); outline-offset: 2px }
-    .pill { font-size: 12px; padding: 2px 6px; border-radius: 9999px; background: #202549; border: 1px solid var(--border); color: var(--muted) }
-
-    .deps { display:flex; flex-wrap: wrap; gap: 6px; margin-top: 6px }
-    .dep { font-size: 12px; padding: 2px 6px; border-radius: 9999px; background: #1d2639; border: 1px solid #2d3650 }
-    .field-row { display:grid; gap:8px; grid-template-columns: repeat(6, 1fr) }
-    .field-row > .col-2 { grid-column: span 2 }
-    .field-row > .col-3 { grid-column: span 3 }
-    .field-row > .col-4 { grid-column: span 4 }
-    .field-row > .col-6 { grid-column: span 6 }
-
-    .right { display: grid; gap: 12px }
-    .status { white-space: pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace; font-size: 12px; color: var(--muted) }
-    .error { color: var(--danger) }
-    .ok { color: var(--ok) }
-    .muted { color: var(--muted) }
-    .kbd { padding: 1px 6px; border:1px solid var(--border); background: #101325; border-radius: 6px; font-family: ui-monospace; font-size: 12px }
-    .field { display: grid; gap: 6px; margin-bottom: 12px }
-    .field:last-child { margin-bottom: 0 }
-    .field-label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted) }
-    .detail-section { display: grid; gap: 12px }
-    .detail-section h2 { margin: 0; font-size: 18px }
   </style>
 </head>
 <body>
-  <header>
-    <h1>Blockscape JSON Editor <span class="small">— Plain JS, drag & drop, bidirectional JSON sync</span></h1>
-  </header>
+  <div class="pf-v5-c-page">
+    <header class="pf-v5-c-page__header">
+      <div class="pf-v5-c-masthead pf-m-display-inline blockscape-masthead">
+        <div class="pf-v5-c-masthead__content">
+          <div class="blockscape-toolbar">
+            <div class="blockscape-brand">
+              <h1>Blockscape</h1>
+              <span class="brand-sub">Editor</span>
+            </div>
+            <div class="blockscape-toolbar__controls">
+              <button id="addCategoryBtn" class="pf-v5-c-button pf-m-secondary" type="button" title="Add category (Alt+C)">+ Category</button>
+              <button id="addItemBtn" class="pf-v5-c-button pf-m-secondary" type="button" title="Add item to selected category (Alt+I)">+ Item</button>
+              <button id="validateBtn" class="pf-v5-c-button pf-m-primary" type="button" title="Validate JSON and references (Alt+V)">Validate</button>
+              <button id="downloadBtn" class="pf-v5-c-button pf-m-tertiary" type="button" title="Download JSON (Ctrl+S)">Download</button>
+              <label class="pf-v5-c-button pf-m-secondary blockscape-file" title="Open JSON from file (Ctrl+O)">
+                <span>Load File</span>
+                <input id="fileInput" type="file" accept="application/json" />
+              </label>
+              <a href="./index.html" class="pf-v5-c-button pf-m-secondary" role="button">
+                <span>Viewer</span>
+              </a>
 
-  <main>
-    <!-- LEFT SIDE: master list -->
-    <section class="master">
-      <div class="card">
-        <div id="abstractPreview" class="selectable" tabindex="0" role="button" aria-label="Edit abstract">
-          <div class="row" style="justify-content: space-between; align-items: center;">
-            <label class="pill">Abstract</label>
-            <small id="abstractSummary" class="muted"></small>
-          </div>
-          <p id="abstractSnippet" class="muted" style="margin: 8px 0 0 0; font-size: 13px;"></p>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="toolbar">
-          <button id="addCategoryBtn" title="Add category (Alt+C)">+ Category</button>
-          <button id="addItemBtn" title="Add item to selected category (Alt+I)">+ Item</button>
-          <button id="validateBtn" class="btn-ok" title="Validate JSON and references (Alt+V)">Validate</button>
-          <button id="downloadBtn" title="Download JSON (Ctrl+S)">Download</button>
-          <label class="btn" for="fileInput" title="Open JSON from file (Ctrl+O)">Open<input id="fileInput" type="file" accept="application/json" style="display:none"></label>
-        </div>
-        <div id="categories" class="grid" aria-live="polite" aria-label="Categories"></div>
-      </div>
-    </section>
-
-    <!-- RIGHT SIDE: detail + JSON -->
-    <section class="detail">
-      <div class="card" id="detailPanel" aria-live="polite" aria-label="Details"></div>
-      <div class="card">
-        <div class="row" style="justify-content:space-between; align-items: baseline;">
-          <label class="pill">JSON (live)</label>
-          <small class="muted">Schema: { categories:[{id,title,items:[{id,name,logo?,external?,color?,deps:[] }]}], links?:[{from,to}] }</small>
-        </div>
-        <textarea id="jsonArea" spellcheck="false" aria-label="JSON"></textarea>
-        <div class="row" style="justify-content: space-between;">
-          <small class="muted">Edits here update the UI. UI edits update this JSON.</small>
-          <div>
-            <span class="kbd">Alt+C</span> add category
-            <span class="kbd">Alt+I</span> add item
-            <span class="kbd">Alt+V</span> validate
-            <span class="kbd">Ctrl+S</span> download
-            <span class="kbd">Ctrl+O</span> open
+              
+            </div>
+            <div class="blockscape-editor__meta">
+              <span>Plain JS</span>
+              <span>Drag &amp; drop</span>
+              <span>Live JSON</span>
+            </div>
           </div>
         </div>
       </div>
-      <div class="card">
-        <div id="status" class="status">Ready.</div>
-      </div>
-    </section>
-  </main>
+    </header>
 
-  <footer>
-    <small class="muted">No external libs. Data is kept in-memory only. Drag to reorder categories and items; drag items between categories.</small>
-  </footer>
+    <main class="pf-v5-c-page__main">
+      <div class="blockscape-content">
+        <section class="master blockscape-sidebar">
+          <div class="card card--abstract">
+            <div id="abstractPreview" class="selectable" tabindex="0" role="button" aria-label="Edit abstract">
+              <div class="row" style="justify-content: space-between;">
+                <span class="pill">Abstract</span>
+                <small id="abstractSummary" class="muted"></small>
+              </div>
+              <p id="abstractSnippet" class="muted" style="margin: 0; font-size: var(--font-size-sm); line-height: 1.4;"></p>
+            </div>
+          </div>
+
+          <div class="card card--categories">
+            <div class="row" style="justify-content: space-between;">
+              <span class="pill">Categories</span>
+              <small class="muted">Drag to reorder</small>
+            </div>
+            <div id="categories" class="category-grid" aria-live="polite" aria-label="Categories"></div>
+          </div>
+        </section>
+
+        <section class="detail blockscape-editor__detail">
+          <div class="card" id="detailPanel" aria-live="polite" aria-label="Details"></div>
+
+          <div class="card card--json">
+            <div class="row" style="justify-content: space-between; align-items: baseline;">
+              <span class="pill">JSON (live)</span>
+              <small class="muted">Schema: { categories:[{id,title,items:[{id,name,logo?,external?,color?,deps:[]}]}], links?:[{from,to}] }</small>
+            </div>
+            <textarea id="jsonArea" spellcheck="false" aria-label="JSON"></textarea>
+            <div class="row" style="justify-content: space-between;">
+              <small class="muted">Edits here update the UI. UI edits update this JSON.</small>
+              <div class="row" style="gap: var(--space-sm);">
+                <span class="kbd-hint"><span class="kbd">Alt+C</span><small class="muted">category</small></span>
+                <span class="kbd-hint"><span class="kbd">Alt+I</span><small class="muted">item</small></span>
+                <span class="kbd-hint"><span class="kbd">Alt+V</span><small class="muted">validate</small></span>
+                <span class="kbd-hint"><span class="kbd">Ctrl+S</span><small class="muted">download</small></span>
+                <span class="kbd-hint"><span class="kbd">Ctrl+O</span><small class="muted">open</small></span>
+              </div>
+            </div>
+          </div>
+
+          <div class="card card--status">
+            <div id="status" class="status">Ready.</div>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <footer>
+      <small class="muted">No external libs. Data is kept in-memory only. Drag to reorder categories and items; drag items between categories.</small>
+    </footer>
+  </div>
 
 <script>
 (function(){
@@ -394,15 +1008,15 @@
     list.className = 'item-list';
     list.dataset.catId = cat.id;
 
-    cat.items.forEach(item => {
-      list.append(buildItemNode(cat, item));
+    cat.items.forEach((item, index) => {
+      list.append(buildItemNode(cat, item, index, cat.items.length));
     });
 
     catEl.append(header, list);
     return catEl;
   }
 
-  function buildItemNode(cat, item){
+  function buildItemNode(cat, item, index, total){
     const itemEl = document.createElement('div');
     itemEl.className = 'item selectable';
     itemEl.dataset.itemId = item.id;
@@ -421,6 +1035,9 @@
       }
     });
 
+    const itemBody = document.createElement('div');
+    itemBody.className = 'item-body';
+
     const name = document.createElement('span');
     name.className = 'item-name';
     name.dataset.itemId = item.id;
@@ -431,7 +1048,39 @@
     idBadge.dataset.itemId = item.id;
     idBadge.textContent = item.id;
 
-    itemEl.append(name, idBadge);
+    itemBody.append(name, idBadge);
+
+    const actions = document.createElement('div');
+    actions.className = 'item-actions';
+
+    const upBtn = document.createElement('button');
+    upBtn.type = 'button';
+    upBtn.className = 'pf-v5-c-button pf-m-plain';
+    upBtn.title = 'Move item up';
+    upBtn.setAttribute('aria-label', 'Move item up');
+    upBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 3.2 3.2 8H6v4h4V8h2.8z"/></svg>';
+    upBtn.addEventListener('click', (event)=>{
+      event.stopPropagation();
+      moveItem(cat.id, item.id, -1);
+    });
+
+    const downBtn = document.createElement('button');
+    downBtn.type = 'button';
+    downBtn.className = 'pf-v5-c-button pf-m-plain';
+    downBtn.title = 'Move item down';
+    downBtn.setAttribute('aria-label', 'Move item down');
+    downBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="m8 12.8 4.8-4.8H10V4H6v4H3.2z"/></svg>';
+    downBtn.addEventListener('click', (event)=>{
+      event.stopPropagation();
+      moveItem(cat.id, item.id, 1);
+    });
+
+    if (index <= 0) upBtn.disabled = true;
+    if (index === total - 1) downBtn.disabled = true;
+
+    actions.append(upBtn, downBtn);
+
+    itemEl.append(itemBody, actions);
     return itemEl;
   }
 
@@ -920,6 +1569,18 @@
       }
       render();
     }
+  }
+
+  function moveItem(catId, itemId, delta){
+    const cat = model.categories.find(c=>c.id === catId); if (!cat) return;
+    const fromIdx = cat.items.findIndex(it => it.id === itemId);
+    if (fromIdx < 0) return;
+    const toIdx = fromIdx + delta;
+    if (toIdx < 0 || toIdx >= cat.items.length) return;
+    const [moved] = cat.items.splice(fromIdx, 1);
+    cat.items.splice(toIdx, 0, moved);
+    selection = { type: 'item', id: itemId, catId };
+    render();
   }
 
   /** ----------------------------- Sync ----------------------------- */

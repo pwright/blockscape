@@ -127,17 +127,23 @@ This is a client-side only application with no build process required. Simply op
 1. Add SVG files to the `logos/` directory
 2. Reference them in your JSON model using the path `"logos/filename.svg"`
 
-### End-to-end Test
+### End-to-end Tests
 
-Right-click previews are covered by a Cypress test.
+Two Cypress specs exercise both entry points:
+
+- `cypress/e2e/model-preview.cy.js` (landing page preview workflow)
+- `cypress/e2e/editor-workflow.cy.js` (JSON editor CRUD + reorder workflow)
+
+Steps:
 
 1. Install dependencies with `npm install`
-2. Start a static server in one terminal: `npm run serve`
-3. Run the test in another terminal:
+2. In the first terminal, start the static server and leave it running: `npm run serve`
+3. In another terminal (and after unsetting Electron overrides with `unset ELECTRON_RUN_AS_NODE ELECTRON_NO_ATTACH_CONSOLE` if they are present), run:
    - Headless: `npm run cypress:run`
    - Interactive: `npm run cypress:open`
+   - JSON report + artefacts: `npm run cypress:report` (writes `cypress/results/report.json`, videos, and failure screenshots)
 
-The spec `cypress/e2e/model-preview.cy.js` visits `index.html`, switches to another model, and asserts that the preview popup opens on right-click.
+See `cypress.md` for troubleshooting notes and more detail on the captured artefacts.
 
 ## License
 

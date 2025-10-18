@@ -5,7 +5,8 @@
   "scripts": {
     "serve": "http-server -c-1 -p 4173 .",
     "cypress:open": "cypress open",
-    "cypress:run": "cypress run"
+    "cypress:run": "cypress run",
+    "cypress:report": "ELECTRON_RUN_AS_NODE= ELECTRON_NO_ATTACH_CONSOLE= cypress run --reporter json > cypress/results/report.json"
   },
   "devDependencies": {
     "cypress": "^13.7.3",
