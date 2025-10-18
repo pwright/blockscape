@@ -1,0 +1,1021 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Blockscape JSON Editor</title>
+  <style>
+    :root {
+      --bg: #0f1222;
+      --panel: #171a2b;
+      --panel-2: #1e2238;
+      --text: #e6e9f2;
+      --muted: #a9b0c7;
+      --accent: #6aa9ff;
+      --danger: #ff5d6c;
+      --ok: #40d39c;
+      --warn: #ffcc66;
+      --border: #2b3050;
+    }
+    * { box-sizing: border-box }
+    html, body { height: 100% }
+    body {
+      margin: 0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      background: var(--bg);
+      color: var(--text);
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      gap: 10px;
+    }
+    header, footer { padding: 10px 12px; background: var(--panel); border-bottom: 1px solid var(--border) }
+    header h1 { font-size: 18px; margin: 0 }
+    header .small { color: var(--muted); font-size: 12px }
+    main { display: grid; gap: 12px; grid-template-columns: 320px 1fr; padding: 12px; align-items: start }
+    @media (max-width: 1100px) {
+      main { grid-template-columns: 1fr }
+      .detail {
+        position: static;
+        max-height: none;
+        overflow: visible;
+        padding-right: 0;
+      }
+    }
+
+    /* LEFT: master list */
+    .master { display: grid; gap: 12px; align-content: start }
+    .detail {
+      display: grid;
+      gap: 12px;
+      align-content: start;
+      position: sticky;
+      top: 12px;
+      align-self: start;
+      max-height: calc(100vh - 36px);
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+    .toolbar { display: flex; gap: 8px; flex-wrap: wrap }
+    button, .btn { cursor: pointer; border: 1px solid var(--border); background: var(--panel-2); color: var(--text); padding: 6px 10px; border-radius: 8px; font-weight: 600 }
+    button:hover { border-color: var(--accent) }
+    .btn-danger { background: #31161b; border-color: #5a1f27; color: #ff9aa3 }
+    .btn-ok { background: #163127; border-color: #2b5a46; color: #9cf2cd }
+    .btn-warn { background: #2f2a0e; border-color: #665c1c; color: #ffe199 }
+    .row { display: flex; gap: 8px; align-items: center }
+    .grow { flex: 1 }
+    input[type="text"], input[type="url"], input[type="color"], textarea, select {
+      width: 100%; background: var(--panel-2); color: var(--text); border: 1px solid var(--border);
+      padding: 7px 9px; border-radius: 8px; font-size: 14px; outline: none
+    }
+    textarea { min-height: 86px; resize: vertical }
+
+    .card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 10px; }
+    .selectable { cursor: pointer; border-radius: 10px; padding: 8px; border: 1px solid transparent; background: var(--panel-2); transition: border-color 0.15s ease, background-color 0.15s ease; }
+    .selectable:hover { border-color: var(--accent); }
+    .cat { border: 1px solid var(--border); border-radius: 12px; padding: 8px; background: #15182a; display: grid; gap: 8px }
+    .cat[draggable="true"] { cursor: grab }
+    .cat-header { display:flex; align-items:center; gap:8px; justify-content: space-between; }
+    .cat-title { display:flex; gap:8px; align-items:center }
+    .item-list { display: grid; gap: 6px }
+    .item { background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px; padding: 8px; display:flex; justify-content: space-between; align-items:center }
+    .item[draggable="true"] { cursor: grab }
+    .selected { border-color: var(--accent); background: #1a2642; }
+    .drag-over { outline: 2px dashed var(--accent); outline-offset: 2px }
+    .pill { font-size: 12px; padding: 2px 6px; border-radius: 9999px; background: #202549; border: 1px solid var(--border); color: var(--muted) }
+
+    .deps { display:flex; flex-wrap: wrap; gap: 6px; margin-top: 6px }
+    .dep { font-size: 12px; padding: 2px 6px; border-radius: 9999px; background: #1d2639; border: 1px solid #2d3650 }
+    .field-row { display:grid; gap:8px; grid-template-columns: repeat(6, 1fr) }
+    .field-row > .col-2 { grid-column: span 2 }
+    .field-row > .col-3 { grid-column: span 3 }
+    .field-row > .col-4 { grid-column: span 4 }
+    .field-row > .col-6 { grid-column: span 6 }
+
+    .right { display: grid; gap: 12px }
+    .status { white-space: pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace; font-size: 12px; color: var(--muted) }
+    .error { color: var(--danger) }
+    .ok { color: var(--ok) }
+    .muted { color: var(--muted) }
+    .kbd { padding: 1px 6px; border:1px solid var(--border); background: #101325; border-radius: 6px; font-family: ui-monospace; font-size: 12px }
+    .field { display: grid; gap: 6px; margin-bottom: 12px }
+    .field:last-child { margin-bottom: 0 }
+    .field-label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted) }
+    .detail-section { display: grid; gap: 12px }
+    .detail-section h2 { margin: 0; font-size: 18px }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Blockscape JSON Editor <span class="small">— Plain JS, drag & drop, bidirectional JSON sync</span></h1>
+  </header>
+
+  <main>
+    <!-- LEFT SIDE: master list -->
+    <section class="master">
+      <div class="card">
+        <div id="abstractPreview" class="selectable" tabindex="0" role="button" aria-label="Edit abstract">
+          <div class="row" style="justify-content: space-between; align-items: center;">
+            <label class="pill">Abstract</label>
+            <small id="abstractSummary" class="muted"></small>
+          </div>
+          <p id="abstractSnippet" class="muted" style="margin: 8px 0 0 0; font-size: 13px;"></p>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="toolbar">
+          <button id="addCategoryBtn" title="Add category (Alt+C)">+ Category</button>
+          <button id="addItemBtn" title="Add item to selected category (Alt+I)">+ Item</button>
+          <button id="validateBtn" class="btn-ok" title="Validate JSON and references (Alt+V)">Validate</button>
+          <button id="downloadBtn" title="Download JSON (Ctrl+S)">Download</button>
+          <label class="btn" for="fileInput" title="Open JSON from file (Ctrl+O)">Open<input id="fileInput" type="file" accept="application/json" style="display:none"></label>
+        </div>
+        <div id="categories" class="grid" aria-live="polite" aria-label="Categories"></div>
+      </div>
+    </section>
+
+    <!-- RIGHT SIDE: detail + JSON -->
+    <section class="detail">
+      <div class="card" id="detailPanel" aria-live="polite" aria-label="Details"></div>
+      <div class="card">
+        <div class="row" style="justify-content:space-between; align-items: baseline;">
+          <label class="pill">JSON (live)</label>
+          <small class="muted">Schema: { categories:[{id,title,items:[{id,name,logo?,external?,color?,deps:[] }]}], links?:[{from,to}] }</small>
+        </div>
+        <textarea id="jsonArea" spellcheck="false" aria-label="JSON"></textarea>
+        <div class="row" style="justify-content: space-between;">
+          <small class="muted">Edits here update the UI. UI edits update this JSON.</small>
+          <div>
+            <span class="kbd">Alt+C</span> add category
+            <span class="kbd">Alt+I</span> add item
+            <span class="kbd">Alt+V</span> validate
+            <span class="kbd">Ctrl+S</span> download
+            <span class="kbd">Ctrl+O</span> open
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div id="status" class="status">Ready.</div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <small class="muted">No external libs. Data is kept in-memory only. Drag to reorder categories and items; drag items between categories.</small>
+  </footer>
+
+<script>
+(function(){
+  "use strict";
+  /**
+   * Blockscape JSON Editor
+   * - Plain JS, single-file, no dependencies.
+   * - Bidirectional sync: structured UI <-> JSON textarea.
+   * - Drag & drop: reorder categories; reorder/move items.
+   * - CRUD for categories and items.
+   * - Optional fields supported: logo, external, color.
+   * - Minimal referential integrity checks for deps and id uniqueness.
+   *
+   * Console logging is included to aid debugging.
+   */
+
+  /** ----------------------------- Utilities ----------------------------- */
+  const $ = (sel, el=document) => el.querySelector(sel);
+  const $$ = (sel, el=document) => Array.from(el.querySelectorAll(sel));
+  const uid = (p) => `${p}_${Math.random().toString(36).slice(2,8)}`;
+
+  function debounce(fn, ms){
+    let t; return (...args)=>{ clearTimeout(t); t=setTimeout(()=>fn(...args), ms); };
+  }
+
+  function download(filename, text){
+    const blob = new Blob([text], {type: 'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename; a.click(); URL.revokeObjectURL(url);
+  }
+
+  function setStatus(msg, cls){
+    const el = $('#status');
+    el.textContent = msg;
+    el.className = 'status ' + (cls || '');
+    console.log('[status]', msg);
+  }
+
+  /** ----------------------------- Model ----------------------------- */
+  /** Internal canonical model. */
+  let model = {
+    abstract: "",
+    categories: [],
+    // passthrough: we preserve unknown top-level fields to avoid data loss
+  };
+
+  /** Unknown top-level keys we keep when round-tripping JSON. */
+  let passthrough = {};
+
+  /** Serialize model + passthrough to JSON string. */
+  function toJSONString(){
+    const out = { ...passthrough, abstract: model.abstract, categories: structuredClone(model.categories) };
+    return JSON.stringify(out, null, 2);
+  }
+
+  /** Parse JSON string to model; throws with details on failure. */
+  function parseJSONString(text){
+    const raw = JSON.parse(text);
+    if (!raw || typeof raw !== 'object') throw new Error('Root must be an object');
+    if (!Array.isArray(raw.categories)) throw new Error('Missing required array: categories');
+
+    // Keep unknown top-level keys
+    const { abstract = "", categories, ...rest } = raw;
+    passthrough = rest;
+
+    // Normalize categories and items
+    const cats = categories.map((c,i)=>({
+      id: String(c.id ?? uid('cat')).trim() || uid('cat'),
+      title: String(c.title ?? c.id ?? `Category ${i+1}`),
+      items: Array.isArray(c.items) ? c.items.map((it,j)=>({
+        id: String(it.id ?? uid('item')).trim() || uid('item'),
+        name: String(it.name ?? it.id ?? `Item ${j+1}`),
+        logo: it.logo ?? undefined,
+        external: it.external ?? undefined,
+        color: it.color ?? undefined,
+        deps: Array.isArray(it.deps) ? it.deps.map(String) : []
+      })) : []
+    }));
+
+    model = { abstract: String(abstract ?? ''), categories: cats };
+  }
+
+  /** Validate id uniqueness and dependency references. */
+  function validate(){
+    const messages = [];
+    const ids = new Map();
+
+    // Collect item ids across all categories
+    const itemIds = new Set();
+    model.categories.forEach(c => c.items.forEach(it => itemIds.add(it.id)));
+
+    // Check category ids
+    for (const c of model.categories){
+      if (ids.has(c.id)) messages.push(`Duplicate category id: ${c.id}`);
+      ids.set(c.id, true);
+      // Check item ids in this category
+      const local = new Set();
+      for (const it of c.items){
+        if (ids.has(it.id) || local.has(it.id)) messages.push(`Duplicate item id: ${it.id}`);
+        local.add(it.id); ids.set(it.id, true);
+        // deps must exist
+        for (const d of (it.deps||[])){
+          if (!itemIds.has(d)) messages.push(`Missing dep id '${d}' referenced by item '${it.id}'`);
+          if (d === it.id) messages.push(`Item '${it.id}' cannot depend on itself`);
+        }
+      }
+    }
+
+    if (messages.length){
+      setStatus("Validation errors:\n- " + messages.join("\n- "), 'error');
+      return { ok:false, messages };
+    }
+
+    setStatus('Validation OK. ' + (Object.keys(passthrough).length?`(Kept extra keys: ${Object.keys(passthrough).join(', ')})`:'') , 'ok');
+    return { ok:true, messages:[] };
+  }
+
+  /** ----------------------------- Rendering ----------------------------- */
+  const categoriesEl = $('#categories');
+  const abstractPreview = $('#abstractPreview');
+  const abstractSummary = $('#abstractSummary');
+  const abstractSnippet = $('#abstractSnippet');
+  const detailPanel = $('#detailPanel');
+  const jsonArea = $('#jsonArea');
+
+  let selection = { type: 'abstract' };
+
+  abstractPreview.addEventListener('click', ()=> selectAbstract());
+  abstractPreview.addEventListener('keydown', (e)=>{
+    if (e.key === 'Enter' || e.key === ' '){
+      e.preventDefault();
+      selectAbstract();
+    }
+  });
+
+  function createField(labelText, control){
+    const wrapper = document.createElement('div');
+    wrapper.className = 'field';
+    const label = document.createElement('div');
+    label.className = 'field-label';
+    label.textContent = labelText;
+    wrapper.append(label, control);
+    return wrapper;
+  }
+
+  // Render entire UI from model
+  function render(){
+    console.log('[render] model', model);
+    renderAbstractPreview();
+    renderMasterList();
+    renderDetail();
+    updateSelectionUI();
+    jsonArea.value = toJSONString();
+  }
+
+  function renderAbstractPreview(){
+    const text = (model.abstract || '').trim();
+    const wordCount = text ? text.split(/\s+/).filter(Boolean).length : 0;
+    abstractSummary.textContent = text ? `${wordCount} word${wordCount === 1 ? '' : 's'}` : 'No abstract yet';
+    const snippet = text ? text.slice(0, 140) + (text.length > 140 ? '…' : '') : 'Click to add an abstract.';
+    abstractSnippet.textContent = snippet;
+  }
+
+  function renderMasterList(){
+    categoriesEl.innerHTML = '';
+    model.categories.forEach(cat => {
+      categoriesEl.append(buildCategoryNode(cat));
+    });
+    enableCategoryDnD();
+    enableItemDnD();
+  }
+
+  function buildCategoryNode(cat){
+    const catEl = document.createElement('div');
+    catEl.className = 'cat selectable';
+    catEl.dataset.catId = cat.id;
+    catEl.draggable = true;
+    catEl.tabIndex = 0;
+
+    catEl.addEventListener('click', (e)=>{
+      if ((e.target instanceof HTMLElement) && e.target.closest('.item')) return;
+      selectCategory(cat.id);
+    });
+    catEl.addEventListener('keydown', (e)=>{
+      if (e.key === 'Enter' || e.key === ' '){
+        e.preventDefault();
+        selectCategory(cat.id);
+      }
+    });
+
+    const header = document.createElement('div');
+    header.className = 'cat-header';
+
+    const left = document.createElement('div');
+    left.className = 'cat-title';
+
+    const drag = document.createElement('span');
+    drag.className = 'pill';
+    drag.textContent = '≡';
+    drag.title = 'Drag to reorder category';
+
+    const title = document.createElement('span');
+    title.className = 'cat-title-text';
+    title.dataset.catId = cat.id;
+    title.textContent = cat.title || '(Untitled category)';
+
+    left.append(drag, title);
+
+    const right = document.createElement('div');
+    right.className = 'row';
+    right.style.gap = '6px';
+
+    const idBadge = document.createElement('span');
+    idBadge.className = 'pill muted cat-id-text';
+    idBadge.dataset.catId = cat.id;
+    idBadge.textContent = cat.id;
+
+    const count = document.createElement('span');
+    count.className = 'pill';
+    count.dataset.catId = cat.id;
+    count.textContent = `${cat.items.length} item${cat.items.length === 1 ? '' : 's'}`;
+
+    right.append(idBadge, count);
+
+    header.append(left, right);
+
+    const list = document.createElement('div');
+    list.className = 'item-list';
+    list.dataset.catId = cat.id;
+
+    cat.items.forEach(item => {
+      list.append(buildItemNode(cat, item));
+    });
+
+    catEl.append(header, list);
+    return catEl;
+  }
+
+  function buildItemNode(cat, item){
+    const itemEl = document.createElement('div');
+    itemEl.className = 'item selectable';
+    itemEl.dataset.itemId = item.id;
+    itemEl.dataset.catId = cat.id;
+    itemEl.draggable = true;
+    itemEl.tabIndex = 0;
+
+    itemEl.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      selectItem(cat.id, item.id);
+    });
+    itemEl.addEventListener('keydown', (e)=>{
+      if (e.key === 'Enter' || e.key === ' '){
+        e.preventDefault();
+        selectItem(cat.id, item.id);
+      }
+    });
+
+    const name = document.createElement('span');
+    name.className = 'item-name';
+    name.dataset.itemId = item.id;
+    name.textContent = item.name || '(Untitled item)';
+
+    const idBadge = document.createElement('span');
+    idBadge.className = 'pill item-id';
+    idBadge.dataset.itemId = item.id;
+    idBadge.textContent = item.id;
+
+    itemEl.append(name, idBadge);
+    return itemEl;
+  }
+
+  function renderDetail(){
+    detailPanel.innerHTML = '';
+    let content;
+    if (selection.type === 'abstract'){
+      content = renderAbstractDetail();
+    } else if (selection.type === 'category'){
+      const cat = model.categories.find(c=>c.id === selection.id);
+      if (!cat){
+        selection = { type: 'abstract' };
+        updateSelectionUI();
+        renderDetail();
+        return;
+      }
+      content = renderCategoryDetail(cat);
+    } else if (selection.type === 'item'){
+      const cat = model.categories.find(c=>c.id === selection.catId);
+      const item = cat?.items.find(it => it.id === selection.id);
+      if (!cat || !item){
+        selection = { type: 'abstract' };
+        updateSelectionUI();
+        renderDetail();
+        return;
+      }
+      content = renderItemDetail(cat, item);
+    } else {
+      content = document.createElement('div');
+      content.textContent = 'Select something to edit.';
+    }
+    detailPanel.append(content);
+  }
+
+  function renderAbstractDetail(){
+    const wrap = document.createElement('div');
+    wrap.className = 'detail-section';
+
+    const heading = document.createElement('h2');
+    heading.textContent = 'Abstract';
+    wrap.append(heading);
+
+    const textarea = document.createElement('textarea');
+    textarea.value = model.abstract || '';
+    textarea.placeholder = 'Describe your domain...';
+    textarea.addEventListener('input', ()=>{
+      model.abstract = textarea.value;
+      renderAbstractPreview();
+      syncJSON();
+    });
+
+    wrap.append(createField('Abstract', textarea));
+    return wrap;
+  }
+
+  function renderCategoryDetail(cat){
+    const wrap = document.createElement('div');
+    wrap.className = 'detail-section';
+
+    const heading = document.createElement('h2');
+    heading.textContent = 'Category';
+    wrap.append(heading);
+
+    const info = document.createElement('div');
+    info.className = 'muted';
+    info.textContent = `${cat.items.length} item${cat.items.length === 1 ? '' : 's'}`;
+    wrap.append(info);
+
+    const titleInput = document.createElement('input');
+    titleInput.type = 'text';
+    titleInput.value = cat.title;
+    titleInput.placeholder = 'Category title';
+    titleInput.addEventListener('input', ()=>{
+      cat.title = titleInput.value;
+      const titleEl = categoriesEl.querySelector(`.cat-title-text[data-cat-id="${cat.id}"]`);
+      if (titleEl){ titleEl.textContent = cat.title || '(Untitled category)'; }
+      syncJSON();
+    });
+    wrap.append(createField('Title', titleInput));
+
+    const idInput = document.createElement('input');
+    idInput.type = 'text';
+    idInput.value = cat.id;
+    idInput.placeholder = 'category-id';
+    idInput.addEventListener('change', ()=>{
+      const oldId = cat.id;
+      const next = idInput.value.trim();
+      if (!next){
+        idInput.value = oldId;
+        return;
+      }
+      if (model.categories.some(c => c !== cat && c.id === next)){
+        alert(`Category id '${next}' already exists.`);
+        idInput.value = oldId;
+        return;
+      }
+      cat.id = next;
+      const catEl = categoriesEl.querySelector(`.cat[data-cat-id="${oldId}"]`);
+      if (catEl){
+        catEl.dataset.catId = next;
+        const list = catEl.querySelector('.item-list');
+        if (list) list.dataset.catId = next;
+        catEl.querySelectorAll('.item').forEach(itEl => itEl.dataset.catId = next);
+      }
+      const idBadge = categoriesEl.querySelector(`.cat-id-text[data-cat-id="${oldId}"]`);
+      if (idBadge){
+        idBadge.dataset.catId = next;
+        idBadge.textContent = next;
+      }
+      if (selection.type === 'category' && selection.id === oldId){ selection.id = next; }
+      if (selection.type === 'item' && selection.catId === oldId){ selection.catId = next; }
+      syncJSON();
+      updateSelectionUI();
+      renderDetail();
+    });
+    wrap.append(createField('ID', idInput));
+
+    const actions = document.createElement('div');
+    actions.className = 'row';
+    actions.style.justifyContent = 'space-between';
+
+    const addBtn = document.createElement('button');
+    addBtn.textContent = '+ Item';
+    addBtn.addEventListener('click', ()=>{ addItem(cat.id); });
+
+    const deleteBtn = document.createElement('button');
+    deleteBtn.textContent = 'Delete category';
+    deleteBtn.className = 'btn-danger';
+    deleteBtn.addEventListener('click', ()=>{
+      if (confirm(`Delete category '${cat.title || cat.id}' and its items?`)){
+        removeCategory(cat.id);
+      }
+    });
+
+    actions.append(addBtn, deleteBtn);
+    wrap.append(actions);
+
+    return wrap;
+  }
+
+  function renderItemDetail(cat, item){
+    const wrap = document.createElement('div');
+    wrap.className = 'detail-section';
+
+    const header = document.createElement('div');
+    header.className = 'row';
+    header.style.justifyContent = 'space-between';
+
+    const heading = document.createElement('h2');
+    heading.textContent = item.name || 'Item';
+    header.append(heading);
+
+    const idBadge = document.createElement('span');
+    idBadge.className = 'pill';
+    idBadge.textContent = item.id;
+    header.append(idBadge);
+
+    wrap.append(header);
+
+    const catLabel = document.createElement('div');
+    catLabel.className = 'muted';
+    catLabel.textContent = `Category: ${cat.title || cat.id}`;
+    wrap.append(catLabel);
+
+    const nameInput = document.createElement('input');
+    nameInput.type = 'text';
+    nameInput.value = item.name;
+    nameInput.placeholder = 'Item name';
+    nameInput.addEventListener('input', ()=>{
+      item.name = nameInput.value;
+      const nameEl = categoriesEl.querySelector(`.item-name[data-item-id="${item.id}"]`);
+      if (nameEl){ nameEl.textContent = item.name || '(Untitled item)'; }
+      heading.textContent = item.name || 'Item';
+      syncJSON();
+    });
+    wrap.append(createField('Name', nameInput));
+
+    const idInput = document.createElement('input');
+    idInput.type = 'text';
+    idInput.value = item.id;
+    idInput.placeholder = 'item-id';
+    idInput.addEventListener('change', ()=>{
+      const oldId = item.id;
+      const next = idInput.value.trim();
+      if (!next){
+        idInput.value = oldId;
+        return;
+      }
+      if (model.categories.some(c=>c.items.some(it=>it !== item && it.id === next))){
+        alert(`Item id '${next}' already exists.`);
+        idInput.value = oldId;
+        return;
+      }
+      model.categories.forEach(c=>c.items.forEach(x=>{
+        x.deps = (x.deps||[]).map(d => d === oldId ? next : d);
+      }));
+      item.id = next;
+      const itemEl = categoriesEl.querySelector(`.item[data-item-id="${oldId}"]`);
+      if (itemEl){
+        itemEl.dataset.itemId = next;
+        const badge = itemEl.querySelector('.item-id');
+        if (badge){ badge.dataset.itemId = next; badge.textContent = next; }
+        const nameEl = itemEl.querySelector('.item-name');
+        if (nameEl){ nameEl.dataset.itemId = next; }
+      }
+      idBadge.textContent = next;
+      if (selection.type === 'item' && selection.id === oldId){ selection.id = next; }
+      syncJSON();
+      renderDetail();
+      updateSelectionUI();
+    });
+    wrap.append(createField('ID', idInput));
+
+    const colorInput = document.createElement('input');
+    colorInput.type = 'color';
+    colorInput.value = item.color || '#6aa9ff';
+    colorInput.addEventListener('input', ()=>{
+      item.color = colorInput.value;
+      syncJSON();
+    });
+    wrap.append(createField('Color', colorInput));
+
+    const logoInput = document.createElement('input');
+    logoInput.type = 'url';
+    logoInput.value = item.logo || '';
+    logoInput.placeholder = 'https://...';
+    logoInput.addEventListener('input', ()=>{
+      item.logo = logoInput.value || undefined;
+      syncJSON();
+    });
+    wrap.append(createField('Logo (optional)', logoInput));
+
+    const externalInput = document.createElement('input');
+    externalInput.type = 'url';
+    externalInput.value = item.external || '';
+    externalInput.placeholder = 'https://...';
+    externalInput.addEventListener('input', ()=>{
+      item.external = externalInput.value || undefined;
+      syncJSON();
+    });
+    wrap.append(createField('External link (optional)', externalInput));
+
+    const depsField = document.createElement('div');
+    depsField.className = 'field';
+    const depsLabel = document.createElement('div');
+    depsLabel.className = 'field-label';
+    depsLabel.textContent = 'Dependencies';
+    depsField.append(depsLabel);
+
+    const depSelect = document.createElement('select');
+    depSelect.multiple = true;
+    const allItems = getAllItems();
+    depSelect.size = Math.min(8, Math.max(4, allItems.length || 4));
+    for (const optItem of allItems){
+      const opt = document.createElement('option');
+      opt.value = optItem.id;
+      opt.textContent = `${optItem.id} — ${optItem.name}`;
+      if (optItem.id === item.id) opt.disabled = true;
+      if ((item.deps || []).includes(optItem.id)) opt.selected = true;
+      depSelect.append(opt);
+    }
+    depsField.append(depSelect);
+
+    const depsBox = document.createElement('div');
+    depsBox.className = 'deps';
+    (item.deps || []).forEach(d => {
+      const chip = document.createElement('span');
+      chip.className = 'dep';
+      chip.textContent = d;
+      depsBox.append(chip);
+    });
+    depsField.append(depsBox);
+
+    depSelect.addEventListener('change', ()=>{
+      item.deps = Array.from(depSelect.selectedOptions).map(o=>o.value);
+      depsBox.innerHTML = '';
+      item.deps.forEach(d => {
+        const chip = document.createElement('span');
+        chip.className = 'dep';
+        chip.textContent = d;
+        depsBox.append(chip);
+      });
+      syncJSON();
+    });
+
+    wrap.append(depsField);
+
+    const dependents = getDependents(item.id);
+    if (dependents.length){
+      const usedField = document.createElement('div');
+      usedField.className = 'field';
+      const usedLabel = document.createElement('div');
+      usedLabel.className = 'field-label';
+      usedLabel.textContent = 'Used by';
+      const usedBox = document.createElement('div');
+      usedBox.className = 'deps';
+      dependents.forEach(dep => {
+        const chip = document.createElement('span');
+        chip.className = 'dep';
+        chip.textContent = dep.id;
+        chip.title = dep.name;
+        usedBox.append(chip);
+      });
+      usedField.append(usedLabel, usedBox);
+      wrap.append(usedField);
+    }
+
+    const actions = document.createElement('div');
+    actions.className = 'row';
+    actions.style.marginTop = '8px';
+    actions.style.justifyContent = 'space-between';
+
+    const deleteBtn = document.createElement('button');
+    deleteBtn.textContent = 'Delete item';
+    deleteBtn.className = 'btn-danger';
+    deleteBtn.addEventListener('click', ()=>{
+      if (confirm(`Delete item '${item.name || item.id}'?`)){
+        removeItem(cat.id, item.id);
+      }
+    });
+
+    actions.append(deleteBtn);
+    wrap.append(actions);
+
+    return wrap;
+  }
+
+  function updateSelectionUI(){
+    abstractPreview.classList.toggle('selected', selection.type === 'abstract');
+    $$('.cat', categoriesEl).forEach(catEl => {
+      catEl.classList.toggle('selected', selection.type === 'category' && catEl.dataset.catId === selection.id);
+    });
+    $$('.item', categoriesEl).forEach(itemEl => {
+      itemEl.classList.toggle('selected', selection.type === 'item' && itemEl.dataset.itemId === selection.id);
+    });
+  }
+
+  function selectAbstract(){
+    if (selection.type === 'abstract') {
+      updateSelectionUI();
+      return;
+    }
+    selection = { type: 'abstract' };
+    updateSelectionUI();
+    renderDetail();
+  }
+
+  function selectCategory(catId){
+    if (selection.type === 'category' && selection.id === catId){
+      updateSelectionUI();
+      return;
+    }
+    selection = { type: 'category', id: catId };
+    updateSelectionUI();
+    renderDetail();
+  }
+
+  function selectItem(catId, itemId){
+    if (selection.type === 'item' && selection.id === itemId) {
+      updateSelectionUI();
+      return;
+    }
+    selection = { type: 'item', id: itemId, catId };
+    updateSelectionUI();
+    renderDetail();
+  }
+
+  function getTargetCategoryId(){
+    if (selection.type === 'category') return selection.id;
+    if (selection.type === 'item') return selection.catId;
+    return model.categories[0]?.id;
+  }
+
+  function getAllItems(){
+    const arr = [];
+    for (const c of model.categories){ for (const it of c.items){ arr.push(it); } }
+    return arr;
+  }
+
+  function getDependents(itemId){
+    const arr = [];
+    for (const c of model.categories){
+      for (const it of c.items){
+        if ((it.deps || []).includes(itemId)){ arr.push(it); }
+      }
+    }
+    return arr;
+  }
+
+  /** ----------------------------- DnD ----------------------------- */
+  function enableCategoryDnD(){
+    $$('.cat', categoriesEl).forEach(catEl => {
+      catEl.addEventListener('dragstart', (e)=>{
+        e.dataTransfer.setData('text/plain', JSON.stringify({ type:'category', id: catEl.dataset.catId }));
+      });
+      catEl.addEventListener('dragover', (e)=>{ e.preventDefault(); catEl.classList.add('drag-over'); });
+      catEl.addEventListener('dragleave', ()=> catEl.classList.remove('drag-over'));
+      catEl.addEventListener('drop', (e)=>{
+        e.preventDefault(); catEl.classList.remove('drag-over');
+        const data = JSON.parse(e.dataTransfer.getData('text/plain'));
+        if (data.type !== 'category') return;
+        const fromIdx = model.categories.findIndex(c=>c.id===data.id);
+        const toIdx = model.categories.findIndex(c=>c.id===catEl.dataset.catId);
+        if (fromIdx<0 || toIdx<0 || fromIdx===toIdx) return;
+        const [moved] = model.categories.splice(fromIdx,1);
+        model.categories.splice(toIdx,0,moved);
+        render(); // re-render to refresh order
+      });
+    });
+  }
+
+  function enableItemDnD(){
+    $$('.item', categoriesEl).forEach(itemEl => {
+      itemEl.addEventListener('dragstart', (e)=>{
+        e.dataTransfer.setData('text/plain', JSON.stringify({ type:'item', itemId: itemEl.dataset.itemId, fromCatId: itemEl.dataset.catId }));
+      });
+    });
+
+    $$('.item-list', categoriesEl).forEach(listEl => {
+      listEl.addEventListener('dragover', (e)=>{ e.preventDefault(); listEl.classList.add('drag-over'); });
+      listEl.addEventListener('dragleave', ()=> listEl.classList.remove('drag-over'));
+      listEl.addEventListener('drop', (e)=>{
+        e.preventDefault(); listEl.classList.remove('drag-over');
+        const data = JSON.parse(e.dataTransfer.getData('text/plain'));
+        if (data.type !== 'item') return;
+        const fromCat = model.categories.find(c=>c.id===data.fromCatId);
+        const toCat = model.categories.find(c=>c.id===listEl.dataset.catId);
+        if (!fromCat || !toCat) return;
+        const idx = fromCat.items.findIndex(it=>it.id===data.itemId);
+        if (idx<0) return;
+        const [moved] = fromCat.items.splice(idx,1);
+        toCat.items.push(moved);
+        if (selection.type === 'item' && selection.id === moved.id){
+          selection = { type: 'item', id: moved.id, catId: toCat.id };
+        }
+        render();
+      });
+    });
+  }
+
+  /** ----------------------------- CRUD ----------------------------- */
+  function addCategory(){
+    const cat = { id: uid('category'), title: 'New Category', items: [] };
+    model.categories.push(cat);
+    selection = { type: 'category', id: cat.id };
+    render();
+    return cat;
+  }
+  function removeCategory(catId){
+    const i = model.categories.findIndex(c=>c.id===catId);
+    if (i>=0){
+      const next = model.categories[i+1] || model.categories[i-1];
+      model.categories.splice(i,1);
+      if (selection.type === 'category' && selection.id === catId){
+        if (next){ selection = { type: 'category', id: next.id }; }
+        else { selection = { type: 'abstract' }; }
+      } else if (selection.type === 'item' && selection.catId === catId){
+        if (next){ selection = { type: 'category', id: next.id }; }
+        else { selection = { type: 'abstract' }; }
+      }
+      render();
+    }
+  }
+
+  function addItem(catId){
+    const cat = model.categories.find(c=>c.id===catId) || model.categories[0];
+    if (!cat){ alert('No categories exist. Create a category first.'); return; }
+    const id = uid('item');
+    const item = { id, name: 'New Item', deps: [], color: '#6aa9ff' };
+    cat.items.push(item);
+    selection = { type: 'item', id, catId: cat.id };
+    render();
+    return item;
+  }
+  function removeItem(catId, itemId){
+    const cat = model.categories.find(c=>c.id===catId); if (!cat) return;
+    const i = cat.items.findIndex(it=>it.id===itemId);
+    if (i>=0){
+      // also remove references from others' deps
+      model.categories.forEach(c=>c.items.forEach(x=> x.deps = (x.deps||[]).filter(d=>d!==itemId)));
+      const next = cat.items[i+1] || cat.items[i-1];
+      cat.items.splice(i,1);
+      if (selection.type === 'item' && selection.id === itemId){
+        if (next){ selection = { type: 'item', id: next.id, catId: cat.id }; }
+        else { selection = { type: 'category', id: cat.id }; }
+      }
+      render();
+    }
+  }
+
+  /** ----------------------------- Sync ----------------------------- */
+  const syncJSON = debounce(()=>{
+    jsonArea.value = toJSONString();
+  }, 120);
+
+  jsonArea.addEventListener('input', debounce(()=>{
+    try {
+      parseJSONString(jsonArea.value);
+      selection = { type: 'abstract' };
+      render();
+      setStatus('Parsed JSON OK.', 'ok');
+    } catch (e){
+      setStatus('JSON parse error: ' + e.message, 'error');
+    }
+  }, 220));
+
+  /** ----------------------------- IO & UX ----------------------------- */
+  $('#addCategoryBtn').addEventListener('click', ()=>{ addCategory(); });
+  $('#addItemBtn').addEventListener('click', ()=>{
+    if (!model.categories.length){
+      const cat = addCategory();
+      if (cat) addItem(cat.id);
+      return;
+    }
+    const targetId = getTargetCategoryId();
+    addItem(targetId);
+  });
+  $('#validateBtn').addEventListener('click', validate);
+  $('#downloadBtn').addEventListener('click', ()=>{
+    validate();
+    download('blockscape.json', toJSONString());
+  });
+
+  $('#fileInput').addEventListener('change', (e)=>{
+    const f = e.target.files?.[0]; if (!f) return;
+    const reader = new FileReader();
+    reader.onload = ()=>{
+      try {
+        parseJSONString(String(reader.result));
+        selection = { type: 'abstract' };
+        render();
+        setStatus(`Loaded: ${f.name}`, 'ok');
+      }
+      catch(err){ setStatus('Failed to load: ' + err.message, 'error'); }
+    };
+    reader.readAsText(f);
+  });
+
+  // Keyboard shortcuts
+  window.addEventListener('keydown', (e)=>{
+    if (e.altKey && e.code==='KeyC'){ e.preventDefault(); addCategory(); }
+    if (e.altKey && e.code==='KeyI'){
+      e.preventDefault();
+      if (!model.categories.length){
+        const cat = addCategory();
+        if (cat) addItem(cat.id);
+        return;
+      }
+      const targetId = getTargetCategoryId();
+      addItem(targetId);
+    }
+    if (e.altKey && e.code==='KeyV'){ e.preventDefault(); validate(); }
+    if ((e.ctrlKey||e.metaKey) && e.code==='KeyS'){ e.preventDefault(); download('blockscape.json', toJSONString()); }
+    if ((e.ctrlKey||e.metaKey) && e.code==='KeyO'){ e.preventDefault(); $('#fileInput').click(); }
+  });
+
+  /** ----------------------------- Boot ----------------------------- */
+  // Seed with example if textarea is empty (first run)
+  const SAMPLE = {
+    abstract: "Describe your domain here…",
+    categories: [
+      { id:"communication", title:"Communication Effects", items:[
+        { id:"glance_comprehension", name:"Glanceable Landscape", deps:["value_visibility_axis","legend_minimal"], color: "#6aa9ff" },
+        { id:"component_values", name:"Component Values", deps:["layout_engine","model_components"], color: "#9f7aea" },
+        { id:"review_alignment", name:"Shared Understanding", deps:["glance_comprehension","component_values"], color: "#40d39c" }
+      ]},
+      { id:"inputs", title:"Inputs", items:[
+        { id:"domain_prompt", name:"Domain Prompt", deps:[] },
+        { id:"domain_json", name:"Domain JSON", deps:[] }
+      ]}
+    ],
+    links: []
+  };
+
+  try {
+    parseJSONString(JSON.stringify(SAMPLE));
+    selection = { type: 'abstract' };
+    render();
+    setStatus('Initialized with sample. Start editing.');
+  } catch (e){
+    setStatus('Initialization error: ' + e.message, 'error');
+  }
+
+})();
+</script>
+</body>
+</html>
