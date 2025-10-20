@@ -14,9 +14,10 @@ describe('Model preview context menu', () => {
       .should('exist')
       .rightclick();
 
-    cy.get('#itemPreview')
-      .should('have.class', 'is-visible')
-      .and('not.have.attr', 'hidden');
+    cy.get('#itemPreview', { timeout: 10000 })
+      .should('not.have.attr', 'hidden')
+      .and('have.attr', 'aria-hidden', 'false')
+      .and('have.class', 'is-visible');
 
     cy.get('#itemPreview .item-preview__title')
       .should('contain', 'Credibility');

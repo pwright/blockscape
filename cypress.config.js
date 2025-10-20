@@ -1,12 +1,15 @@
 const { defineConfig } = require("cypress");
 
 module.exports = defineConfig({
+  video: true,
+  videosFolder: "cypress/videos",
+  screenshotsFolder: "cypress/screenshots",
   e2e: {
     baseUrl: "http://localhost:4173",
     supportFile: false,
     fixturesFolder: false,
     specPattern: "cypress/e2e/**/*.cy.js",
-    video: false,
-    screenshotOnRunFailure: false
+    video: true,
+    screenshotOnRunFailure: true
   }
 });

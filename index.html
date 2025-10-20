@@ -822,14 +822,22 @@
             <div class="blockscape-toolbar__controls">
               <label class="sr-only" for="search">Search tiles</label>
               <input id="search" class="pf-v5-c-form-control" type="text" placeholder="Search…" />
+               
               <label class="sr-only" for="urlInput">Load JSON from URL</label>
               <input id="urlInput" class="pf-v5-c-form-control is-url" type="text"
-                placeholder="Load JSON from URL…" />
+                placeholder="Load JSON from URL…" /> 
+                
               <button id="loadUrl" class="pf-v5-c-button pf-m-secondary" type="button">Load URL</button>
+              <button id="downloadJson" class="pf-v5-c-button pf-m-tertiary" type="button" title="Download JSON (Ctrl+S)">Download</button>
+              
               <label class="pf-v5-c-button pf-m-secondary blockscape-file" role="button">
-                <span>Add JSON files</span>
+                <span>Load File(s)</span>
                 <input id="file" type="file" accept=".json,.txt" multiple />
               </label>
+              <a href="./editor.html" class="pf-v5-c-button pf-m-secondary" role="button">
+                <span>Editor</span>
+              </a>
+              
             </div>
             <div class="blockscape-legend" role="presentation">
               <span class="legend-entry"><span class="legend-dot legend-dot--dep"></span> enables</span>
@@ -1029,6 +1037,7 @@
     const previewTitle = preview.querySelector('.item-preview__title');
     const previewBody = preview.querySelector('.item-preview__body');
     const previewClose = preview.querySelector('.item-preview__close');
+    const downloadButton = document.getElementById('downloadJson');
 
     // Show the seed in the editor initially.
     jsonBox.value = document.getElementById('seed').innerHTML.trim();
@@ -1046,6 +1055,38 @@
 
     // ===== Utilities =====
     function uid() { return Math.random().toString(36).slice(2, 10); }
+
+    function download(filename, text) {
+      const blob = new Blob([text], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function makeDownloadName(base) {
+      return (base || 'blockscape')
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9._-]+/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '') || 'blockscape';
+    }
+
+    function downloadCurrentJson(source = 'shortcut') {
+      const text = jsonBox.value || '';
+      if (!text.trim()) {
+        console.warn("[Blockscape] download ignored: JSON box is empty.");
+        return false;
+      }
+      const title = models[activeIndex]?.title;
+      const filename = `${makeDownloadName(title)}.json`;
+      download(filename, text);
+      console.log(`[Blockscape] saved JSON (${source}):`, filename);
+      return true;
+    }
 
     // --- NEW: letter → color mapping and helpers ---
     // Letter → color mapping (tailwind-ish palette). G => green.
@@ -1471,7 +1512,19 @@
       hidePreview();
     });
 
+    if (downloadButton) {
+      downloadButton.addEventListener('click', () => {
+        downloadCurrentJson('button');
+      });
+    }
+
     document.addEventListener('keydown', (event) => {
+      if ((event.ctrlKey || event.metaKey) && event.code === 'KeyS') {
+        event.preventDefault();
+        downloadCurrentJson('shortcut');
+        return;
+      }
+
       if (event.key === 'Escape' && preview && !preview.hidden) {
         hidePreview();
       }
