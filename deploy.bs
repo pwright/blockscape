@@ -1,7 +1,7 @@
 {
   "id": "deployment-models-blockscape",
   "title": "Deployment Models Value Chain",
-  "abstract": "Users want reliable, fast, and secure delivery of software into production; value is realized by choosing an appropriate deployment model (from local Maven runs and fat JARs through VMs, containers, Kubernetes, GitOps, serverless, and edge/WASM) that is enabled by platform services (CI/CD, registries, observability, secrets, identity) and grounded on infrastructure (compute, network, storage).<br> Load details from https://gist.githubusercontent.com/pwright/91c0dc3e2a625e44ea1d5f3534f43d8f/raw/0f80a1623b3570ebcab6169856154a33997a2817/deployment-models.bs",
+  "abstract": "Users want reliable, fast, and secure delivery of software into production; value is realized by choosing an appropriate deployment model (from local Maven runs and fat JARs through VMs, containers, Kubernetes, GitOps, serverless, and edge/WASM) that is enabled by platform services (CI/CD, registries, observability, secrets, identity) and grounded on infrastructure (compute, network, storage).<br> Load details from <br> https://gist.githubusercontent.com/pwright/91c0dc3e2a625e44ea1d5f3534f43d8f/raw/d0233131d6bbcec806a885aa50482ece348e3629/deployment-models.bs",
   "categories": [
     {
       "id": "user-capabilities",

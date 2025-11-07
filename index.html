@@ -550,6 +550,19 @@
       box-shadow: var(--color-shadow);
     }
 
+    .blockscape-abstract a.blockscape-gist-link {
+      color: var(--color-primary);
+      font-weight: var(--font-weight-semibold);
+      text-decoration: underline;
+      cursor: pointer;
+      word-break: break-all;
+    }
+
+    .blockscape-abstract a.blockscape-gist-link.is-loading {
+      opacity: 0.65;
+      pointer-events: none;
+    }
+
     .category {
       margin: var(--space-lg) 0;
     }
@@ -1561,6 +1574,7 @@
         const abstractDiv = document.createElement('div');
         abstractDiv.className = 'blockscape-abstract';
         abstractDiv.innerHTML = model.m.abstract;
+        enhanceAbstractWithGistLinks(abstractDiv);
         app.appendChild(abstractDiv);
         console.log("[Blockscape] Abstract div appended to DOM");
       } else {
@@ -2130,7 +2144,7 @@
       
       for (const filename of jsonFiles) {
         try {
-          const response = await fetch(filename);
+          const response = await fetch(filename, { cache: 'no-store' });
           if (!response.ok) continue;
 
           const text = await response.text();
@@ -2149,15 +2163,129 @@
       }
     }
 
+    async function fetchTextWithCacheBypass(url) {
+      const attempts = [
+        { cache: 'no-store' },
+        { cache: 'reload' },
+        {}
+      ];
+      let lastError = null;
+      for (const opts of attempts) {
+        try {
+          console.log(`[Blockscape] fetching ${url} with cache="${opts.cache ?? 'default'}"`);
+          const response = await fetch(url, opts);
+          if (response.status === 304) {
+            console.warn("[Blockscape] fetch returned 304 (Not Modified), retrying without cache");
+            continue;
+          }
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+          return await response.text();
+        } catch (error) {
+          lastError = error;
+        }
+      }
+      throw lastError || new Error('Unable to fetch URL');
+    }
+
+    function enhanceAbstractWithGistLinks(container) {
+      if (!container) return;
+
+      const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+      const textNodes = [];
+      while (walker.nextNode()) {
+        textNodes.push(walker.currentNode);
+      }
+
+      textNodes.forEach(node => convertTextNodeGistLinks(node));
+
+      container.querySelectorAll('a[href]').forEach(anchor => {
+        const href = anchor.getAttribute('href');
+        if (isGistUrl(href)) {
+          attachGistLinkBehavior(anchor, href);
+        }
+      });
+    }
+
+    function convertTextNodeGistLinks(node) {
+      if (!node || !node.nodeValue || !node.nodeValue.includes('http')) return;
+      const text = node.nodeValue;
+      const regex = /(https?:\/\/[^\s<]+)/gi;
+      const matches = [];
+      let match;
+      while ((match = regex.exec(text)) !== null) {
+        if (isGistUrl(match[0])) {
+          matches.push({ url: match[0], index: match.index });
+        }
+      }
+      if (!matches.length) return;
+
+      const fragment = document.createDocumentFragment();
+      let cursor = 0;
+      matches.forEach(({ url, index }) => {
+        if (index > cursor) {
+          fragment.appendChild(document.createTextNode(text.slice(cursor, index)));
+        }
+        fragment.appendChild(createGistLinkAnchor(url));
+        cursor = index + url.length;
+      });
+      if (cursor < text.length) {
+        fragment.appendChild(document.createTextNode(text.slice(cursor)));
+      }
+      node.parentNode.replaceChild(fragment, node);
+    }
+
+    function createGistLinkAnchor(url) {
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.textContent = url;
+      anchor.target = '_blank';
+      anchor.rel = 'noopener noreferrer';
+      attachGistLinkBehavior(anchor, url);
+      return anchor;
+    }
+
+    function attachGistLinkBehavior(anchor, url) {
+      if (!anchor || anchor.dataset.gistLinkBound === 'true') return;
+      anchor.dataset.gistLinkBound = 'true';
+      anchor.classList.add('blockscape-gist-link');
+      anchor.title = 'Load this Gist into Blockscape';
+      anchor.addEventListener('click', (event) => handleGistLinkClick(event, url, anchor));
+    }
+
+    async function handleGistLinkClick(event, url, anchor) {
+      event.preventDefault();
+      event.stopPropagation();
+      if (!url || anchor.dataset.loading === 'true') return;
+      anchor.dataset.loading = 'true';
+      anchor.classList.add('is-loading');
+      try {
+        await loadFromUrl(url);
+      } finally {
+        anchor.dataset.loading = 'false';
+        anchor.classList.remove('is-loading');
+      }
+    }
+
+    function isGistUrl(candidate) {
+      if (typeof candidate !== 'string') return false;
+      try {
+        const parsed = new URL(candidate, window.location.href);
+        const host = parsed.hostname.toLowerCase();
+        return host === 'gist.github.com'
+          || host === 'gist.githubusercontent.com'
+          || (host.startsWith('gist.') && (host.endsWith('github.com') || host.endsWith('githubusercontent.com')));
+      } catch {
+        return false;
+      }
+    }
+
     // Load JSON from custom URL
     async function loadFromUrl(url) {
       try {
         console.log("[Blockscape] loading from URL:", url);
-        const response = await fetch(url);
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-        const text = await response.text();
+        const text = await fetchTextWithCacheBypass(url);
         const rawName = url.split('/').pop() || '';
         const baseName = rawName.replace(/\.[^.]+$/, '') || 'URL Model';
         let entries;
