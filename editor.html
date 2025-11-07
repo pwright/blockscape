@@ -1049,8 +1049,9 @@
     renderAbstractPreview();
     renderMasterList();
     renderDetail();
-    updateSelectionUI();
     jsonArea.value = toJSONString();
+    ensureSelectedItemFromLocation();
+    updateSelectionUI();
   }
 
   function renderAbstractPreview(){
@@ -1623,6 +1624,41 @@
     $$('.item', categoriesEl).forEach(itemEl => {
       itemEl.classList.toggle('selected', selection.type === 'item' && itemEl.dataset.itemId === selection.id);
     });
+    syncSelectedQueryParam();
+  }
+
+  function syncSelectedQueryParam(){
+    if (typeof history === 'undefined' || typeof history.replaceState !== 'function') return;
+    try {
+      const url = new URL(window.location.href);
+      const existing = url.searchParams.get('selected');
+      if (selection.type === 'item') {
+        if (existing === selection.id) return;
+        url.searchParams.set('selected', selection.id);
+      } else {
+        if (!existing) return;
+        url.searchParams.delete('selected');
+      }
+      history.replaceState(null, '', url.toString());
+    } catch (err) {
+      console.warn('[Editor] failed to sync selected item param', err);
+    }
+  }
+
+  function getSelectedItemIdFromLocation(){
+    try {
+      const params = new URLSearchParams(window.location.search);
+      if (params.has('selected')) {
+        return params.get('selected');
+      }
+      const hashMatch = window.location.hash.match(/(?:[?&]|^)selected=([^&]+)/);
+      if (hashMatch) {
+        return decodeURIComponent(hashMatch[1]);
+      }
+    } catch (err) {
+      console.warn('[Editor] unable to read selected from location', err);
+    }
+    return null;
   }
 
   function selectAbstract(){
@@ -1653,6 +1689,31 @@
     selection = { type: 'item', id: itemId, catId };
     updateSelectionUI();
     renderDetail();
+  }
+
+  function findItemById(itemId){
+    if (!itemId) return null;
+    for (const cat of model.categories){
+      const hit = cat.items.find(it => it.id === itemId);
+      if (hit) return { cat, item: hit };
+    }
+    return null;
+  }
+
+  function ensureSelectedItemFromLocation(){
+    const targetId = getSelectedItemIdFromLocation();
+    if (!targetId) return;
+    if (selection.type === 'item' && selection.id === targetId) return;
+    const match = findItemById(targetId);
+    if (!match) return;
+    selectItem(match.cat.id, match.item.id);
+    requestAnimationFrame(() => {
+      const targetEl = categoriesEl.querySelector(`.item[data-item-id="${match.item.id}"]`);
+      if (targetEl) {
+        targetEl.scrollIntoView({ block: 'center' });
+        targetEl.focus({ preventScroll: true });
+      }
+    });
   }
 
   function getTargetCategoryId(){
@@ -1906,9 +1967,26 @@
       if (!payload || typeof payload.text !== 'string'){
         throw new Error('Missing payload text');
       }
+      const payloadSelectedId = typeof payload.selectedItemId === 'string' ? payload.selectedItemId : null;
+      const selectedItemId = payloadSelectedId || getSelectedItemIdFromLocation();
       parseJSONString(payload.text);
-      selection = { type: 'abstract' };
+      const match = selectedItemId ? findItemById(selectedItemId) : null;
+      selection = match
+        ? { type: 'item', id: match.item.id, catId: match.cat.id }
+        : { type: 'abstract' };
+      if (selectedItemId && !match) {
+        console.warn('[Editor] viewer-selected item not found in payload:', selectedItemId);
+      }
       render();
+      if (match) {
+        requestAnimationFrame(() => {
+          const target = categoriesEl.querySelector(`.item[data-item-id="${match.item.id}"]`);
+          if (target) {
+            target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+            target.focus({ preventScroll: true });
+          }
+        });
+      }
       setStatus('Loaded JSON from viewer.', 'ok');
       return true;
     } catch (err) {

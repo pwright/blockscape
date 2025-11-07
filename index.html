@@ -449,34 +449,21 @@
       border: none;
       background: transparent;
       box-shadow: none;
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-sm);
     }
 
-    .blockscape-json-panel details {
-      background: var(--blockscape-surface);
-      border: 1px solid var(--blockscape-border);
-      border-radius: var(--radius-md);
-      padding: var(--space-md);
-      box-shadow: var(--color-shadow);
-    }
-
-    details summary {
-      list-style: none;
-      cursor: pointer;
+    .blockscape-json-panel__title {
       font-weight: var(--font-weight-semibold);
       font-size: var(--font-size-sm);
-    }
-
-    details summary::-webkit-details-marker {
-      display: none;
-    }
-
-    details[open] summary {
-      margin-bottom: var(--space-sm);
+      margin: 0;
     }
 
     .blockscape-json-panel .muted {
       font-size: var(--font-size-xs);
-      margin: 0.5rem 0 1rem 0;
+      margin: 0;
+      line-height: 1.4;
     }
 
     .blockscape-json-controls {
@@ -538,6 +525,69 @@
       color: var(--blockscape-muted);
     }
 
+    .blockscape-tabs {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-sm);
+      margin-top: var(--space-md);
+    }
+
+    .blockscape-tablist {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-2xs);
+      border-bottom: 1px solid var(--color-border);
+    }
+
+    .blockscape-tab {
+      appearance: none;
+      border: 1px solid transparent;
+      border-bottom: none;
+      border-radius: var(--radius-md) var(--radius-md) 0 0;
+      background: transparent;
+      padding: var(--space-sm) var(--space-md);
+      font-size: var(--font-size-sm);
+      font-weight: var(--font-weight-semibold);
+      color: var(--blockscape-muted);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2xs);
+      min-width: 6rem;
+      transition: color var(--transition), background var(--transition), border-color var(--transition);
+    }
+
+    .blockscape-tab.is-active {
+      color: var(--color-text);
+      background: var(--color-surface);
+      border-color: var(--color-border);
+      box-shadow: var(--color-shadow);
+      position: relative;
+      top: 1px;
+    }
+
+    .blockscape-tabpanels {
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      background: var(--color-surface);
+      box-shadow: var(--color-shadow);
+    }
+
+    .blockscape-tabpanel {
+      display: none;
+      padding: var(--space-lg);
+    }
+
+    .blockscape-tabpanel.is-active {
+      display: block;
+    }
+
+    .blockscape-source-panel {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-md);
+    }
+
     .blockscape-abstract {
       font-size: var(--font-size-sm);
       color: var(--blockscape-muted);
@@ -546,8 +596,23 @@
       background: var(--blockscape-surface-alt);
       border-radius: var(--radius-md);
       border-left: 3px solid var(--blockscape-dep);
-      margin-bottom: var(--space-lg);
+      margin: 0;
       box-shadow: var(--color-shadow);
+    }
+
+    .blockscape-abstract-panel {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-md);
+    }
+
+    .blockscape-abstract-placeholder {
+      border: 1px dashed var(--color-border);
+      border-radius: var(--radius-md);
+      padding: var(--space-lg);
+      background: var(--color-surface-muted);
+      color: var(--blockscape-muted);
+      font-size: var(--font-size-sm);
     }
 
     .blockscape-abstract a.blockscape-gist-link {
@@ -565,6 +630,30 @@
 
     .category {
       margin: var(--space-lg) 0;
+    }
+
+    .blockscape-render {
+      position: relative;
+    }
+
+    .blockscape-tab-tooltip {
+      position: absolute;
+      max-width: min(420px, calc(100% - 2 * var(--space-md)));
+      padding: var(--space-md);
+      background: var(--color-surface);
+      box-shadow: var(--color-shadow);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      font-size: var(--font-size-sm);
+      color: var(--blockscape-muted);
+      z-index: 1000;
+      pointer-events: none;
+      transition: opacity var(--transition);
+      opacity: 0;
+    }
+
+    .blockscape-tab-tooltip.is-visible {
+      opacity: 1;
     }
 
     .cat-head {
@@ -931,24 +1020,23 @@
           </div>
         </aside>
         <div class="blockscape-main">
-          <section class="pf-v5-c-page__main-section blockscape-json-panel">
-            <details>
-              <summary>Paste / edit JSON for the <b>active</b> model (schema below)</summary>
-              <div class="muted">
-                Schema: <code>{ id, title, abstract?, categories:[{id,title,items:[{id,name,logo?,external?,color?,deps:[]}]}], links?:[{from,to}] }</code><br />
-                You can paste multiple objects separated by <code>---</code> to append several models. A single object
-                replaces only when you click “Replace active with JSON”.
+          <section class="pf-v5-c-page__main-section blockscape-json-panel" hidden
+            aria-label="Model source JSON editor">
+            <p class="blockscape-json-panel__title">Paste / edit JSON for the <b>active</b> model (schema below)</p>
+            <div class="muted">
+              Schema: <code>{ id, title, abstract?, categories:[{id,title,items:[{id,name,logo?,external?,color?,deps:[]}]}], links?:[{from,to}] }</code><br />
+              You can paste multiple objects separated by <code>---</code> to append several models. A single object
+              replaces only when you click “Replace active with JSON”.
+            </div>
+            <div class="blockscape-json-controls">
+              <textarea id="jsonBox" class="pf-v5-c-form-control"
+                aria-label="JSON editor for the active model"></textarea>
+              <div class="blockscape-json-actions">
+                <button id="appendFromBox" class="pf-v5-c-button pf-m-primary" type="button">Append model(s)</button>
+                <button id="replaceActive" class="pf-v5-c-button pf-m-secondary" type="button">Replace active with
+                  JSON</button>
               </div>
-              <div class="blockscape-json-controls">
-                <textarea id="jsonBox" class="pf-v5-c-form-control"
-                  aria-label="JSON editor for the active model"></textarea>
-                <div class="blockscape-json-actions">
-                  <button id="appendFromBox" class="pf-v5-c-button pf-m-primary" type="button">Append model(s)</button>
-                  <button id="replaceActive" class="pf-v5-c-button pf-m-secondary" type="button">Replace active with
-                    JSON</button>
-                </div>
-              </div>
-            </details>
+            </div>
           </section>
 
           <section class="pf-v5-c-page__main-section blockscape-main-section">
@@ -963,7 +1051,7 @@
     {
       "id": "blockscape",
       "title": "Understanding Blockscape",
-      "abstract": "Blockscape is a tool for visualizing value chains and dependency relationships. It can be used to visualize the value chain of a project, a product, or a service. It can also be used to visualize the dependencies between different components of a project.<br>The tool enables users to understand dependencies, relationships, and value chains within a domain.<br>You can choose other data from left hand menu.<br>Or load data from a URL.<br>Select an item to see its dependencies.<br>Edit and Share to copy URL to clipboard",
+      "abstract": "Blockscape is a tool for visualizing value chains and dependency relationships. It can be used to visualize the value chain of a project, a product, or a service. It can also be used to visualize the dependencies between different components of a project.<br>The tool enables users to understand dependencies, relationships, and value chains within a domain.<br>You can choose other data from left hand menu.<br>Or load data from a URL. Use https://github.com/pwright/blockscape/blob/main/model-generation-prompt.md  as a prompt to create JSON.<br>Select an item to see its dependencies.<br>Edit and Share to copy URL to clipboard<br>",
       "categories": [
         {
           "id": "communication",
@@ -1124,6 +1212,7 @@
   </template>
 
   <svg id="overlay" class="svg-layer"></svg>
+  <div id="tabTooltip" class="blockscape-tab-tooltip" hidden aria-hidden="true"></div>
 
   <div id="itemPreview" class="item-preview" hidden aria-hidden="true">
     <div class="item-preview__header">
@@ -1139,8 +1228,10 @@
     console.log("[Blockscape] init");
 
     const jsonBox = document.getElementById('jsonBox');
+    const jsonPanel = document.querySelector('.blockscape-json-panel');
     const app = document.getElementById('app');
     const overlay = document.getElementById('overlay');
+    const tabTooltip = document.getElementById('tabTooltip');
     const modelList = document.getElementById('modelList');
     const preview = document.getElementById('itemPreview');
     const previewTitle = preview.querySelector('.item-preview__title');
@@ -1542,6 +1633,7 @@
     // ===== Render =====
     function render() {
       if (!model) return;
+      hideTabTooltip();
       console.log("[Blockscape] rendering categories=", model.m.categories.length);
       console.log("[Blockscape] model.m has abstract?", !!model.m.abstract, "- value:", model.m.abstract ? model.m.abstract.substring(0, 50) + "..." : "none");
       app.innerHTML = "";
@@ -1567,19 +1659,127 @@
       }
 
       app.appendChild(meta);
+      const tabsWrapper = document.createElement('div');
+      tabsWrapper.className = 'blockscape-tabs';
 
-      // Add abstract if present
+      const tabList = document.createElement('div');
+      tabList.className = 'blockscape-tablist';
+      tabList.setAttribute('role', 'tablist');
+      tabsWrapper.appendChild(tabList);
+
+      const panelsWrapper = document.createElement('div');
+      panelsWrapper.className = 'blockscape-tabpanels';
+      tabsWrapper.appendChild(panelsWrapper);
+
+      const mapPanel = document.createElement('div');
+      const abstractPanel = document.createElement('div');
+      const sourcePanel = document.createElement('div');
+      let infoTooltipHtml = '';
+
+      const tabDefs = [
+        { id: 'map', label: 'Map', panel: mapPanel },
+        { id: 'abstract', label: 'Info', panel: abstractPanel },
+        { id: 'source', label: 'Source', panel: sourcePanel }
+      ];
+
+      const handleTabVisibility = (tabId) => {
+        if (!overlay) return;
+        const showOverlay = tabId === 'map';
+        overlay.hidden = !showOverlay;
+        if (showOverlay) {
+          reflowRects();
+          drawLinks();
+        } else {
+          overlay.innerHTML = '';
+        }
+      };
+
+      tabDefs.forEach((tab, idx) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.id = `tab-${tab.id}`;
+        button.className = 'blockscape-tab' + (idx === 0 ? ' is-active' : '');
+        button.setAttribute('role', 'tab');
+        button.setAttribute('aria-controls', `panel-${tab.id}`);
+        button.setAttribute('aria-selected', idx === 0 ? 'true' : 'false');
+        button.textContent = tab.label;
+        tab.button = button;
+        tabList.appendChild(button);
+
+        tab.panel.id = `panel-${tab.id}`;
+        tab.panel.classList.add('blockscape-tabpanel');
+        tab.panel.setAttribute('role', 'tabpanel');
+        tab.panel.setAttribute('aria-labelledby', button.id);
+        tab.panel.hidden = idx === 0 ? false : true;
+        if (idx === 0) tab.panel.classList.add('is-active');
+        panelsWrapper.appendChild(tab.panel);
+      });
+
+      const activateTab = (targetId) => {
+        tabDefs.forEach(t => {
+          const isActive = t.id === targetId;
+          t.button.classList.toggle('is-active', isActive);
+          t.button.setAttribute('aria-selected', isActive ? 'true' : 'false');
+          t.panel.classList.toggle('is-active', isActive);
+          t.panel.hidden = !isActive;
+        });
+        handleTabVisibility(targetId);
+      };
+
+      tabDefs.forEach(t => {
+        t.button.addEventListener('click', () => {
+          hideTabTooltip();
+          activateTab(t.id);
+        });
+        if (t.id === 'abstract') {
+          t.button.addEventListener('mouseenter', () => showTabTooltip(t.button, infoTooltipHtml, { offset: 12 }));
+          t.button.addEventListener('mouseleave', hideTabTooltip);
+          t.button.addEventListener('focus', () => showTabTooltip(t.button, infoTooltipHtml, { offset: 12 }));
+          t.button.addEventListener('blur', hideTabTooltip);
+        }
+      });
+
+      activateTab(tabDefs[0].id);
+
+      app.appendChild(tabsWrapper);
+
+      const renderHost = document.createElement('div');
+      renderHost.className = 'blockscape-render';
+      mapPanel.appendChild(renderHost);
+
+      const abstractWrapper = document.createElement('div');
+      abstractWrapper.className = 'blockscape-abstract-panel';
       if (model.m.abstract) {
-        console.log("[Blockscape] Creating abstract div");
+        console.log("[Blockscape] Rendering abstract content");
         const abstractDiv = document.createElement('div');
         abstractDiv.className = 'blockscape-abstract';
         abstractDiv.innerHTML = model.m.abstract;
         enhanceAbstractWithGistLinks(abstractDiv);
-        app.appendChild(abstractDiv);
-        console.log("[Blockscape] Abstract div appended to DOM");
+        abstractWrapper.appendChild(abstractDiv);
+        infoTooltipHtml = abstractDiv.outerHTML;
       } else {
         console.log("[Blockscape] No abstract found in model.m");
+        const placeholder = document.createElement('div');
+        placeholder.className = 'blockscape-abstract-placeholder';
+        placeholder.textContent = 'No abstract has been provided for this model.';
+        abstractWrapper.appendChild(placeholder);
+        infoTooltipHtml = placeholder.outerHTML;
       }
+      abstractPanel.appendChild(abstractWrapper);
+
+      const sourceWrapper = document.createElement('div');
+      sourceWrapper.className = 'blockscape-source-panel';
+      if (jsonPanel) {
+        jsonPanel.hidden = false;
+        jsonPanel.classList.remove('pf-v5-c-page__main-section');
+        sourceWrapper.appendChild(jsonPanel);
+      } else {
+        const missing = document.createElement('p');
+        missing.className = 'muted';
+        missing.textContent = 'Source editor unavailable.';
+        sourceWrapper.appendChild(missing);
+      }
+      sourcePanel.appendChild(sourceWrapper);
 
       model.m.categories.forEach(cat => {
         const section = document.createElement('section');
@@ -1628,7 +1828,7 @@
           index.set(it.id, { el: tile, catId: cat.id, rect: null });
         });
 
-        app.appendChild(section);
+        renderHost.appendChild(section);
       });
 
       model.reusedLocal.forEach(id => {
@@ -1692,7 +1892,7 @@
 
     function drawLinks() {
       while (overlay.firstChild) overlay.removeChild(overlay.firstChild);
-      if (!selection) return;
+      if (!selection || overlay.hidden) return;
 
       const fromRect = index.get(selection)?.rect;
       if (!fromRect) return;
@@ -1719,6 +1919,38 @@
 
     function center(r) { return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }
     function escapeHtml(s) { return s.replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[m])); }
+
+    function showTabTooltip(target, html, { offset = 8 } = {}) {
+      if (!tabTooltip || !target || !html) return;
+      tabTooltip.innerHTML = html;
+      tabTooltip.hidden = false;
+      tabTooltip.setAttribute('aria-hidden', 'false');
+      requestAnimationFrame(() => {
+        const rect = target.getBoundingClientRect();
+        const tooltipRect = tabTooltip.getBoundingClientRect();
+        const scrollX = window.scrollX || document.documentElement.scrollLeft;
+        const scrollY = window.scrollY || document.documentElement.scrollTop;
+        let left = rect.left + rect.width / 2 - tooltipRect.width / 2 + scrollX;
+        let top = rect.top - tooltipRect.height - offset + scrollY;
+        if (left < scrollX + offset) left = scrollX + offset;
+        const maxLeft = scrollX + window.innerWidth - tooltipRect.width - offset;
+        if (left > maxLeft) left = maxLeft;
+        if (top < scrollY + offset) top = rect.bottom + offset + scrollY;
+        tabTooltip.style.left = `${left}px`;
+        tabTooltip.style.top = `${top}px`;
+        tabTooltip.classList.add('is-visible');
+      });
+    }
+
+    function hideTabTooltip() {
+      if (!tabTooltip) return;
+      tabTooltip.classList.remove('is-visible');
+      tabTooltip.setAttribute('aria-hidden', 'true');
+      tabTooltip.hidden = true;
+    }
+
+    window.addEventListener('scroll', hideTabTooltip, true);
+    window.addEventListener('resize', hideTabTooltip);
 
     function hidePreview() {
       if (!preview) return;
@@ -1882,16 +2114,26 @@
           return;
         }
         try {
-          localStorage.setItem(EDITOR_TRANSFER_KEY, JSON.stringify({
+          const payload = {
             ts: Date.now(),
-            text
-          }));
+            text,
+            source: 'viewer'
+          };
+          if (selection) {
+            payload.selectedItemId = selection;
+          }
+          localStorage.setItem(EDITOR_TRANSFER_KEY, JSON.stringify(payload));
         } catch (storageError) {
           console.error('[Blockscape] failed to store editor payload', storageError);
           alert('Unable to stash JSON for the editor (storage disabled?).');
           return;
         }
-        window.open('editor.html#viewer', '_blank');
+        let editorUrl = 'editor.html#viewer';
+        if (selection) {
+          const encoded = encodeURIComponent(selection);
+          editorUrl = `editor.html?selected=${encoded}#viewer`;
+        }
+        window.open(editorUrl, '_blank');
       });
     }
 
@@ -2273,9 +2515,8 @@
       try {
         const parsed = new URL(candidate, window.location.href);
         const host = parsed.hostname.toLowerCase();
-        return host === 'gist.github.com'
-          || host === 'gist.githubusercontent.com'
-          || (host.startsWith('gist.') && (host.endsWith('github.com') || host.endsWith('githubusercontent.com')));
+        return host === 'gist.githubusercontent.com'
+          || (host.startsWith('gist.') && host.endsWith('githubusercontent.com'));
       } catch {
         return false;
       }
