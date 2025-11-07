@@ -405,6 +405,28 @@
       color: var(--blockscape-muted);
     }
 
+    .model-meta {
+      margin: var(--space-xs) 0;
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2xs);
+    }
+
+    .model-meta-title {
+      font-size: var(--font-size-md);
+      font-weight: var(--font-weight-semibold);
+      color: var(--blockscape-foreground);
+    }
+
+    .model-meta-id {
+      align-self: flex-start;
+    }
+
+    .model-meta-id.is-placeholder {
+      opacity: 0.7;
+      font-style: italic;
+    }
+
     button,
     .pf-v5-c-button,
     label.pf-v5-c-button {
@@ -733,6 +755,10 @@
                 <span class="pill">Abstract</span>
                 <small id="abstractSummary" class="muted"></small>
               </div>
+              <div class="model-meta">
+                <div id="modelTitleDisplay" class="model-meta-title"></div>
+                <span id="modelIdDisplay" class="pill model-meta-id"></span>
+              </div>
               <p id="abstractSnippet" class="muted" style="margin: 0; font-size: var(--font-size-sm); line-height: 1.4;"></p>
             </div>
           </div>
@@ -818,10 +844,8 @@
   }
 
   function guessViewerTitle(){
-    if (passthrough && typeof passthrough.title === 'string'){
-      const trimmed = passthrough.title.trim();
-      if (trimmed) return trimmed;
-    }
+    const title = (model.title || '').trim();
+    if (title) return title;
     const firstCat = model.categories?.[0];
     if (firstCat){
       return `Editor – ${firstCat.title || firstCat.id || 'Category'}`;
@@ -832,6 +856,8 @@
   /** ----------------------------- Model ----------------------------- */
   /** Internal canonical model. */
   let model = {
+    id: "",
+    title: "",
     abstract: "",
     categories: [],
     // passthrough: we preserve unknown top-level fields to avoid data loss
@@ -842,7 +868,11 @@
 
   /** Serialize model + passthrough to JSON string. */
   function toJSONString(){
-    const out = { ...passthrough, abstract: model.abstract, categories: structuredClone(model.categories) };
+    const out = { ...passthrough };
+    out.id = (model.id ?? '').toString();
+    out.title = (model.title ?? '').toString();
+    out.abstract = model.abstract;
+    out.categories = structuredClone(model.categories);
     return JSON.stringify(out, null, 2);
   }
 
@@ -853,7 +883,7 @@
     if (!Array.isArray(raw.categories)) throw new Error('Missing required array: categories');
 
     // Keep unknown top-level keys
-    const { abstract = "", categories, ...rest } = raw;
+    const { abstract = "", categories, title = "", id = "", ...rest } = raw;
     passthrough = rest;
 
     // Normalize categories and items
@@ -870,7 +900,15 @@
       })) : []
     }));
 
-    model = { abstract: String(abstract ?? ''), categories: cats };
+    const normalizedTitle = title == null ? '' : String(title);
+    const normalizedId = id == null ? '' : String(id);
+
+    model = { 
+      id: normalizedId.trim(), 
+      title: normalizedTitle.trim(), 
+      abstract: String(abstract ?? ''), 
+      categories: cats 
+    };
   }
 
   /** Validate id uniqueness and dependency references. */
@@ -913,6 +951,8 @@
   const abstractPreview = $('#abstractPreview');
   const abstractSummary = $('#abstractSummary');
   const abstractSnippet = $('#abstractSnippet');
+  const modelTitleDisplay = $('#modelTitleDisplay');
+  const modelIdDisplay = $('#modelIdDisplay');
   const detailPanel = $('#detailPanel');
   const jsonArea = $('#jsonArea');
   const EDITOR_TRANSFER_KEY = 'blockscape:editorPayload';
@@ -950,6 +990,22 @@
   }
 
   function renderAbstractPreview(){
+    const title = (model.title || '').trim();
+    if (modelTitleDisplay){
+      modelTitleDisplay.textContent = title || 'Untitled model';
+      modelTitleDisplay.classList.toggle('muted', !title);
+    }
+    const idText = (model.id || '').trim();
+    if (modelIdDisplay){
+      if (idText){
+        modelIdDisplay.textContent = `ID: ${idText}`;
+        modelIdDisplay.classList.remove('is-placeholder');
+      } else {
+        modelIdDisplay.textContent = 'ID not set';
+        modelIdDisplay.classList.add('is-placeholder');
+      }
+    }
+
     const text = (model.abstract || '').trim();
     const wordCount = text ? text.split(/\s+/).filter(Boolean).length : 0;
     abstractSummary.textContent = text ? `${wordCount} word${wordCount === 1 ? '' : 's'}` : 'No abstract yet';
@@ -1138,6 +1194,34 @@
     const heading = document.createElement('h2');
     heading.textContent = 'Abstract';
     wrap.append(heading);
+
+    const titleInput = document.createElement('input');
+    titleInput.type = 'text';
+    titleInput.value = model.title || '';
+    titleInput.placeholder = 'Model title (shown in viewer)';
+    titleInput.addEventListener('input', ()=>{
+      model.title = titleInput.value;
+      renderAbstractPreview();
+      syncJSON();
+    });
+    wrap.append(createField('Model Title', titleInput));
+
+    const idInput = document.createElement('input');
+    idInput.type = 'text';
+    idInput.value = model.id || '';
+    idInput.placeholder = 'model-id';
+    idInput.addEventListener('input', ()=>{
+      model.id = idInput.value;
+      renderAbstractPreview();
+      syncJSON();
+    });
+    idInput.addEventListener('blur', ()=>{
+      idInput.value = idInput.value.trim();
+      model.id = idInput.value;
+      renderAbstractPreview();
+      syncJSON();
+    });
+    wrap.append(createField('Model ID', idInput));
 
     const textarea = document.createElement('textarea');
     textarea.value = model.abstract || '';
@@ -1729,6 +1813,8 @@
 
   // Seed with example if textarea is empty (first run)
   const SAMPLE = {
+    id: "blockscape_editor_sample",
+    title: "Blockscape Sample",
     abstract: "Describe your domain here…",
     categories: [
       { id:"communication", title:"Communication Effects", items:[

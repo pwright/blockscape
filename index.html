@@ -381,6 +381,25 @@
 
     .model-nav-label {
       font-weight: var(--font-weight-semibold);
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: var(--space-2xs);
+    }
+
+    .model-nav-title {
+      font-size: var(--font-size-sm);
+    }
+
+    .model-nav-id {
+      font-size: var(--font-size-xs);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--blockscape-muted);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      padding: 0 var(--space-2xs);
+      background: var(--color-surface-muted);
     }
 
     .model-nav-meta {
@@ -488,6 +507,26 @@
 
     .blockscape-main-section {
       padding: 0 var(--space-lg) var(--space-xl);
+    }
+
+    .blockscape-model-meta {
+      margin-bottom: var(--space-md);
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2xs);
+    }
+
+    .blockscape-model-title {
+      font-size: var(--font-size-lg);
+      font-weight: var(--font-weight-semibold);
+      color: var(--color-text);
+    }
+
+    .blockscape-model-id {
+      font-size: var(--font-size-xs);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--blockscape-muted);
     }
 
     .blockscape-abstract {
@@ -895,6 +934,8 @@
 
   <template id="seed">
     {
+      "id": "blockscape_seed",
+      "title": "Blockscape Seed Template",
       "abstract": "Blockscape is a tool for visualizing value chains and dependency relationships. It can be used to visualize the value chain of a project, a product, or a service. It can also be used to visualize the dependencies between different components of a project.<br>The tool enables users to understand dependencies, relationships, and value chains within a domain.<br>You can choose other data from left hand menu.<br>Or load data from a URL.<br>Select an item to see its dependencies.",
       "categories": [
         {
@@ -1107,13 +1148,42 @@
         .replace(/^-|-$/g, '') || 'blockscape';
     }
 
+    function ensureModelMetadata(data, { titleHint = 'Untitled Model', idHint } = {}) {
+      if (!data || typeof data !== 'object') return data;
+      const trimmedTitle = (data.title ?? '').toString().trim();
+      data.title = trimmedTitle || titleHint || 'Untitled Model';
+
+      const trimmedId = (data.id ?? '').toString().trim();
+      if (!trimmedId) {
+        const base = idHint || data.title || titleHint || 'model';
+        const slug = makeDownloadName(base).replace(/\./g, '-');
+        data.id = slug || `model-${uid()}`;
+      } else {
+        data.id = trimmedId;
+      }
+      return data;
+    }
+
+    function getModelTitle(entry, fallback = 'Untitled Model') {
+      if (!entry) return fallback;
+      const candidate = (entry.data?.title ?? entry.title ?? '').toString().trim();
+      return candidate || fallback;
+    }
+
+    function getModelId(entry) {
+      const candidate = entry?.data?.id;
+      if (!candidate) return null;
+      const trimmed = candidate.toString().trim();
+      return trimmed || null;
+    }
+
     function downloadCurrentJson(source = 'shortcut') {
       const text = jsonBox.value || '';
       if (!text.trim()) {
         console.warn("[Blockscape] download ignored: JSON box is empty.");
         return false;
       }
-      const title = models[activeIndex]?.title;
+      const title = getModelTitle(models[activeIndex], 'blockscape');
       const filename = `${makeDownloadName(title)}.json`;
       download(filename, text);
       console.log(`[Blockscape] saved JSON (${source}):`, filename);
@@ -1157,7 +1227,7 @@
         return;
       }
       activeIndex = i;
-      console.log("[Blockscape] active model:", models[i].title, "(index", i + " )");
+      console.log("[Blockscape] active model:", getModelTitle(models[i]), "(index", i + " )");
       renderModelList();
       loadActiveIntoEditor();
       rebuildFromActive();
@@ -1185,7 +1255,19 @@
 
         const label = document.createElement('span');
         label.className = 'model-nav-label';
-        label.textContent = `${i + 1}. ${m.title}`;
+
+        const titleSpan = document.createElement('span');
+        titleSpan.className = 'model-nav-title';
+        titleSpan.textContent = `${i + 1}. ${getModelTitle(m)}`;
+        label.appendChild(titleSpan);
+
+        const dataId = getModelId(m);
+        if (dataId) {
+          const idBadge = document.createElement('span');
+          idBadge.className = 'model-nav-id';
+          idBadge.textContent = dataId;
+          label.appendChild(idBadge);
+        }
 
         const categories = Array.isArray(m.data?.categories) ? m.data.categories : [];
         const itemsCount = categories.reduce((sum, cat) => sum + ((cat.items || []).length), 0);
@@ -1213,17 +1295,27 @@
       const trimmed = (txt || "").trim();
       if (!trimmed) return [];
       const parsed = tryParseJson(trimmed);
-      if (parsed) return (Array.isArray(parsed) ? parsed : [parsed]).map((o, idx) => ({
-        id: uid(),
-        title: `${titleBase} #${idx + 1}`,
-        data: o
-      }));
+      if (parsed) {
+        const arr = Array.isArray(parsed) ? parsed : [parsed];
+        return arr.map((o, idx) => {
+          ensureModelMetadata(o, { titleHint: `${titleBase} #${idx + 1}` });
+          return {
+            id: uid(),
+            title: o.title || `${titleBase} #${idx + 1}`,
+            data: o
+          };
+        });
+      }
       const parts = trimmed.split(/^\s*---\s*$/m).map(s => s.trim()).filter(Boolean);
-      return parts.map((p, i) => ({
-        id: uid(),
-        title: `${titleBase} #${i + 1}`,
-        data: JSON.parse(p)
-      }));
+      return parts.map((p, i) => {
+        const obj = JSON.parse(p);
+        ensureModelMetadata(obj, { titleHint: `${titleBase} #${i + 1}` });
+        return {
+          id: uid(),
+          title: obj.title || `${titleBase} #${i + 1}`,
+          data: obj
+        };
+      });
     }
 
     function consumeEditorPayload() {
@@ -1303,9 +1395,11 @@
         return null;
       }
 
+      ensureModelMetadata(payload.data, { titleHint: payload.title || 'Shared Model' });
+
       models.push({
         id: uid(),
-        title: payload.title || 'Shared Model',
+        title: payload.data.title || payload.title || 'Shared Model',
         data: payload.data
       });
 
@@ -1385,6 +1479,24 @@
 
       overlay.setAttribute("width", window.innerWidth);
       overlay.setAttribute("height", window.innerHeight);
+
+      const meta = document.createElement('div');
+      meta.className = 'blockscape-model-meta';
+
+      const titleEl = document.createElement('div');
+      titleEl.className = 'blockscape-model-title';
+      titleEl.textContent = (model.m.title && model.m.title.trim()) || getModelTitle(models[activeIndex]);
+      meta.appendChild(titleEl);
+
+      const normalizedId = (model.m.id ?? '').toString().trim();
+      if (normalizedId) {
+        const idEl = document.createElement('div');
+        idEl.className = 'blockscape-model-id';
+        idEl.textContent = `ID: ${normalizedId}`;
+        meta.appendChild(idEl);
+      }
+
+      app.appendChild(meta);
 
       // Add abstract if present
       if (model.m.abstract) {
@@ -1652,7 +1764,7 @@
           return;
         }
         const payload = {
-          title: models[activeIndex].title || 'Shared Model',
+          title: getModelTitle(models[activeIndex], 'Shared Model'),
           data: models[activeIndex].data
         };
         let encoded;
@@ -1842,8 +1954,13 @@
       if (activeIndex < 0) { alert("No active model selected."); return; }
       try {
         const obj = JSON.parse(jsonBox.value);
+        ensureModelMetadata(obj, { 
+          titleHint: getModelTitle(models[activeIndex]), 
+          idHint: getModelId(models[activeIndex]) || getModelTitle(models[activeIndex]) 
+        });
         models[activeIndex].data = obj;
-        console.log("[Blockscape] replaced active model:", models[activeIndex].title);
+        models[activeIndex].title = obj.title || models[activeIndex].title;
+        console.log("[Blockscape] replaced active model:", getModelTitle(models[activeIndex]));
         rebuildFromActive();
       } catch (e) {
         console.error("[Blockscape] replace error:", e);
@@ -1864,8 +1981,12 @@
             console.warn("[Blockscape] no models in file:", f.name);
             continue;
           }
-          // Ensure file-derived entries use filename as title base
-          models.push(...entries.map((en, i) => ({ ...en, title: entries.length > 1 ? `${f.name} #${i + 1}` : f.name })));
+          // Ensure file-derived entries prefer embedded title/id but fall back to filename
+          models.push(...entries.map((en, i) => {
+            const dataTitle = (en.data?.title ?? '').toString().trim();
+            const fallbackTitle = entries.length > 1 ? `${f.name} #${i + 1}` : f.name;
+            return { ...en, title: dataTitle || fallbackTitle };
+          }));
         }
         if (activeIndex === -1 && models.length) setActive(0);
         else renderModelList();
@@ -1889,7 +2010,7 @@
     // Remove selected model
     document.getElementById('removeModel').onclick = () => {
       if (activeIndex < 0) return;
-      console.log("[Blockscape] removing model:", models[activeIndex].title);
+      console.log("[Blockscape] removing model:", getModelTitle(models[activeIndex]));
       models.splice(activeIndex, 1);
       if (!models.length) {
         activeIndex = -1;
@@ -1955,9 +2076,11 @@
           const response = await fetch(filename);
           if (response.ok) {
             const data = await response.json();
+            const baseName = filename.replace('.json', '');
+            ensureModelMetadata(data, { titleHint: baseName, idHint: baseName });
             models.push({ 
               id: uid(), 
-              title: filename.replace('.json', ''), 
+              title: data.title || baseName, 
               data: data 
             });
             console.log("[Blockscape] loaded", filename);
@@ -1978,9 +2101,10 @@
         }
         const data = await response.json();
         const filename = url.split('/').pop().replace('.json', '') || 'URL Model';
+        ensureModelMetadata(data, { titleHint: filename, idHint: filename });
         models.push({ 
           id: uid(), 
-          title: filename, 
+          title: data.title || filename, 
           data: data 
         });
         console.log("[Blockscape] loaded from URL:", filename);
@@ -1997,8 +2121,9 @@
     // Bootstrap with Blockscape
     (async function bootstrap() {
       const seedObj = JSON.parse(document.getElementById('seed').innerHTML.trim());
+      ensureModelMetadata(seedObj, { titleHint: seedObj.title || 'Blockscape', idHint: seedObj.id || 'blockscape' });
       
-      models.push({ id: uid(), title: "Blockscape", data: seedObj });
+      models.push({ id: uid(), title: seedObj.title || "Blockscape", data: seedObj });
       
       // Try to load JSON files from same directory
       await loadJsonFiles();
