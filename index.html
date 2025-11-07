@@ -867,17 +867,17 @@
                 placeholder="Load JSON from URL…" /> 
                 
               <button id="loadUrl" class="pf-v5-c-button pf-m-secondary" type="button">Load URL</button>
-              <button id="downloadJson" class="pf-v5-c-button pf-m-tertiary" type="button" title="Download JSON (Ctrl+S)">Download</button>
-              <button id="shareModel" class="pf-v5-c-button pf-m-secondary" type="button" title="Copy a shareable URL for this model">Share</button>
-              <button id="openInEditor" class="pf-v5-c-button pf-m-primary" type="button" title="Open current JSON in the editor">Edit in Editor</button>
               
+ 
               <label class="pf-v5-c-button pf-m-secondary blockscape-file" role="button">
                 <span>Load File(s)</span>
                 <input id="file" type="file" accept=".json,.txt" multiple />
               </label>
-              <a href="./editor.html" class="pf-v5-c-button pf-m-secondary" role="button">
-                <span>Editor</span>
-              </a>
+ 
+              <button id="openInEditor" class="pf-v5-c-button pf-m-primary" type="button" title="Open current JSON in the editor">Edit</button>
+              
+              <button id="shareModel" class="pf-v5-c-button pf-m-secondary" type="button" title="Copy a shareable URL for this model">Share</button>
+              
               
             </div>
             <div class="blockscape-legend" role="presentation">
@@ -907,8 +907,7 @@
             <details>
               <summary>Paste / edit JSON for the <b>active</b> model (schema below)</summary>
               <div class="muted">
-                Schema: <code>{ categories:[{id, title, items:[{id,name,logo?,external?,color?,deps:[] }]}],
-                  links?:[{from,to}] }</code><br />
+                Schema: <code>{ id, title, abstract?, categories:[{id,title,items:[{id,name,logo?,external?,color?,deps:[]}]}], links?:[{from,to}] }</code><br />
                 You can paste multiple objects separated by <code>---</code> to append several models. A single object
                 replaces only when you click “Replace active with JSON”.
               </div>
@@ -1160,6 +1159,10 @@
         data.id = slug || `model-${uid()}`;
       } else {
         data.id = trimmedId;
+      }
+
+      if (typeof data.abstract !== 'string') {
+        data.abstract = data.abstract == null ? '' : String(data.abstract);
       }
       return data;
     }

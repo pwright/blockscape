@@ -778,7 +778,7 @@
           <div class="card card--json">
             <div class="row" style="justify-content: space-between; align-items: baseline;">
               <span class="pill">JSON (live)</span>
-              <small class="muted">Schema: { categories:[{id,title,items:[{id,name,logo?,external?,color?,deps:[]}]}], links?:[{from,to}] }</small>
+              <small class="muted">Schema: { id, title, abstract?, categories:[{id,title,items:[{id,name,logo?,external?,color?,deps:[]}]}], links?:[{from,to}] }</small>
             </div>
             <textarea id="jsonArea" spellcheck="false" aria-label="JSON"></textarea>
             <div class="row" style="justify-content: space-between;">
@@ -915,6 +915,23 @@
   function validate(){
     const messages = [];
     const ids = new Map();
+
+    const trimmedId = (model.id || '').trim();
+    if (!trimmedId) {
+      messages.push('Model id is required.');
+    } else if (!/^[a-z0-9._-]+$/i.test(trimmedId)) {
+      messages.push('Model id may only contain letters, numbers, ".", "-", or "_".');
+    }
+
+    const trimmedTitle = (model.title || '').trim();
+    if (!trimmedTitle) {
+      messages.push('Model title is required.');
+    }
+
+    const abstractText = typeof model.abstract === 'string' ? model.abstract : '';
+    if (!abstractText.trim()) {
+      messages.push('Model abstract is required.');
+    }
 
     // Collect item ids across all categories
     const itemIds = new Set();
