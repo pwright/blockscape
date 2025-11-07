@@ -7,7 +7,7 @@ module.exports = defineConfig({
   e2e: {
     baseUrl: "http://localhost:4173",
     supportFile: false,
-    fixturesFolder: false,
+    fixturesFolder: "cypress/fixtures",
     specPattern: "cypress/e2e/**/*.cy.js",
     video: true,
     screenshotOnRunFailure: true

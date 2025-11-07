@@ -4,6 +4,8 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Blockscape JSON Editor</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="alternate icon" type="image/x-icon" href="/favicon.ico" />
   <style>
     :root {
       color-scheme: light;
@@ -124,16 +126,36 @@
 
     .blockscape-brand {
       display: inline-flex;
-      align-items: baseline;
-      gap: var(--space-xs);
+      align-items: center;
+      gap: var(--space-sm);
       font-weight: var(--font-weight-bold);
       font-size: var(--font-size-lg);
       letter-spacing: 0.04em;
       text-transform: uppercase;
     }
 
+    .blockscape-brand__home {
+      display: inline-flex;
+      align-items: center;
+      line-height: 0;
+    }
+
+    .blockscape-brand__logo {
+      display: block;
+      height: 48px;
+      width: auto;
+      max-width: 260px;
+    }
+
+    .blockscape-brand__text {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2xs);
+    }
+
     .blockscape-brand h1 {
       font: inherit;
+      margin: 0;
     }
 
     .brand-sub {
@@ -735,11 +757,17 @@
     <header class="pf-v5-c-page__header">
       <div class="pf-v5-c-masthead pf-m-display-inline blockscape-masthead">
         <div class="pf-v5-c-masthead__content">
-          <div class="blockscape-toolbar">
-            <div class="blockscape-brand">
-              <h1>Blockscape</h1>
-              <span class="brand-sub">Editor</span>
-            </div>
+            <div class="blockscape-toolbar">
+              <div class="blockscape-brand">
+                <a class="blockscape-brand__home" href="index.html" title="Back to Blockscape viewer">
+                  <img class="blockscape-brand__logo" src="logos/blockscape-logo.svg"
+                    alt="Blockscape — return to viewer" decoding="async" />
+                </a>
+                <div class="blockscape-brand__text">
+                  <h1></h1>
+                  <span class="brand-sub">Editor</span>
+                </div>
+              </div>
             <div class="blockscape-toolbar__controls">
               <button id="addCategoryBtn" class="pf-v5-c-button pf-m-secondary" type="button" title="Add category (Alt+C)">+ Category</button>
               

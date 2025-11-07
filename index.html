@@ -5,6 +5,7 @@
   <meta charset="utf-8" />
   <title>Blockscape — simple landscape-style tiles</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <style>
     :root {
       color-scheme: light;
@@ -130,6 +131,13 @@
     .blockscape-brand h1 {
       font: inherit;
       margin: 0;
+    }
+
+    .blockscape-brand__logo {
+      display: block;
+      height: 52px;
+      width: auto;
+      max-width: 320px;
     }
 
     .blockscape-toolbar__controls {
@@ -819,6 +827,10 @@
         width: 100%;
       }
 
+      .blockscape-brand__logo {
+        height: 44px;
+      }
+
       .blockscape-toolbar__controls {
         width: 100%;
       }
@@ -850,7 +862,9 @@
         <div class="pf-v5-c-masthead__content">
           <div class="blockscape-toolbar">
             <div class="blockscape-brand">
-              <h1>Blockscape</h1>
+              <h1 class="sr-only">Blockscape</h1>
+              <img class="blockscape-brand__logo" src="logos/blockscape-logo.svg"
+                alt="Blockscape — landscape tile explorer" decoding="async" />
               <a href="https://github.com/pwright/blockscape" target="_blank"
                 class="pf-v5-c-button pf-m-plain" title="View on GitHub" aria-label="View Blockscape on GitHub">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
@@ -2112,22 +2126,23 @@
 
     // Load JSON files from same directory (for static hosting)
     async function loadJsonFiles() {
-      const jsonFiles = ['NFR.json', 'ISO-IEC-25010.json', 'SEII-QAW.json'];
+      const jsonFiles = ['NFR.bs', 'deploy.bs'];
       
       for (const filename of jsonFiles) {
         try {
           const response = await fetch(filename);
-          if (response.ok) {
-            const data = await response.json();
-            const baseName = filename.replace('.json', '');
-            ensureModelMetadata(data, { titleHint: baseName, idHint: baseName });
-            models.push({ 
-              id: uid(), 
-              title: data.title || baseName, 
-              data: data 
-            });
-            console.log("[Blockscape] loaded", filename);
+          if (!response.ok) continue;
+
+          const text = await response.text();
+          const baseName = filename.replace(/\.[^.]+$/, '') || 'Model';
+          const entries = normalizeToModelsFromText(text, baseName);
+          if (!entries.length) {
+            console.warn("[Blockscape] no models found in", filename);
+            continue;
           }
+
+          models.push(...entries);
+          console.log(`[Blockscape] loaded ${entries.length} model(s) from ${filename}`);
         } catch (error) {
           console.log("[Blockscape] could not load", filename, "- this is normal for file:// protocol");
         }
@@ -2142,17 +2157,32 @@
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
-        const data = await response.json();
-        const filename = url.split('/').pop().replace('.json', '') || 'URL Model';
-        ensureModelMetadata(data, { titleHint: filename, idHint: filename });
-        models.push({ 
-          id: uid(), 
-          title: data.title || filename, 
-          data: data 
-        });
-        console.log("[Blockscape] loaded from URL:", filename);
-        renderModelList();
-        if (activeIndex === -1) setActive(0);
+        const text = await response.text();
+        const rawName = url.split('/').pop() || '';
+        const baseName = rawName.replace(/\.[^.]+$/, '') || 'URL Model';
+        let entries;
+        try {
+          entries = normalizeToModelsFromText(text, baseName);
+        } catch (parseError) {
+          throw new Error(`Invalid JSON payload: ${parseError.message}`);
+        }
+        if (!entries.length) {
+          throw new Error('No JSON objects found in response.');
+        }
+        models.push(...entries.map((entry, idx) => {
+          const dataTitle = (entry.data?.title ?? '').toString().trim();
+          const fallbackTitle = entries.length > 1 ? `${baseName} #${idx + 1}` : baseName;
+          return {
+            ...entry,
+            title: dataTitle || fallbackTitle
+          };
+        }));
+        console.log(`[Blockscape] loaded ${entries.length} model(s) from URL:`, baseName);
+        if (activeIndex === -1) {
+          setActive(0);
+        } else {
+          renderModelList();
+        }
         return true;
       } catch (error) {
         console.error("[Blockscape] URL load error:", error);
