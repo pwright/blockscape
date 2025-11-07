@@ -590,6 +590,26 @@
       color: var(--blockscape-muted);
     }
 
+    .color-field-control {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-sm);
+      flex-wrap: wrap;
+    }
+
+    .color-none-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2xs);
+      font-size: var(--font-size-sm);
+      color: var(--blockscape-muted);
+      user-select: none;
+    }
+
+    .color-none-toggle input {
+      margin: 0;
+    }
+
     .detail-section {
       display: flex;
       flex-direction: column;
@@ -722,17 +742,16 @@
             </div>
             <div class="blockscape-toolbar__controls">
               <button id="addCategoryBtn" class="pf-v5-c-button pf-m-secondary" type="button" title="Add category (Alt+C)">+ Category</button>
+              
               <button id="addItemBtn" class="pf-v5-c-button pf-m-secondary" type="button" title="Add item to selected category (Alt+I)">+ Item</button>
-              <button id="validateBtn" class="pf-v5-c-button pf-m-primary" type="button" title="Validate JSON and references (Alt+V)">Validate</button>
+              
               <button id="downloadBtn" class="pf-v5-c-button pf-m-tertiary" type="button" title="Download JSON (Ctrl+S)">Download</button>
-              <button id="openInViewer" class="pf-v5-c-button pf-m-primary" type="button" title="Open this JSON in the viewer">Send to Viewer</button>
               <label class="pf-v5-c-button pf-m-secondary blockscape-file" title="Open JSON from file (Ctrl+O)">
                 <span>Load File</span>
                 <input id="fileInput" type="file" accept="application/json" />
               </label>
-              <a href="./index.html" class="pf-v5-c-button pf-m-secondary" role="button">
-                <span>Viewer</span>
-              </a>
+              <button id="validateBtn" class="pf-v5-c-button pf-m-primary" type="button" title="Validate JSON and references (Alt+V)">Validate</button>
+              <button id="openInViewer" class="pf-v5-c-button pf-m-primary" type="button" title="Open this JSON in the viewer">View</button>
 
               
             </div>
@@ -1411,14 +1430,57 @@
     });
     wrap.append(createField('ID', idInput));
 
+    const colorControls = document.createElement('div');
+    colorControls.className = 'color-field-control';
+
     const colorInput = document.createElement('input');
     colorInput.type = 'color';
-    colorInput.value = item.color || '#6aa9ff';
+
+    let lastColor = item.color || '#6aa9ff';
+
+    const noneLabel = document.createElement('label');
+    noneLabel.className = 'color-none-toggle';
+    const noneCheckbox = document.createElement('input');
+    noneCheckbox.type = 'checkbox';
+    const noneText = document.createElement('span');
+    noneText.textContent = 'None';
+    noneLabel.append(noneCheckbox, noneText);
+
+    function updateColorState(){
+      const hasColor = typeof item.color === 'string' && item.color.length > 0;
+      if (hasColor){
+        colorInput.value = item.color;
+        lastColor = item.color;
+      } else {
+        colorInput.value = lastColor;
+      }
+      colorInput.disabled = !hasColor;
+      noneCheckbox.checked = !hasColor;
+    }
+
     colorInput.addEventListener('input', ()=>{
       item.color = colorInput.value;
+      lastColor = item.color;
+      noneCheckbox.checked = false;
+      colorInput.disabled = false;
       syncJSON();
     });
-    wrap.append(createField('Color', colorInput));
+
+    noneCheckbox.addEventListener('change', ()=>{
+      if (noneCheckbox.checked){
+        if (item.color){ lastColor = item.color; }
+        item.color = undefined;
+      } else {
+        item.color = lastColor || '#6aa9ff';
+      }
+      updateColorState();
+      syncJSON();
+    });
+
+    updateColorState();
+
+    colorControls.append(colorInput, noneLabel);
+    wrap.append(createField('Color', colorControls));
 
     const logoInput = document.createElement('input');
     logoInput.type = 'url';
@@ -1666,7 +1728,7 @@
     const cat = model.categories.find(c=>c.id===catId) || model.categories[0];
     if (!cat){ alert('No categories exist. Create a category first.'); return; }
     const id = uid('item');
-    const item = { id, name: 'New Item', deps: [], color: '#6aa9ff' };
+    const item = { id, name: 'New Item', deps: [] };
     cat.items.push(item);
     selection = { type: 'item', id, catId: cat.id };
     render();
@@ -1830,7 +1892,7 @@
 
   // Seed with example if textarea is empty (first run)
   const SAMPLE = {
-    id: "blockscape_editor_sample",
+    id: "blockscape",
     title: "Blockscape Sample",
     abstract: "Describe your domain here…",
     categories: [

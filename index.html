@@ -353,6 +353,7 @@
       display: flex;
       flex-direction: column;
       align-items: flex-start;
+      text-align: left;
       gap: var(--space-2xs);
       border: 1px solid transparent;
       border-radius: var(--radius-sm);
@@ -876,7 +877,7 @@
  
               <button id="openInEditor" class="pf-v5-c-button pf-m-primary" type="button" title="Open current JSON in the editor">Edit</button>
               
-              <button id="shareModel" class="pf-v5-c-button pf-m-secondary" type="button" title="Copy a shareable URL for this model">Share</button>
+              <button id="shareModel" class="pf-v5-c-button pf-m-primary" type="button" title="Copy a shareable URL for this model">Share</button>
               
               
             </div>
@@ -933,52 +934,39 @@
 
   <template id="seed">
     {
-      "id": "blockscape_seed",
-      "title": "Blockscape Seed Template",
-      "abstract": "Blockscape is a tool for visualizing value chains and dependency relationships. It can be used to visualize the value chain of a project, a product, or a service. It can also be used to visualize the dependencies between different components of a project.<br>The tool enables users to understand dependencies, relationships, and value chains within a domain.<br>You can choose other data from left hand menu.<br>Or load data from a URL.<br>Select an item to see its dependencies.",
+      "id": "blockscape",
+      "title": "Understanding Blockscape",
+      "abstract": "Blockscape is a tool for visualizing value chains and dependency relationships. It can be used to visualize the value chain of a project, a product, or a service. It can also be used to visualize the dependencies between different components of a project.<br>The tool enables users to understand dependencies, relationships, and value chains within a domain.<br>You can choose other data from left hand menu.<br>Or load data from a URL.<br>Select an item to see its dependencies.<br>Edit and Share to copy URL to clipboard",
       "categories": [
         {
           "id": "communication",
-          "title": "Communication Effects",
+          "title": "Communication",
           "items": [
             {
-              "id": "glance_comprehension",
-              "name": "Glanceable Landscape",
-              "deps": [
-                "value_visibility_axis",
-                "legend_minimal"
-              ]
-            },
-            {
-              "id": "component_values",
-              "name": "Component Values",
-              "deps": [
-                "layout_engine",
-                "model_components"
-              ]
-            },
-            {
-              "id": "review_alignment",
-              "name": "Shared Understanding",
-              "deps": [
-                "glance_comprehension",
-                "component_values"
-              ]
-            }
-          ]
-        },
-        {
-          "id": "inputs",
-          "title": "Inputs",
-          "items": [
-            {
-              "id": "domain_prompt",
-              "name": "Domain Prompt",
+              "id": "gestalt",
+              "name": "Visual schema",
               "deps": []
             },
             {
-              "id": "domain_json",
-              "name": "Domain JSON",
+              "id": "spacial-memory",
+              "name": "Spacial memory",
+              "deps": []
+            },
+            {
+              "id": "legend-literacy",
+              "name": "Legend literacy",
+              "deps": []
+            },
+            {
+              "id": "icons",
+              "name": "Iconography",
+              "color": "#6aa9ff",
+              "deps": []
+            },
+            {
+              "id": "relational-awareness",
+              "name": "Relational awareness",
+              "color": "#6aa9ff",
               "deps": []
             }
           ]
@@ -988,17 +976,41 @@
           "title": "Modeling",
           "items": [
             {
-              "id": "model_components",
-              "name": "Components and Categories",
+              "id": "domain_prompt",
+              "name": "Domain Prompt",
               "deps": [
-                "domain_json"
+                "relational-awareness"
+              ]
+            },
+            {
+              "id": "editor",
+              "name": "Editor",
+              "color": "#6aa9ff",
+              "deps": [
+                "model_components",
+                "icons"
+              ]
+            },
+            {
+              "id": "domain_json",
+              "name": "Domain JSON",
+              "deps": [
+                "domain_prompt"
               ]
             },
             {
               "id": "model_dependencies",
               "name": "Dependencies",
               "deps": [
-                "model_components"
+                "model_components",
+                "relational-awareness"
+              ]
+            },
+            {
+              "id": "model_components",
+              "name": "Components and Categories",
+              "deps": [
+                "domain_json"
               ]
             }
           ]
@@ -1012,21 +1024,26 @@
               "name": "Layout Engine",
               "deps": [
                 "model_components",
-                "model_dependencies"
+                "model_dependencies",
+                "gestalt",
+                "icons"
               ]
             },
             {
               "id": "value_visibility_axis",
               "name": "Vertical Position = Visible Value",
               "deps": [
-                "layout_engine"
+                "layout_engine",
+                "legend-literacy",
+                "spacial-memory"
               ]
             },
             {
               "id": "evolution_axis",
               "name": "Horizontal Evolution (Optional)",
               "deps": [
-                "layout_engine"
+                "layout_engine",
+                "legend-literacy"
               ]
             }
           ]
@@ -1036,20 +1053,43 @@
           "title": "Outputs",
           "items": [
             {
+              "id": "extendable",
+              "name": "Extendable",
+              "deps": [
+                "domain_json"
+              ]
+            },
+            {
               "id": "guideframe",
               "name": "Video creation",
               "deps": [
- 
+                "layout_engine",
+                "value_visibility_axis",
+                "evolution_axis"
               ]
             },
             {
               "id": "website",
               "name": "Website",
               "deps": [
-                "layout_engine"
+                "layout_engine",
+                "value_visibility_axis",
+                "evolution_axis"
+              ]
+            },
+            {
+              "id": "git",
+              "name": "Git/Gist",
+              "deps": []
+            },
+            {
+              "id": "share",
+              "name": "Share",
+              "color": "#6aa9ff",
+              "deps": [
+                "website"
               ]
             }
-
           ]
         }
       ]
@@ -1261,7 +1301,7 @@
 
         const titleSpan = document.createElement('span');
         titleSpan.className = 'model-nav-title';
-        titleSpan.textContent = `${i + 1}. ${getModelTitle(m)}`;
+        titleSpan.textContent = getModelTitle(m);
         label.appendChild(titleSpan);
 
         const dataId = getModelId(m);
