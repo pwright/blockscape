@@ -1,7 +1,7 @@
 {
   "id": "NFR",
   "title": "Non Functional Requirements",
-  "abstract": "This blockscape visualizes a comprehensive collection of *ility words - non functionality requirement (NFR) attributes ending in '-ility' - organized into categories and showing their relationships.<br>These *ility words represent various aspects of software quality, system behavior, and architectural characteristics. Each word is categorized by theme (Performance, Security, Maintainability, etc.) and connected to other *ility words through dependency relationships.<br>The visualization helps understand how different quality attributes influence and enable each other, creating a network of interconnected *ility concepts.<br>You can choose other data from the 'Seed Template' pulldown.<br>Or load data from a URL.<br>Select an item to see its dependencies.",
+  "abstract": "This blockscape visualizes a comprehensive collection of *ility words - non functionality requirement (NFR) attributes ending in '-ility' - organized into categories and showing their relationships.<br>These *ility words represent various aspects of software quality, system behavior, and architectural characteristics. Each word is categorized by theme (Performance, Security, Maintainability, etc.) and connected to other *ility words through dependency relationships.<br>The visualization helps understand how different quality attributes influence and enable each other, creating a network of interconnected *ility concepts.<br>You can view alternative requirements standards by loading from this URL.<br>https://gist.githubusercontent.com/pwright/281441c9c07eabe9ef0cd43a27e766de/raw/030d6dd59c2c1e7dbff3b7f565acb24f3cc32c78/requirements.bs",
 
   "categories": [
     {

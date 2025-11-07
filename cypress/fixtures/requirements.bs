@@ -1,4 +1,254 @@
 {
+  "id": "ISO-IEC-25010",
+  "title": "ISO/IEC 25010 Quality Model",
+  "abstract": "This blockscape visualizes the ISO/IEC 25010 software quality model, which defines eight quality characteristics for software products: Functional Suitability, Performance Efficiency, Compatibility, Usability, Reliability, Security, Maintainability, and Portability.<br>Each characteristic contains multiple sub-characteristics that define specific aspects of software quality. The dependencies between these characteristics show how different quality aspects influence and enable each other.<br>This visualization helps understand the relationships between different quality attributes and how they contribute to overall software quality.<br>You can choose other data from the 'Seed Template' pulldown.<br>Or load data from a URL.<br>Select an item to see its dependencies.",
+  "categories": [
+    {
+      "id": "functional_suitability",
+      "title": "Functional Suitability",
+      "items": [
+        {
+          "id": "functional_completeness",
+          "name": "Functional completeness",
+          "deps": []
+        },
+        {
+          "id": "functional_correctness",
+          "name": "Functional correctness",
+          "deps": [
+            "functional_completeness"
+          ]
+        },
+        {
+          "id": "functional_appropriateness",
+          "name": "Functional appropriateness",
+          "deps": [
+            "functional_completeness"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "performance_efficiency",
+      "title": "Performance Efficiency",
+      "items": [
+        {
+          "id": "time_behaviour",
+          "name": "Time behaviour",
+          "deps": [
+            "resource_utilisation",
+            "capacity"
+          ]
+        },
+        {
+          "id": "resource_utilisation",
+          "name": "Resource utilisation",
+          "deps": []
+        },
+        {
+          "id": "capacity",
+          "name": "Capacity",
+          "deps": [
+            "resource_utilisation"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "compatibility",
+      "title": "Compatibility",
+      "items": [
+        {
+          "id": "co_existence",
+          "name": "Co-existence",
+          "deps": []
+        },
+        {
+          "id": "interoperability",
+          "name": "Interoperability",
+          "deps": []
+        }
+      ]
+    },
+    {
+      "id": "usability",
+      "title": "Usability",
+      "items": [
+        {
+          "id": "appropriateness_recognizability",
+          "name": "Appropriateness recognizability",
+          "deps": []
+        },
+        {
+          "id": "learnability",
+          "name": "Learnability",
+          "deps": [
+            "appropriateness_recognizability"
+          ]
+        },
+        {
+          "id": "operability",
+          "name": "Operability",
+          "deps": [
+            "learnability"
+          ]
+        },
+        {
+          "id": "user_error_protection",
+          "name": "User error protection",
+          "deps": [
+            "operability"
+          ]
+        },
+        {
+          "id": "user_interface_aesthetics",
+          "name": "User interface aesthetics",
+          "deps": []
+        },
+        {
+          "id": "accessibility",
+          "name": "Accessibility",
+          "deps": [
+            "operability"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "reliability",
+      "title": "Reliability",
+      "items": [
+        {
+          "id": "maturity",
+          "name": "Maturity",
+          "deps": []
+        },
+        {
+          "id": "availability",
+          "name": "Availability",
+          "deps": [
+            "maturity",
+            "fault_tolerance",
+            "recoverability"
+          ]
+        },
+        {
+          "id": "fault_tolerance",
+          "name": "Fault tolerance",
+          "deps": [
+            "maturity"
+          ]
+        },
+        {
+          "id": "recoverability",
+          "name": "Recoverability",
+          "deps": [
+            "maturity"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "security",
+      "title": "Security",
+      "items": [
+        {
+          "id": "confidentiality",
+          "name": "Confidentiality",
+          "deps": []
+        },
+        {
+          "id": "integrity",
+          "name": "Integrity",
+          "deps": []
+        },
+        {
+          "id": "non_repudiation",
+          "name": "Non-repudiation",
+          "deps": [
+            "integrity",
+            "authenticity",
+            "accountability"
+          ]
+        },
+        {
+          "id": "accountability",
+          "name": "Accountability",
+          "deps": []
+        },
+        {
+          "id": "authenticity",
+          "name": "Authenticity",
+          "deps": []
+        }
+      ]
+    },
+    {
+      "id": "maintainability",
+      "title": "Maintainability",
+      "items": [
+        {
+          "id": "modularity",
+          "name": "Modularity",
+          "deps": []
+        },
+        {
+          "id": "reusability",
+          "name": "Reusability",
+          "deps": [
+            "modularity"
+          ]
+        },
+        {
+          "id": "analysability",
+          "name": "Analysability",
+          "deps": []
+        },
+        {
+          "id": "modifiability",
+          "name": "Modifiability",
+          "deps": [
+            "analysability",
+            "modularity"
+          ]
+        },
+        {
+          "id": "testability",
+          "name": "Testability",
+          "deps": [
+            "analysability",
+            "modularity"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "portability",
+      "title": "Portability",
+      "items": [
+        {
+          "id": "adaptability",
+          "name": "Adaptability",
+          "deps": []
+        },
+        {
+          "id": "installability",
+          "name": "Installability",
+          "deps": []
+        },
+        {
+          "id": "replaceability",
+          "name": "Replaceability",
+          "deps": [
+            "adaptability"
+          ]
+        }
+      ]
+    }
+  ]
+}
+---
+{
   "id": "SEII-QAW",
   "title": "SEII-QAW Quality Attributes",
   "abstract": "This blockscape visualizes quality attributes for QAW (Quality Attribute Workshop) sessions, based on the SEII (Software Engineering Institute International) framework.<br>It presents key quality characteristics including Availability, Modifiability, Performance, Security, Testability, Usability, Interoperability, Portability, Maintainability, and Deployability.<br>Each characteristic contains multiple sub-characteristics that define specific aspects of software quality. The dependencies between these characteristics show how different quality aspects influence and enable each other.<br>This visualization helps QAW participants understand the relationships between different quality attributes and how they contribute to overall software quality during architecture design discussions.<br>You can choose other data from the 'Seed Template' pulldown.<br>Or load data from a URL.<br>Select an item to see its dependencies.",

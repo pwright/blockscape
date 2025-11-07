@@ -5,6 +5,7 @@
   <meta charset="utf-8" />
   <title>Blockscape — simple landscape-style tiles</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <style>
     :root {
       color-scheme: light;
@@ -130,6 +131,13 @@
     .blockscape-brand h1 {
       font: inherit;
       margin: 0;
+    }
+
+    .blockscape-brand__logo {
+      display: block;
+      height: 52px;
+      width: auto;
+      max-width: 320px;
     }
 
     .blockscape-toolbar__controls {
@@ -542,6 +550,19 @@
       box-shadow: var(--color-shadow);
     }
 
+    .blockscape-abstract a.blockscape-gist-link {
+      color: var(--color-primary);
+      font-weight: var(--font-weight-semibold);
+      text-decoration: underline;
+      cursor: pointer;
+      word-break: break-all;
+    }
+
+    .blockscape-abstract a.blockscape-gist-link.is-loading {
+      opacity: 0.65;
+      pointer-events: none;
+    }
+
     .category {
       margin: var(--space-lg) 0;
     }
@@ -819,6 +840,10 @@
         width: 100%;
       }
 
+      .blockscape-brand__logo {
+        height: 44px;
+      }
+
       .blockscape-toolbar__controls {
         width: 100%;
       }
@@ -850,7 +875,9 @@
         <div class="pf-v5-c-masthead__content">
           <div class="blockscape-toolbar">
             <div class="blockscape-brand">
-              <h1>Blockscape</h1>
+              <h1 class="sr-only">Blockscape</h1>
+              <img class="blockscape-brand__logo" src="logos/blockscape-logo.svg"
+                alt="Blockscape — landscape tile explorer" decoding="async" />
               <a href="https://github.com/pwright/blockscape" target="_blank"
                 class="pf-v5-c-button pf-m-plain" title="View on GitHub" aria-label="View Blockscape on GitHub">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
@@ -1547,6 +1574,7 @@
         const abstractDiv = document.createElement('div');
         abstractDiv.className = 'blockscape-abstract';
         abstractDiv.innerHTML = model.m.abstract;
+        enhanceAbstractWithGistLinks(abstractDiv);
         app.appendChild(abstractDiv);
         console.log("[Blockscape] Abstract div appended to DOM");
       } else {
@@ -2112,25 +2140,144 @@
 
     // Load JSON files from same directory (for static hosting)
     async function loadJsonFiles() {
-      const jsonFiles = ['NFR.json', 'ISO-IEC-25010.json', 'SEII-QAW.json'];
+      const jsonFiles = ['NFR.bs', 'deploy.bs'];
       
       for (const filename of jsonFiles) {
         try {
-          const response = await fetch(filename);
-          if (response.ok) {
-            const data = await response.json();
-            const baseName = filename.replace('.json', '');
-            ensureModelMetadata(data, { titleHint: baseName, idHint: baseName });
-            models.push({ 
-              id: uid(), 
-              title: data.title || baseName, 
-              data: data 
-            });
-            console.log("[Blockscape] loaded", filename);
+          const response = await fetch(filename, { cache: 'no-store' });
+          if (!response.ok) continue;
+
+          const text = await response.text();
+          const baseName = filename.replace(/\.[^.]+$/, '') || 'Model';
+          const entries = normalizeToModelsFromText(text, baseName);
+          if (!entries.length) {
+            console.warn("[Blockscape] no models found in", filename);
+            continue;
           }
+
+          models.push(...entries);
+          console.log(`[Blockscape] loaded ${entries.length} model(s) from ${filename}`);
         } catch (error) {
           console.log("[Blockscape] could not load", filename, "- this is normal for file:// protocol");
         }
+      }
+    }
+
+    async function fetchTextWithCacheBypass(url) {
+      const attempts = [
+        { cache: 'no-store' },
+        { cache: 'reload' },
+        {}
+      ];
+      let lastError = null;
+      for (const opts of attempts) {
+        try {
+          console.log(`[Blockscape] fetching ${url} with cache="${opts.cache ?? 'default'}"`);
+          const response = await fetch(url, opts);
+          if (response.status === 304) {
+            console.warn("[Blockscape] fetch returned 304 (Not Modified), retrying without cache");
+            continue;
+          }
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+          return await response.text();
+        } catch (error) {
+          lastError = error;
+        }
+      }
+      throw lastError || new Error('Unable to fetch URL');
+    }
+
+    function enhanceAbstractWithGistLinks(container) {
+      if (!container) return;
+
+      const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+      const textNodes = [];
+      while (walker.nextNode()) {
+        textNodes.push(walker.currentNode);
+      }
+
+      textNodes.forEach(node => convertTextNodeGistLinks(node));
+
+      container.querySelectorAll('a[href]').forEach(anchor => {
+        const href = anchor.getAttribute('href');
+        if (isGistUrl(href)) {
+          attachGistLinkBehavior(anchor, href);
+        }
+      });
+    }
+
+    function convertTextNodeGistLinks(node) {
+      if (!node || !node.nodeValue || !node.nodeValue.includes('http')) return;
+      const text = node.nodeValue;
+      const regex = /(https?:\/\/[^\s<]+)/gi;
+      const matches = [];
+      let match;
+      while ((match = regex.exec(text)) !== null) {
+        if (isGistUrl(match[0])) {
+          matches.push({ url: match[0], index: match.index });
+        }
+      }
+      if (!matches.length) return;
+
+      const fragment = document.createDocumentFragment();
+      let cursor = 0;
+      matches.forEach(({ url, index }) => {
+        if (index > cursor) {
+          fragment.appendChild(document.createTextNode(text.slice(cursor, index)));
+        }
+        fragment.appendChild(createGistLinkAnchor(url));
+        cursor = index + url.length;
+      });
+      if (cursor < text.length) {
+        fragment.appendChild(document.createTextNode(text.slice(cursor)));
+      }
+      node.parentNode.replaceChild(fragment, node);
+    }
+
+    function createGistLinkAnchor(url) {
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.textContent = url;
+      anchor.target = '_blank';
+      anchor.rel = 'noopener noreferrer';
+      attachGistLinkBehavior(anchor, url);
+      return anchor;
+    }
+
+    function attachGistLinkBehavior(anchor, url) {
+      if (!anchor || anchor.dataset.gistLinkBound === 'true') return;
+      anchor.dataset.gistLinkBound = 'true';
+      anchor.classList.add('blockscape-gist-link');
+      anchor.title = 'Load this Gist into Blockscape';
+      anchor.addEventListener('click', (event) => handleGistLinkClick(event, url, anchor));
+    }
+
+    async function handleGistLinkClick(event, url, anchor) {
+      event.preventDefault();
+      event.stopPropagation();
+      if (!url || anchor.dataset.loading === 'true') return;
+      anchor.dataset.loading = 'true';
+      anchor.classList.add('is-loading');
+      try {
+        await loadFromUrl(url);
+      } finally {
+        anchor.dataset.loading = 'false';
+        anchor.classList.remove('is-loading');
+      }
+    }
+
+    function isGistUrl(candidate) {
+      if (typeof candidate !== 'string') return false;
+      try {
+        const parsed = new URL(candidate, window.location.href);
+        const host = parsed.hostname.toLowerCase();
+        return host === 'gist.github.com'
+          || host === 'gist.githubusercontent.com'
+          || (host.startsWith('gist.') && (host.endsWith('github.com') || host.endsWith('githubusercontent.com')));
+      } catch {
+        return false;
       }
     }
 
@@ -2138,21 +2285,32 @@
     async function loadFromUrl(url) {
       try {
         console.log("[Blockscape] loading from URL:", url);
-        const response = await fetch(url);
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        const text = await fetchTextWithCacheBypass(url);
+        const rawName = url.split('/').pop() || '';
+        const baseName = rawName.replace(/\.[^.]+$/, '') || 'URL Model';
+        let entries;
+        try {
+          entries = normalizeToModelsFromText(text, baseName);
+        } catch (parseError) {
+          throw new Error(`Invalid JSON payload: ${parseError.message}`);
         }
-        const data = await response.json();
-        const filename = url.split('/').pop().replace('.json', '') || 'URL Model';
-        ensureModelMetadata(data, { titleHint: filename, idHint: filename });
-        models.push({ 
-          id: uid(), 
-          title: data.title || filename, 
-          data: data 
-        });
-        console.log("[Blockscape] loaded from URL:", filename);
-        renderModelList();
-        if (activeIndex === -1) setActive(0);
+        if (!entries.length) {
+          throw new Error('No JSON objects found in response.');
+        }
+        models.push(...entries.map((entry, idx) => {
+          const dataTitle = (entry.data?.title ?? '').toString().trim();
+          const fallbackTitle = entries.length > 1 ? `${baseName} #${idx + 1}` : baseName;
+          return {
+            ...entry,
+            title: dataTitle || fallbackTitle
+          };
+        }));
+        console.log(`[Blockscape] loaded ${entries.length} model(s) from URL:`, baseName);
+        if (activeIndex === -1) {
+          setActive(0);
+        } else {
+          renderModelList();
+        }
         return true;
       } catch (error) {
         console.error("[Blockscape] URL load error:", error);
