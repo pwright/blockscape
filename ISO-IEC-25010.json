@@ -1,4 +1,6 @@
 {
+  "id": "ISO-IEC-25010",
+  "title": "ISO/IEC 25010 Quality Model",
   "abstract": "This blockscape visualizes the ISO/IEC 25010 software quality model, which defines eight quality characteristics for software products: Functional Suitability, Performance Efficiency, Compatibility, Usability, Reliability, Security, Maintainability, and Portability.<br>Each characteristic contains multiple sub-characteristics that define specific aspects of software quality. The dependencies between these characteristics show how different quality aspects influence and enable each other.<br>This visualization helps understand the relationships between different quality attributes and how they contribute to overall software quality.<br>You can choose other data from the 'Seed Template' pulldown.<br>Or load data from a URL.<br>Select an item to see its dependencies.",
   "categories": [
     {

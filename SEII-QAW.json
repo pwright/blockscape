@@ -1,4 +1,6 @@
 {
+  "id": "SEII-QAW",
+  "title": "SEII-QAW Quality Attributes",
   "abstract": "This blockscape visualizes quality attributes for QAW (Quality Attribute Workshop) sessions, based on the SEII (Software Engineering Institute International) framework.<br>It presents key quality characteristics including Availability, Modifiability, Performance, Security, Testability, Usability, Interoperability, Portability, Maintainability, and Deployability.<br>Each characteristic contains multiple sub-characteristics that define specific aspects of software quality. The dependencies between these characteristics show how different quality aspects influence and enable each other.<br>This visualization helps QAW participants understand the relationships between different quality attributes and how they contribute to overall software quality during architecture design discussions.<br>You can choose other data from the 'Seed Template' pulldown.<br>Or load data from a URL.<br>Select an item to see its dependencies.",
   "categories": [
     {

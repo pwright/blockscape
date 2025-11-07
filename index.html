@@ -353,6 +353,7 @@
       display: flex;
       flex-direction: column;
       align-items: flex-start;
+      text-align: left;
       gap: var(--space-2xs);
       border: 1px solid transparent;
       border-radius: var(--radius-sm);
@@ -381,6 +382,25 @@
 
     .model-nav-label {
       font-weight: var(--font-weight-semibold);
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: var(--space-2xs);
+    }
+
+    .model-nav-title {
+      font-size: var(--font-size-sm);
+    }
+
+    .model-nav-id {
+      font-size: var(--font-size-xs);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--blockscape-muted);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      padding: 0 var(--space-2xs);
+      background: var(--color-surface-muted);
     }
 
     .model-nav-meta {
@@ -488,6 +508,26 @@
 
     .blockscape-main-section {
       padding: 0 var(--space-lg) var(--space-xl);
+    }
+
+    .blockscape-model-meta {
+      margin-bottom: var(--space-md);
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2xs);
+    }
+
+    .blockscape-model-title {
+      font-size: var(--font-size-lg);
+      font-weight: var(--font-weight-semibold);
+      color: var(--color-text);
+    }
+
+    .blockscape-model-id {
+      font-size: var(--font-size-xs);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--blockscape-muted);
     }
 
     .blockscape-abstract {
@@ -828,15 +868,17 @@
                 placeholder="Load JSON from URL…" /> 
                 
               <button id="loadUrl" class="pf-v5-c-button pf-m-secondary" type="button">Load URL</button>
-              <button id="downloadJson" class="pf-v5-c-button pf-m-tertiary" type="button" title="Download JSON (Ctrl+S)">Download</button>
               
+ 
               <label class="pf-v5-c-button pf-m-secondary blockscape-file" role="button">
                 <span>Load File(s)</span>
                 <input id="file" type="file" accept=".json,.txt" multiple />
               </label>
-              <a href="./editor.html" class="pf-v5-c-button pf-m-secondary" role="button">
-                <span>Editor</span>
-              </a>
+ 
+              <button id="openInEditor" class="pf-v5-c-button pf-m-primary" type="button" title="Open current JSON in the editor">Edit</button>
+              
+              <button id="shareModel" class="pf-v5-c-button pf-m-primary" type="button" title="Copy a shareable URL for this model">Share</button>
+              
               
             </div>
             <div class="blockscape-legend" role="presentation">
@@ -866,8 +908,7 @@
             <details>
               <summary>Paste / edit JSON for the <b>active</b> model (schema below)</summary>
               <div class="muted">
-                Schema: <code>{ categories:[{id, title, items:[{id,name,logo?,external?,color?,deps:[] }]}],
-                  links?:[{from,to}] }</code><br />
+                Schema: <code>{ id, title, abstract?, categories:[{id,title,items:[{id,name,logo?,external?,color?,deps:[]}]}], links?:[{from,to}] }</code><br />
                 You can paste multiple objects separated by <code>---</code> to append several models. A single object
                 replaces only when you click “Replace active with JSON”.
               </div>
@@ -893,50 +934,39 @@
 
   <template id="seed">
     {
-      "abstract": "Blockscape is a tool for visualizing value chains and dependency relationships. It can be used to visualize the value chain of a project, a product, or a service. It can also be used to visualize the dependencies between different components of a project.<br>The tool enables users to understand dependencies, relationships, and value chains within a domain.<br>You can choose other data from left hand menu.<br>Or load data from a URL.<br>Select an item to see its dependencies.",
+      "id": "blockscape",
+      "title": "Understanding Blockscape",
+      "abstract": "Blockscape is a tool for visualizing value chains and dependency relationships. It can be used to visualize the value chain of a project, a product, or a service. It can also be used to visualize the dependencies between different components of a project.<br>The tool enables users to understand dependencies, relationships, and value chains within a domain.<br>You can choose other data from left hand menu.<br>Or load data from a URL.<br>Select an item to see its dependencies.<br>Edit and Share to copy URL to clipboard",
       "categories": [
         {
           "id": "communication",
-          "title": "Communication Effects",
+          "title": "Communication",
           "items": [
             {
-              "id": "glance_comprehension",
-              "name": "Glanceable Landscape",
-              "deps": [
-                "value_visibility_axis",
-                "legend_minimal"
-              ]
-            },
-            {
-              "id": "component_values",
-              "name": "Component Values",
-              "deps": [
-                "layout_engine",
-                "model_components"
-              ]
-            },
-            {
-              "id": "review_alignment",
-              "name": "Shared Understanding",
-              "deps": [
-                "glance_comprehension",
-                "component_values"
-              ]
-            }
-          ]
-        },
-        {
-          "id": "inputs",
-          "title": "Inputs",
-          "items": [
-            {
-              "id": "domain_prompt",
-              "name": "Domain Prompt",
+              "id": "gestalt",
+              "name": "Visual schema",
               "deps": []
             },
             {
-              "id": "domain_json",
-              "name": "Domain JSON",
+              "id": "spacial-memory",
+              "name": "Spacial memory",
+              "deps": []
+            },
+            {
+              "id": "legend-literacy",
+              "name": "Legend literacy",
+              "deps": []
+            },
+            {
+              "id": "icons",
+              "name": "Iconography",
+              "color": "#6aa9ff",
+              "deps": []
+            },
+            {
+              "id": "relational-awareness",
+              "name": "Relational awareness",
+              "color": "#6aa9ff",
               "deps": []
             }
           ]
@@ -946,17 +976,41 @@
           "title": "Modeling",
           "items": [
             {
-              "id": "model_components",
-              "name": "Components and Categories",
+              "id": "domain_prompt",
+              "name": "Domain Prompt",
               "deps": [
-                "domain_json"
+                "relational-awareness"
+              ]
+            },
+            {
+              "id": "editor",
+              "name": "Editor",
+              "color": "#6aa9ff",
+              "deps": [
+                "model_components",
+                "icons"
+              ]
+            },
+            {
+              "id": "domain_json",
+              "name": "Domain JSON",
+              "deps": [
+                "domain_prompt"
               ]
             },
             {
               "id": "model_dependencies",
               "name": "Dependencies",
               "deps": [
-                "model_components"
+                "model_components",
+                "relational-awareness"
+              ]
+            },
+            {
+              "id": "model_components",
+              "name": "Components and Categories",
+              "deps": [
+                "domain_json"
               ]
             }
           ]
@@ -970,21 +1024,26 @@
               "name": "Layout Engine",
               "deps": [
                 "model_components",
-                "model_dependencies"
+                "model_dependencies",
+                "gestalt",
+                "icons"
               ]
             },
             {
               "id": "value_visibility_axis",
               "name": "Vertical Position = Visible Value",
               "deps": [
-                "layout_engine"
+                "layout_engine",
+                "legend-literacy",
+                "spacial-memory"
               ]
             },
             {
               "id": "evolution_axis",
               "name": "Horizontal Evolution (Optional)",
               "deps": [
-                "layout_engine"
+                "layout_engine",
+                "legend-literacy"
               ]
             }
           ]
@@ -994,20 +1053,43 @@
           "title": "Outputs",
           "items": [
             {
+              "id": "extendable",
+              "name": "Extendable",
+              "deps": [
+                "domain_json"
+              ]
+            },
+            {
               "id": "guideframe",
               "name": "Video creation",
               "deps": [
- 
+                "layout_engine",
+                "value_visibility_axis",
+                "evolution_axis"
               ]
             },
             {
               "id": "website",
               "name": "Website",
               "deps": [
-                "layout_engine"
+                "layout_engine",
+                "value_visibility_axis",
+                "evolution_axis"
+              ]
+            },
+            {
+              "id": "git",
+              "name": "Git/Gist",
+              "deps": []
+            },
+            {
+              "id": "share",
+              "name": "Share",
+              "color": "#6aa9ff",
+              "deps": [
+                "website"
               ]
             }
-
           ]
         }
       ]
@@ -1038,6 +1120,9 @@
     const previewBody = preview.querySelector('.item-preview__body');
     const previewClose = preview.querySelector('.item-preview__close');
     const downloadButton = document.getElementById('downloadJson');
+    const shareButton = document.getElementById('shareModel');
+    const editButton = document.getElementById('openInEditor');
+    const EDITOR_TRANSFER_KEY = 'blockscape:editorPayload';
 
     // Show the seed in the editor initially.
     jsonBox.value = document.getElementById('seed').innerHTML.trim();
@@ -1055,6 +1140,33 @@
 
     // ===== Utilities =====
     function uid() { return Math.random().toString(36).slice(2, 10); }
+
+    function base64Encode(text) {
+      const bytes = new TextEncoder().encode(text);
+      let binary = '';
+      bytes.forEach(b => { binary += String.fromCharCode(b); });
+      return btoa(binary);
+    }
+
+    function base64Decode(base64) {
+      const binary = atob(base64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+      return new TextDecoder().decode(bytes);
+    }
+
+    function base64UrlEncode(text) {
+      return base64Encode(text).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+    }
+
+    function base64UrlDecode(token) {
+      let base64 = token.replace(/-/g, '+').replace(/_/g, '/');
+      const pad = base64.length % 4;
+      if (pad) base64 += '='.repeat(4 - pad);
+      return base64Decode(base64);
+    }
 
     function download(filename, text) {
       const blob = new Blob([text], { type: 'application/json' });
@@ -1075,13 +1187,46 @@
         .replace(/^-|-$/g, '') || 'blockscape';
     }
 
+    function ensureModelMetadata(data, { titleHint = 'Untitled Model', idHint } = {}) {
+      if (!data || typeof data !== 'object') return data;
+      const trimmedTitle = (data.title ?? '').toString().trim();
+      data.title = trimmedTitle || titleHint || 'Untitled Model';
+
+      const trimmedId = (data.id ?? '').toString().trim();
+      if (!trimmedId) {
+        const base = idHint || data.title || titleHint || 'model';
+        const slug = makeDownloadName(base).replace(/\./g, '-');
+        data.id = slug || `model-${uid()}`;
+      } else {
+        data.id = trimmedId;
+      }
+
+      if (typeof data.abstract !== 'string') {
+        data.abstract = data.abstract == null ? '' : String(data.abstract);
+      }
+      return data;
+    }
+
+    function getModelTitle(entry, fallback = 'Untitled Model') {
+      if (!entry) return fallback;
+      const candidate = (entry.data?.title ?? entry.title ?? '').toString().trim();
+      return candidate || fallback;
+    }
+
+    function getModelId(entry) {
+      const candidate = entry?.data?.id;
+      if (!candidate) return null;
+      const trimmed = candidate.toString().trim();
+      return trimmed || null;
+    }
+
     function downloadCurrentJson(source = 'shortcut') {
       const text = jsonBox.value || '';
       if (!text.trim()) {
         console.warn("[Blockscape] download ignored: JSON box is empty.");
         return false;
       }
-      const title = models[activeIndex]?.title;
+      const title = getModelTitle(models[activeIndex], 'blockscape');
       const filename = `${makeDownloadName(title)}.json`;
       download(filename, text);
       console.log(`[Blockscape] saved JSON (${source}):`, filename);
@@ -1125,7 +1270,7 @@
         return;
       }
       activeIndex = i;
-      console.log("[Blockscape] active model:", models[i].title, "(index", i + " )");
+      console.log("[Blockscape] active model:", getModelTitle(models[i]), "(index", i + " )");
       renderModelList();
       loadActiveIntoEditor();
       rebuildFromActive();
@@ -1153,7 +1298,19 @@
 
         const label = document.createElement('span');
         label.className = 'model-nav-label';
-        label.textContent = `${i + 1}. ${m.title}`;
+
+        const titleSpan = document.createElement('span');
+        titleSpan.className = 'model-nav-title';
+        titleSpan.textContent = getModelTitle(m);
+        label.appendChild(titleSpan);
+
+        const dataId = getModelId(m);
+        if (dataId) {
+          const idBadge = document.createElement('span');
+          idBadge.className = 'model-nav-id';
+          idBadge.textContent = dataId;
+          label.appendChild(idBadge);
+        }
 
         const categories = Array.isArray(m.data?.categories) ? m.data.categories : [];
         const itemsCount = categories.reduce((sum, cat) => sum + ((cat.items || []).length), 0);
@@ -1181,17 +1338,124 @@
       const trimmed = (txt || "").trim();
       if (!trimmed) return [];
       const parsed = tryParseJson(trimmed);
-      if (parsed) return (Array.isArray(parsed) ? parsed : [parsed]).map((o, idx) => ({
-        id: uid(),
-        title: `${titleBase} #${idx + 1}`,
-        data: o
-      }));
+      if (parsed) {
+        const arr = Array.isArray(parsed) ? parsed : [parsed];
+        return arr.map((o, idx) => {
+          ensureModelMetadata(o, { titleHint: `${titleBase} #${idx + 1}` });
+          return {
+            id: uid(),
+            title: o.title || `${titleBase} #${idx + 1}`,
+            data: o
+          };
+        });
+      }
       const parts = trimmed.split(/^\s*---\s*$/m).map(s => s.trim()).filter(Boolean);
-      return parts.map((p, i) => ({
+      return parts.map((p, i) => {
+        const obj = JSON.parse(p);
+        ensureModelMetadata(obj, { titleHint: `${titleBase} #${i + 1}` });
+        return {
+          id: uid(),
+          title: obj.title || `${titleBase} #${i + 1}`,
+          data: obj
+        };
+      });
+    }
+
+    function consumeEditorPayload() {
+      if (typeof window === 'undefined' || !window.localStorage) return null;
+      let raw;
+      try {
+        raw = localStorage.getItem(EDITOR_TRANSFER_KEY);
+      } catch (err) {
+        console.warn('[Blockscape] failed to access editor payload', err);
+        return null;
+      }
+      if (!raw) return null;
+      let payload;
+      try {
+        payload = JSON.parse(raw);
+      } catch (err) {
+        console.warn('[Blockscape] invalid payload JSON', err);
+        try { localStorage.removeItem(EDITOR_TRANSFER_KEY); } catch (_) {}
+        return null;
+      }
+      if (payload?.source !== 'editor') return null;
+      try {
+        localStorage.removeItem(EDITOR_TRANSFER_KEY);
+      } catch (err) {
+        console.warn('[Blockscape] failed to clear editor payload', err);
+      }
+      if (!payload.text || typeof payload.text !== 'string') {
+        console.warn('[Blockscape] payload missing text');
+        return null;
+      }
+      let entries = [];
+      try {
+        entries = normalizeToModelsFromText(payload.text, payload.title || 'Editor Export');
+      } catch (err) {
+        console.warn('[Blockscape] could not parse payload text', err);
+        return null;
+      }
+      if (!entries.length) return null;
+      const startIndex = models.length;
+      entries.forEach(entry => models.push(entry));
+      console.log(`[Blockscape] imported ${entries.length} model(s) from editor`);
+      return startIndex;
+    }
+
+    function consumeShareLink() {
+      const hash = window.location.hash || '';
+      let token = null;
+      let source = null;
+
+      const hashMatch = hash.match(/share=([^&]+)/);
+      if (hashMatch) {
+        token = hashMatch[1];
+        source = 'hash';
+      }
+
+      if (!token) {
+        const params = new URLSearchParams(window.location.search);
+        if (params.has('share')) {
+          token = params.get('share');
+          source = 'search';
+        }
+      }
+
+      if (!token) return null;
+
+      let payload;
+      try {
+        const text = base64UrlDecode(token);
+        payload = JSON.parse(text);
+      } catch (err) {
+        console.warn('[Blockscape] failed to decode share token', err);
+        return null;
+      }
+
+      if (!payload || typeof payload !== 'object' || typeof payload.data !== 'object') {
+        console.warn('[Blockscape] share payload missing data');
+        return null;
+      }
+
+      ensureModelMetadata(payload.data, { titleHint: payload.title || 'Shared Model' });
+
+      models.push({
         id: uid(),
-        title: `${titleBase} #${i + 1}`,
-        data: JSON.parse(p)
-      }));
+        title: payload.data.title || payload.title || 'Shared Model',
+        data: payload.data
+      });
+
+      if (source === 'hash') {
+        history.replaceState(null, '', window.location.pathname + window.location.search);
+      } else if (source === 'search') {
+        const params = new URLSearchParams(window.location.search);
+        params.delete('share');
+        const newSearch = params.toString();
+        history.replaceState(null, '', window.location.pathname + (newSearch ? `?${newSearch}` : ''));
+      }
+
+      return models.length - 1;
     }
 
     function parse(mObj) {
@@ -1258,6 +1522,24 @@
 
       overlay.setAttribute("width", window.innerWidth);
       overlay.setAttribute("height", window.innerHeight);
+
+      const meta = document.createElement('div');
+      meta.className = 'blockscape-model-meta';
+
+      const titleEl = document.createElement('div');
+      titleEl.className = 'blockscape-model-title';
+      titleEl.textContent = (model.m.title && model.m.title.trim()) || getModelTitle(models[activeIndex]);
+      meta.appendChild(titleEl);
+
+      const normalizedId = (model.m.id ?? '').toString().trim();
+      if (normalizedId) {
+        const idEl = document.createElement('div');
+        idEl.className = 'blockscape-model-id';
+        idEl.textContent = `ID: ${normalizedId}`;
+        meta.appendChild(idEl);
+      }
+
+      app.appendChild(meta);
 
       // Add abstract if present
       if (model.m.abstract) {
@@ -1518,6 +1800,73 @@
       });
     }
 
+    if (shareButton) {
+      shareButton.addEventListener('click', async () => {
+        if (activeIndex < 0 || !models[activeIndex]) {
+          alert('Select or load a model before sharing.');
+          return;
+        }
+        const payload = {
+          title: getModelTitle(models[activeIndex], 'Shared Model'),
+          data: models[activeIndex].data
+        };
+        let encoded;
+        try {
+          encoded = base64UrlEncode(JSON.stringify(payload));
+        } catch (err) {
+          console.error('[Blockscape] share encode failed', err);
+          alert('Unable to encode this model for sharing.');
+          return;
+        }
+        const shareUrl = new URL(window.location.href);
+        shareUrl.searchParams.delete('share');
+        shareUrl.hash = `share=${encoded}`;
+        const fullUrl = shareUrl.toString();
+
+        let copied = false;
+        if (navigator.clipboard?.writeText) {
+          try {
+            await navigator.clipboard.writeText(fullUrl);
+            copied = true;
+          } catch (err) {
+            console.warn('[Blockscape] clipboard write failed', err);
+          }
+        }
+        if (copied) {
+          alert('Share URL copied to clipboard.');
+        } else {
+          window.prompt('Copy this share URL:', fullUrl);
+        }
+      });
+    }
+
+    if (editButton) {
+      editButton.addEventListener('click', () => {
+        const text = (jsonBox.value || '').trim();
+        if (!text) {
+          alert('Load or paste a model before opening the editor.');
+          return;
+        }
+        try {
+          JSON.parse(text);
+        } catch (err) {
+          alert('Current JSON is invalid. Fix it before opening the editor.');
+          return;
+        }
+        try {
+          localStorage.setItem(EDITOR_TRANSFER_KEY, JSON.stringify({
+            ts: Date.now(),
+            text
+          }));
+        } catch (storageError) {
+          console.error('[Blockscape] failed to store editor payload', storageError);
+          alert('Unable to stash JSON for the editor (storage disabled?).');
+          return;
+        }
+        window.open('editor.html#viewer', '_blank');
+      });
+    }
+
     document.addEventListener('keydown', (event) => {
       if ((event.ctrlKey || event.metaKey) && event.code === 'KeyS') {
         event.preventDefault();
@@ -1648,8 +1997,13 @@
       if (activeIndex < 0) { alert("No active model selected."); return; }
       try {
         const obj = JSON.parse(jsonBox.value);
+        ensureModelMetadata(obj, { 
+          titleHint: getModelTitle(models[activeIndex]), 
+          idHint: getModelId(models[activeIndex]) || getModelTitle(models[activeIndex]) 
+        });
         models[activeIndex].data = obj;
-        console.log("[Blockscape] replaced active model:", models[activeIndex].title);
+        models[activeIndex].title = obj.title || models[activeIndex].title;
+        console.log("[Blockscape] replaced active model:", getModelTitle(models[activeIndex]));
         rebuildFromActive();
       } catch (e) {
         console.error("[Blockscape] replace error:", e);
@@ -1670,8 +2024,12 @@
             console.warn("[Blockscape] no models in file:", f.name);
             continue;
           }
-          // Ensure file-derived entries use filename as title base
-          models.push(...entries.map((en, i) => ({ ...en, title: entries.length > 1 ? `${f.name} #${i + 1}` : f.name })));
+          // Ensure file-derived entries prefer embedded title/id but fall back to filename
+          models.push(...entries.map((en, i) => {
+            const dataTitle = (en.data?.title ?? '').toString().trim();
+            const fallbackTitle = entries.length > 1 ? `${f.name} #${i + 1}` : f.name;
+            return { ...en, title: dataTitle || fallbackTitle };
+          }));
         }
         if (activeIndex === -1 && models.length) setActive(0);
         else renderModelList();
@@ -1695,7 +2053,7 @@
     // Remove selected model
     document.getElementById('removeModel').onclick = () => {
       if (activeIndex < 0) return;
-      console.log("[Blockscape] removing model:", models[activeIndex].title);
+      console.log("[Blockscape] removing model:", getModelTitle(models[activeIndex]));
       models.splice(activeIndex, 1);
       if (!models.length) {
         activeIndex = -1;
@@ -1761,9 +2119,11 @@
           const response = await fetch(filename);
           if (response.ok) {
             const data = await response.json();
+            const baseName = filename.replace('.json', '');
+            ensureModelMetadata(data, { titleHint: baseName, idHint: baseName });
             models.push({ 
               id: uid(), 
-              title: filename.replace('.json', ''), 
+              title: data.title || baseName, 
               data: data 
             });
             console.log("[Blockscape] loaded", filename);
@@ -1784,9 +2144,10 @@
         }
         const data = await response.json();
         const filename = url.split('/').pop().replace('.json', '') || 'URL Model';
+        ensureModelMetadata(data, { titleHint: filename, idHint: filename });
         models.push({ 
           id: uid(), 
-          title: filename, 
+          title: data.title || filename, 
           data: data 
         });
         console.log("[Blockscape] loaded from URL:", filename);
@@ -1803,13 +2164,19 @@
     // Bootstrap with Blockscape
     (async function bootstrap() {
       const seedObj = JSON.parse(document.getElementById('seed').innerHTML.trim());
+      ensureModelMetadata(seedObj, { titleHint: seedObj.title || 'Blockscape', idHint: seedObj.id || 'blockscape' });
       
-      models.push({ id: uid(), title: "Blockscape", data: seedObj });
+      models.push({ id: uid(), title: seedObj.title || "Blockscape", data: seedObj });
       
       // Try to load JSON files from same directory
       await loadJsonFiles();
       
-      setActive(0);
+      const editorIndex = consumeEditorPayload();
+      const shareIndex = consumeShareLink();
+      const initialIndex = typeof shareIndex === 'number'
+        ? shareIndex
+        : (typeof editorIndex === 'number' ? editorIndex : 0);
+      setActive(initialIndex);
     })();
   </script>
 </body>

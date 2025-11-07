@@ -12,21 +12,26 @@ Generate a **Blockscape value‑chain JSON** for the domain of **[DOMAIN NAME]**
 
 * Output **valid JSON only** with the structure below (no commentary):
 
-  * `categories`: array of category objects
+  * Model level:
+    * `id`: required string, short/sluggy (lowercase, hyphen/underscore ok)
+    * `title`: required string, human‑friendly model title
+    * `abstract`: required string (plain text or simple HTML) that explains the landscape
+    * `categories`: array of category objects
+    * optional `links`: array of `{ "from": "id", "to": "id" }` for cross‑category edges
 
-    * each category has:
+  * Each category has:
+    * `id` (short, lowercase, unique)
+    * `title` (human‑friendly)
+    * `items`: array of component objects
 
-      * `id` (short, lowercase, unique)
-      * `title` (human‑friendly)
-      * `items`: array of component objects
-
-        * each item has:
-
-          * `id` (short, lowercase, unique across all categories)
-          * `name` (human‑friendly)
-          * optional `logo` (e.g., "logos/[slug].svg")
-          * `deps`: array of item `id`s this item **depends on** (must reference defined items only)
-* Use **3–5 categories** and **2–5 items per category**. Prefer clarity over exhaustiveness.
+      * each item has:
+        * `id` (short, lowercase, unique across all categories)
+        * `name` (human‑friendly)
+        * optional `logo` (e.g., `"logos/[slug].svg"`)
+        * optional `external` (boolean) if it represents an external dependency
+        * optional `color` (hex string) for tile tint
+        * `deps`: array of item `id`s this item **depends on** (must reference defined items only)
+* Use **3–6/7 categories** and **2–6/7 items per category**. Prefer clarity over exhaustiveness.
 * Order categories roughly from **abstract to concrete**.
 * Model **visible user value** via **vertical position** (things closer to the user are higher). Ensure `deps` reflect a flow from higher‑value items to their underlying enablers.
 * (Optional) You may imply **horizontal evolution/maturity** via category naming or item grouping, but do not add extra fields for it.
@@ -42,6 +47,9 @@ Return **only the JSON** matching this schema:
 
 ```
 {
+  "id": "[model-id]",
+  "title": "[Model Title]",
+  "abstract": "[Short description or HTML snippet]",
   "categories": [
     {
       "id": "[category-id]",
@@ -56,10 +64,11 @@ Return **only the JSON** matching this schema:
 
 ### Validation Checklist (the model should self‑check before returning):
 
+* Top-level `id`, `title`, and `abstract` are present and non-empty.
 * All `deps` reference **existing** item IDs.
 * No duplicate `id`s across all items.
 * 3–5 categories; each has 2–5 items.
-* No extra fields beyond `id`, `title`, `items`, `name`, `logo` (optional), `deps`.
+* No extra fields beyond those listed above.
 * JSON parses.
 
 ---
