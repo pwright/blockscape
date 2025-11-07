@@ -703,6 +703,7 @@
               <button id="addItemBtn" class="pf-v5-c-button pf-m-secondary" type="button" title="Add item to selected category (Alt+I)">+ Item</button>
               <button id="validateBtn" class="pf-v5-c-button pf-m-primary" type="button" title="Validate JSON and references (Alt+V)">Validate</button>
               <button id="downloadBtn" class="pf-v5-c-button pf-m-tertiary" type="button" title="Download JSON (Ctrl+S)">Download</button>
+              <button id="openInViewer" class="pf-v5-c-button pf-m-primary" type="button" title="Open this JSON in the viewer">Send to Viewer</button>
               <label class="pf-v5-c-button pf-m-secondary blockscape-file" title="Open JSON from file (Ctrl+O)">
                 <span>Load File</span>
                 <input id="fileInput" type="file" accept="application/json" />
@@ -816,6 +817,18 @@
     console.log('[status]', msg);
   }
 
+  function guessViewerTitle(){
+    if (passthrough && typeof passthrough.title === 'string'){
+      const trimmed = passthrough.title.trim();
+      if (trimmed) return trimmed;
+    }
+    const firstCat = model.categories?.[0];
+    if (firstCat){
+      return `Editor – ${firstCat.title || firstCat.id || 'Category'}`;
+    }
+    return 'Editor Export';
+  }
+
   /** ----------------------------- Model ----------------------------- */
   /** Internal canonical model. */
   let model = {
@@ -902,8 +915,11 @@
   const abstractSnippet = $('#abstractSnippet');
   const detailPanel = $('#detailPanel');
   const jsonArea = $('#jsonArea');
+  const EDITOR_TRANSFER_KEY = 'blockscape:editorPayload';
+  const openInViewerBtn = $('#openInViewer');
 
   let selection = { type: 'abstract' };
+  let viewerPayloadError = false;
 
   abstractPreview.addEventListener('click', ()=> selectAbstract());
   abstractPreview.addEventListener('keydown', (e)=>{
@@ -1616,6 +1632,35 @@
     download('blockscape.json', toJSONString());
   });
 
+  if (openInViewerBtn){
+    openInViewerBtn.addEventListener('click', ()=>{
+      const text = (toJSONString() || '').trim();
+      if (!text){
+        alert('Nothing to send yet. Build a model first.');
+        return;
+      }
+      try {
+        localStorage.setItem(EDITOR_TRANSFER_KEY, JSON.stringify({
+          ts: Date.now(),
+          text,
+          source: 'editor',
+          title: guessViewerTitle()
+        }));
+      } catch (err) {
+        console.warn('[Editor] unable to store viewer payload', err);
+        alert('Unable to stash JSON for the viewer (storage disabled?).');
+        return;
+      }
+      const win = window.open('index.html#editor', '_blank');
+      if (!win){
+        alert('Popup blocked. Please allow popups for this site or open the viewer manually.');
+      } else {
+        win.focus();
+      }
+      setStatus('Sent JSON to viewer.', 'ok');
+    });
+  }
+
   $('#fileInput').addEventListener('change', (e)=>{
     const f = e.target.files?.[0]; if (!f) return;
     const reader = new FileReader();
@@ -1650,6 +1695,38 @@
   });
 
   /** ----------------------------- Boot ----------------------------- */
+  function consumeViewerPayload(){
+    if (typeof window === 'undefined' || !window.localStorage) return false;
+    let raw;
+    try {
+      raw = localStorage.getItem(EDITOR_TRANSFER_KEY);
+    } catch (err) {
+      console.warn('[Editor] failed to read viewer payload', err);
+      return false;
+    }
+    if (!raw) return false;
+    try {
+      localStorage.removeItem(EDITOR_TRANSFER_KEY);
+    } catch (err) {
+      console.warn('[Editor] failed to clear viewer payload', err);
+    }
+    try {
+      const payload = JSON.parse(raw);
+      if (!payload || typeof payload.text !== 'string'){
+        throw new Error('Missing payload text');
+      }
+      parseJSONString(payload.text);
+      selection = { type: 'abstract' };
+      render();
+      setStatus('Loaded JSON from viewer.', 'ok');
+      return true;
+    } catch (err) {
+      viewerPayloadError = true;
+      console.warn('[Editor] invalid viewer payload', err);
+      return false;
+    }
+  }
+
   // Seed with example if textarea is empty (first run)
   const SAMPLE = {
     abstract: "Describe your domain here…",
@@ -1667,6 +1744,10 @@
     links: []
   };
 
+  if (consumeViewerPayload()){
+    return;
+  }
+
   try {
     parseJSONString(JSON.stringify(SAMPLE));
     selection = { type: 'abstract' };
@@ -1674,6 +1755,10 @@
     setStatus('Initialized with sample. Start editing.');
   } catch (e){
     setStatus('Initialization error: ' + e.message, 'error');
+  }
+
+  if (viewerPayloadError){
+    setStatus('Viewer payload was invalid; loaded default sample instead.', 'error');
   }
 
 })();

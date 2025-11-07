@@ -829,6 +829,8 @@
                 
               <button id="loadUrl" class="pf-v5-c-button pf-m-secondary" type="button">Load URL</button>
               <button id="downloadJson" class="pf-v5-c-button pf-m-tertiary" type="button" title="Download JSON (Ctrl+S)">Download</button>
+              <button id="shareModel" class="pf-v5-c-button pf-m-secondary" type="button" title="Copy a shareable URL for this model">Share</button>
+              <button id="openInEditor" class="pf-v5-c-button pf-m-primary" type="button" title="Open current JSON in the editor">Edit in Editor</button>
               
               <label class="pf-v5-c-button pf-m-secondary blockscape-file" role="button">
                 <span>Load File(s)</span>
@@ -1038,6 +1040,9 @@
     const previewBody = preview.querySelector('.item-preview__body');
     const previewClose = preview.querySelector('.item-preview__close');
     const downloadButton = document.getElementById('downloadJson');
+    const shareButton = document.getElementById('shareModel');
+    const editButton = document.getElementById('openInEditor');
+    const EDITOR_TRANSFER_KEY = 'blockscape:editorPayload';
 
     // Show the seed in the editor initially.
     jsonBox.value = document.getElementById('seed').innerHTML.trim();
@@ -1055,6 +1060,33 @@
 
     // ===== Utilities =====
     function uid() { return Math.random().toString(36).slice(2, 10); }
+
+    function base64Encode(text) {
+      const bytes = new TextEncoder().encode(text);
+      let binary = '';
+      bytes.forEach(b => { binary += String.fromCharCode(b); });
+      return btoa(binary);
+    }
+
+    function base64Decode(base64) {
+      const binary = atob(base64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+      return new TextDecoder().decode(bytes);
+    }
+
+    function base64UrlEncode(text) {
+      return base64Encode(text).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+    }
+
+    function base64UrlDecode(token) {
+      let base64 = token.replace(/-/g, '+').replace(/_/g, '/');
+      const pad = base64.length % 4;
+      if (pad) base64 += '='.repeat(4 - pad);
+      return base64Decode(base64);
+    }
 
     function download(filename, text) {
       const blob = new Blob([text], { type: 'application/json' });
@@ -1192,6 +1224,101 @@
         title: `${titleBase} #${i + 1}`,
         data: JSON.parse(p)
       }));
+    }
+
+    function consumeEditorPayload() {
+      if (typeof window === 'undefined' || !window.localStorage) return null;
+      let raw;
+      try {
+        raw = localStorage.getItem(EDITOR_TRANSFER_KEY);
+      } catch (err) {
+        console.warn('[Blockscape] failed to access editor payload', err);
+        return null;
+      }
+      if (!raw) return null;
+      let payload;
+      try {
+        payload = JSON.parse(raw);
+      } catch (err) {
+        console.warn('[Blockscape] invalid payload JSON', err);
+        try { localStorage.removeItem(EDITOR_TRANSFER_KEY); } catch (_) {}
+        return null;
+      }
+      if (payload?.source !== 'editor') return null;
+      try {
+        localStorage.removeItem(EDITOR_TRANSFER_KEY);
+      } catch (err) {
+        console.warn('[Blockscape] failed to clear editor payload', err);
+      }
+      if (!payload.text || typeof payload.text !== 'string') {
+        console.warn('[Blockscape] payload missing text');
+        return null;
+      }
+      let entries = [];
+      try {
+        entries = normalizeToModelsFromText(payload.text, payload.title || 'Editor Export');
+      } catch (err) {
+        console.warn('[Blockscape] could not parse payload text', err);
+        return null;
+      }
+      if (!entries.length) return null;
+      const startIndex = models.length;
+      entries.forEach(entry => models.push(entry));
+      console.log(`[Blockscape] imported ${entries.length} model(s) from editor`);
+      return startIndex;
+    }
+
+    function consumeShareLink() {
+      const hash = window.location.hash || '';
+      let token = null;
+      let source = null;
+
+      const hashMatch = hash.match(/share=([^&]+)/);
+      if (hashMatch) {
+        token = hashMatch[1];
+        source = 'hash';
+      }
+
+      if (!token) {
+        const params = new URLSearchParams(window.location.search);
+        if (params.has('share')) {
+          token = params.get('share');
+          source = 'search';
+        }
+      }
+
+      if (!token) return null;
+
+      let payload;
+      try {
+        const text = base64UrlDecode(token);
+        payload = JSON.parse(text);
+      } catch (err) {
+        console.warn('[Blockscape] failed to decode share token', err);
+        return null;
+      }
+
+      if (!payload || typeof payload !== 'object' || typeof payload.data !== 'object') {
+        console.warn('[Blockscape] share payload missing data');
+        return null;
+      }
+
+      models.push({
+        id: uid(),
+        title: payload.title || 'Shared Model',
+        data: payload.data
+      });
+
+      if (source === 'hash') {
+        history.replaceState(null, '', window.location.pathname + window.location.search);
+      } else if (source === 'search') {
+        const params = new URLSearchParams(window.location.search);
+        params.delete('share');
+        const newSearch = params.toString();
+        history.replaceState(null, '', window.location.pathname + (newSearch ? `?${newSearch}` : ''));
+      }
+
+      return models.length - 1;
     }
 
     function parse(mObj) {
@@ -1518,6 +1645,73 @@
       });
     }
 
+    if (shareButton) {
+      shareButton.addEventListener('click', async () => {
+        if (activeIndex < 0 || !models[activeIndex]) {
+          alert('Select or load a model before sharing.');
+          return;
+        }
+        const payload = {
+          title: models[activeIndex].title || 'Shared Model',
+          data: models[activeIndex].data
+        };
+        let encoded;
+        try {
+          encoded = base64UrlEncode(JSON.stringify(payload));
+        } catch (err) {
+          console.error('[Blockscape] share encode failed', err);
+          alert('Unable to encode this model for sharing.');
+          return;
+        }
+        const shareUrl = new URL(window.location.href);
+        shareUrl.searchParams.delete('share');
+        shareUrl.hash = `share=${encoded}`;
+        const fullUrl = shareUrl.toString();
+
+        let copied = false;
+        if (navigator.clipboard?.writeText) {
+          try {
+            await navigator.clipboard.writeText(fullUrl);
+            copied = true;
+          } catch (err) {
+            console.warn('[Blockscape] clipboard write failed', err);
+          }
+        }
+        if (copied) {
+          alert('Share URL copied to clipboard.');
+        } else {
+          window.prompt('Copy this share URL:', fullUrl);
+        }
+      });
+    }
+
+    if (editButton) {
+      editButton.addEventListener('click', () => {
+        const text = (jsonBox.value || '').trim();
+        if (!text) {
+          alert('Load or paste a model before opening the editor.');
+          return;
+        }
+        try {
+          JSON.parse(text);
+        } catch (err) {
+          alert('Current JSON is invalid. Fix it before opening the editor.');
+          return;
+        }
+        try {
+          localStorage.setItem(EDITOR_TRANSFER_KEY, JSON.stringify({
+            ts: Date.now(),
+            text
+          }));
+        } catch (storageError) {
+          console.error('[Blockscape] failed to store editor payload', storageError);
+          alert('Unable to stash JSON for the editor (storage disabled?).');
+          return;
+        }
+        window.open('editor.html#viewer', '_blank');
+      });
+    }
+
     document.addEventListener('keydown', (event) => {
       if ((event.ctrlKey || event.metaKey) && event.code === 'KeyS') {
         event.preventDefault();
@@ -1809,7 +2003,12 @@
       // Try to load JSON files from same directory
       await loadJsonFiles();
       
-      setActive(0);
+      const editorIndex = consumeEditorPayload();
+      const shareIndex = consumeShareLink();
+      const initialIndex = typeof shareIndex === 'number'
+        ? shareIndex
+        : (typeof editorIndex === 'number' ? editorIndex : 0);
+      setActive(initialIndex);
     })();
   </script>
 </body>
