@@ -1,5 +1,7 @@
 # Blockscape
 
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/pwright/blockscape)
+
 A simple, interactive web application for creating and visualizing landscape-style tiles that represent value chains, system architectures, or any hierarchical dependency relationships.
 
 ## Features
@@ -20,7 +22,7 @@ See https://pwright.github.io/blockscape/ and try switching from:
 ## Quick Start
 
 1. Open `index.html` in your web browser
-2. Use the [prompt](./template-generation-prompt.md) to generate json for your domain.
+2. Use the [prompt](./model-generation-prompt.md) to generate json for your domain.
 3. Open https://pwright.github.io/blockscape/ and paste json to *Append model*.
 4. Drag tiles to reorder within categories
 5. Click tiles to see dependency relationships
@@ -83,9 +85,7 @@ The application includes two example templates:
 
 1. **Blockscape**: A generic value chain template showing communication effects, inputs, modeling, rendering, and outputs
 2. **NFR**: Explore non functional requirements
-3. **ISO-IEC-25010**
-4. **SEII-QAW**
-
+3. **Deployments**
 
 ## Usage
 
@@ -158,7 +158,3 @@ This project is open source. See the GitHub repository for license details.
 ## Contributing
 
 Contributions are welcome! Please feel free to submit issues and pull requests on the GitHub repository.
-
-## Related Projects
-
-- [Skupper](https://skupper.io/) - The multi-cluster communication layer used in the example template
