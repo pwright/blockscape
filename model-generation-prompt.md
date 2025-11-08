@@ -28,7 +28,7 @@ Generate a **Blockscape value‑chain JSON** for the domain of **[DOMAIN NAME]**
         * `id` (short, lowercase, unique across all categories)
         * `name` (human‑friendly)
         * optional `logo` (e.g., `"logos/[slug].svg"`)
-        * optional `external` (boolean) if it represents an external dependency
+        * optional `external` (string URL) pointing to external documentation or reference material for that item
         * optional `color` (hex string) for tile tint
         * `deps`: array of item `id`s this item **depends on** (must reference defined items only)
 * Use **3–6/7 categories** and **2–6/7 items per category**. Prefer clarity over exhaustiveness.

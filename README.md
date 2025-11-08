@@ -48,7 +48,7 @@ Blockscape uses a simple JSON schema to define landscape models:
           "name": "Item Name",
           "deps": ["dependency-id-1", "dependency-id-2"],
           "logo": "path/to/logo.svg",
-          "external": true
+          "external": "https://example.com/docs/component"
         }
       ]
     }
@@ -69,7 +69,7 @@ Blockscape uses a simple JSON schema to define landscape models:
     - **name**: Human-friendly component name
     - **deps**: Array of item IDs this component depends on
     - **logo**: Optional path to logo image
-    - **external**: Optional boolean for external dependencies
+    - **external**: Optional URL for an external reference (docs, gists, etc.). When present the tile gains a dashed border and a launch icon that opens the link in a new tab.
 - **links**: Optional array of additional dependency links
 
 ## Visual Indicators
@@ -77,7 +77,7 @@ Blockscape uses a simple JSON schema to define landscape models:
 - **Blue border**: Dependencies (items this component enables)
 - **Red border**: Dependents (items that depend on this component)
 - **Orange badge**: Reused components (used by multiple other components)
-- **Dashed border**: External dependencies
+- **Dashed border + ↗ icon**: External reference link available
 
 ## Built-in Templates
 

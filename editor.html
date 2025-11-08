@@ -825,7 +825,7 @@
           <div class="card card--json">
             <div class="row" style="justify-content: space-between; align-items: baseline;">
               <span class="pill">JSON (live)</span>
-              <small class="muted">Schema: { id, title, abstract?, categories:[{id,title,items:[{id,name,logo?,external?,color?,deps:[]}]}], links?:[{from,to}] }</small>
+              <small class="muted">Schema: { id, title, abstract?, categories:[{id,title,items:[{id,name,logo?,external?:url,color?,deps:[]}]}], links?:[{from,to}] }</small>
             </div>
             <textarea id="jsonArea" spellcheck="false" aria-label="JSON"></textarea>
             <div class="row" style="justify-content: space-between;">
@@ -861,7 +861,7 @@
    * - Bidirectional sync: structured UI <-> JSON textarea.
    * - Drag & drop: reorder categories; reorder/move items.
    * - CRUD for categories and items.
-   * - Optional fields supported: logo, external, color.
+   * - Optional fields supported: logo, external URL, color.
    * - Minimal referential integrity checks for deps and id uniqueness.
    *
    * Console logging is included to aid debugging.
@@ -912,6 +912,7 @@
 
   /** Unknown top-level keys we keep when round-tripping JSON. */
   let passthrough = {};
+  let legacyExternalWarningIssued = false;
 
   /** Serialize model + passthrough to JSON string. */
   function toJSONString(){
@@ -923,8 +924,21 @@
     return JSON.stringify(out, null, 2);
   }
 
+  function normalizeExternalField(value){
+    if (typeof value === 'string'){
+      const trimmed = value.trim();
+      return trimmed || undefined;
+    }
+    if (value === true && !legacyExternalWarningIssued){
+      legacyExternalWarningIssued = true;
+      console.warn('[Blockscape Editor] boolean `external` fields are deprecated; provide a URL instead.');
+    }
+    return undefined;
+  }
+
   /** Parse JSON string to model; throws with details on failure. */
   function parseJSONString(text){
+    legacyExternalWarningIssued = false;
     const raw = JSON.parse(text);
     if (!raw || typeof raw !== 'object') throw new Error('Root must be an object');
     if (!Array.isArray(raw.categories)) throw new Error('Missing required array: categories');
@@ -941,7 +955,7 @@
         id: String(it.id ?? uid('item')).trim() || uid('item'),
         name: String(it.name ?? it.id ?? `Item ${j+1}`),
         logo: it.logo ?? undefined,
-        external: it.external ?? undefined,
+        external: normalizeExternalField(it.external),
         color: it.color ?? undefined,
         deps: Array.isArray(it.deps) ? it.deps.map(String) : []
       })) : []
@@ -1523,13 +1537,14 @@
 
     const externalInput = document.createElement('input');
     externalInput.type = 'url';
-    externalInput.value = item.external || '';
+    externalInput.value = typeof item.external === 'string' ? item.external : '';
     externalInput.placeholder = 'https://...';
     externalInput.addEventListener('input', ()=>{
-      item.external = externalInput.value || undefined;
+      const next = externalInput.value.trim();
+      item.external = next || undefined;
       syncJSON();
     });
-    wrap.append(createField('External link (optional)', externalInput));
+    wrap.append(createField('External reference URL (optional)', externalInput));
 
     const depsField = document.createElement('div');
     depsField.className = 'field';

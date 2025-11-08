@@ -766,6 +766,32 @@
       background: #f8fafc;
     }
 
+    .tile .external-link {
+      position: absolute;
+      top: var(--space-sm);
+      left: var(--space-sm);
+      width: 24px;
+      height: 24px;
+      border-radius: 999px;
+      border: 1px solid transparent;
+      background: rgba(148, 163, 184, 0.16);
+      color: inherit;
+      font-size: 0.75rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      padding: 0;
+      transition: background var(--transition), color var(--transition), border var(--transition);
+    }
+
+    .tile .external-link:hover,
+    .tile .external-link:focus-visible {
+      background: rgba(148, 163, 184, 0.28);
+      border-color: rgba(148, 163, 184, 0.45);
+      color: var(--color-text);
+    }
+
     .tile.dep {
       box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
       border-color: var(--blockscape-dep);
@@ -851,6 +877,32 @@
       text-overflow: ellipsis;
       white-space: nowrap;
       flex: 1 1 auto;
+    }
+
+    .item-preview__actions {
+      display: flex;
+      gap: var(--space-2xs);
+      align-items: center;
+      flex: 0 0 auto;
+    }
+
+    .item-preview__action {
+      border: 1px solid var(--color-border);
+      background: var(--color-surface);
+      color: var(--blockscape-foreground);
+      font-size: var(--font-size-xs);
+      padding: var(--space-2xs) var(--space-sm);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.2rem;
+    }
+
+    .item-preview__action:hover,
+    .item-preview__action:focus-visible {
+      background: var(--color-surface-muted);
+      border-color: var(--color-border-strong);
     }
 
     .item-preview__close {
@@ -1001,7 +1053,7 @@
               <span class="legend-entry"><span class="legend-dot legend-dot--dep"></span> enables</span>
               <span class="legend-entry"><span class="legend-dot legend-dot--revdep"></span> dependents</span>
               <span class="legend-entry"><span class="legend-dot legend-dot--reused"></span> reused</span>
-              <span class="legend-entry"><span class="legend-dot legend-dot--external"></span> external</span>
+              <span class="legend-entry"><span class="legend-dot legend-dot--external"></span> external link</span>
             </div>
           </div>
         </div>
@@ -1024,7 +1076,7 @@
             aria-label="Model source JSON editor">
             <p class="blockscape-json-panel__title">Paste / edit JSON for the <b>active</b> model (schema below)</p>
             <div class="muted">
-              Schema: <code>{ id, title, abstract?, categories:[{id,title,items:[{id,name,logo?,external?,color?,deps:[]}]}], links?:[{from,to}] }</code><br />
+              Schema: <code>{ id, title, abstract?, categories:[{id,title,items:[{id,name,logo?,external?:url,color?,deps:[]}]}], links?:[{from,to}] }</code><br />
               You can paste multiple objects separated by <code>---</code> to append several models. A single object
               replaces only when you click “Replace active with JSON”.
             </div>
@@ -1217,6 +1269,7 @@
   <div id="itemPreview" class="item-preview" hidden aria-hidden="true">
     <div class="item-preview__header">
       <span class="item-preview__title">Preview</span>
+      <div class="item-preview__actions" hidden></div>
       <button type="button" class="item-preview__close" aria-label="Close preview">&times;</button>
     </div>
     <div class="item-preview__body">
@@ -1234,9 +1287,10 @@
     const tabTooltip = document.getElementById('tabTooltip');
     const modelList = document.getElementById('modelList');
     const preview = document.getElementById('itemPreview');
-    const previewTitle = preview.querySelector('.item-preview__title');
-    const previewBody = preview.querySelector('.item-preview__body');
-    const previewClose = preview.querySelector('.item-preview__close');
+  const previewTitle = preview.querySelector('.item-preview__title');
+  const previewBody = preview.querySelector('.item-preview__body');
+  const previewActions = preview.querySelector('.item-preview__actions');
+  const previewClose = preview.querySelector('.item-preview__close');
     const downloadButton = document.getElementById('downloadJson');
     const shareButton = document.getElementById('shareModel');
     const editButton = document.getElementById('openInEditor');
@@ -1797,10 +1851,12 @@
         section.appendChild(grid);
 
         (cat.items || []).forEach(it => {
+          const externalMeta = resolveExternalMeta(it.external);
           const tile = document.createElement('div');
-          tile.className = 'tile' + (it.external ? ' external' : '');
+          tile.className = externalMeta.isExternal ? 'tile external' : 'tile';
           tile.tabIndex = 0;
           tile.dataset.id = it.id;
+          if (externalMeta.url) { tile.dataset.externalUrl = externalMeta.url; }
 
           const img = document.createElement('img');
           img.className = 'logo';
@@ -1820,6 +1876,9 @@
           badge.className = 'badge';
           badge.textContent = 'reused';
 
+          if (externalMeta.url) {
+            tile.appendChild(createExternalLinkButton(externalMeta.url));
+          }
           tile.appendChild(img);
           tile.appendChild(nm);
           tile.appendChild(badge);
@@ -1920,6 +1979,40 @@
     function center(r) { return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }
     function escapeHtml(s) { return s.replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[m])); }
 
+    function resolveExternalMeta(value) {
+      if (typeof value === 'string') {
+        const trimmed = value.trim();
+        if (!trimmed) return { isExternal: false, url: '' };
+        try {
+          const url = new URL(trimmed);
+          if (!/^https?:/i.test(url.protocol)) return { isExternal: false, url: '' };
+          return { isExternal: true, url: url.toString() };
+        } catch (error) {
+          console.warn('[Blockscape] invalid external url skipped', value, error);
+          return { isExternal: false, url: '' };
+        }
+      }
+      if (value === true) {
+        return { isExternal: true, url: '' };
+      }
+      return { isExternal: false, url: '' };
+    }
+
+    function createExternalLinkButton(url) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'external-link';
+      button.setAttribute('aria-label', 'Open external reference in a new tab');
+      button.title = url;
+      button.textContent = '↗';
+      button.addEventListener('click', (event) => {
+        event.stopPropagation();
+        window.open(url, '_blank', 'noopener');
+      });
+      button.addEventListener('keydown', (event) => event.stopPropagation());
+      return button;
+    }
+
     function showTabTooltip(target, html, { offset = 8 } = {}) {
       if (!tabTooltip || !target || !html) return;
       tabTooltip.innerHTML = html;
@@ -1957,6 +2050,7 @@
       preview.classList.remove('is-visible', 'item-preview--has-frame', 'item-preview--expanded');
       preview.setAttribute('aria-hidden', 'true');
       preview.hidden = true;
+      setPreviewActions('');
     }
 
     function showPreviewAt(x, y) {
@@ -1986,6 +2080,26 @@
       preview.style.top = `${top}px`;
     }
 
+    function setPreviewActions(url) {
+      if (!previewActions) return;
+      previewActions.innerHTML = '';
+      if (url) {
+        const action = document.createElement('button');
+        action.type = 'button';
+        action.className = 'item-preview__action';
+        action.innerHTML = 'Open external link <span aria-hidden="true">↗</span>';
+        action.title = url;
+        action.addEventListener('click', (event) => {
+          event.stopPropagation();
+          window.open(url, '_blank', 'noopener');
+        });
+        previewActions.appendChild(action);
+        previewActions.hidden = false;
+      } else {
+        previewActions.hidden = true;
+      }
+    }
+
     async function handleTileContextMenu(event, tile) {
       if (!preview) return;
       event.stopPropagation();
@@ -1995,6 +2109,8 @@
       const filename = id ? `${id}.html` : '';
       const filepath = filename ? `items/${filename}` : '';
       const requestId = ++previewRequestId;
+      const externalUrl = tile.dataset.externalUrl || '';
+      setPreviewActions(externalUrl);
 
       previewTitle.textContent = displayName;
       previewBody.innerHTML = '<div class="item-preview__status">Loading…</div>';
