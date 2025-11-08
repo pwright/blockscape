@@ -98,31 +98,12 @@ The application includes two example templates:
 
 ### Editing Models
 
-1. Select a model from the dropdown
-2. Edit the JSON in the text area
-3. Click "Replace active with JSON" to update the model
-4. Changes are immediately reflected in the visualization
+1. Select a model 
+2. Click **Edit**
+3. When you're finished editing, click **View**
 
-### Reordering Components
+NOTE: This process creates new tabs in your browser.
 
-1. Drag tiles within the same category to reorder them
-2. The JSON will be automatically updated to reflect the new order
-
-## File Structure
-
-```
-blockscape/
-├── index.html              # Main application file
-├── items/                  # Supporting html files
-├── logos/                  # Logo assets
-│   ├── Docker.svg
-│   ├── k8s.svg
-│   ├── Podman.svg
-│   ├── skupper-logo.svg
-│   └── systemd.svg
-├── template-generation-prompt.md  # AI prompt template for generating models
-└── README.md              # This file
-```
 
 ## Development
 
