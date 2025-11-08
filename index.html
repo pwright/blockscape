@@ -1078,7 +1078,8 @@
             <div class="muted">
               Schema: <code>{ id, title, abstract?, categories:[{id,title,items:[{id,name,logo?,external?:url,color?,deps:[]}]}], links?:[{from,to}] }</code><br />
               You can paste multiple objects separated by <code>---</code> to append several models. A single object
-              replaces only when you click “Replace active with JSON”.
+              replaces only when you click “Replace active with JSON”. Tip: with no input focused, press Cmd/Ctrl+V
+              anywhere on the page to append clipboard JSON instantly.
             </div>
             <div class="blockscape-json-controls">
               <textarea id="jsonBox" class="pf-v5-c-form-control"
@@ -1531,6 +1532,25 @@
           data: obj
         };
       });
+    }
+
+    function isEditableElement(el) {
+      if (!el) return false;
+      if (el.isContentEditable) return true;
+      const tag = (el.tagName || '').toLowerCase();
+      return tag === 'input' || tag === 'textarea' || tag === 'select';
+    }
+
+    function shouldHandleGlobalPaste() {
+      const active = document.activeElement;
+      if (!active || active === document.body || active === document.documentElement) return true;
+      return !isEditableElement(active);
+    }
+
+    function looksLikeModelJson(text) {
+      if (!text) return false;
+      const start = text.trimStart();
+      return /^\s*(\{|\[|---)/.test(start);
     }
 
     function consumeEditorPayload() {
@@ -2426,6 +2446,30 @@
         e.target.value = ""; // allow re-selecting the same files
       }
     };
+
+    // Paste JSON anywhere to append new models
+    document.addEventListener('paste', handleClipboardPaste);
+
+    function handleClipboardPaste(event) {
+      if (!shouldHandleGlobalPaste()) return;
+      const text = event.clipboardData?.getData('text/plain')
+        || (window.clipboardData && window.clipboardData.getData('Text'))
+        || '';
+      if (!looksLikeModelJson(text)) return;
+      let entries = [];
+      try {
+        entries = normalizeToModelsFromText(text, 'Clipboard');
+      } catch (err) {
+        console.warn('[Blockscape] clipboard paste ignored (invalid JSON)', err);
+        return;
+      }
+      if (!entries.length) return;
+      event.preventDefault();
+      const startIndex = models.length;
+      models.push(...entries);
+      console.log(`[Blockscape] pasted ${entries.length} model(s) from clipboard`);
+      setActive(startIndex);
+    }
 
     // Switch active model from sidebar
     modelList.addEventListener('click', (e) => {
