@@ -1638,15 +1638,6 @@
         data: payload.data
       });
 
-      if (source === 'hash') {
-        history.replaceState(null, '', window.location.pathname + window.location.search);
-      } else if (source === 'search') {
-        const params = new URLSearchParams(window.location.search);
-        params.delete('share');
-        const newSearch = params.toString();
-        history.replaceState(null, '', window.location.pathname + (newSearch ? `?${newSearch}` : ''));
-      }
-
       return models.length - 1;
     }
 
