@@ -812,7 +812,7 @@
     }
 
     .svg-layer {
-      position: absolute;
+      position: fixed;
       inset: 0;
       pointer-events: none;
       z-index: 0;
@@ -1040,7 +1040,7 @@
  
               <label class="pf-v5-c-button pf-m-secondary blockscape-file" role="button">
                 <span>Load File(s)</span>
-                <input id="file" type="file" accept=".json,.txt" multiple />
+                <input id="file" type="file" accept=".bs,.json,.txt" multiple />
               </label>
  
               <button id="openInEditor" class="pf-v5-c-button pf-m-primary" type="button" title="Open current JSON in the editor">Edit</button>
@@ -1435,6 +1435,28 @@
       const L = 0.2126*Math.pow(r/255,2.2) + 0.7152*Math.pow(g/255,2.2) + 0.0722*Math.pow(b/255,2.2);
       return L > 0.35 ? '#111111' : '#ffffff';
     }
+
+    function scrollPageToTop() {
+      if (typeof window === 'undefined' || typeof window.scrollTo !== 'function') return;
+      try {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } catch (err) {
+        window.scrollTo(0, 0);
+      }
+    }
+
+    let overlaySyncPending = false;
+    function scheduleOverlaySync() {
+      if (overlaySyncPending) return;
+      overlaySyncPending = true;
+      requestAnimationFrame(() => {
+        overlaySyncPending = false;
+        reflowRects();
+        drawLinks();
+      });
+    }
+
+    let globalEventsBound = false;
 
     function setActive(i) {
       hidePreview();
@@ -1939,7 +1961,11 @@
         grid.addEventListener('dragleave', handleDragLeave);
       });
 
-      window.addEventListener('resize', () => { reflowRects(); drawLinks(); });
+      if (!globalEventsBound) {
+        globalEventsBound = true;
+        window.addEventListener('resize', scheduleOverlaySync);
+        window.addEventListener('scroll', scheduleOverlaySync, { passive: true });
+      }
       document.getElementById('clear').onclick = () => clearSelection();
     }
 
@@ -2468,6 +2494,7 @@
       if (!button) return;
       const i = parseInt(button.dataset.index, 10);
       if (!Number.isInteger(i)) return;
+      scrollPageToTop();
       setActive(i);
     });
 
