@@ -1296,6 +1296,7 @@
     const shareButton = document.getElementById('shareModel');
     const editButton = document.getElementById('openInEditor');
     const EDITOR_TRANSFER_KEY = 'blockscape:editorPayload';
+    const defaultDocumentTitle = document.title;
 
     // Show the seed in the editor initially.
     jsonBox.value = document.getElementById('seed').innerHTML.trim();
@@ -1393,6 +1394,12 @@
       return trimmed || null;
     }
 
+    function syncDocumentTitle() {
+      const activeModel = (activeIndex >= 0 && models[activeIndex]) ? models[activeIndex] : null;
+      const modelId = getModelId(activeModel);
+      document.title = modelId ? `${modelId}-blockscape` : defaultDocumentTitle;
+    }
+
     function downloadCurrentJson(source = 'shortcut') {
       const text = jsonBox.value || '';
       if (!text.trim()) {
@@ -1466,6 +1473,7 @@
       }
       activeIndex = i;
       console.log("[Blockscape] active model:", getModelTitle(models[i]), "(index", i + " )");
+      syncDocumentTitle();
       renderModelList();
       loadActiveIntoEditor();
       rebuildFromActive();
@@ -2426,6 +2434,7 @@
         });
         models[activeIndex].data = obj;
         models[activeIndex].title = obj.title || models[activeIndex].title;
+        syncDocumentTitle();
         console.log("[Blockscape] replaced active model:", getModelTitle(models[activeIndex]));
         rebuildFromActive();
       } catch (e) {
@@ -2510,6 +2519,7 @@
         overlay.innerHTML = "";
         jsonBox.value = "";
         renderModelList();
+        syncDocumentTitle();
         return;
       }
       const next = Math.min(activeIndex, models.length - 1);
