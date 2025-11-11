@@ -773,6 +773,8 @@
               
               <button id="addItemBtn" class="pf-v5-c-button pf-m-secondary" type="button" title="Add item to selected category (Alt+I)">+ Item</button>
               
+              <button id="duplicateItemBtn" class="pf-v5-c-button pf-m-secondary" type="button" title="Duplicate selected item" disabled>Duplicate</button>
+              
               <button id="downloadBtn" class="pf-v5-c-button pf-m-tertiary" type="button" title="Download JSON (Ctrl+S)">Download</button>
               <label class="pf-v5-c-button pf-m-secondary blockscape-file" title="Open JSON from file (Ctrl+O)">
                 <span>Load File</span>
@@ -1034,6 +1036,7 @@
   const detailPanel = $('#detailPanel');
   const jsonArea = $('#jsonArea');
   const EDITOR_TRANSFER_KEY = 'blockscape:editorPayload';
+  const duplicateItemBtn = $('#duplicateItemBtn');
   const openInViewerBtn = $('#openInViewer');
 
   let selection = { type: 'abstract' };
@@ -1639,6 +1642,9 @@
     $$('.item', categoriesEl).forEach(itemEl => {
       itemEl.classList.toggle('selected', selection.type === 'item' && itemEl.dataset.itemId === selection.id);
     });
+    if (duplicateItemBtn){
+      duplicateItemBtn.disabled = selection.type !== 'item';
+    }
     syncSelectedQueryParam();
   }
 
@@ -1741,6 +1747,17 @@
     const arr = [];
     for (const c of model.categories){ for (const it of c.items){ arr.push(it); } }
     return arr;
+  }
+
+  function buildDuplicateId(baseId){
+    const trimmed = (baseId || '').trim();
+    if (!trimmed) return uid('item');
+    const taken = new Set(getAllItems().map(it => it.id));
+    let nextId = `${trimmed}-1`;
+    while (taken.has(nextId)){
+      nextId = `${nextId}-1`;
+    }
+    return nextId;
   }
 
   function getDependents(itemId){
@@ -1866,6 +1883,21 @@
     render();
   }
 
+  function duplicateItem(catId, itemId){
+    const cat = model.categories.find(c => c.id === catId); if (!cat) return null;
+    const index = cat.items.findIndex(it => it.id === itemId);
+    if (index < 0) return null;
+    const source = cat.items[index];
+    const duplicate = typeof structuredClone === 'function'
+      ? structuredClone(source)
+      : JSON.parse(JSON.stringify(source));
+    duplicate.id = buildDuplicateId(source.id);
+    cat.items.splice(index + 1, 0, duplicate);
+    selection = { type: 'item', id: duplicate.id, catId: cat.id };
+    render();
+    return duplicate;
+  }
+
   /** ----------------------------- Sync ----------------------------- */
   const syncJSON = debounce(()=>{
     jsonArea.value = toJSONString();
@@ -1893,6 +1925,12 @@
     const targetId = getTargetCategoryId();
     addItem(targetId);
   });
+  if (duplicateItemBtn){
+    duplicateItemBtn.addEventListener('click', ()=>{
+      if (selection.type !== 'item') return;
+      duplicateItem(selection.catId, selection.id);
+    });
+  }
   $('#validateBtn').addEventListener('click', validate);
   $('#downloadBtn').addEventListener('click', ()=>{
     validate();
