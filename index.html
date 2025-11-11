@@ -1101,167 +1101,67 @@
   </div>
 
   <template id="seed">
+{
+  "id": "blockscape",
+  "title": "Blockscape (AI maps)",
+  "abstract": "Blockscape (pronounced BYK-shed) visualizes value chains and dependencies using a BS file. This model emphasizes the Communication layer that makes maps comprehensible, alongside concrete user experiences, authoring & LLM flows, presentation semantics, and the platform services that enable them.",
+  "categories": [
     {
-      "id": "blockscape",
-      "title": "Understanding Blockscape",
-      "abstract": "Blockscape is a tool for visualizing value chains and dependency relationships. It can be used to visualize the value chain of a project, a product, or a service. It can also be used to visualize the dependencies between different components of a project.<br>The tool enables users to understand dependencies, relationships, and value chains within a domain.<br>You can choose other data from left hand menu.<br>Or load data from a URL. Use https://github.com/pwright/blockscape/blob/main/model-generation-prompt.md  as a prompt to create JSON.<br>Select an item to see its dependencies.<br>Edit and Share to copy URL to clipboard<br>",
-      "categories": [
-        {
-          "id": "communication",
-          "title": "Communication",
-          "items": [
-            {
-              "id": "gestalt",
-              "name": "Visual schema",
-              "deps": []
-            },
-            {
-              "id": "spacial-memory",
-              "name": "Spacial memory",
-              "deps": []
-            },
-            {
-              "id": "legend-literacy",
-              "name": "Legend literacy",
-              "deps": []
-            },
-            {
-              "id": "icons",
-              "name": "Iconography",
-              "color": "#6aa9ff",
-              "deps": []
-            },
-            {
-              "id": "relational-awareness",
-              "name": "Relational awareness",
-              "color": "#6aa9ff",
-              "deps": []
-            }
-          ]
-        },
-        {
-          "id": "modeling",
-          "title": "Modeling",
-          "items": [
-            {
-              "id": "domain_prompt",
-              "name": "Domain Prompt",
-              "deps": [
-                "relational-awareness"
-              ]
-            },
-            {
-              "id": "editor",
-              "name": "Editor",
-              "color": "#6aa9ff",
-              "deps": [
-                "model_components",
-                "icons"
-              ]
-            },
-            {
-              "id": "domain_json",
-              "name": "Domain JSON",
-              "deps": [
-                "domain_prompt"
-              ]
-            },
-            {
-              "id": "model_dependencies",
-              "name": "Dependencies",
-              "deps": [
-                "model_components",
-                "relational-awareness"
-              ]
-            },
-            {
-              "id": "model_components",
-              "name": "Components and Categories",
-              "deps": [
-                "domain_json"
-              ]
-            }
-          ]
-        },
-        {
-          "id": "rendering",
-          "title": "Rendering",
-          "items": [
-            {
-              "id": "layout_engine",
-              "name": "Layout Engine",
-              "deps": [
-                "model_components",
-                "model_dependencies",
-                "gestalt",
-                "icons"
-              ]
-            },
-            {
-              "id": "value_visibility_axis",
-              "name": "Vertical Position = Visible Value",
-              "deps": [
-                "layout_engine",
-                "legend-literacy",
-                "spacial-memory"
-              ]
-            },
-            {
-              "id": "evolution_axis",
-              "name": "Horizontal Evolution (Optional)",
-              "deps": [
-                "layout_engine",
-                "legend-literacy"
-              ]
-            }
-          ]
-        },
-        {
-          "id": "outputs",
-          "title": "Outputs",
-          "items": [
-            {
-              "id": "extendable",
-              "name": "Extendable",
-              "deps": [
-                "domain_json"
-              ]
-            },
-            {
-              "id": "guideframe",
-              "name": "Video creation",
-              "deps": [
-                "layout_engine",
-                "value_visibility_axis",
-                "evolution_axis"
-              ]
-            },
-            {
-              "id": "website",
-              "name": "Website",
-              "deps": [
-                "layout_engine",
-                "value_visibility_axis",
-                "evolution_axis"
-              ]
-            },
-            {
-              "id": "git",
-              "name": "Git/Gist",
-              "deps": []
-            },
-            {
-              "id": "share",
-              "name": "Share",
-              "color": "#6aa9ff",
-              "deps": [
-                "website"
-              ]
-            }
-          ]
-        }
+      "id": "communication",
+      "title": "Communication",
+      "items": [
+        { "id": "gestalt", "name": "Visual schema", "deps": [] },
+        { "id": "value-chain", "name": "Value chain (y-axis)", "deps": [] },
+        { "id": "spacial-memory", "name": "Spacial memory", "deps": [] },
+        { "id": "evolution", "name": "Evolution (x-axis)", "deps": [] },
+        { "id": "legend-literacy", "name": "Legend literacy", "deps": [] },
+        { "id": "relational-awareness", "name": "Relational awareness", "deps": [] },
+        { "id": "icons", "name": "Iconography", "deps": [] }
+      ]
+    },
+    {
+      "id": "experience",
+      "title": "User Experience",
+      "items": [
+        { "id": "paste-bs-file", "name": "Paste BS File", "deps": ["bs-parser", "schema-validator"] },
+        { "id": "load-multidoc-file", "name": "Load Multi-Document File", "deps": ["multidoc-assembler", "bs-parser", "schema-validator"] },
+        { "id": "load-multidoc-from-url", "name": "Load Multi-Document from URL", "deps": ["url-fetcher", "multidoc-assembler", "bs-parser", "schema-validator"] },
+        { "id": "create-gist-multidoc", "name": "Create Header+Detail in Gist", "deps": ["gist-integration", "multidoc-assembler", "schema-validator"] },
+        { "id": "abstract-gist-loading", "name": "Abstract Supports Gist Loading", "deps": ["gist-integration", "bs-parser", "schema-validator"] }
+      ]
+    },
+    {
+      "id": "authoring-ai",
+      "title": "Authoring & LLM",
+      "items": [
+        { "id": "bs-format-simple", "name": "BS format is simple", "deps": [] },
+        { "id": "editor-human-terms", "name": "Editor (human terms)", "deps": ["gestalt"] },
+        { "id": "llm-generate-bs", "name": "LLM generates BS", "deps": ["schema-validator"] },
+        { "id": "llm-consume-bs", "name": "LLM consumes BS", "deps": ["bs-parser"] }
+      ]
+    },
+    {
+      "id": "presentation",
+      "title": "Presentation Semantics",
+      "items": [
+        { "id": "layout_engine", "name": "Layout Engine", "deps": ["bs-parser", "gestalt", "icons"] },
+        { "id": "value_visibility_axis", "name": "Vertical Position = Visible Value", "deps": ["spacial-memory", "legend-literacy", "value-chain"] },
+        { "id": "evolution_axis", "name": "Horizontal Evolution (Optional)", "deps": ["legend-literacy", "evolution"] }
+      ]
+    },
+    {
+      "id": "platform",
+      "title": "Platform Services",
+      "items": [
+        { "id": "bs-parser", "name": "BS Parser", "deps": [] },
+        { "id": "multidoc-assembler", "name": "Multi-Doc Assembler", "deps": [] },
+        { "id": "gist-integration", "name": "Gist Integration", "deps": [] },
+        { "id": "url-fetcher", "name": "URL Fetcher", "deps": [] },
+        { "id": "schema-validator", "name": "Schema Validator", "deps": [] }
       ]
     }
+  ]
+}
   </template>
 
   <svg id="overlay" class="svg-layer"></svg>
