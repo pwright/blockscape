@@ -22,7 +22,7 @@ See https://pwright.github.io/blockscape/ and try switching from:
 ## Quick Start
 
 1. Open `index.html` in your web browser
-2. Use the [prompt](./model-generation-prompt.md) to generate json for your domain.
+2. Use the [prompt](map-generation-prompt.md) to generate json for your domain.
 3. Open https://pwright.github.io/blockscape/ and paste json to *Append model*.
 4. Drag tiles to reorder within categories
 5. Click tiles to see dependency relationships

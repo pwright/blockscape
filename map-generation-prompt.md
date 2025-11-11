@@ -100,7 +100,7 @@ Users need **reliable predictions** surfaced via **APIs/UI**, backed by **versio
       "id": "experience",
       "title": "User Experience",
       "items": [
-        { "id": "prediction-api", "name": "Prediction API", "deps": ["model-serving", "authz"] },
+        { "id": "prediction-api", "name": "Prediction API", "deps": ["model-serving", "authz"], "external": "https://example.com/api.html"},
         { "id": "batch-scoring", "name": "Batch Scoring", "deps": ["feature-store", "orchestration"] },
         { "id": "ui-console", "name": "Ops Console", "deps": ["monitoring", "logging"] }
       ]
