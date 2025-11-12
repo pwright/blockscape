@@ -1104,7 +1104,7 @@
 {
   "id": "blockscape",
   "title": "Blockscape (AI maps)",
-  "abstract": "Blockscape (pronounced BYK-shed) visualizes value chains and dependencies using a BS file. This model emphasizes the Communication layer that makes maps comprehensible, alongside concrete user experiences, authoring & LLM flows, presentation semantics, and the platform services that enable them.",
+  "abstract": "Blockscape (pronounced BYK-shed) visualizes value chains and dependencies using a BS file. Inspired by Wardley maps, these maps emphasizes the Communication layer that makes maps comprehensible, alongside concrete user experiences, authoring & LLM flows, presentation semantics, and the platform services that enable them.",
   "categories": [
     {
       "id": "communication",
@@ -1132,11 +1132,11 @@
     },
     {
       "id": "authoring-ai",
-      "title": "Authoring & LLM",
+      "title": "Authoring and LLM",
       "items": [
         { "id": "bs-format-simple", "name": "BS format is simple", "deps": [] },
         { "id": "editor-human-terms", "name": "Editor (human terms)", "deps": ["gestalt"] },
-        { "id": "llm-generate-bs", "name": "LLM generates BS", "deps": ["schema-validator"] },
+        { "id": "llm-generate-bs", "name": "LLM generates BS", "deps": ["schema-validator"], "external": "https://github.com/pwright/blockscape/blob/main/map-generation-prompt.md" },
         { "id": "llm-consume-bs", "name": "LLM consumes BS", "deps": ["bs-parser"] }
       ]
     },
@@ -2470,7 +2470,7 @@
 
     // Load JSON files from same directory (for static hosting)
     async function loadJsonFiles() {
-      const jsonFiles = ['NFR.bs', 'deploy.bs'];
+      const jsonFiles = ['APIs.bs','wardley.bs'];
       
       for (const filename of jsonFiles) {
         try {
