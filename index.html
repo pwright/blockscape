@@ -1085,6 +1085,10 @@
               <textarea id="jsonBox" class="pf-v5-c-form-control"
                 aria-label="JSON editor for the active model"></textarea>
               <div class="blockscape-json-actions">
+                <button id="copyJson" class="pf-v5-c-button pf-m-tertiary" type="button"
+                  title="Copy the current JSON to your clipboard">Copy</button>
+                <button id="pasteJson" class="pf-v5-c-button pf-m-tertiary" type="button"
+                  title="Paste clipboard JSON to replace the editor contents">Paste</button>
                 <button id="appendFromBox" class="pf-v5-c-button pf-m-primary" type="button">Append model(s)</button>
                 <button id="replaceActive" class="pf-v5-c-button pf-m-secondary" type="button">Replace active with
                   JSON</button>
@@ -1195,6 +1199,8 @@
     const downloadButton = document.getElementById('downloadJson');
     const shareButton = document.getElementById('shareModel');
     const editButton = document.getElementById('openInEditor');
+    const copyJsonButton = document.getElementById('copyJson');
+    const pasteJsonButton = document.getElementById('pasteJson');
     const EDITOR_TRANSFER_KEY = 'blockscape:editorPayload';
     const defaultDocumentTitle = document.title;
 
@@ -1250,6 +1256,24 @@
       a.download = filename;
       a.click();
       URL.revokeObjectURL(url);
+    }
+
+    async function writeTextToClipboard(text) {
+      if (!navigator.clipboard?.writeText) return false;
+      try {
+        await navigator.clipboard.writeText(text);
+        return true;
+      } catch (err) {
+        console.warn('[Blockscape] clipboard write failed', err);
+        return false;
+      }
+    }
+
+    async function readTextFromClipboard() {
+      if (!navigator.clipboard?.readText) {
+        throw new Error('Clipboard read not supported');
+      }
+      return navigator.clipboard.readText();
     }
 
     function makeDownloadName(base) {
@@ -2308,6 +2332,39 @@
     }
 
     // ===== Controls =====
+
+    if (copyJsonButton) {
+      copyJsonButton.addEventListener('click', async () => {
+        const text = jsonBox.value || '';
+        if (!text.trim()) {
+          alert('JSON editor is empty.');
+          return;
+        }
+        const copied = await writeTextToClipboard(text);
+        if (copied) {
+          alert('JSON copied to clipboard.');
+        } else {
+          window.prompt('Copy this JSON manually:', text);
+        }
+      });
+    }
+
+    if (pasteJsonButton) {
+      pasteJsonButton.addEventListener('click', async () => {
+        try {
+          const text = await readTextFromClipboard();
+          if (!text) {
+            alert('Clipboard is empty.');
+            return;
+          }
+          jsonBox.value = text;
+          jsonBox.focus();
+        } catch (err) {
+          console.warn('[Blockscape] clipboard read failed', err);
+          alert('Unable to read from the clipboard. Use Cmd/Ctrl+V inside the editor instead.');
+        }
+      });
+    }
 
     // Append models from textarea
     document.getElementById('appendFromBox').onclick = () => {
