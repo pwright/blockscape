@@ -198,6 +198,13 @@ The application includes two example templates:
 
 NOTE: This process creates new tabs in your browser.
 
+## Navigation and moving blocks
+
+- **Select tiles** with the mouse or use bare `←/→` to walk through tiles horizontally; `↑/↓` jump between categories while keeping the nearest column alignment.
+- **Keyboard moves**: `Shift+←/→` reorder the selected tile within its current category and `Shift+↑/↓` move it to the previous/next category, inserting it near the same column.
+- **Drag and drop** any tile onto another category to reorder or recategorize; the JSON backing data updates immediately so downloads/exports pick up the new layout.
+
+- **Del** to delete an item (ctrl-z to undo)
 
 ## Development
 

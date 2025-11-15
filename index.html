@@ -1217,6 +1217,7 @@
     let selection = null;
     let previewRequestId = 0;
     let previewAnchor = { x: 0, y: 0 };
+    let lastDeletedItem = null;
 
     // ===== Utilities =====
     function uid() { return Math.random().toString(36).slice(2, 10); }
@@ -1391,6 +1392,7 @@
 
     function setActive(i) {
       hidePreview();
+      lastDeletedItem = null;
       if (i < 0 || i >= models.length) {
         console.warn("[Blockscape] setActive called with out-of-range index:", i);
         return;
@@ -2229,8 +2231,60 @@
         return;
       }
 
+      if ((event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey && event.key && event.key.toLowerCase() === 'z') {
+        if (!shouldHandleGlobalPaste()) return;
+        const undone = undoLastDeletion();
+        if (undone) {
+          event.preventDefault();
+          return;
+        }
+      }
+
       if (event.key === 'Escape' && preview && !preview.hidden) {
         hidePreview();
+      }
+
+      if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+        if (!shouldHandleGlobalPaste()) return;
+        if (event.altKey || event.ctrlKey || event.metaKey) return;
+        const step = event.key === 'ArrowLeft' ? -1 : 1;
+        if (event.shiftKey) {
+          const moved = moveSelectionWithinCategory(step);
+          if (moved) {
+            event.preventDefault();
+          }
+        } else {
+          const changed = selectAdjacentItem(step);
+          if (changed) {
+            event.preventDefault();
+          }
+        }
+      }
+
+      if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+        if (!shouldHandleGlobalPaste()) return;
+        if (event.altKey || event.ctrlKey || event.metaKey) return;
+        const step = event.key === 'ArrowUp' ? -1 : 1;
+        if (event.shiftKey) {
+          const moved = moveSelectionAcrossCategories(step);
+          if (moved) {
+            event.preventDefault();
+          }
+        } else {
+          const moved = selectAdjacentCategory(step);
+          if (moved) {
+            event.preventDefault();
+          }
+        }
+      }
+
+      if (event.key === 'Delete') {
+        if (!shouldHandleGlobalPaste()) return;
+        if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+        const removed = deleteSelectedItem();
+        if (removed) {
+          event.preventDefault();
+        }
       }
     });
 
@@ -2289,16 +2343,14 @@
     function handleDrop(e) {
       e.preventDefault();
       const targetGrid = e.target.closest('.grid');
+      if (!targetGrid) return;
       const targetCategory = targetGrid.closest('.category');
+      if (!targetCategory) return;
       const targetCategoryId = targetCategory.dataset.cat;
 
       if (!draggedItemId || !targetCategoryId) return;
-      if (draggedCategoryId !== targetCategoryId) {
-        console.log("[Blockscape] drop rejected - different category");
-        return;
-      }
 
-      const tiles = Array.from(targetGrid.querySelectorAll('.tile'));
+      const tiles = Array.from(targetGrid.querySelectorAll('.tile')).filter(tile => tile.dataset.id !== draggedItemId);
       const targetTile = tiles.find(tile => {
         const rect = tile.getBoundingClientRect();
         return e.clientY < rect.top + rect.height / 2;
@@ -2306,29 +2358,288 @@
 
       reorderItem(draggedItemId, targetTile ? targetTile.dataset.id : null, targetCategoryId);
       render();
-      console.log("[Blockscape] drop completed", draggedItemId, "in", targetCategoryId);
+      console.log("[Blockscape] drop completed", draggedItemId, "from", draggedCategoryId, "to", targetCategoryId);
     }
 
-    function reorderItem(itemId, targetItemId, categoryId) {
+    function reorderItem(itemId, targetItemId, targetCategoryId) {
       if (activeIndex < 0) return;
       const mobj = models[activeIndex].data;
-      const category = (mobj.categories || []).find(cat => cat.id === categoryId);
-      if (!category) return;
+      const categories = mobj.categories || [];
+      const sourceCategory = categories.find(cat => (cat.items || []).some(item => item.id === itemId));
+      const targetCategory = categories.find(cat => cat.id === targetCategoryId);
+      if (!sourceCategory || !targetCategory) return;
 
-      const itemIndex = (category.items || []).findIndex(item => item.id === itemId);
+      sourceCategory.items = sourceCategory.items || [];
+      targetCategory.items = targetCategory.items || [];
+
+      const itemIndex = sourceCategory.items.findIndex(item => item.id === itemId);
       if (itemIndex === -1) return;
 
-      const [movedItem] = category.items.splice(itemIndex, 1);
+      const [movedItem] = sourceCategory.items.splice(itemIndex, 1);
+      let insertIndex = targetCategory.items.length;
       if (targetItemId) {
-        const targetIndex = category.items.findIndex(item => item.id === targetItemId);
-        if (targetIndex !== -1) category.items.splice(targetIndex, 0, movedItem);
-        else category.items.push(movedItem);
-      } else {
-        category.items.push(movedItem);
+        const targetIndex = targetCategory.items.findIndex(item => item.id === targetItemId);
+        if (targetIndex !== -1) insertIndex = targetIndex;
       }
+      targetCategory.items.splice(insertIndex, 0, movedItem);
+
       // keep editor in sync
       loadActiveIntoEditor();
       rebuildFromActive();
+    }
+
+    function moveSelectionWithinCategory(step) {
+      if (!selection || activeIndex < 0 || !step) return false;
+      const mobj = models[activeIndex].data;
+      const categories = mobj.categories || [];
+      const selectedMeta = index.get(selection);
+      let category = null;
+      if (selectedMeta?.catId) {
+        category = categories.find(cat => cat.id === selectedMeta.catId);
+      }
+      if (!category) {
+        category = categories.find(cat => (cat.items || []).some(item => item.id === selection));
+      }
+      if (!category) return false;
+
+      category.items = category.items || [];
+      const currentIndex = category.items.findIndex(item => item.id === selection);
+      if (currentIndex === -1) return false;
+
+      const targetIndex = currentIndex + step;
+      if (targetIndex < 0 || targetIndex >= category.items.length) return false;
+
+      const [movedItem] = category.items.splice(currentIndex, 1);
+      category.items.splice(targetIndex, 0, movedItem);
+
+      loadActiveIntoEditor();
+      rebuildFromActive();
+      render();
+      select(selection);
+      return true;
+    }
+
+    function selectAdjacentItem(step) {
+      if (!model || !model.m || !step) return false;
+      const categories = model.m.categories || [];
+      if (!categories.length) return false;
+
+      const findFirstItem = () => {
+        const firstCategory = categories.find(cat => (cat.items || []).length);
+        if (!firstCategory) return null;
+        return { category: firstCategory, item: firstCategory.items[0] };
+      };
+
+      if (!selection) {
+        const starter = findFirstItem();
+        if (!starter) return false;
+        select(starter.item.id);
+        return true;
+      }
+
+      const selectedMeta = index.get(selection);
+      let category = null;
+      if (selectedMeta?.catId) {
+        category = categories.find(cat => cat.id === selectedMeta.catId);
+      }
+      if (!category) {
+        category = categories.find(cat => (cat.items || []).some(item => item.id === selection));
+      }
+      if (!category) {
+        const starter = findFirstItem();
+        if (!starter) return false;
+        select(starter.item.id);
+        return true;
+      }
+
+      const items = category.items || [];
+      if (!items.length) return false;
+      const currentIndex = items.findIndex(item => item.id === selection);
+      if (currentIndex === -1) return false;
+
+      const targetIndex = currentIndex + step;
+      if (targetIndex < 0 || targetIndex >= items.length) return false;
+
+      select(items[targetIndex].id);
+      return true;
+    }
+
+    function selectAdjacentCategory(step) {
+      if (!model || !model.m || !step) return false;
+      const categories = model.m.categories || [];
+      if (!categories.length) return false;
+
+      const getFirstSelectable = () => {
+        for (const cat of categories) {
+          if (cat.items && cat.items.length) {
+            return cat.items[0].id;
+          }
+        }
+        return null;
+      };
+
+      const resolveCategoryIndexForSelection = () => {
+        if (!selection) return -1;
+        const selectedMeta = index.get(selection);
+        if (selectedMeta?.catId) {
+          const idx = categories.findIndex(cat => cat.id === selectedMeta.catId);
+          if (idx !== -1) return idx;
+        }
+        return categories.findIndex(cat => (cat.items || []).some(item => item.id === selection));
+      };
+
+      let currentCategoryIndex = resolveCategoryIndexForSelection();
+      if (currentCategoryIndex === -1) {
+        const first = getFirstSelectable();
+        if (!first) return false;
+        select(first);
+        return true;
+      }
+
+      const currentItems = categories[currentCategoryIndex].items || [];
+      let currentItemPosition = currentItems.findIndex(item => item.id === selection);
+      if (currentItemPosition === -1) currentItemPosition = 0;
+
+      let targetIndex = currentCategoryIndex + step;
+      while (targetIndex >= 0 && targetIndex < categories.length) {
+        const targetCat = categories[targetIndex];
+        const items = targetCat.items || [];
+        if (items.length) {
+          const pos = Math.min(items.length - 1, Math.max(0, currentItemPosition));
+          select(items[pos].id);
+          return true;
+        }
+        targetIndex += step > 0 ? 1 : -1;
+      }
+
+      return false;
+    }
+
+    function moveSelectionAcrossCategories(step) {
+      if (!selection || activeIndex < 0 || !step) return false;
+      const mobj = models[activeIndex].data;
+      const categories = mobj.categories || [];
+      if (!categories.length) return false;
+
+      const selectedMeta = index.get(selection);
+      let sourceIndex = -1;
+      if (selectedMeta?.catId) {
+        sourceIndex = categories.findIndex(cat => cat.id === selectedMeta.catId);
+      }
+      if (sourceIndex === -1) {
+        sourceIndex = categories.findIndex(cat => (cat.items || []).some(item => item.id === selection));
+      }
+      if (sourceIndex === -1) return false;
+
+      const targetIndex = sourceIndex + step;
+      if (targetIndex < 0 || targetIndex >= categories.length) return false;
+
+      const sourceCategory = categories[sourceIndex];
+      const targetCategory = categories[targetIndex];
+      if (!targetCategory) return false;
+
+      sourceCategory.items = sourceCategory.items || [];
+      targetCategory.items = targetCategory.items || [];
+
+      const currentIndex = sourceCategory.items.findIndex(item => item.id === selection);
+      if (currentIndex === -1) return false;
+
+      const insertPos = Math.min(targetCategory.items.length, Math.max(0, currentIndex));
+      const targetItemId = insertPos < targetCategory.items.length ? targetCategory.items[insertPos].id : null;
+
+      reorderItem(selection, targetItemId, targetCategory.id);
+      render();
+      select(selection);
+      return true;
+    }
+
+    function undoLastDeletion() {
+      if (!lastDeletedItem || activeIndex < 0) return false;
+      const activeModel = models[activeIndex];
+      if (!activeModel || activeModel.id !== lastDeletedItem.modelId) return false;
+
+      const deleted = lastDeletedItem;
+      const mobj = activeModel.data;
+      const categories = mobj.categories || [];
+      const category = categories.find(cat => cat.id === deleted.categoryId);
+      if (!category) return false;
+
+      category.items = category.items || [];
+      const insertIndex = Math.min(Math.max(deleted.index, 0), category.items.length);
+      category.items.splice(insertIndex, 0, deleted.item);
+
+      lastDeletedItem = null;
+      hidePreview();
+      selection = null;
+      loadActiveIntoEditor();
+      rebuildFromActive();
+      render();
+      select(deleted.item.id);
+      console.log("[Blockscape] undo delete restored", deleted.item.id);
+      return true;
+    }
+
+    function deleteSelectedItem() {
+      if (!selection || activeIndex < 0) return false;
+      const mobj = models[activeIndex].data;
+      const categories = mobj.categories || [];
+      if (!categories.length) return false;
+
+      const selectedMeta = index.get(selection);
+      let category = null;
+      if (selectedMeta?.catId) {
+        category = categories.find(cat => cat.id === selectedMeta.catId);
+      }
+      if (!category) {
+        category = categories.find(cat => (cat.items || []).some(item => item.id === selection));
+      }
+      if (!category || !Array.isArray(category.items)) return false;
+
+      const currentIndex = category.items.findIndex(item => item.id === selection);
+      if (currentIndex === -1) return false;
+
+      const removed = category.items.splice(currentIndex, 1)[0];
+      if (!removed) return false;
+
+      const activeModel = models[activeIndex];
+      lastDeletedItem = {
+        item: removed,
+        categoryId: category.id,
+        index: currentIndex,
+        modelId: activeModel ? activeModel.id : null
+      };
+
+      const findNextSelection = () => {
+        if (category.items.length) {
+          const neighborIndex = Math.min(currentIndex, category.items.length - 1);
+          return category.items[neighborIndex]?.id || null;
+        }
+        const catIndex = categories.findIndex(cat => cat.id === category.id);
+        if (catIndex === -1) return null;
+        for (let i = catIndex + 1; i < categories.length; i++) {
+          const items = categories[i].items || [];
+          if (items.length) return items[0].id;
+        }
+        for (let i = catIndex - 1; i >= 0; i--) {
+          const items = categories[i].items || [];
+          if (items.length) return items[0].id;
+        }
+        return null;
+      };
+
+      const nextSelectionId = findNextSelection();
+      hidePreview();
+      selection = null;
+      loadActiveIntoEditor();
+      rebuildFromActive();
+      render();
+      if (nextSelectionId) {
+        select(nextSelectionId);
+      } else {
+        clearSelection();
+      }
+      console.log("[Blockscape] removed item", removed.id);
+      return true;
     }
 
     // ===== Controls =====
