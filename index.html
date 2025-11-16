@@ -149,6 +149,20 @@
       min-width: 280px;
     }
 
+    .blockscape-url-form {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      margin: 0;
+    }
+
+    .url-hint {
+      min-height: 1.2rem;
+      font-size: var(--font-size-xs);
+      color: var(--color-muted);
+      margin-left: 0.1rem;
+    }
+
     .blockscape-toolbar__controls .pf-v5-c-form-control {
       min-width: 11rem;
     }
@@ -1031,11 +1045,13 @@
               <label class="sr-only" for="search">Search tiles</label>
               <input id="search" class="pf-v5-c-form-control" type="text" placeholder="Search…" />
                
-              <label class="sr-only" for="urlInput">Load JSON from URL</label>
-              <input id="urlInput" class="pf-v5-c-form-control is-url" type="text"
-                placeholder="Load JSON from URL…" /> 
-                
-              <button id="loadUrl" class="pf-v5-c-button pf-m-secondary" type="button">Load URL</button>
+              <form id="urlForm" class="blockscape-url-form" autocomplete="on" novalidate>
+                <label class="sr-only" for="urlInput">Load JSON from URL</label>
+                <input id="urlInput" name="modelUrl" class="pf-v5-c-form-control is-url" type="url"
+                  placeholder="Load JSON from URL…" autocomplete="additional-name" />
+                <button id="loadUrl" class="pf-v5-c-button pf-m-secondary" type="submit">Load URL</button>
+                <div id="urlHint" class="url-hint" aria-live="polite"></div>
+              </form>
               
  
               <label class="pf-v5-c-button pf-m-secondary blockscape-file" role="button">
@@ -1077,9 +1093,9 @@
             <p class="blockscape-json-panel__title">Paste / edit JSON for the <b>active</b> model (schema below)</p>
             <div class="muted">
               Schema: <code>{ id, title, abstract?, categories:[{id,title,items:[{id,name,logo?,external?:url,color?,deps:[]}]}], links?:[{from,to}] }</code><br />
-              You can paste multiple objects separated by <code>---</code> to append several models. A single object
-              replaces only when you click “Replace active with JSON”. Tip: with no input focused, press Cmd/Ctrl+V
-              anywhere on the page to append clipboard JSON instantly.
+              You can paste multiple objects separated by <code>---</code> or <code>%%%</code> to append several models.
+              A single object replaces only when you click “Replace active with JSON”. Tip: with no input focused, press
+              Cmd/Ctrl+V anywhere on the page to append clipboard JSON instantly.
             </div>
             <div class="blockscape-json-controls">
               <textarea id="jsonBox" class="pf-v5-c-form-control"
@@ -1192,6 +1208,9 @@
     const tabTooltip = document.getElementById('tabTooltip');
     const modelList = document.getElementById('modelList');
     const preview = document.getElementById('itemPreview');
+    const urlForm = document.getElementById('urlForm');
+    const urlInput = document.getElementById('urlInput');
+    const loadUrlButton = document.getElementById('loadUrl');
   const previewTitle = preview.querySelector('.item-preview__title');
   const previewBody = preview.querySelector('.item-preview__body');
   const previewActions = preview.querySelector('.item-preview__actions');
@@ -1462,7 +1481,7 @@
 
     function tryParseJson(txt) { try { return JSON.parse(txt); } catch { return null; } }
 
-    // Accept 1) object, 2) array-of-objects, 3) '---' separated objects
+    // Accept 1) object, 2) array-of-objects, 3) '---' or '%%%' separated objects
     function normalizeToModelsFromText(txt, titleBase = "Pasted") {
       const trimmed = (txt || "").trim();
       if (!trimmed) return [];
@@ -1478,7 +1497,7 @@
           };
         });
       }
-      const parts = trimmed.split(/^\s*---\s*$/m).map(s => s.trim()).filter(Boolean);
+      const parts = trimmed.split(/^\s*(?:---|%%%)\s*$/m).map(s => s.trim()).filter(Boolean);
       return parts.map((p, i) => {
         const obj = JSON.parse(p);
         ensureModelMetadata(obj, { titleHint: `${titleBase} #${i + 1}` });
@@ -1506,7 +1525,7 @@
     function looksLikeModelJson(text) {
       if (!text) return false;
       const start = text.trimStart();
-      return /^\s*(\{|\[|---)/.test(start);
+      return /^\s*(\{|\[|---|%%%)/.test(start);
     }
 
     function consumeEditorPayload() {
@@ -1595,6 +1614,40 @@
       });
 
       return models.length - 1;
+    }
+
+    async function consumeLoadParam() {
+      const hash = window.location.hash || '';
+      let target = null;
+
+      const hashMatch = hash.match(/load=([^&]+)/);
+      if (hashMatch) {
+        try {
+          target = decodeURIComponent(hashMatch[1]);
+        } catch {
+          target = hashMatch[1];
+        }
+      }
+
+      if (!target) {
+        const params = new URLSearchParams(window.location.search);
+        if (params.has('load')) {
+          target = params.get('load');
+        }
+      }
+
+      if (!target) return null;
+
+      try {
+        const startIndex = models.length;
+        const ok = await loadFromUrl(target);
+        if (!ok) return null;
+        const added = models.length - startIndex;
+        return added > 0 ? startIndex : null;
+      } catch (err) {
+        console.warn('[Blockscape] load param failed', err);
+        return null;
+      }
     }
 
     function parse(mObj) {
@@ -2170,6 +2223,14 @@
         shareUrl.hash = `share=${encoded}`;
         const fullUrl = shareUrl.toString();
 
+        // Update the address bar so the current page URL matches the share URL
+        try {
+          window.history.replaceState({}, document.title, fullUrl);
+        } catch (err) {
+          console.warn('[Blockscape] failed to update URL for share', err);
+          window.location.hash = shareUrl.hash;
+        }
+
         let copied = false;
         if (navigator.clipboard?.writeText) {
           try {
@@ -2711,7 +2772,7 @@
       }
     };
 
-    // Load files: each text may be single object, array, or --- separated
+    // Load files: each text may be single object, array, or ---/%%% separated
     document.getElementById('file').onchange = async (e) => {
       const files = Array.from(e.target.files || []);
       if (!files.length) return;
@@ -2805,23 +2866,38 @@
     });
 
     // Load from URL
-    document.getElementById('loadUrl').addEventListener('click', async () => {
-      const url = document.getElementById('urlInput').value.trim();
-      if (!url) {
-        alert("Please enter a URL");
-        return;
-      }
-      await loadFromUrl(url);
-      document.getElementById('urlInput').value = ''; // Clear input after successful load
-    });
-
-    // Allow Enter key in URL input
-    document.getElementById('urlInput').addEventListener('keydown', async (e) => {
-      if (e.key === 'Enter') {
+    if (urlForm && urlInput && loadUrlButton) {
+      urlForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        document.getElementById('loadUrl').click();
-      }
-    });
+        const url = urlInput.value.trim();
+        if (!url) {
+          alert("Please enter a URL");
+          urlInput.focus();
+          return;
+        }
+        const ok = await loadFromUrl(url);
+        if (ok) {
+          urlInput.value = '';
+          const hint = document.getElementById('urlHint');
+          if (hint) hint.textContent = '';
+        }
+      });
+    }
+
+    // Show last 12 characters after user pauses typing
+    (function attachUrlHint() {
+      const hint = document.getElementById('urlHint');
+      if (!urlInput || !hint) return;
+      let timer = null;
+      urlInput.addEventListener('input', () => {
+        clearTimeout(timer);
+        timer = setTimeout(() => {
+          const value = urlInput.value;
+          const tail = value.slice(-12);
+          hint.textContent = tail ? `…${tail}` : '';
+        }, 300);
+      });
+    })();
 
     // Helpers
     function rebuildFromActive() {
@@ -3026,11 +3102,15 @@
       // Try to load JSON files from same directory
       await loadJsonFiles();
       
+      // Load explicit model from URL hash/search (?load= or #load=)
+      const loadIndex = await consumeLoadParam();
       const editorIndex = consumeEditorPayload();
       const shareIndex = consumeShareLink();
-      const initialIndex = typeof shareIndex === 'number'
-        ? shareIndex
-        : (typeof editorIndex === 'number' ? editorIndex : 0);
+      const initialIndex = typeof loadIndex === 'number'
+        ? loadIndex
+        : (typeof shareIndex === 'number'
+          ? shareIndex
+          : (typeof editorIndex === 'number' ? editorIndex : 0));
       setActive(initialIndex);
     })();
   </script>
