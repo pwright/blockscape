@@ -17,7 +17,6 @@ Generate a **Blockscape value‑chain JSON** for the domain of **[DOMAIN NAME]**
     * `title`: required string, human‑friendly model title
     * `abstract`: required string (plain text or simple HTML) that explains the landscape
     * `categories`: array of category objects
-    * optional `links`: array of `{ "from": "id", "to": "id" }` for cross‑category edges
 
   * Each category has:
     * `id` (short, lowercase, unique)

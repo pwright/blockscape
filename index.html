@@ -515,6 +515,22 @@
       min-width: 12rem;
     }
 
+    .blockscape-toon-panel {
+      padding: var(--space-md);
+      border: 1px dashed var(--color-border);
+      border-radius: var(--radius-md);
+      background: var(--color-surface-subtle);
+    }
+
+    .blockscape-toon-panel .blockscape-json-controls textarea {
+      min-height: 10rem;
+      background: var(--color-surface);
+    }
+
+    .blockscape-toon-panel .blockscape-json-actions {
+      min-width: 11rem;
+    }
+
     .blockscape-main-section {
       padding: 0 var(--space-lg) var(--space-xl);
     }
@@ -1092,7 +1108,7 @@
             aria-label="Model source JSON editor">
             <p class="blockscape-json-panel__title">Paste / edit JSON for the <b>active</b> model (schema below)</p>
             <div class="muted">
-              Schema: <code>{ id, title, abstract?, categories:[{id,title,items:[{id,name,logo?,external?:url,color?,deps:[]}]}], links?:[{from,to}] }</code><br />
+              Schema: <code>{ id, title, abstract?, categories:[{id,title,items:[{id,name,logo?,external?:url,color?,deps:[]}]}] }</code><br />
               You can paste multiple objects separated by <code>---</code> or <code>%%%</code> to append several models.
               A single object replaces only when you click “Replace active with JSON”. Tip: with no input focused, press
               Cmd/Ctrl+V anywhere on the page to append clipboard JSON instantly.
@@ -1108,6 +1124,24 @@
                 <button id="appendFromBox" class="pf-v5-c-button pf-m-primary" type="button">Append model(s)</button>
                 <button id="replaceActive" class="pf-v5-c-button pf-m-secondary" type="button">Replace active with
                   JSON</button>
+              </div>
+            </div>
+
+            <div class="blockscape-toon-panel" aria-label="Toon format converter (beta)">
+              <p class="blockscape-json-panel__title">Toon format (beta) — round-trip with JSON</p>
+              <div class="muted">
+                Converts between JSON and a lightweight toon outline (indent + dashes). Supports scalars, objects, and
+                arrays; comments starting with <code>#</code> or <code>//</code> are ignored. Replace this stub when you
+                adopt the real toon grammar.
+              </div>
+              <div class="blockscape-json-controls blockscape-toon-controls">
+                <textarea id="toonBox" class="pf-v5-c-form-control"
+                  aria-label="Toon format editor for the active model"></textarea>
+                <div class="blockscape-json-actions">
+                  <button id="jsonToToon" class="pf-v5-c-button pf-m-secondary" type="button">JSON → Toon</button>
+                  <button id="toonToJson" class="pf-v5-c-button pf-m-primary" type="button">Toon → JSON</button>
+                  <button id="copyToon" class="pf-v5-c-button pf-m-tertiary" type="button">Copy Toon</button>
+                </div>
               </div>
             </div>
           </section>
@@ -1202,6 +1236,7 @@
     console.log("[Blockscape] init");
 
     const jsonBox = document.getElementById('jsonBox');
+    const toonBox = document.getElementById('toonBox');
     const jsonPanel = document.querySelector('.blockscape-json-panel');
     const app = document.getElementById('app');
     const overlay = document.getElementById('overlay');
@@ -1220,11 +1255,21 @@
     const editButton = document.getElementById('openInEditor');
     const copyJsonButton = document.getElementById('copyJson');
     const pasteJsonButton = document.getElementById('pasteJson');
+    const toonToJsonButton = document.getElementById('toonToJson');
+    const jsonToToonButton = document.getElementById('jsonToToon');
+    const copyToonButton = document.getElementById('copyToon');
     const EDITOR_TRANSFER_KEY = 'blockscape:editorPayload';
     const defaultDocumentTitle = document.title;
 
     // Show the seed in the editor initially.
     jsonBox.value = document.getElementById('seed').innerHTML.trim();
+    if (toonBox) {
+      try {
+        toonBox.value = toonStringify(JSON.parse(jsonBox.value));
+      } catch (err) {
+        console.warn('[Blockscape] failed to seed toon box', err);
+      }
+    }
 
     // ===== State =====
     /** @type {{id:string,title:string,data:any}[]} */
@@ -1342,6 +1387,168 @@
       const activeModel = (activeIndex >= 0 && models[activeIndex]) ? models[activeIndex] : null;
       const modelId = getModelId(activeModel);
       document.title = modelId ? `${modelId}-blockscape` : defaultDocumentTitle;
+    }
+
+    // --- Toon format helpers (indent + dash outline) ---
+    function isInlineToonValue(v) {
+      return v === null || typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean';
+    }
+
+    function formatToonScalar(v) {
+      if (v === null) return 'null';
+      if (typeof v === 'number' && Number.isFinite(v)) return String(v);
+      if (typeof v === 'boolean') return v ? 'true' : 'false';
+      if (typeof v === 'string') return JSON.stringify(v);
+      return JSON.stringify(v);
+    }
+
+    function toonStringify(value, indent = 0) {
+      const pad = '  '.repeat(indent);
+      if (Array.isArray(value)) {
+        if (!value.length) return '[]';
+        return value.map(item => {
+          if (isInlineToonValue(item)) {
+            return `${pad}- ${formatToonScalar(item)}`;
+          }
+          const rendered = toonStringify(item, indent + 1);
+          if (rendered === '[]' || rendered === '{}') {
+            return `${pad}- ${rendered}`;
+          }
+          return `${pad}-\n${rendered}`;
+        }).join('\n');
+      }
+      if (value && typeof value === 'object') {
+        const keys = Object.keys(value);
+        if (!keys.length) return '{}';
+        return keys.map(key => {
+          const v = value[key];
+          if (isInlineToonValue(v)) {
+            return `${pad}${key}: ${formatToonScalar(v)}`;
+          }
+          const rendered = toonStringify(v, indent + 1);
+          if (rendered === '[]' || rendered === '{}') {
+            return `${pad}${key}: ${rendered}`;
+          }
+          return `${pad}${key}:\n${rendered}`;
+        }).join('\n');
+      }
+      return formatToonScalar(value);
+    }
+
+    function parseInlineToonValue(token) {
+      const atom = (str) => {
+        if (str === 'null') return null;
+        if (str === 'true') return true;
+        if (str === 'false') return false;
+        if (/^-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?$/.test(str)) return Number(str);
+        if ((str.startsWith('"') && str.endsWith('"')) || (str.startsWith("'") && str.endsWith("'"))) {
+          try {
+            return str.startsWith('"') ? JSON.parse(str) : str.slice(1, -1);
+          } catch {
+            return str.slice(1, -1);
+          }
+        }
+        return str;
+      };
+
+      if (token === '[]') return [];
+      if (token === '{}') return {};
+      if (token.startsWith('[') && token.endsWith(']')) {
+        const inner = token.slice(1, -1).trim();
+        if (!inner) return [];
+        return inner.split(',').map(part => atom(part.trim())).filter(v => v !== '');
+      }
+      if ((token.startsWith('{') && token.endsWith('}'))) {
+        try { return JSON.parse(token); } catch { /* fallthrough */ }
+      }
+      return atom(token);
+    }
+
+    function inferToonBlockKind(lines, startIndex, parentIndent) {
+      for (let i = startIndex + 1; i < lines.length; i++) {
+        const raw = lines[i];
+        const trimmed = raw.trim();
+        if (!trimmed || trimmed.startsWith('#') || trimmed.startsWith('//')) continue;
+        const indent = raw.match(/^\s*/)[0].length;
+        if (indent <= parentIndent) return 'object';
+        return trimmed.startsWith('-') ? 'array' : 'object';
+      }
+      return 'object';
+    }
+
+    function toonParse(text) {
+      const lines = (text || '').split(/\r?\n/);
+      let root = {};
+      const stack = [{ indent: -1, container: root, kind: 'object' }];
+
+      for (let i = 0; i < lines.length; i++) {
+        const raw = lines[i];
+        const trimmed = raw.trim();
+        if (!trimmed || trimmed.startsWith('#') || trimmed.startsWith('//')) continue;
+        const indent = raw.match(/^\s*/)[0].length;
+
+        while (stack.length > 1 && indent <= stack[stack.length - 1].indent) {
+          stack.pop();
+        }
+
+        const ctx = stack[stack.length - 1];
+        if (!ctx || !ctx.container) throw new Error(`Unable to place line ${i + 1}`);
+
+        if (trimmed.startsWith('-') && ctx.kind === 'object' && Object.keys(ctx.container).length === 0) {
+          ctx.kind = 'array';
+          ctx.container = [];
+          root = ctx.container;
+        }
+
+        if (trimmed.startsWith('-')) {
+          if (ctx.kind !== 'array') throw new Error(`Line ${i + 1}: array item outside an array`);
+          const content = trimmed.startsWith('- ') ? trimmed.slice(2).trim() : trimmed.slice(1).trim();
+          if (!content) {
+            const kind = inferToonBlockKind(lines, i, indent);
+            const node = kind === 'array' ? [] : {};
+            ctx.container.push(node);
+            stack.push({ indent: indent + 1, container: node, kind });
+            continue;
+          }
+          const colonIdx = content.indexOf(':');
+          if (colonIdx !== -1) {
+            const key = content.slice(0, colonIdx).trim();
+            const valuePart = content.slice(colonIdx + 1).trim();
+            if (!key) throw new Error(`Line ${i + 1}: missing key after '-'`);
+            const obj = {};
+            ctx.container.push(obj);
+            stack.push({ indent: indent + 1, container: obj, kind: 'object' });
+            if (valuePart) {
+              obj[key] = parseInlineToonValue(valuePart);
+            } else {
+              const blockKind = inferToonBlockKind(lines, i, indent);
+              const node = blockKind === 'array' ? [] : {};
+              obj[key] = node;
+              stack.push({ indent: indent + 1, container: node, kind: blockKind });
+            }
+            continue;
+          }
+          ctx.container.push(parseInlineToonValue(content));
+          continue;
+        }
+
+        const colonIdx = trimmed.indexOf(':');
+        if (colonIdx === -1) throw new Error(`Line ${i + 1}: expected ":"`);
+        const key = trimmed.slice(0, colonIdx).trim();
+        const valuePart = trimmed.slice(colonIdx + 1).trim();
+        if (!key) throw new Error(`Line ${i + 1}: missing key`);
+
+        if (!valuePart) {
+          const kind = inferToonBlockKind(lines, i, indent);
+          const node = kind === 'array' ? [] : {};
+          ctx.container[key] = node;
+          stack.push({ indent: indent + 1, container: node, kind });
+        } else {
+          ctx.container[key] = parseInlineToonValue(valuePart);
+        }
+      }
+
+      return root;
     }
 
     function downloadCurrentJson(source = 'shortcut') {
@@ -1475,8 +1682,16 @@
     }
 
     function loadActiveIntoEditor() {
-      if (activeIndex < 0) { jsonBox.value = ""; return; }
+      if (activeIndex < 0) { jsonBox.value = ""; if (toonBox) toonBox.value = ""; return; }
       jsonBox.value = JSON.stringify(models[activeIndex].data, null, 2);
+      if (toonBox) {
+        try {
+          toonBox.value = toonStringify(models[activeIndex].data);
+        } catch (err) {
+          console.warn('[Blockscape] toon stringify failed', err);
+          toonBox.value = '';
+        }
+      }
     }
 
     function tryParseJson(txt) { try { return JSON.parse(txt); } catch { return null; } }
@@ -1659,7 +1874,6 @@
       (mObj.categories || []).forEach(c => (c.items || []).forEach(it => {
         seen.add(it.id);
         const deps = new Set(it.deps || []);
-        (mObj.links || []).forEach(l => { if (l.from === it.id) deps.add(l.to); });
         fwd.set(it.id, deps);
         deps.forEach(d => {
           if (!rev.has(d)) rev.set(d, new Set());
@@ -2717,6 +2931,55 @@
           alert('JSON copied to clipboard.');
         } else {
           window.prompt('Copy this JSON manually:', text);
+        }
+      });
+    }
+
+    if (jsonToToonButton) {
+      jsonToToonButton.addEventListener('click', () => {
+        if (!toonBox) return;
+        try {
+          const obj = JSON.parse(jsonBox.value || '');
+          toonBox.value = toonStringify(obj);
+        } catch (err) {
+          console.error('[Blockscape] json -> toon failed', err);
+          alert('Current JSON is invalid. Fix it before converting.');
+        }
+      });
+    }
+
+    if (toonToJsonButton) {
+      toonToJsonButton.addEventListener('click', () => {
+        if (!toonBox) return;
+        const text = toonBox.value || '';
+        if (!text.trim()) {
+          alert('Toon editor is empty.');
+          return;
+        }
+        try {
+          const obj = toonParse(text);
+          jsonBox.value = JSON.stringify(obj, null, 2);
+          ensureModelMetadata(obj, { titleHint: getModelTitle(models[activeIndex]) || 'Toon import' });
+        } catch (err) {
+          console.error('[Blockscape] toon -> json failed', err);
+          alert(`Toon parse error: ${err.message}`);
+        }
+      });
+    }
+
+    if (copyToonButton) {
+      copyToonButton.addEventListener('click', async () => {
+        if (!toonBox) return;
+        const text = toonBox.value || '';
+        if (!text.trim()) {
+          alert('Toon editor is empty.');
+          return;
+        }
+        const copied = await writeTextToClipboard(text);
+        if (copied) {
+          alert('Toon copied to clipboard.');
+        } else {
+          window.prompt('Copy this toon manually:', text);
         }
       });
     }
