@@ -902,6 +902,14 @@
     return 'Editor Export';
   }
 
+  function closeEditorWindow(){
+    try {
+      window.close();
+    } catch (err) {
+      console.warn('[Editor] unable to close window', err);
+    }
+  }
+
   /** ----------------------------- Model ----------------------------- */
   /** Internal canonical model. */
   let model = {
@@ -1036,6 +1044,7 @@
   const detailPanel = $('#detailPanel');
   const jsonArea = $('#jsonArea');
   const EDITOR_TRANSFER_KEY = 'blockscape:editorPayload';
+  const EDITOR_TRANSFER_MESSAGE_TYPE = 'blockscape:editorTransfer';
   const duplicateItemBtn = $('#duplicateItemBtn');
   const openInViewerBtn = $('#openInViewer');
 
@@ -1956,13 +1965,30 @@
         alert('Unable to stash JSON for the viewer (storage disabled?).');
         return;
       }
-      const win = window.open('index.html#editor', '_blank');
-      if (!win){
-        alert('Popup blocked. Please allow popups for this site or open the viewer manually.');
-      } else {
-        win.focus();
+      const viewerUrl = 'index.html#editor';
+      let deliveredToExistingViewer = false;
+      if (window.opener && !window.opener.closed) {
+        try {
+          const targetOrigin = (window.location.origin && window.location.origin !== 'null')
+            ? window.location.origin
+            : '*';
+          window.opener.postMessage({ type: EDITOR_TRANSFER_MESSAGE_TYPE, ts: Date.now() }, targetOrigin);
+          window.opener.focus();
+          deliveredToExistingViewer = true;
+        } catch (err) {
+          console.warn('[Editor] unable to notify existing viewer window', err);
+        }
+      }
+      if (!deliveredToExistingViewer) {
+        const win = window.open(viewerUrl, '_blank');
+        if (!win){
+          alert('Popup blocked. Please allow popups for this site or open the viewer manually.');
+        } else {
+          win.focus();
+        }
       }
       setStatus('Sent JSON to viewer.', 'ok');
+      closeEditorWindow();
     });
   }
 

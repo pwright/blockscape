@@ -1221,6 +1221,7 @@
     const copyJsonButton = document.getElementById('copyJson');
     const pasteJsonButton = document.getElementById('pasteJson');
     const EDITOR_TRANSFER_KEY = 'blockscape:editorPayload';
+    const EDITOR_TRANSFER_MESSAGE_TYPE = 'blockscape:editorTransfer';
     const defaultDocumentTitle = document.title;
 
     // Show the seed in the editor initially.
@@ -1568,6 +1569,15 @@
       entries.forEach(entry => models.push(entry));
       console.log(`[Blockscape] imported ${entries.length} model(s) from editor`);
       return startIndex;
+    }
+
+    function importEditorPayload(trigger = 'storage') {
+      const startIndex = consumeEditorPayload();
+      if (typeof startIndex !== 'number') return false;
+      const importedCount = models.length - startIndex;
+      setActive(startIndex);
+      console.log(`[Blockscape] imported ${importedCount} model(s) from editor via ${trigger}.`);
+      return true;
     }
 
     function consumeShareLink() {
@@ -2282,6 +2292,38 @@
           editorUrl = `editor.html?selected=${encoded}#viewer`;
         }
         window.open(editorUrl, '_blank');
+      });
+    }
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('storage', (event) => {
+        if (!event) return;
+        if (event.storageArea && event.storageArea !== window.localStorage) return;
+        if (event.key !== EDITOR_TRANSFER_KEY) return;
+        if (!event.newValue) return;
+        let payload;
+        try {
+          payload = JSON.parse(event.newValue);
+        } catch (err) {
+          console.warn('[Blockscape] storage payload parse failed', err);
+          return;
+        }
+        if (!payload || payload.source !== 'editor') return;
+        importEditorPayload('storage-event');
+      });
+
+      window.addEventListener('message', (event) => {
+        if (!event || !event.data) return;
+        const currentOrigin = window.location.origin;
+        if (currentOrigin && currentOrigin !== 'null') {
+          if (event.origin !== currentOrigin) return;
+        } else if (event.origin && event.origin !== 'null') {
+          return;
+        }
+        if (typeof event.data !== 'object') return;
+        if (event.data === null) return;
+        if (event.data.type !== EDITOR_TRANSFER_MESSAGE_TYPE) return;
+        importEditorPayload('message');
       });
     }
 
