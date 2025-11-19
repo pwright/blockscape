@@ -1580,6 +1580,35 @@
       return true;
     }
 
+    function updateShareHashForModel(model, fallbackTitle = 'Shared Model') {
+      if (!model || !model.data) {
+        throw new Error('Select or load a model before sharing.');
+      }
+      let encoded;
+      const payload = {
+        title: getModelTitle(model, fallbackTitle),
+        data: model.data
+      };
+      try {
+        encoded = base64UrlEncode(JSON.stringify(payload));
+      } catch (err) {
+        console.error('[Blockscape] share encode failed', err);
+        throw new Error('Unable to encode this model for sharing.');
+      }
+
+      const shareUrl = new URL(window.location.href);
+      shareUrl.searchParams.delete('share');
+      shareUrl.hash = `share=${encoded}`;
+
+      try {
+        window.history.replaceState({}, document.title, shareUrl.toString());
+      } catch (err) {
+        console.warn('[Blockscape] failed to update URL for share', err);
+        window.location.hash = shareUrl.hash;
+      }
+      return shareUrl;
+    }
+
     function consumeShareLink() {
       const hash = window.location.hash || '';
       let token = null;

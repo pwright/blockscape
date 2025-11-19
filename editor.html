@@ -902,6 +902,29 @@
     return 'Editor Export';
   }
 
+  function base64Encode(text){
+    const bytes = new TextEncoder().encode(text);
+    let binary = '';
+    bytes.forEach(b => { binary += String.fromCharCode(b); });
+    return btoa(binary);
+  }
+
+  function base64UrlEncode(text){
+    return base64Encode(text).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+  }
+
+  function createViewerShareTarget(){
+    const payload = {
+      title: guessViewerTitle(),
+      data: JSON.parse(toJSONString())
+    };
+    const encoded = base64UrlEncode(JSON.stringify(payload));
+    return {
+      hash: `share=${encoded}`,
+      url: `index.html#share=${encoded}`
+    };
+  }
+
   function closeEditorWindow(){
     try {
       window.close();
@@ -1965,7 +1988,14 @@
         alert('Unable to stash JSON for the viewer (storage disabled?).');
         return;
       }
-      const viewerUrl = 'index.html#editor';
+      let shareTarget = null;
+      try {
+        shareTarget = createViewerShareTarget();
+      } catch (err) {
+        console.warn('[Editor] unable to build share URL for viewer', err);
+      }
+
+      const viewerUrl = shareTarget?.url || 'index.html#editor';
       let deliveredToExistingViewer = false;
       if (window.opener && !window.opener.closed) {
         try {
@@ -1973,6 +2003,9 @@
             ? window.location.origin
             : '*';
           window.opener.postMessage({ type: EDITOR_TRANSFER_MESSAGE_TYPE, ts: Date.now() }, targetOrigin);
+          if (shareTarget?.hash){
+            window.opener.location.hash = shareTarget.hash;
+          }
           window.opener.focus();
           deliveredToExistingViewer = true;
         } catch (err) {
