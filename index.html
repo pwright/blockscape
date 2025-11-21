@@ -170,8 +170,92 @@
       min-width: 18rem;
     }
 
-    .blockscape-toolbar__controls .apicurio-controls {
-      flex: 1 1 100%;
+    .apicurio-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-sm);
+      font-size: var(--font-size-sm);
+      font-weight: var(--font-weight-medium);
+    }
+
+    .apicurio-toggle input {
+      width: 1.2rem;
+      height: 1.2rem;
+    }
+
+    .apicurio-artifacts {
+      border: 1px dashed var(--color-border);
+      border-radius: var(--radius-md);
+      padding: var(--space-sm);
+      background: var(--color-surface-muted);
+      min-height: 3rem;
+      font-size: var(--font-size-sm);
+    }
+
+    .apicurio-artifact-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2xs);
+    }
+
+    .apicurio-artifact {
+      width: 100%;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      background: var(--color-surface);
+      padding: var(--space-xs);
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      text-align: left;
+      gap: var(--space-2xs);
+      cursor: pointer;
+      font-size: var(--font-size-sm);
+      transition: border-color var(--transition), background var(--transition), box-shadow var(--transition);
+    }
+
+    .apicurio-artifact:hover,
+    .apicurio-artifact:focus-visible {
+      border-color: var(--color-primary);
+      background: var(--color-primary-soft);
+      outline: none;
+      box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.2);
+    }
+
+    .apicurio-artifact-title {
+      font-weight: var(--font-weight-semibold);
+    }
+
+    .apicurio-artifact-meta {
+      font-size: var(--font-size-xs);
+      color: var(--color-muted);
+    }
+
+    .apicurio-version-list {
+      margin-top: var(--space-xs);
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2xs);
+    }
+
+    .apicurio-version-button {
+      border: 1px dashed var(--color-border);
+      border-radius: var(--radius-sm);
+      padding: var(--space-2xs) var(--space-xs);
+      background: var(--color-surface);
+      font-size: var(--font-size-xs);
+      cursor: pointer;
+      text-align: left;
+    }
+
+    .apicurio-version-button:hover,
+    .apicurio-version-button:focus-visible {
+      border-color: var(--color-primary);
+      background: var(--color-primary-soft);
+      outline: none;
     }
 
     .apicurio-settings {
@@ -671,6 +755,34 @@
       display: block;
     }
 
+    .blockscape-registry-panel {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-md);
+      padding: var(--space-lg);
+      background: var(--blockscape-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      box-shadow: var(--color-shadow);
+    }
+
+    .blockscape-registry-header {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2xs);
+    }
+
+    .blockscape-registry-header h2 {
+      margin: 0;
+      font-size: var(--font-size-md);
+    }
+
+    .blockscape-registry-header p {
+      margin: 0;
+      font-size: var(--font-size-sm);
+      color: var(--color-muted);
+    }
+
     .blockscape-source-panel {
       display: flex;
       flex-direction: column;
@@ -1141,33 +1253,6 @@
               <button id="openInEditor" class="pf-v5-c-button pf-m-primary" type="button" title="Open current JSON in the editor">Edit</button>
               
               <button id="shareModel" class="pf-v5-c-button pf-m-primary" type="button" title="Copy a shareable URL for this model">Share</button>
-              
-              <div class="apicurio-controls">
-                <button id="pushApicurio" class="pf-v5-c-button pf-m-secondary" type="button" disabled
-                  title="Enter Apicurio connection details to enable pushes">Push to Apicurio</button>
-                <details id="apicurioSettings" class="apicurio-settings">
-                  <summary>Apicurio registry (optional)</summary>
-                  <div class="apicurio-fields">
-                    <label>
-                      Registry base URL
-                      <input id="apicurioUrl" type="url" placeholder="https://registry.example/apis/registry/v3"
-                        autocomplete="url" />
-                    </label>
-                    <label>
-                      Group ID
-                      <input id="apicurioGroup" type="text" placeholder="default" autocomplete="organization" />
-                    </label>
-                    <label>
-                      Auth token (optional)
-                      <input id="apicurioToken" type="password" placeholder="Bearer token" autocomplete="off" />
-                    </label>
-                  </div>
-                  <p class="apicurio-hint">Details stay in this browser only.</p>
-                </details>
-                <div id="apicurioStatus" class="apicurio-status" role="status" aria-live="polite"></div>
-              </div>
-              
- 
             </div>
             <div class="blockscape-legend" role="presentation">
               <span class="legend-entry"><span class="legend-dot legend-dot--dep"></span> enables</span>
@@ -1315,11 +1400,14 @@
     const urlForm = document.getElementById('urlForm');
     const urlInput = document.getElementById('urlInput');
     const loadUrlButton = document.getElementById('loadUrl');
-    const pushApicurioButton = document.getElementById('pushApicurio');
-    const apicurioUrlInput = document.getElementById('apicurioUrl');
-    const apicurioGroupInput = document.getElementById('apicurioGroup');
-    const apicurioTokenInput = document.getElementById('apicurioToken');
-    const apicurioStatusNode = document.getElementById('apicurioStatus');
+    let pushApicurioButton = null;
+    let apicurioListButton = null;
+    let apicurioUrlInput = null;
+    let apicurioGroupInput = null;
+    let apicurioTokenInput = null;
+    let apicurioToggleInput = null;
+    let apicurioStatusNode = null;
+    let apicurioArtifactsContainer = null;
     const previewTitle = preview.querySelector('.item-preview__title');
     const previewBody = preview.querySelector('.item-preview__body');
     const previewActions = preview.querySelector('.item-preview__actions');
@@ -1334,7 +1422,8 @@
     const defaultDocumentTitle = document.title;
     const APICURIO_STORAGE_KEY = 'blockscape:apicurioConfig';
     const DEFAULT_APICURIO_BASE = 'http://localhost:8080/apis/registry/v3';
-    const DEFAULT_APICURIO_GROUP = 'default';
+    const DEFAULT_APICURIO_GROUP = 'bs';
+    const DEFAULT_APICURIO_ENABLED = false;
 
     // Show the seed in the editor initially.
     jsonBox.value = document.getElementById('seed').innerHTML.trim();
@@ -1346,7 +1435,8 @@
     let apicurioConfig = {
       baseUrl: DEFAULT_APICURIO_BASE,
       groupId: DEFAULT_APICURIO_GROUP,
-      authToken: ''
+      authToken: '',
+      enabled: DEFAULT_APICURIO_ENABLED
     };
 
     let model = null;           // parsed result of active model: { m, fwd, rev, reusedLocal, seen }
@@ -1355,6 +1445,8 @@
     let previewRequestId = 0;
     let previewAnchor = { x: 0, y: 0 };
     let lastDeletedItem = null;
+    let apicurioArtifactsById = new Map();
+    let apicurioArtifactVersions = new Map();
 
     hydrateApicurioConfig();
 
@@ -1480,18 +1572,341 @@
       }
       const restoredBase = sanitizeApicurioBaseUrl(restored.baseUrl ?? DEFAULT_APICURIO_BASE);
       const restoredGroup = (restored.groupId ?? DEFAULT_APICURIO_GROUP).toString().trim();
+      let restoredEnabled = DEFAULT_APICURIO_ENABLED;
+      if (typeof restored.enabled === 'boolean') {
+        restoredEnabled = restored.enabled;
+      } else if (typeof restored.enabled === 'string') {
+        restoredEnabled = restored.enabled === 'true';
+      }
       apicurioConfig.baseUrl = restoredBase || DEFAULT_APICURIO_BASE;
       apicurioConfig.groupId = restoredGroup || DEFAULT_APICURIO_GROUP;
       apicurioConfig.authToken = (restored.authToken ?? '').toString().trim();
-      if (apicurioUrlInput) apicurioUrlInput.value = apicurioConfig.baseUrl;
-      if (apicurioGroupInput) apicurioGroupInput.value = apicurioConfig.groupId;
-      if (apicurioTokenInput) apicurioTokenInput.value = apicurioConfig.authToken;
-      if (!hasApicurioDetails()) {
+      apicurioConfig.enabled = restoredEnabled;
+      refreshApicurioUiState();
+    }
+
+    function syncApicurioInputsFromConfig() {
+      if (apicurioUrlInput) apicurioUrlInput.value = apicurioConfig.baseUrl || '';
+      if (apicurioGroupInput) apicurioGroupInput.value = apicurioConfig.groupId || '';
+      if (apicurioTokenInput) apicurioTokenInput.value = apicurioConfig.authToken || '';
+      if (apicurioToggleInput) apicurioToggleInput.checked = isApicurioEnabled();
+    }
+
+    function refreshApicurioUiState() {
+      syncApicurioInputsFromConfig();
+      if (!isApicurioEnabled()) {
+        setApicurioStatus('Apicurio integration is off. Enable it to allow pushes.', 'muted');
+        resetApicurioArtifactsPanel('Apicurio integration is disabled.');
+      } else if (!hasApicurioDetails()) {
         setApicurioStatus('Enter Apicurio connection details to enable push.', 'muted');
+        resetApicurioArtifactsPanel('Enter registry details to browse artifacts.');
       } else {
         setApicurioStatus('Apicurio push is ready when a model is selected.', 'muted');
+        if (!apicurioArtifactsById.size) {
+          setApicurioArtifactsMessage('Click “List artifacts” to browse the current group.');
+        }
       }
       updateApicurioAvailability();
+    }
+
+    function resetApicurioArtifactsPanel(message) {
+      apicurioArtifactsById.clear();
+      setApicurioArtifactsMessage(message);
+    }
+
+    function setApicurioArtifactsMessage(message) {
+      if (!apicurioArtifactsContainer) return;
+      apicurioArtifactsContainer.innerHTML = '';
+      if (!message) return;
+      const p = document.createElement('p');
+      p.className = 'apicurio-hint';
+      p.textContent = message;
+      apicurioArtifactsContainer.appendChild(p);
+    }
+
+    function renderApicurioArtifactsList(entries) {
+      if (!apicurioArtifactsContainer) return;
+      apicurioArtifactsContainer.innerHTML = '';
+      if (!entries.length) {
+        setApicurioArtifactsMessage('No artifacts found in this group.');
+        return;
+      }
+      const list = document.createElement('ul');
+      list.className = 'apicurio-artifact-list';
+      entries.forEach(entry => {
+        if (!entry?.artifactId) return;
+        const li = document.createElement('li');
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'apicurio-artifact';
+        button.dataset.artifactId = entry.artifactId;
+        button.dataset.artifactTrigger = 'toggle';
+
+        const title = document.createElement('span');
+        title.className = 'apicurio-artifact-title';
+        title.textContent = entry.artifactId;
+        button.appendChild(title);
+
+        const metaParts = [];
+        if (entry.name) metaParts.push(entry.name);
+        if (entry.version != null) metaParts.push(`v${entry.version}`);
+        if (entry.type) metaParts.push(entry.type);
+        if (metaParts.length) {
+          const meta = document.createElement('span');
+          meta.className = 'apicurio-artifact-meta';
+          meta.textContent = metaParts.join(' • ');
+          button.appendChild(meta);
+        }
+
+        if (entry.description) {
+          const desc = document.createElement('span');
+          desc.className = 'apicurio-artifact-meta';
+          desc.textContent = entry.description;
+          button.appendChild(desc);
+        }
+
+        li.appendChild(button);
+        const versionPanel = document.createElement('div');
+        versionPanel.className = 'apicurio-version-list';
+        versionPanel.dataset.versionPanel = entry.artifactId;
+        versionPanel.hidden = true;
+        const hint = document.createElement('p');
+        hint.className = 'apicurio-hint';
+        hint.textContent = 'Click above to choose a version to load.';
+        versionPanel.appendChild(hint);
+        li.appendChild(versionPanel);
+        list.appendChild(li);
+      });
+      apicurioArtifactsContainer.appendChild(list);
+    }
+
+    function getApicurioVersionPanel(artifactId) {
+      if (!apicurioArtifactsContainer) return null;
+      return apicurioArtifactsContainer.querySelector(`[data-version-panel=\"${artifactId}\"]`);
+    }
+
+    function setVersionPanelMessage(panel, message) {
+      if (!panel) return;
+      panel.innerHTML = '';
+      if (!message) return;
+      const p = document.createElement('p');
+      p.className = 'apicurio-hint';
+      p.textContent = message;
+      panel.appendChild(p);
+    }
+
+    function renderApicurioVersionButtons(artifactId, versions) {
+      const panel = getApicurioVersionPanel(artifactId);
+      if (!panel) return;
+      panel.innerHTML = '';
+      if (!versions.length) {
+        setVersionPanelMessage(panel, 'No versions found for this artifact.');
+        return;
+      }
+      versions.forEach((ver) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'apicurio-version-button';
+        btn.dataset.artifactId = artifactId;
+        btn.dataset.artifactVersion = ver.version;
+        const labelParts = [`Version ${ver.version}`];
+        if (ver.createdOn) {
+          const dt = new Date(ver.createdOn);
+          if (!isNaN(dt)) {
+            labelParts.push(dt.toISOString().slice(0, 10));
+          }
+        }
+        btn.textContent = labelParts.join(' — ');
+        panel.appendChild(btn);
+      });
+    }
+
+    async function toggleArtifactVersions(artifactId) {
+      const panel = getApicurioVersionPanel(artifactId);
+      if (!panel) return;
+      const isOpen = panel.dataset.open === 'true';
+      if (isOpen) {
+        panel.hidden = true;
+        panel.dataset.open = 'false';
+        return;
+      }
+      panel.hidden = false;
+      panel.dataset.open = 'true';
+      if (panel.dataset.loaded === 'true') return;
+      if (!hasApicurioDetails()) {
+        setVersionPanelMessage(panel, 'Enter registry details first.');
+        return;
+      }
+      setVersionPanelMessage(panel, 'Loading versions…');
+      try {
+        const baseUrl = sanitizeApicurioBaseUrl(apicurioConfig.baseUrl);
+        const groupId = apicurioConfig.groupId.trim();
+        const versions = await fetchApicurioArtifactVersions(baseUrl, groupId, artifactId);
+        apicurioArtifactVersions.set(artifactId, versions);
+        panel.dataset.loaded = 'true';
+        renderApicurioVersionButtons(artifactId, versions);
+      } catch (err) {
+        console.error('[Blockscape] failed to load versions', err);
+        setVersionPanelMessage(panel, `Unable to fetch versions: ${err.message}`);
+      }
+    }
+
+    function normalizeApicurioArtifactsPayload(payload) {
+      if (Array.isArray(payload)) return payload;
+      if (Array.isArray(payload?.artifacts)) return payload.artifacts;
+      if (Array.isArray(payload?.items)) return payload.items;
+      if (Array.isArray(payload?.results)) return payload.results;
+      return [];
+    }
+
+    async function fetchApicurioArtifactMetadata(baseUrl, groupId, artifactId) {
+      const encodedGroup = encodeURIComponent(groupId);
+      const encodedId = encodeURIComponent(artifactId);
+      const target = `${baseUrl}/groups/${encodedGroup}/artifacts/${encodedId}`;
+      const headers = buildApicurioHeaders();
+      headers['Accept'] = 'application/json';
+      const resp = await fetch(target, { method: 'GET', headers });
+      if (!resp.ok) {
+        let detail = resp.statusText || 'Unknown error';
+        try {
+          const text = await resp.text();
+          if (text) detail = text.slice(0, 400);
+        } catch {
+          // ignore
+        }
+        throw new Error(`Failed to fetch artifact metadata (${resp.status}): ${detail}`);
+      }
+      return resp.json();
+    }
+
+    async function fetchApicurioArtifactVersions(baseUrl, groupId, artifactId) {
+      const encodedGroup = encodeURIComponent(groupId);
+      const encodedId = encodeURIComponent(artifactId);
+      const target = `${baseUrl}/groups/${encodedGroup}/artifacts/${encodedId}/versions?limit=50&order=desc`;
+      const headers = buildApicurioHeaders();
+      headers['Accept'] = 'application/json';
+      const resp = await fetch(target, { method: 'GET', headers });
+      if (!resp.ok) {
+        let detail = resp.statusText || 'Unknown error';
+        try {
+          const text = await resp.text();
+          if (text) detail = text.slice(0, 400);
+        } catch {
+          // ignore
+        }
+        throw new Error(`Failed to fetch artifact versions (${resp.status}): ${detail}`);
+      }
+      const payload = await resp.json();
+      return normalizeApicurioVersionsPayload(payload).filter((v) => v && v.version != null);
+    }
+
+    function normalizeApicurioVersionsPayload(payload) {
+      if (Array.isArray(payload)) return payload;
+      if (Array.isArray(payload?.versions)) return payload.versions;
+      if (Array.isArray(payload?.items)) return payload.items;
+      return [];
+    }
+
+    function bindApicurioElements(scope = document) {
+      pushApicurioButton = scope.querySelector('#pushApicurio') || document.getElementById('pushApicurio');
+      apicurioListButton = scope.querySelector('#listApicurioArtifacts') || document.getElementById('listApicurioArtifacts');
+      apicurioUrlInput = scope.querySelector('#apicurioUrl') || document.getElementById('apicurioUrl');
+      apicurioGroupInput = scope.querySelector('#apicurioGroup') || document.getElementById('apicurioGroup');
+      apicurioTokenInput = scope.querySelector('#apicurioToken') || document.getElementById('apicurioToken');
+      apicurioToggleInput = scope.querySelector('#apicurioToggle') || document.getElementById('apicurioToggle');
+      apicurioStatusNode = scope.querySelector('#apicurioStatus') || document.getElementById('apicurioStatus');
+      apicurioArtifactsContainer = scope.querySelector('#apicurioArtifacts') || document.getElementById('apicurioArtifacts');
+    }
+
+    function attachApicurioEventHandlers() {
+      [apicurioUrlInput, apicurioGroupInput, apicurioTokenInput].forEach((input) => {
+        if (!input) return;
+        input.addEventListener('input', handleApicurioInputChange);
+      });
+      if (pushApicurioButton) {
+        pushApicurioButton.addEventListener('click', () => {
+          pushActiveModelToApicurio();
+        });
+      }
+      if (apicurioToggleInput) {
+        apicurioToggleInput.addEventListener('change', handleApicurioToggleChange);
+      }
+      if (apicurioListButton) {
+        apicurioListButton.addEventListener('click', listApicurioArtifacts);
+      }
+      if (apicurioArtifactsContainer) {
+        apicurioArtifactsContainer.addEventListener('click', (event) => {
+          const versionButton = event.target.closest('[data-artifact-version]');
+          if (versionButton) {
+            event.stopPropagation();
+            const artifactId = versionButton.dataset.artifactId;
+            const version = versionButton.dataset.artifactVersion;
+            if (artifactId && version) {
+              loadApicurioArtifact(artifactId, version);
+            }
+            return;
+          }
+          const artifactTrigger = event.target.closest('[data-artifact-trigger]');
+          if (artifactTrigger) {
+            const artifactId = artifactTrigger.dataset.artifactId;
+            if (!artifactId) return;
+            toggleArtifactVersions(artifactId);
+          }
+        });
+      }
+    }
+
+    function createApicurioPanelContent() {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'blockscape-registry-panel';
+      wrapper.innerHTML = `
+        <div class="blockscape-registry-header">
+          <h2>Apicurio registry</h2>
+          <p>Configure the registry connection and push the active model.</p>
+        </div>
+        <div class="apicurio-controls">
+          <label class="apicurio-toggle">
+            <input id="apicurioToggle" type="checkbox" />
+            <span>Enable Apicurio push</span>
+          </label>
+          <p class="apicurio-hint">When disabled, Blockscape never contacts your registry.</p>
+          <button id="pushApicurio" class="pf-v5-c-button pf-m-secondary" type="button" disabled
+            title="Enter Apicurio connection details to enable pushes">Push to Apicurio</button>
+          <button id="listApicurioArtifacts" class="pf-v5-c-button pf-m-secondary" type="button" disabled
+            title="List artifacts in the configured group">List artifacts</button>
+          <details id="apicurioSettings" class="apicurio-settings">
+            <summary>Connection settings (optional)</summary>
+            <div class="apicurio-fields">
+              <label>
+                Registry base URL
+                <input id="apicurioUrl" type="url" placeholder="https://registry.example/apis/registry/v3" autocomplete="url" />
+              </label>
+              <label>
+                Group ID
+                <input id="apicurioGroup" type="text" placeholder="default" autocomplete="organization" />
+              </label>
+              <label>
+                Auth token (optional)
+                <input id="apicurioToken" type="password" placeholder="Bearer token" autocomplete="off" />
+              </label>
+            </div>
+            <p class="apicurio-hint">Details stay in this browser only.</p>
+          </details>
+          <div id="apicurioStatus" class="apicurio-status" role="status" aria-live="polite"></div>
+          <div id="apicurioArtifacts" class="apicurio-artifacts" aria-live="polite"></div>
+        </div>
+      `;
+      return wrapper;
+    }
+
+    function mountApicurioTab(panelNode) {
+      if (!panelNode) return;
+      panelNode.innerHTML = '';
+      const content = createApicurioPanelContent();
+      panelNode.appendChild(content);
+      bindApicurioElements(panelNode);
+      attachApicurioEventHandlers();
+      refreshApicurioUiState();
     }
 
     function persistApicurioConfig() {
@@ -1507,6 +1922,10 @@
       return Boolean(apicurioConfig.baseUrl && apicurioConfig.groupId);
     }
 
+    function isApicurioEnabled() {
+      return apicurioConfig.enabled !== false;
+    }
+
     function setApicurioStatus(message = '', tone = 'muted') {
       if (!apicurioStatusNode) return;
       apicurioStatusNode.textContent = message || '';
@@ -1519,12 +1938,31 @@
     }
 
     function updateApicurioAvailability() {
-      if (!pushApicurioButton) return;
-      const isBusy = pushApicurioButton.dataset.loading === 'true';
-      const ready = hasApicurioDetails() && activeIndex >= 0 && !!getModelId(models[activeIndex]);
-      pushApicurioButton.disabled = isBusy || !ready;
-      if (!isBusy) {
-        pushApicurioButton.textContent = 'Push to Apicurio';
+      const enabled = isApicurioEnabled();
+      const haveDetails = hasApicurioDetails();
+      if (pushApicurioButton) {
+        const isBusy = pushApicurioButton.dataset.loading === 'true';
+        const ready = enabled && haveDetails && activeIndex >= 0 && !!getModelId(models[activeIndex]);
+        pushApicurioButton.disabled = !enabled || isBusy || !ready;
+        if (!enabled) {
+          pushApicurioButton.textContent = 'Enable Apicurio to push';
+        } else if (!isBusy) {
+          pushApicurioButton.textContent = 'Push to Apicurio';
+        }
+      }
+      if (apicurioListButton) {
+        const listBusy = apicurioListButton.dataset.loading === 'true';
+        const listReady = enabled && haveDetails;
+        apicurioListButton.disabled = !listReady || listBusy;
+        if (!listBusy) {
+          if (!enabled) {
+            apicurioListButton.textContent = 'Enable Apicurio to list';
+          } else if (!haveDetails) {
+            apicurioListButton.textContent = 'Enter details to list';
+          } else {
+            apicurioListButton.textContent = 'List artifacts';
+          }
+        }
       }
     }
 
@@ -1567,12 +2005,13 @@
       apicurioConfig.groupId = (apicurioGroupInput?.value ?? '').trim();
       apicurioConfig.authToken = (apicurioTokenInput?.value ?? '').trim();
       persistApicurioConfig();
-      if (!hasApicurioDetails()) {
-        setApicurioStatus('Enter Apicurio connection details to enable push.', 'muted');
-      } else {
-        setApicurioStatus('', 'muted');
-      }
-      updateApicurioAvailability();
+      refreshApicurioUiState();
+    }
+
+    function handleApicurioToggleChange() {
+      apicurioConfig.enabled = apicurioToggleInput ? apicurioToggleInput.checked : DEFAULT_APICURIO_ENABLED;
+      persistApicurioConfig();
+      refreshApicurioUiState();
     }
 
     async function apicurioArtifactExists(baseUrl, groupId, artifactId, headers) {
@@ -1597,6 +2036,10 @@
 
     async function pushActiveModelToApicurio() {
       if (!pushApicurioButton || pushApicurioButton.dataset.loading === 'true') return;
+      if (!isApicurioEnabled()) {
+        setApicurioStatus('Apicurio integration is off. Enable it first.', 'error');
+        return;
+      }
       if (!hasApicurioDetails()) {
         setApicurioStatus('Enter the registry base URL and group ID before pushing.', 'error');
         return;
@@ -1674,6 +2117,157 @@
       } finally {
         pushApicurioButton.dataset.loading = 'false';
         updateApicurioAvailability();
+      }
+    }
+
+    async function listApicurioArtifacts() {
+      if (!apicurioListButton || apicurioListButton.dataset.loading === 'true') return;
+      if (!isApicurioEnabled()) {
+        setApicurioStatus('Enable Apicurio integration to list artifacts.', 'error');
+        return;
+      }
+      if (!hasApicurioDetails()) {
+        setApicurioStatus('Enter registry base URL and group ID before listing.', 'error');
+        return;
+      }
+      const baseUrl = sanitizeApicurioBaseUrl(apicurioConfig.baseUrl);
+      const groupId = apicurioConfig.groupId.trim();
+      const encodedGroup = encodeURIComponent(groupId);
+      const endpoint = `${baseUrl}/groups/${encodedGroup}/artifacts?limit=50&offset=0`;
+      apicurioListButton.dataset.loading = 'true';
+      apicurioListButton.textContent = 'Listing…';
+      apicurioListButton.disabled = true;
+      setApicurioStatus('Listing artifacts…', 'muted');
+      setApicurioArtifactsMessage('Contacting registry…');
+      try {
+        const headers = buildApicurioHeaders();
+        headers['Accept'] = 'application/json';
+        const resp = await fetch(endpoint, { method: 'GET', headers });
+        if (!resp.ok) {
+          let detail = resp.statusText || 'Unknown error';
+          try {
+            const text = await resp.text();
+            if (text) detail = text.slice(0, 400);
+          } catch {
+            // ignore
+          }
+          throw new Error(`Failed to list artifacts (${resp.status}): ${detail}`);
+        }
+        const payload = await resp.json();
+        const entries = normalizeApicurioArtifactsPayload(payload).filter(item => item && item.artifactId);
+        apicurioArtifactsById.clear();
+        apicurioArtifactVersions.clear();
+        entries.forEach(item => {
+          if (item?.artifactId) {
+            apicurioArtifactsById.set(item.artifactId, item);
+          }
+        });
+        renderApicurioArtifactsList(entries);
+        const count = entries.length;
+        setApicurioStatus(count ? `Found ${count} artifact${count === 1 ? '' : 's'}.` : 'No artifacts found in this group.', count ? 'success' : 'muted');
+      } catch (err) {
+        console.error('[Blockscape] failed to list artifacts', err);
+        resetApicurioArtifactsPanel('Unable to list artifacts.');
+        setApicurioStatus(`Listing failed: ${err.message}`, 'error');
+      } finally {
+        apicurioListButton.dataset.loading = 'false';
+        updateApicurioAvailability();
+      }
+    }
+
+    async function loadApicurioArtifact(artifactId, explicitVersion = null) {
+      if (!artifactId) return;
+      if (!isApicurioEnabled()) {
+        setApicurioStatus('Enable Apicurio integration to load artifacts.', 'error');
+        return;
+      }
+      if (!hasApicurioDetails()) {
+        setApicurioStatus('Enter registry connection details before loading artifacts.', 'error');
+        return;
+      }
+      const baseUrl = sanitizeApicurioBaseUrl(apicurioConfig.baseUrl);
+      const groupId = apicurioConfig.groupId.trim();
+      const encodedGroup = encodeURIComponent(groupId);
+      const encodedId = encodeURIComponent(artifactId);
+      let meta = apicurioArtifactsById.get(artifactId);
+      const ensureMetadata = async () => {
+        try {
+          const fresh = await fetchApicurioArtifactMetadata(baseUrl, groupId, artifactId);
+          if (fresh?.artifactId) {
+            apicurioArtifactsById.set(artifactId, fresh);
+          }
+          return fresh;
+        } catch (err) {
+          console.error('[Blockscape] failed to fetch artifact metadata before loading', err);
+          throw err;
+        }
+      };
+      if (!meta) {
+        try {
+          meta = await ensureMetadata();
+        } catch (err) {
+          setApicurioStatus(`Failed to fetch artifact metadata: ${err.message}`, 'error');
+          return;
+        }
+      }
+      let versionSegment = 'latest';
+      if (explicitVersion) {
+        versionSegment = encodeURIComponent(explicitVersion);
+      } else {
+        if (!meta || meta.version == null) {
+          try {
+            meta = await ensureMetadata();
+          } catch (err) {
+            setApicurioStatus(`Failed to fetch artifact metadata: ${err.message}`, 'error');
+            return;
+          }
+        }
+        versionSegment = meta?.version ? encodeURIComponent(meta.version) : 'latest';
+      }
+      const contentEndpoint = `${baseUrl}/groups/${encodedGroup}/artifacts/${encodedId}/versions/${versionSegment}/content`;
+      setApicurioStatus(`Loading artifact ${artifactId}…`, 'muted');
+      try {
+        const headers = buildApicurioHeaders();
+        headers['Accept'] = 'application/json, application/*+json, */*;q=0.8';
+        const resp = await fetch(contentEndpoint, { method: 'GET', headers });
+        if (!resp.ok) {
+          let detail = resp.statusText || 'Unknown error';
+          try {
+            const text = await resp.text();
+            if (text) detail = text.slice(0, 400);
+          } catch {
+            // ignore
+          }
+          throw new Error(`Failed to load artifact content (${resp.status}): ${detail}`);
+        }
+        const text = await resp.text();
+        let data = null;
+        try {
+          data = JSON.parse(text);
+        } catch {
+          throw new Error('Artifact content is not valid JSON.');
+        }
+        if (!Array.isArray(data?.categories) && typeof data?.content === 'string') {
+          try {
+            data = JSON.parse(data.content);
+          } catch (innerErr) {
+            console.warn('[Blockscape] artifact payload contained nested content that could not be parsed', innerErr);
+          }
+        }
+        const resolvedMeta = apicurioArtifactsById.get(artifactId) || meta || {};
+        ensureModelMetadata(data, { titleHint: resolvedMeta.name || artifactId, idHint: artifactId });
+        const entry = {
+          id: uid(),
+          title: data.title || resolvedMeta.name || artifactId,
+          data
+        };
+        models.push(entry);
+        setActive(models.length - 1);
+        const suffix = explicitVersion ? ` (version ${explicitVersion})` : (meta?.version ? ` (version ${meta.version})` : '');
+        setApicurioStatus(`Loaded artifact ${artifactId}${suffix}.`, 'success');
+      } catch (err) {
+        console.error('[Blockscape] failed to load artifact', err);
+        setApicurioStatus(`Failed to load artifact: ${err.message}`, 'error');
       }
     }
 
@@ -2088,6 +2682,9 @@
     function render() {
       if (!model) return;
       hideTabTooltip();
+      if (!Array.isArray(model.m.categories)) {
+        model.m.categories = [];
+      }
       console.log("[Blockscape] rendering categories=", model.m.categories.length);
       console.log("[Blockscape] model.m has abstract?", !!model.m.abstract, "- value:", model.m.abstract ? model.m.abstract.substring(0, 50) + "..." : "none");
       app.innerHTML = "";
@@ -2128,12 +2725,14 @@
       const mapPanel = document.createElement('div');
       const abstractPanel = document.createElement('div');
       const sourcePanel = document.createElement('div');
+      const apicurioPanel = document.createElement('div');
       let infoTooltipHtml = '';
 
       const tabDefs = [
         { id: 'map', label: 'Map', panel: mapPanel },
         { id: 'abstract', label: 'Info', panel: abstractPanel },
-        { id: 'source', label: 'Source', panel: sourcePanel }
+        { id: 'source', label: 'Source', panel: sourcePanel },
+        { id: 'apicurio', label: 'Apicurio', panel: apicurioPanel }
       ];
 
       const handleTabVisibility = (tabId) => {
@@ -2234,6 +2833,7 @@
         sourceWrapper.appendChild(missing);
       }
       sourcePanel.appendChild(sourceWrapper);
+      mountApicurioTab(apicurioPanel);
 
       model.m.categories.forEach(cat => {
         const section = document.createElement('section');
@@ -2627,17 +3227,6 @@
         }
       });
     }
-
-    if (pushApicurioButton) {
-      pushApicurioButton.addEventListener('click', () => {
-        pushActiveModelToApicurio();
-      });
-    }
-
-    [apicurioUrlInput, apicurioGroupInput, apicurioTokenInput].forEach((input) => {
-      if (!input) return;
-      input.addEventListener('input', handleApicurioInputChange);
-    });
 
     if (editButton) {
       editButton.addEventListener('click', () => {
