@@ -3,8 +3,10 @@
 Backend
 
 ```
-podman run --replace --name registry   -p 8080:8080   -e QUARKUS_HTTP_CORS=true   -e QUARKUS_HTTP_CORS_ORIGINS="*"   -e QUARKUS_HTTP_CORS_ACCESS_CONTROL_ALLOW_METHODS="GET,PUT,POST,DELETE,OPTIONS,HEAD"   -e QUARKUS_HTTP_CORS_ACCESS_CONTROL_ALLOW_HEADERS="accept,authorization,content-type,x-requested-with"   apicurio/apicurio-registry:latest-release
+podman run --replace --name registry   -p 8080:8080   -e QUARKUS_HTTP_CORS=true   -e QUARKUS_HTTP_CORS_ORIGINS="*"  -e APICURIO_SEMVER_BRANCHING_ENABLED=true  -e QUARKUS_HTTP_CORS_ACCESS_CONTROL_ALLOW_METHODS="GET,PUT,POST,DELETE,OPTIONS,HEAD"   -e QUARKUS_HTTP_CORS_ACCESS_CONTROL_ALLOW_HEADERS="accept,authorization,content-type,x-requested-with"   apicurio/apicurio-registry:latest-release
 ```
+
+
 
 UI
 

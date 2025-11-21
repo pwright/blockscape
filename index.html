@@ -170,6 +170,10 @@
       min-width: 18rem;
     }
 
+    .apicurio-subnote {
+      margin-top: -0.25rem;
+    }
+
     .apicurio-toggle {
       display: inline-flex;
       align-items: center;
@@ -1406,6 +1410,7 @@
     let apicurioGroupInput = null;
     let apicurioTokenInput = null;
     let apicurioToggleInput = null;
+    let apicurioSemverInput = null;
     let apicurioStatusNode = null;
     let apicurioArtifactsContainer = null;
     const previewTitle = preview.querySelector('.item-preview__title');
@@ -1424,6 +1429,7 @@
     const DEFAULT_APICURIO_BASE = 'http://localhost:8080/apis/registry/v3';
     const DEFAULT_APICURIO_GROUP = 'bs';
     const DEFAULT_APICURIO_ENABLED = false;
+    const DEFAULT_APICURIO_SEMVER_ENABLED = false;
 
     // Show the seed in the editor initially.
     jsonBox.value = document.getElementById('seed').innerHTML.trim();
@@ -1436,7 +1442,8 @@
       baseUrl: DEFAULT_APICURIO_BASE,
       groupId: DEFAULT_APICURIO_GROUP,
       authToken: '',
-      enabled: DEFAULT_APICURIO_ENABLED
+      enabled: DEFAULT_APICURIO_ENABLED,
+      useSemver: DEFAULT_APICURIO_SEMVER_ENABLED
     };
 
     let model = null;           // parsed result of active model: { m, fwd, rev, reusedLocal, seen }
@@ -1573,15 +1580,22 @@
       const restoredBase = sanitizeApicurioBaseUrl(restored.baseUrl ?? DEFAULT_APICURIO_BASE);
       const restoredGroup = (restored.groupId ?? DEFAULT_APICURIO_GROUP).toString().trim();
       let restoredEnabled = DEFAULT_APICURIO_ENABLED;
+      let restoredSemver = DEFAULT_APICURIO_SEMVER_ENABLED;
       if (typeof restored.enabled === 'boolean') {
         restoredEnabled = restored.enabled;
       } else if (typeof restored.enabled === 'string') {
         restoredEnabled = restored.enabled === 'true';
       }
+      if (typeof restored.useSemver === 'boolean') {
+        restoredSemver = restored.useSemver;
+      } else if (typeof restored.useSemver === 'string') {
+        restoredSemver = restored.useSemver === 'true';
+      }
       apicurioConfig.baseUrl = restoredBase || DEFAULT_APICURIO_BASE;
       apicurioConfig.groupId = restoredGroup || DEFAULT_APICURIO_GROUP;
       apicurioConfig.authToken = (restored.authToken ?? '').toString().trim();
       apicurioConfig.enabled = restoredEnabled;
+      apicurioConfig.useSemver = restoredSemver;
       refreshApicurioUiState();
     }
 
@@ -1590,6 +1604,7 @@
       if (apicurioGroupInput) apicurioGroupInput.value = apicurioConfig.groupId || '';
       if (apicurioTokenInput) apicurioTokenInput.value = apicurioConfig.authToken || '';
       if (apicurioToggleInput) apicurioToggleInput.checked = isApicurioEnabled();
+      if (apicurioSemverInput) apicurioSemverInput.checked = Boolean(apicurioConfig.useSemver);
     }
 
     function refreshApicurioUiState() {
@@ -1814,6 +1829,7 @@
       apicurioGroupInput = scope.querySelector('#apicurioGroup') || document.getElementById('apicurioGroup');
       apicurioTokenInput = scope.querySelector('#apicurioToken') || document.getElementById('apicurioToken');
       apicurioToggleInput = scope.querySelector('#apicurioToggle') || document.getElementById('apicurioToggle');
+      apicurioSemverInput = scope.querySelector('#apicurioSemver') || document.getElementById('apicurioSemver');
       apicurioStatusNode = scope.querySelector('#apicurioStatus') || document.getElementById('apicurioStatus');
       apicurioArtifactsContainer = scope.querySelector('#apicurioArtifacts') || document.getElementById('apicurioArtifacts');
     }
@@ -1830,6 +1846,9 @@
       }
       if (apicurioToggleInput) {
         apicurioToggleInput.addEventListener('change', handleApicurioToggleChange);
+      }
+      if (apicurioSemverInput) {
+        apicurioSemverInput.addEventListener('change', handleApicurioSemverToggleChange);
       }
       if (apicurioListButton) {
         apicurioListButton.addEventListener('click', listApicurioArtifacts);
@@ -1869,7 +1888,12 @@
             <input id="apicurioToggle" type="checkbox" />
             <span>Enable Apicurio push</span>
           </label>
+          <label class="apicurio-toggle">
+            <input id="apicurioSemver" type="checkbox" />
+            <span>Use semantic versioning</span>
+          </label>
           <p class="apicurio-hint">When disabled, Blockscape never contacts your registry.</p>
+          <p class="apicurio-hint apicurio-subnote">When on, Blockscape reads the latest version and auto-bumps the next semver on each push.</p>
           <button id="pushApicurio" class="pf-v5-c-button pf-m-secondary" type="button" disabled
             title="Enter Apicurio connection details to enable pushes">Push to Apicurio</button>
           <button id="listApicurioArtifacts" class="pf-v5-c-button pf-m-secondary" type="button" disabled
@@ -1975,7 +1999,7 @@
       return headers;
     }
 
-    function buildApicurioCreateBody(artifactId, contentText, { title, description } = {}) {
+    function buildApicurioCreateBody(artifactId, contentText, { title, description, version } = {}) {
       const payload = {
         artifactId,
         artifactType: 'JSON',
@@ -1986,18 +2010,82 @@
           }
         }
       };
+      if (version) payload.firstVersion.version = version;
       if (title) payload.name = title;
       if (description) payload.description = description;
       return payload;
     }
 
-    function buildApicurioUpdateBody(contentText) {
-      return {
+    function buildApicurioUpdateBody(contentText, { version } = {}) {
+      const body = {
         content: {
           contentType: 'application/json',
           content: contentText
         }
       };
+      if (version) body.version = version;
+      return body;
+    }
+
+    function parseApicurioSemver(value) {
+      if (value == null) return null;
+      const text = String(value).trim();
+      if (!text) return null;
+      const fullMatch = /^v?(\d+)\.(\d+)\.(\d+)(?:-.+)?$/.exec(text);
+      if (fullMatch) {
+        return {
+          major: Number(fullMatch[1]),
+          minor: Number(fullMatch[2]),
+          patch: Number(fullMatch[3])
+        };
+      }
+      const majorOnly = /^v?(\d+)$/.exec(text);
+      if (majorOnly) {
+        return {
+          major: Number(majorOnly[1]),
+          minor: 0,
+          patch: 0
+        };
+      }
+      return null;
+    }
+
+    function formatSemverParts(parts) {
+      return `${parts.major}.${parts.minor}.${parts.patch}`;
+    }
+
+    function compareSemverParts(a, b) {
+      if (!a && !b) return 0;
+      if (!a) return -1;
+      if (!b) return 1;
+      if (a.major !== b.major) return a.major - b.major;
+      if (a.minor !== b.minor) return a.minor - b.minor;
+      return a.patch - b.patch;
+    }
+
+    function computeNextSemverVersion(versions = []) {
+      let latest = null;
+      versions.forEach((entry) => {
+        const parsed = parseApicurioSemver(entry?.version ?? entry);
+        if (!parsed) return;
+        if (!latest || compareSemverParts(parsed, latest) > 0) {
+          latest = parsed;
+        }
+      });
+      if (!latest) return '1.0.0';
+      const bumped = { ...latest, patch: latest.patch + 1 };
+      return formatSemverParts(bumped);
+    }
+
+    async function resolveApicurioSemverTarget(baseUrl, groupId, artifactId, exists) {
+      if (!apicurioConfig.useSemver) return null;
+      if (!exists) return '1.0.0';
+      try {
+        const versions = await fetchApicurioArtifactVersions(baseUrl, groupId, artifactId);
+        return computeNextSemverVersion(versions);
+      } catch (err) {
+        throw new Error(`Unable to compute next semantic version: ${err.message}`);
+      }
     }
 
     function handleApicurioInputChange() {
@@ -2010,6 +2098,12 @@
 
     function handleApicurioToggleChange() {
       apicurioConfig.enabled = apicurioToggleInput ? apicurioToggleInput.checked : DEFAULT_APICURIO_ENABLED;
+      persistApicurioConfig();
+      refreshApicurioUiState();
+    }
+
+    function handleApicurioSemverToggleChange() {
+      apicurioConfig.useSemver = apicurioSemverInput ? apicurioSemverInput.checked : DEFAULT_APICURIO_SEMVER_ENABLED;
       persistApicurioConfig();
       refreshApicurioUiState();
     }
@@ -2066,6 +2160,12 @@
 
       try {
         const exists = await apicurioArtifactExists(baseUrl, groupId, artifactId, headers);
+        const targetVersion = apicurioConfig.useSemver
+          ? await resolveApicurioSemverTarget(baseUrl, groupId, artifactId, exists)
+          : null;
+        if (apicurioConfig.useSemver && !targetVersion) {
+          throw new Error('Semantic versioning is enabled but no version could be computed.');
+        }
         const encodedGroup = encodeURIComponent(groupId);
         const encodedId = encodeURIComponent(artifactId);
         const endpoint = exists
@@ -2076,12 +2176,17 @@
           ...headers,
           'Content-Type': 'application/json'
         };
+        if (targetVersion) {
+          requestHeaders['X-Registry-Version'] = targetVersion;
+          setApicurioStatus(`Pushing to Apicurio as version ${targetVersion}…`, 'muted');
+        }
 
         const bodyObject = exists
-          ? buildApicurioUpdateBody(payload)
+          ? buildApicurioUpdateBody(payload, { version: targetVersion })
           : buildApicurioCreateBody(artifactId, payload, {
             title: getModelTitle(models[activeIndex]),
-            description: models[activeIndex].data?.abstract
+            description: models[activeIndex].data?.abstract,
+            version: targetVersion
           });
 
         const response = await fetch(endpoint, {
