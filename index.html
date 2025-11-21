@@ -163,6 +163,81 @@
       margin-left: 0.1rem;
     }
 
+    .apicurio-controls {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2xs);
+      min-width: 18rem;
+    }
+
+    .blockscape-toolbar__controls .apicurio-controls {
+      flex: 1 1 100%;
+    }
+
+    .apicurio-settings {
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      padding: var(--space-2xs) var(--space-sm) var(--space-xs);
+      background: var(--color-surface);
+      font-size: var(--font-size-xs);
+    }
+
+    .apicurio-settings summary {
+      cursor: pointer;
+      font-weight: var(--font-weight-semibold);
+      list-style: none;
+      display: flex;
+      align-items: center;
+      gap: var(--space-2xs);
+    }
+
+    .apicurio-settings summary::marker,
+    .apicurio-settings summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .apicurio-fields {
+      display: grid;
+      gap: var(--space-xs);
+      grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+      margin-top: var(--space-xs);
+    }
+
+    .apicurio-fields label {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2xs);
+    }
+
+    .apicurio-fields input {
+      font-size: var(--font-size-xs);
+      padding: var(--space-2xs) var(--space-xs);
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--color-border);
+      background: var(--color-surface);
+      color: inherit;
+    }
+
+    .apicurio-hint {
+      margin: var(--space-xs) 0 0;
+      color: var(--color-muted);
+      font-size: var(--font-size-xs);
+    }
+
+    .apicurio-status {
+      font-size: var(--font-size-xs);
+      min-height: 1rem;
+      color: var(--color-muted);
+    }
+
+    .apicurio-status.is-error {
+      color: var(--color-danger);
+    }
+
+    .apicurio-status.is-success {
+      color: var(--color-accent);
+    }
+
     .blockscape-toolbar__controls .pf-v5-c-form-control {
       min-width: 11rem;
     }
@@ -1008,6 +1083,10 @@
         flex: 1 1 auto;
       }
 
+      .apicurio-controls {
+        min-width: auto;
+      }
+
       .blockscape-legend {
         width: 100%;
         justify-content: flex-start;
@@ -1063,7 +1142,32 @@
               
               <button id="shareModel" class="pf-v5-c-button pf-m-primary" type="button" title="Copy a shareable URL for this model">Share</button>
               
+              <div class="apicurio-controls">
+                <button id="pushApicurio" class="pf-v5-c-button pf-m-secondary" type="button" disabled
+                  title="Enter Apicurio connection details to enable pushes">Push to Apicurio</button>
+                <details id="apicurioSettings" class="apicurio-settings">
+                  <summary>Apicurio registry (optional)</summary>
+                  <div class="apicurio-fields">
+                    <label>
+                      Registry base URL
+                      <input id="apicurioUrl" type="url" placeholder="https://registry.example/apis/registry/v3"
+                        autocomplete="url" />
+                    </label>
+                    <label>
+                      Group ID
+                      <input id="apicurioGroup" type="text" placeholder="default" autocomplete="organization" />
+                    </label>
+                    <label>
+                      Auth token (optional)
+                      <input id="apicurioToken" type="password" placeholder="Bearer token" autocomplete="off" />
+                    </label>
+                  </div>
+                  <p class="apicurio-hint">Details stay in this browser only.</p>
+                </details>
+                <div id="apicurioStatus" class="apicurio-status" role="status" aria-live="polite"></div>
+              </div>
               
+ 
             </div>
             <div class="blockscape-legend" role="presentation">
               <span class="legend-entry"><span class="legend-dot legend-dot--dep"></span> enables</span>
@@ -1211,10 +1315,15 @@
     const urlForm = document.getElementById('urlForm');
     const urlInput = document.getElementById('urlInput');
     const loadUrlButton = document.getElementById('loadUrl');
-  const previewTitle = preview.querySelector('.item-preview__title');
-  const previewBody = preview.querySelector('.item-preview__body');
-  const previewActions = preview.querySelector('.item-preview__actions');
-  const previewClose = preview.querySelector('.item-preview__close');
+    const pushApicurioButton = document.getElementById('pushApicurio');
+    const apicurioUrlInput = document.getElementById('apicurioUrl');
+    const apicurioGroupInput = document.getElementById('apicurioGroup');
+    const apicurioTokenInput = document.getElementById('apicurioToken');
+    const apicurioStatusNode = document.getElementById('apicurioStatus');
+    const previewTitle = preview.querySelector('.item-preview__title');
+    const previewBody = preview.querySelector('.item-preview__body');
+    const previewActions = preview.querySelector('.item-preview__actions');
+    const previewClose = preview.querySelector('.item-preview__close');
     const downloadButton = document.getElementById('downloadJson');
     const shareButton = document.getElementById('shareModel');
     const editButton = document.getElementById('openInEditor');
@@ -1223,6 +1332,9 @@
     const EDITOR_TRANSFER_KEY = 'blockscape:editorPayload';
     const EDITOR_TRANSFER_MESSAGE_TYPE = 'blockscape:editorTransfer';
     const defaultDocumentTitle = document.title;
+    const APICURIO_STORAGE_KEY = 'blockscape:apicurioConfig';
+    const DEFAULT_APICURIO_BASE = 'http://localhost:8080/apis/registry/v3';
+    const DEFAULT_APICURIO_GROUP = 'default';
 
     // Show the seed in the editor initially.
     jsonBox.value = document.getElementById('seed').innerHTML.trim();
@@ -1231,6 +1343,11 @@
     /** @type {{id:string,title:string,data:any}[]} */
     let models = [];
     let activeIndex = -1;
+    let apicurioConfig = {
+      baseUrl: DEFAULT_APICURIO_BASE,
+      groupId: DEFAULT_APICURIO_GROUP,
+      authToken: ''
+    };
 
     let model = null;           // parsed result of active model: { m, fwd, rev, reusedLocal, seen }
     let index = new Map();      // id -> {el, catId, rect}
@@ -1238,6 +1355,8 @@
     let previewRequestId = 0;
     let previewAnchor = { x: 0, y: 0 };
     let lastDeletedItem = null;
+
+    hydrateApicurioConfig();
 
     // ===== Utilities =====
     function uid() { return Math.random().toString(36).slice(2, 10); }
@@ -1339,6 +1458,225 @@
       return trimmed || null;
     }
 
+    function sanitizeApicurioBaseUrl(value) {
+      const trimmed = (value || '').toString().trim();
+      return trimmed.replace(/\/+$/, '');
+    }
+
+    function hydrateApicurioConfig() {
+      let restored = {};
+      if (window?.localStorage) {
+        try {
+          const raw = localStorage.getItem(APICURIO_STORAGE_KEY);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (parsed && typeof parsed === 'object') {
+              restored = parsed;
+            }
+          }
+        } catch (err) {
+          console.warn('[Blockscape] failed to restore Apicurio settings', err);
+        }
+      }
+      const restoredBase = sanitizeApicurioBaseUrl(restored.baseUrl ?? DEFAULT_APICURIO_BASE);
+      const restoredGroup = (restored.groupId ?? DEFAULT_APICURIO_GROUP).toString().trim();
+      apicurioConfig.baseUrl = restoredBase || DEFAULT_APICURIO_BASE;
+      apicurioConfig.groupId = restoredGroup || DEFAULT_APICURIO_GROUP;
+      apicurioConfig.authToken = (restored.authToken ?? '').toString().trim();
+      if (apicurioUrlInput) apicurioUrlInput.value = apicurioConfig.baseUrl;
+      if (apicurioGroupInput) apicurioGroupInput.value = apicurioConfig.groupId;
+      if (apicurioTokenInput) apicurioTokenInput.value = apicurioConfig.authToken;
+      if (!hasApicurioDetails()) {
+        setApicurioStatus('Enter Apicurio connection details to enable push.', 'muted');
+      } else {
+        setApicurioStatus('Apicurio push is ready when a model is selected.', 'muted');
+      }
+      updateApicurioAvailability();
+    }
+
+    function persistApicurioConfig() {
+      if (!window?.localStorage) return;
+      try {
+        localStorage.setItem(APICURIO_STORAGE_KEY, JSON.stringify(apicurioConfig));
+      } catch (err) {
+        console.warn('[Blockscape] unable to persist Apicurio settings', err);
+      }
+    }
+
+    function hasApicurioDetails() {
+      return Boolean(apicurioConfig.baseUrl && apicurioConfig.groupId);
+    }
+
+    function setApicurioStatus(message = '', tone = 'muted') {
+      if (!apicurioStatusNode) return;
+      apicurioStatusNode.textContent = message || '';
+      apicurioStatusNode.classList.remove('is-error', 'is-success');
+      if (tone === 'error') {
+        apicurioStatusNode.classList.add('is-error');
+      } else if (tone === 'success') {
+        apicurioStatusNode.classList.add('is-success');
+      }
+    }
+
+    function updateApicurioAvailability() {
+      if (!pushApicurioButton) return;
+      const isBusy = pushApicurioButton.dataset.loading === 'true';
+      const ready = hasApicurioDetails() && activeIndex >= 0 && !!getModelId(models[activeIndex]);
+      pushApicurioButton.disabled = isBusy || !ready;
+      if (!isBusy) {
+        pushApicurioButton.textContent = 'Push to Apicurio';
+      }
+    }
+
+    function buildApicurioHeaders() {
+      const headers = { Accept: 'application/json' };
+      const token = (apicurioConfig.authToken || '').trim();
+      if (token) {
+        headers['Authorization'] = /\s/.test(token) ? token : `Bearer ${token}`;
+      }
+      return headers;
+    }
+
+    function buildApicurioCreateBody(artifactId, contentText, { title, description } = {}) {
+      const payload = {
+        artifactId,
+        artifactType: 'JSON',
+        firstVersion: {
+          content: {
+            contentType: 'application/json',
+            content: contentText
+          }
+        }
+      };
+      if (title) payload.name = title;
+      if (description) payload.description = description;
+      return payload;
+    }
+
+    function buildApicurioUpdateBody(contentText) {
+      return {
+        content: {
+          contentType: 'application/json',
+          content: contentText
+        }
+      };
+    }
+
+    function handleApicurioInputChange() {
+      apicurioConfig.baseUrl = sanitizeApicurioBaseUrl(apicurioUrlInput?.value ?? apicurioConfig.baseUrl);
+      apicurioConfig.groupId = (apicurioGroupInput?.value ?? '').trim();
+      apicurioConfig.authToken = (apicurioTokenInput?.value ?? '').trim();
+      persistApicurioConfig();
+      if (!hasApicurioDetails()) {
+        setApicurioStatus('Enter Apicurio connection details to enable push.', 'muted');
+      } else {
+        setApicurioStatus('', 'muted');
+      }
+      updateApicurioAvailability();
+    }
+
+    async function apicurioArtifactExists(baseUrl, groupId, artifactId, headers) {
+      const encodedGroup = encodeURIComponent(groupId);
+      const encodedId = encodeURIComponent(artifactId);
+      const target = `${baseUrl}/groups/${encodedGroup}/artifacts/${encodedId}`;
+      try {
+        const resp = await fetch(target, { method: 'GET', headers });
+        if (resp.status === 404) return false;
+        if (resp.ok) return true;
+        if (resp.status === 401 || resp.status === 403) {
+          throw new Error('Authentication failed while checking the registry.');
+        }
+        throw new Error(`Registry responded with status ${resp.status} while checking the artifact.`);
+      } catch (err) {
+        if (err instanceof TypeError) {
+          throw new Error('Network error while contacting Apicurio registry.');
+        }
+        throw err;
+      }
+    }
+
+    async function pushActiveModelToApicurio() {
+      if (!pushApicurioButton || pushApicurioButton.dataset.loading === 'true') return;
+      if (!hasApicurioDetails()) {
+        setApicurioStatus('Enter the registry base URL and group ID before pushing.', 'error');
+        return;
+      }
+      if (activeIndex < 0 || !models[activeIndex]) {
+        setApicurioStatus('No active model to push.', 'error');
+        return;
+      }
+      const artifactId = getModelId(models[activeIndex]);
+      if (!artifactId) {
+        setApicurioStatus('Active model needs an id before pushing.', 'error');
+        return;
+      }
+
+      const baseUrl = sanitizeApicurioBaseUrl(apicurioConfig.baseUrl);
+      const groupId = apicurioConfig.groupId.trim();
+      const payload = JSON.stringify(models[activeIndex].data, null, 2);
+      const headers = buildApicurioHeaders();
+
+      pushApicurioButton.dataset.loading = 'true';
+      pushApicurioButton.textContent = 'Pushing…';
+      pushApicurioButton.disabled = true;
+      setApicurioStatus('Pushing to Apicurio…', 'muted');
+
+      try {
+        const exists = await apicurioArtifactExists(baseUrl, groupId, artifactId, headers);
+        const encodedGroup = encodeURIComponent(groupId);
+        const encodedId = encodeURIComponent(artifactId);
+        const endpoint = exists
+          ? `${baseUrl}/groups/${encodedGroup}/artifacts/${encodedId}/versions`
+          : `${baseUrl}/groups/${encodedGroup}/artifacts`;
+
+        const requestHeaders = {
+          ...headers,
+          'Content-Type': 'application/json'
+        };
+
+        const bodyObject = exists
+          ? buildApicurioUpdateBody(payload)
+          : buildApicurioCreateBody(artifactId, payload, {
+            title: getModelTitle(models[activeIndex]),
+            description: models[activeIndex].data?.abstract
+          });
+
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: requestHeaders,
+          body: JSON.stringify(bodyObject)
+        });
+
+        if (!response.ok) {
+          let detail = response.statusText || 'Unknown error';
+          try {
+            const text = await response.text();
+            if (text) detail = text.slice(0, 400);
+          } catch {
+            // ignore
+          }
+          throw new Error(`Registry rejected the push (${response.status}): ${detail}`);
+        }
+
+        let info = null;
+        try {
+          info = await response.json();
+        } catch {
+          info = null;
+        }
+        const label = info?.version || info?.globalId || '';
+        const prefix = exists ? 'Updated' : 'Created';
+        const suffix = label ? ` (version ${label})` : '';
+        setApicurioStatus(`${prefix} ${artifactId}${suffix}`, 'success');
+      } catch (error) {
+        console.error('[Blockscape] Apicurio push failed', error);
+        setApicurioStatus(`Apicurio push failed: ${error.message}`, 'error');
+      } finally {
+        pushApicurioButton.dataset.loading = 'false';
+        updateApicurioAvailability();
+      }
+    }
+
     function syncDocumentTitle() {
       const activeModel = (activeIndex >= 0 && models[activeIndex]) ? models[activeIndex] : null;
       const modelId = getModelId(activeModel);
@@ -1423,6 +1761,7 @@
       renderModelList();
       loadActiveIntoEditor();
       rebuildFromActive();
+      updateApicurioAvailability();
     }
 
     function renderModelList() {
@@ -1473,6 +1812,8 @@
         li.appendChild(btn);
         modelList.appendChild(li);
       });
+
+      updateApicurioAvailability();
     }
 
     function loadActiveIntoEditor() {
@@ -2287,6 +2628,17 @@
       });
     }
 
+    if (pushApicurioButton) {
+      pushApicurioButton.addEventListener('click', () => {
+        pushActiveModelToApicurio();
+      });
+    }
+
+    [apicurioUrlInput, apicurioGroupInput, apicurioTokenInput].forEach((input) => {
+      if (!input) return;
+      input.addEventListener('input', handleApicurioInputChange);
+    });
+
     if (editButton) {
       editButton.addEventListener('click', () => {
         const text = (jsonBox.value || '').trim();
@@ -2837,6 +3189,7 @@
         syncDocumentTitle();
         console.log("[Blockscape] replaced active model:", getModelTitle(models[activeIndex]));
         rebuildFromActive();
+        updateApicurioAvailability();
       } catch (e) {
         console.error("[Blockscape] replace error:", e);
         alert("JSON parse error (see console).");
