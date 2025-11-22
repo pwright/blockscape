@@ -1590,14 +1590,22 @@
     function computeJsonFingerprint(input) {
       try {
         const value = typeof input === 'string' ? JSON.parse(input) : input;
-        return canonicalizeJson(value) || '';
+        const fp = canonicalizeJson(value);
+        if (fp) return fp;
       } catch (err) {
-        try {
-          return canonicalizeJson(JSON.parse(JSON.stringify(input))) || '';
-        } catch {
-          console.warn('[Blockscape] fingerprint failed for value', err);
-          return '';
-        }
+        console.warn('[Blockscape] fingerprint parse failed (first pass)', err);
+      }
+      try {
+        const clone = JSON.parse(JSON.stringify(input));
+        const fp = canonicalizeJson(clone);
+        if (fp) return fp;
+      } catch (err) {
+        console.warn('[Blockscape] fingerprint failed for value', err);
+      }
+      try {
+        return JSON.stringify(input) || '';
+      } catch {
+        return '';
       }
     }
 
@@ -1906,14 +1914,41 @@
       return [];
     }
 
+    function pickLatestVersionEntry(versions = []) {
+      if (!Array.isArray(versions) || !versions.length) return null;
+      const copy = [...versions].filter(Boolean);
+      copy.sort((a, b) => {
+        const aDate = a?.createdOn ? new Date(a.createdOn).getTime() : 0;
+        const bDate = b?.createdOn ? new Date(b.createdOn).getTime() : 0;
+        if (aDate !== bDate) return bDate - aDate;
+        const aVersionNum = Number(a?.version);
+        const bVersionNum = Number(b?.version);
+        const aNumValid = Number.isFinite(aVersionNum);
+        const bNumValid = Number.isFinite(bVersionNum);
+        if (aNumValid && bNumValid && aVersionNum !== bVersionNum) {
+          return bVersionNum - aVersionNum;
+        }
+        const aVer = String(a?.version ?? '');
+        const bVer = String(b?.version ?? '');
+        return bVer.localeCompare(aVer, undefined, { numeric: true });
+      });
+      return copy[0] || null;
+    }
+
     function normalizeArtifactContentPayload(payload) {
       if (!payload) return payload;
       let data = payload;
-      if (!Array.isArray(payload?.categories) && typeof payload?.content === 'string') {
-        try {
-          data = JSON.parse(payload.content);
-        } catch (err) {
-          console.warn('[Blockscape] artifact payload contained nested content that could not be parsed', err);
+      const topHasCategories = Array.isArray(payload?.categories);
+      if (!topHasCategories) {
+        const embedded = payload?.content;
+        if (typeof embedded === 'string') {
+          try {
+            data = JSON.parse(embedded);
+          } catch (err) {
+            console.warn('[Blockscape] artifact payload contained string content that could not be parsed', err);
+          }
+        } else if (embedded && typeof embedded === 'object') {
+          data = embedded;
         }
       }
       return data;
@@ -1953,6 +1988,35 @@
         data,
         fingerprint: computeJsonFingerprint(data)
       };
+    }
+
+    async function resolveApicurioCompareVersion(baseUrl, groupId, artifactId) {
+      // Always fetch the current versions list for each push so we compare against the latest.
+      try {
+        const versions = await fetchApicurioArtifactVersions(baseUrl, groupId, artifactId);
+        if (versions?.length) {
+          apicurioArtifactVersions.set(artifactId, versions);
+          const newestEntry = pickLatestVersionEntry(versions);
+          if (newestEntry?.version != null) return newestEntry.version;
+        }
+      } catch (err) {
+        console.warn('[Blockscape] compare-version: unable to fetch versions list', err);
+      }
+      // Fall back to artifact metadata if it contains a version.
+      try {
+        const meta = await fetchApicurioArtifactMetadata(baseUrl, groupId, artifactId);
+        if (meta?.version != null) return meta.version;
+      } catch (err) {
+        console.warn('[Blockscape] compare-version: unable to fetch metadata', err);
+      }
+      // Fall back to cached versions if we have them.
+      const cached = apicurioArtifactVersions.get(artifactId);
+      if (cached && cached.length) {
+        const newestCached = pickLatestVersionEntry(cached);
+        if (newestCached?.version != null) return newestCached.version;
+      }
+      // Final fallback
+      return 'latest';
     }
 
     function bindApicurioElements(scope = document) {
@@ -2317,18 +2381,30 @@
         const localFingerprint = computeJsonFingerprint(models[activeIndex].data);
         if (exists) {
           try {
-            const { fingerprint: registryFingerprint } = await fetchApicurioArtifactFingerprint(baseUrl, groupId, artifactId, 'latest');
+            const compareVersion = await resolveApicurioCompareVersion(baseUrl, groupId, artifactId);
+            const { data: registryData, fingerprint: registryFingerprint } = await fetchApicurioArtifactFingerprint(baseUrl, groupId, artifactId, compareVersion);
+            console.group('[Blockscape] Apicurio push compare');
+            console.log('compare version', compareVersion);
+            console.log('local fingerprint', localFingerprint);
+            console.log('registry fingerprint', registryFingerprint);
+            console.log('local payload', models[activeIndex].data);
+            console.log('registry payload', registryData);
+            console.groupEnd();
             if (localFingerprint && registryFingerprint && localFingerprint === registryFingerprint) {
               const proceed = window.confirm('The current registry version is identical to this model. Push anyway?');
               if (!proceed) {
                 setApicurioStatus('Push cancelled (content matches the latest registry version).', 'muted');
                 return;
               }
+              setApicurioStatus('Pushing identical content by user choice.', 'muted');
             } else if (!registryFingerprint) {
               setApicurioStatus('Unable to compare with registry content (skipping confirmation).', 'muted');
+            } else {
+              console.log('[Blockscape] Apicurio compare mismatch (proceeding with push)');
             }
           } catch (compareError) {
             console.warn('[Blockscape] unable to compare registry content before push', compareError);
+            setApicurioStatus('Skipped comparison with registry (content fetch failed). Proceeding with push.', 'muted');
           }
         }
         const targetVersion = apicurioConfig.useSemver
