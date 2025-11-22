@@ -689,6 +689,53 @@
       gap: var(--space-2xs);
     }
 
+    .version-nav {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      padding: var(--space-sm) var(--space-md);
+      margin-bottom: var(--space-md);
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      box-shadow: var(--color-shadow);
+      flex-wrap: wrap;
+    }
+
+    .version-nav__title {
+      font-weight: var(--font-weight-semibold);
+      color: var(--color-text);
+    }
+
+    .version-nav__status {
+      font-size: var(--font-size-xs);
+      color: var(--color-muted);
+    }
+
+    .version-nav__controls {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2xs);
+      margin-left: auto;
+    }
+
+    .version-nav__button {
+      border: 1px solid var(--color-border);
+      background: var(--color-surface-muted);
+      color: var(--color-text);
+      font-size: var(--font-size-xs);
+      padding: var(--space-2xs) var(--space-sm);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+    }
+
+    .version-nav__button:hover,
+    .version-nav__button:focus-visible {
+      background: var(--color-primary-soft);
+      border-color: var(--color-primary);
+      outline: none;
+    }
+
     .blockscape-model-title {
       font-size: var(--font-size-lg);
       font-weight: var(--font-weight-semibold);
@@ -1524,6 +1571,36 @@
         .replace(/^-|-$/g, '') || 'blockscape';
     }
 
+    function stableStringify(value) {
+      if (value === null || typeof value !== 'object') return JSON.stringify(value);
+      if (Array.isArray(value)) return `[${value.map(v => stableStringify(v)).join(',')}]`;
+      const keys = Object.keys(value).sort();
+      const parts = keys.map(k => `${JSON.stringify(k)}:${stableStringify(value[k])}`);
+      return `{${parts.join(',')}}`;
+    }
+
+    function canonicalizeJson(value) {
+      try {
+        return stableStringify(value);
+      } catch {
+        return '';
+      }
+    }
+
+    function computeJsonFingerprint(input) {
+      try {
+        const value = typeof input === 'string' ? JSON.parse(input) : input;
+        return canonicalizeJson(value) || '';
+      } catch (err) {
+        try {
+          return canonicalizeJson(JSON.parse(JSON.stringify(input))) || '';
+        } catch {
+          console.warn('[Blockscape] fingerprint failed for value', err);
+          return '';
+        }
+      }
+    }
+
     function ensureModelMetadata(data, { titleHint = 'Untitled Model', idHint } = {}) {
       if (!data || typeof data !== 'object') return data;
       const trimmedTitle = (data.title ?? '').toString().trim();
@@ -1734,6 +1811,13 @@
         btn.textContent = labelParts.join(' — ');
         panel.appendChild(btn);
       });
+      const loadAllBtn = document.createElement('button');
+      loadAllBtn.type = 'button';
+      loadAllBtn.className = 'apicurio-version-button';
+      loadAllBtn.dataset.artifactId = artifactId;
+      loadAllBtn.dataset.artifactLoadAll = 'true';
+      loadAllBtn.textContent = `Load all (${versions.length})`;
+      panel.appendChild(loadAllBtn);
     }
 
     async function toggleArtifactVersions(artifactId) {
@@ -1822,6 +1906,55 @@
       return [];
     }
 
+    function normalizeArtifactContentPayload(payload) {
+      if (!payload) return payload;
+      let data = payload;
+      if (!Array.isArray(payload?.categories) && typeof payload?.content === 'string') {
+        try {
+          data = JSON.parse(payload.content);
+        } catch (err) {
+          console.warn('[Blockscape] artifact payload contained nested content that could not be parsed', err);
+        }
+      }
+      return data;
+    }
+
+    async function fetchApicurioArtifactContent(baseUrl, groupId, artifactId, versionSegment = 'latest') {
+      const encodedGroup = encodeURIComponent(groupId);
+      const encodedId = encodeURIComponent(artifactId);
+      const encodedVersion = encodeURIComponent(versionSegment || 'latest');
+      const contentEndpoint = `${baseUrl}/groups/${encodedGroup}/artifacts/${encodedId}/versions/${encodedVersion}/content`;
+      const headers = buildApicurioHeaders();
+      headers['Accept'] = 'application/json, application/*+json, */*;q=0.8';
+      const resp = await fetch(contentEndpoint, { method: 'GET', headers });
+      if (!resp.ok) {
+        let detail = resp.statusText || 'Unknown error';
+        try {
+          const text = await resp.text();
+          if (text) detail = text.slice(0, 400);
+        } catch {
+          // ignore
+        }
+        throw new Error(`Failed to load artifact content (${resp.status}): ${detail}`);
+      }
+      const text = await resp.text();
+      let data = null;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        throw new Error('Artifact content is not valid JSON.');
+      }
+      return normalizeArtifactContentPayload(data);
+    }
+
+    async function fetchApicurioArtifactFingerprint(baseUrl, groupId, artifactId, versionSegment = 'latest') {
+      const data = await fetchApicurioArtifactContent(baseUrl, groupId, artifactId, versionSegment);
+      return {
+        data,
+        fingerprint: computeJsonFingerprint(data)
+      };
+    }
+
     function bindApicurioElements(scope = document) {
       pushApicurioButton = scope.querySelector('#pushApicurio') || document.getElementById('pushApicurio');
       apicurioListButton = scope.querySelector('#listApicurioArtifacts') || document.getElementById('listApicurioArtifacts');
@@ -1862,6 +1995,15 @@
             const version = versionButton.dataset.artifactVersion;
             if (artifactId && version) {
               loadApicurioArtifact(artifactId, version);
+            }
+            return;
+          }
+          const loadAllButton = event.target.closest('[data-artifact-load-all]');
+          if (loadAllButton) {
+            event.stopPropagation();
+            const artifactId = loadAllButton.dataset.artifactId;
+            if (artifactId) {
+              loadAllApicurioArtifactVersions(artifactId);
             }
             return;
           }
@@ -2122,9 +2264,21 @@
         throw new Error(`Registry responded with status ${resp.status} while checking the artifact.`);
       } catch (err) {
         if (err instanceof TypeError) {
-          throw new Error('Network error while contacting Apicurio registry.');
+        throw new Error('Network error while contacting Apicurio registry.');
         }
         throw err;
+      }
+    }
+
+    function upsertModelEntryForArtifact(artifactId, entry) {
+      const existingIndex = models.findIndex(m => m.apicurioArtifactId === artifactId);
+      if (existingIndex !== -1) {
+        const preservedId = models[existingIndex].id;
+        models[existingIndex] = { ...entry, id: preservedId || entry.id };
+        setActive(existingIndex);
+      } else {
+        models.push(entry);
+        setActive(models.length - 1);
       }
     }
 
@@ -2160,6 +2314,23 @@
 
       try {
         const exists = await apicurioArtifactExists(baseUrl, groupId, artifactId, headers);
+        const localFingerprint = computeJsonFingerprint(models[activeIndex].data);
+        if (exists) {
+          try {
+            const { fingerprint: registryFingerprint } = await fetchApicurioArtifactFingerprint(baseUrl, groupId, artifactId, 'latest');
+            if (localFingerprint && registryFingerprint && localFingerprint === registryFingerprint) {
+              const proceed = window.confirm('The current registry version is identical to this model. Push anyway?');
+              if (!proceed) {
+                setApicurioStatus('Push cancelled (content matches the latest registry version).', 'muted');
+                return;
+              }
+            } else if (!registryFingerprint) {
+              setApicurioStatus('Unable to compare with registry content (skipping confirmation).', 'muted');
+            }
+          } catch (compareError) {
+            console.warn('[Blockscape] unable to compare registry content before push', compareError);
+          }
+        }
         const targetVersion = apicurioConfig.useSemver
           ? await resolveApicurioSemverTarget(baseUrl, groupId, artifactId, exists)
           : null;
@@ -2292,8 +2463,6 @@
       }
       const baseUrl = sanitizeApicurioBaseUrl(apicurioConfig.baseUrl);
       const groupId = apicurioConfig.groupId.trim();
-      const encodedGroup = encodeURIComponent(groupId);
-      const encodedId = encodeURIComponent(artifactId);
       let meta = apicurioArtifactsById.get(artifactId);
       const ensureMetadata = async () => {
         try {
@@ -2315,9 +2484,12 @@
           return;
         }
       }
+      const knownVersions = apicurioArtifactVersions.get(artifactId) || [];
       let versionSegment = 'latest';
+      let versionLabel = 'latest';
       if (explicitVersion) {
-        versionSegment = encodeURIComponent(explicitVersion);
+        versionSegment = explicitVersion;
+        versionLabel = explicitVersion;
       } else {
         if (!meta || meta.version == null) {
           try {
@@ -2327,53 +2499,103 @@
             return;
           }
         }
-        versionSegment = meta?.version ? encodeURIComponent(meta.version) : 'latest';
+        versionSegment = meta?.version || 'latest';
+        versionLabel = meta?.version || 'latest';
       }
-      const contentEndpoint = `${baseUrl}/groups/${encodedGroup}/artifacts/${encodedId}/versions/${versionSegment}/content`;
+      const matchedVersion = knownVersions.find((v) => String(v.version) === String(versionSegment));
+      if (matchedVersion?.version != null) {
+        versionLabel = matchedVersion.version;
+      }
       setApicurioStatus(`Loading artifact ${artifactId}…`, 'muted');
       try {
-        const headers = buildApicurioHeaders();
-        headers['Accept'] = 'application/json, application/*+json, */*;q=0.8';
-        const resp = await fetch(contentEndpoint, { method: 'GET', headers });
-        if (!resp.ok) {
-          let detail = resp.statusText || 'Unknown error';
-          try {
-            const text = await resp.text();
-            if (text) detail = text.slice(0, 400);
-          } catch {
-            // ignore
-          }
-          throw new Error(`Failed to load artifact content (${resp.status}): ${detail}`);
-        }
-        const text = await resp.text();
-        let data = null;
-        try {
-          data = JSON.parse(text);
-        } catch {
-          throw new Error('Artifact content is not valid JSON.');
-        }
-        if (!Array.isArray(data?.categories) && typeof data?.content === 'string') {
-          try {
-            data = JSON.parse(data.content);
-          } catch (innerErr) {
-            console.warn('[Blockscape] artifact payload contained nested content that could not be parsed', innerErr);
-          }
-        }
+        const data = await fetchApicurioArtifactContent(baseUrl, groupId, artifactId, versionSegment);
         const resolvedMeta = apicurioArtifactsById.get(artifactId) || meta || {};
         ensureModelMetadata(data, { titleHint: resolvedMeta.name || artifactId, idHint: artifactId });
+        const versionEntry = {
+          version: versionLabel,
+          data,
+          createdOn: matchedVersion?.createdOn || resolvedMeta.createdOn
+        };
         const entry = {
           id: uid(),
           title: data.title || resolvedMeta.name || artifactId,
-          data
+          data,
+          apicurioArtifactId: artifactId,
+          apicurioArtifactName: resolvedMeta.name || '',
+          apicurioVersions: [versionEntry],
+          apicurioActiveVersionIndex: 0
         };
-        models.push(entry);
-        setActive(models.length - 1);
-        const suffix = explicitVersion ? ` (version ${explicitVersion})` : (meta?.version ? ` (version ${meta.version})` : '');
+        upsertModelEntryForArtifact(artifactId, entry);
+        const suffix = versionLabel ? ` (version ${versionLabel})` : '';
         setApicurioStatus(`Loaded artifact ${artifactId}${suffix}.`, 'success');
       } catch (err) {
         console.error('[Blockscape] failed to load artifact', err);
         setApicurioStatus(`Failed to load artifact: ${err.message}`, 'error');
       }
+    }
+
+    async function loadAllApicurioArtifactVersions(artifactId) {
+      if (!artifactId) return;
+      if (!isApicurioEnabled()) {
+        setApicurioStatus('Enable Apicurio integration to load artifacts.', 'error');
+        return;
+      }
+      if (!hasApicurioDetails()) {
+        setApicurioStatus('Enter registry connection details before loading artifacts.', 'error');
+        return;
+      }
+      const baseUrl = sanitizeApicurioBaseUrl(apicurioConfig.baseUrl);
+      const groupId = apicurioConfig.groupId.trim();
+      let versions = apicurioArtifactVersions.get(artifactId);
+      if (!versions) {
+        setVersionPanelMessage(getApicurioVersionPanel(artifactId), 'Loading versions…');
+        try {
+          versions = await fetchApicurioArtifactVersions(baseUrl, groupId, artifactId);
+          apicurioArtifactVersions.set(artifactId, versions);
+        } catch (err) {
+          setApicurioStatus(`Failed to fetch versions: ${err.message}`, 'error');
+          return;
+        }
+      }
+      const normalized = (versions || []).filter(v => v && v.version != null);
+      if (!normalized.length) {
+        setApicurioStatus('No versions found for this artifact.', 'muted');
+        return;
+      }
+      setApicurioStatus(`Loading ${normalized.length} version(s) for ${artifactId}…`, 'muted');
+      const resolvedMeta = apicurioArtifactsById.get(artifactId) || {};
+      const versionEntries = [];
+      try {
+        for (const ver of normalized) {
+          const label = ver.version ?? 'latest';
+          const content = await fetchApicurioArtifactContent(baseUrl, groupId, artifactId, label);
+          ensureModelMetadata(content, { titleHint: resolvedMeta.name || artifactId, idHint: artifactId });
+          versionEntries.push({
+            version: label,
+            createdOn: ver.createdOn,
+            data: content
+          });
+        }
+      } catch (err) {
+        console.error('[Blockscape] failed to load one or more versions', err);
+        setApicurioStatus(`Failed to load all versions: ${err.message}`, 'error');
+        return;
+      }
+      if (!versionEntries.length) {
+        setApicurioStatus('No versions loaded from registry.', 'error');
+        return;
+      }
+      const entry = {
+        id: uid(),
+        title: versionEntries[0].data.title || resolvedMeta.name || artifactId,
+        data: versionEntries[0].data,
+        apicurioArtifactId: artifactId,
+        apicurioArtifactName: resolvedMeta.name || '',
+        apicurioVersions: versionEntries,
+        apicurioActiveVersionIndex: 0
+      };
+      upsertModelEntryForArtifact(artifactId, entry);
+      setApicurioStatus(`Loaded ${versionEntries.length} version(s) for ${artifactId}.`, 'success');
     }
 
     function syncDocumentTitle() {
@@ -2504,7 +2726,10 @@
 
         const meta = document.createElement('span');
         meta.className = 'model-nav-meta';
-        meta.textContent = `${categories.length} cat · ${itemsCount} items`;
+        const versionsInfo = (m.apicurioVersions && m.apicurioVersions.length > 1)
+          ? ` · ${m.apicurioVersions.length} versions`
+          : '';
+        meta.textContent = `${categories.length} cat · ${itemsCount} items${versionsInfo}`;
 
         btn.appendChild(label);
         btn.appendChild(meta);
@@ -2783,6 +3008,82 @@
       return canvas.toDataURL('image/png');
     }
 
+    function getActiveApicurioVersionIndex(entry) {
+      if (!entry?.apicurioVersions?.length) return -1;
+      const idx = Number.isInteger(entry.apicurioActiveVersionIndex) ? entry.apicurioActiveVersionIndex : 0;
+      return Math.min(Math.max(idx, 0), entry.apicurioVersions.length - 1);
+    }
+
+    function getActiveApicurioVersionLabel(entry) {
+      const idx = getActiveApicurioVersionIndex(entry);
+      if (idx === -1) return null;
+      const versionEntry = entry.apicurioVersions[idx];
+      return versionEntry?.version ?? null;
+    }
+
+    function setActiveApicurioVersion(entryIndex, versionIndex) {
+      if (entryIndex < 0 || entryIndex >= models.length) return false;
+      const entry = models[entryIndex];
+      if (!entry?.apicurioVersions?.length) return false;
+      const count = entry.apicurioVersions.length;
+      const normalized = ((versionIndex % count) + count) % count;
+      const target = entry.apicurioVersions[normalized];
+      if (!target?.data) return false;
+      entry.apicurioActiveVersionIndex = normalized;
+      entry.data = target.data;
+      selection = null;
+      loadActiveIntoEditor();
+      rebuildFromActive();
+      return true;
+    }
+
+    function stepApicurioVersion(step) {
+      if (!step || activeIndex < 0) return;
+      const entry = models[activeIndex];
+      if (!entry?.apicurioVersions?.length) return;
+      const current = getActiveApicurioVersionIndex(entry);
+      if (current === -1) return;
+      setActiveApicurioVersion(activeIndex, current + step);
+    }
+
+    function renderVersionNavigator(entry) {
+      if (!entry?.apicurioVersions || entry.apicurioVersions.length <= 1) return null;
+      const nav = document.createElement('div');
+      nav.className = 'version-nav';
+
+      const title = document.createElement('div');
+      title.className = 'version-nav__title';
+      title.textContent = entry.apicurioArtifactName || entry.apicurioArtifactId || getModelId(entry) || 'Artifact';
+      nav.appendChild(title);
+
+      const status = document.createElement('div');
+      status.className = 'version-nav__status';
+      const activeIdx = getActiveApicurioVersionIndex(entry);
+      const activeVersionLabel = getActiveApicurioVersionLabel(entry) || 'latest';
+      status.textContent = `Version ${activeVersionLabel} (${activeIdx + 1} of ${entry.apicurioVersions.length})`;
+      nav.appendChild(status);
+
+      const controls = document.createElement('div');
+      controls.className = 'version-nav__controls';
+      const prevBtn = document.createElement('button');
+      prevBtn.type = 'button';
+      prevBtn.className = 'version-nav__button';
+      prevBtn.textContent = 'Previous';
+      prevBtn.addEventListener('click', () => stepApicurioVersion(-1));
+
+      const nextBtn = document.createElement('button');
+      nextBtn.type = 'button';
+      nextBtn.className = 'version-nav__button';
+      nextBtn.textContent = 'Next';
+      nextBtn.addEventListener('click', () => stepApicurioVersion(1));
+
+      controls.appendChild(prevBtn);
+      controls.appendChild(nextBtn);
+      nav.appendChild(controls);
+
+      return nav;
+    }
+
     // ===== Render =====
     function render() {
       if (!model) return;
@@ -2795,6 +3096,11 @@
       app.innerHTML = "";
       index.clear();
 
+      const versionNav = renderVersionNavigator(models[activeIndex]);
+      if (versionNav) {
+        app.appendChild(versionNav);
+      }
+
       overlay.setAttribute("width", window.innerWidth);
       overlay.setAttribute("height", window.innerHeight);
 
@@ -2806,12 +3112,19 @@
       titleEl.textContent = (model.m.title && model.m.title.trim()) || getModelTitle(models[activeIndex]);
       meta.appendChild(titleEl);
 
+      const activeVersionLabel = getActiveApicurioVersionLabel(models[activeIndex]);
       const normalizedId = (model.m.id ?? '').toString().trim();
       if (normalizedId) {
         const idEl = document.createElement('div');
         idEl.className = 'blockscape-model-id';
         idEl.textContent = `ID: ${normalizedId}`;
         meta.appendChild(idEl);
+      }
+      if (activeVersionLabel) {
+        const versionEl = document.createElement('div');
+        versionEl.className = 'blockscape-model-id';
+        versionEl.textContent = `Version: ${activeVersionLabel}`;
+        meta.appendChild(versionEl);
       }
 
       app.appendChild(meta);
