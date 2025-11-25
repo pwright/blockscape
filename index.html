@@ -1391,6 +1391,12 @@
     </div>
   </div>
 
+  <script type="module">
+    // Load TOON library dynamically and make it available globally
+    import { encode, decode } from 'https://cdn.jsdelivr.net/npm/@toon-format/toon@2.0.0/dist/index.mjs';
+    window.toonFormat = { encode, decode };
+    console.log('[Blockscape] TOON library loaded');
+  </script>
   <script>
     console.log("[Blockscape] init");
 
@@ -2522,6 +2528,91 @@
 
     function tryParseJson(txt) { try { return JSON.parse(txt); } catch { return null; } }
 
+    // Helper function to get TOON library functions
+    function getToonLibrary() {
+      // The library is loaded via ES module and exposed on window.toonFormat
+      if (window.toonFormat && typeof window.toonFormat.encode === 'function' && typeof window.toonFormat.decode === 'function') {
+        return window.toonFormat;
+      }
+      return null;
+    }
+
+    // Normalize data structure to ensure uniform arrays for better TOON tabular format
+    // Converts arrays (like deps) to comma-separated strings for tabular format
+    function normalizeForToon(data) {
+      if (!data || typeof data !== 'object') return data;
+      
+      // Deep clone to avoid mutating original
+      const normalized = JSON.parse(JSON.stringify(data));
+      
+      // Normalize categories array to ensure uniform items
+      if (Array.isArray(normalized.categories)) {
+        normalized.categories.forEach(category => {
+          if (Array.isArray(category.items) && category.items.length > 0) {
+            // Find all possible fields across all items
+            const allFields = new Set();
+            category.items.forEach(item => {
+              Object.keys(item).forEach(key => allFields.add(key));
+            });
+            
+            // Ensure all items have all fields in the same order
+            const fieldList = Array.from(allFields).sort(); // Sort for consistency
+            category.items.forEach(item => {
+              fieldList.forEach(field => {
+                if (!(field in item)) {
+                  // Use empty string for missing fields (TOON tabular format needs primitives)
+                  item[field] = '';
+                }
+                // Convert arrays to comma-separated strings for tabular format
+                if (Array.isArray(item[field])) {
+                  item[field] = item[field].join(',');
+                }
+                // Ensure all values are primitives (string, number, boolean, or empty string)
+                if (item[field] !== null && typeof item[field] === 'object') {
+                  item[field] = '';
+                }
+              });
+            });
+          }
+        });
+      }
+      
+      return normalized;
+    }
+
+    // Denormalize TOON data back to original structure (convert comma-separated strings back to arrays)
+    function denormalizeFromToon(data) {
+      if (!data || typeof data !== 'object') return data;
+      
+      // Deep clone
+      const denormalized = JSON.parse(JSON.stringify(data));
+      
+      // Restore arrays from comma-separated strings
+      if (Array.isArray(denormalized.categories)) {
+        denormalized.categories.forEach(category => {
+          if (Array.isArray(category.items)) {
+            category.items.forEach(item => {
+              // Convert deps back to array if it's a string
+              if (item.deps && typeof item.deps === 'string') {
+                item.deps = item.deps ? item.deps.split(',').map(s => s.trim()).filter(Boolean) : [];
+              }
+              // Remove empty string fields that were added for normalization
+              Object.keys(item).forEach(key => {
+                if (item[key] === '' && key !== 'deps') {
+                  // Only remove if it's an optional field (not id, name, or deps)
+                  if (!['id', 'name'].includes(key)) {
+                    delete item[key];
+                  }
+                }
+              });
+            });
+          }
+        });
+      }
+      
+      return denormalized;
+    }
+
     // Accept 1) object, 2) array-of-objects, 3) '---' or '%%%' separated objects
     function normalizeToModelsFromText(txt, titleBase = "Pasted") {
       const trimmed = (txt || "").trim();
@@ -2830,6 +2921,7 @@
       const mapPanel = document.createElement('div');
       const abstractPanel = document.createElement('div');
       const sourcePanel = document.createElement('div');
+      const toonPanel = document.createElement('div');
       const apicurioPanel = document.createElement('div');
       let infoTooltipHtml = '';
 
@@ -2837,6 +2929,7 @@
         { id: 'map', label: 'Map', panel: mapPanel },
         { id: 'abstract', label: 'Info', panel: abstractPanel },
         { id: 'source', label: 'Source', panel: sourcePanel },
+        { id: 'toon', label: 'TOON', panel: toonPanel },
         { id: 'apicurio', label: 'Apicurio', panel: apicurioPanel }
       ];
 
@@ -2873,7 +2966,67 @@
         panelsWrapper.appendChild(tab.panel);
       });
 
+      let currentTabId = tabDefs[0].id;
       const activateTab = (targetId) => {
+        const previousTabId = currentTabId;
+        
+        // Handle conversion when switching to/from toon tab
+        const toonBox = document.getElementById('toonBox');
+        
+        if (previousTabId === 'source' && targetId === 'toon') {
+          // Converting from JSON to TOON when entering TOON tab
+          try {
+            const jsonText = jsonBox.value || '';
+            if (jsonText.trim()) {
+              const jsonData = JSON.parse(jsonText);
+              // Normalize data to ensure uniform arrays for better TOON tabular format
+              const normalizedData = normalizeForToon(jsonData);
+              const toonLib = getToonLibrary();
+              
+              if (toonLib && toonLib.encode) {
+                const toonText = toonLib.encode(normalizedData);
+                if (toonBox) toonBox.value = toonText;
+              } else {
+                console.error('[Blockscape] TOON library not loaded or encode function not found');
+                console.log('[Blockscape] Available globals:', Object.keys(window).filter(k => k.toLowerCase().includes('toon')));
+                // Log all window properties for debugging
+                console.log('[Blockscape] Checking window properties:', Object.keys(window).slice(0, 50));
+                if (toonBox) toonBox.value = 'Error: TOON library not available. Please refresh the page.';
+              }
+            } else {
+              if (toonBox) toonBox.value = '';
+            }
+          } catch (err) {
+            console.error('[Blockscape] JSON to TOON conversion error:', err);
+            if (toonBox) toonBox.value = `Error: ${err.message}`;
+          }
+        } else if (previousTabId === 'toon' && targetId !== 'toon') {
+          // Converting from TOON to JSON when leaving TOON tab (to any other tab)
+          try {
+            const toonText = toonBox ? toonBox.value || '' : '';
+            if (toonText.trim() && !toonText.startsWith('Error:')) {
+              const toonLib = getToonLibrary();
+              
+              if (toonLib && toonLib.decode) {
+                const jsonData = toonLib.decode(toonText);
+                // Denormalize: convert comma-separated strings back to arrays
+                const denormalizedData = denormalizeFromToon(jsonData);
+                jsonBox.value = JSON.stringify(denormalizedData, null, 2);
+              } else {
+                console.error('[Blockscape] TOON library not loaded or decode function not found');
+                console.log('[Blockscape] Available globals:', Object.keys(window).filter(k => k.toLowerCase().includes('toon')));
+                // Don't overwrite jsonBox with error if library not available
+              }
+            } else if (!toonText.trim()) {
+              jsonBox.value = '';
+            }
+          } catch (err) {
+            console.error('[Blockscape] TOON to JSON conversion error:', err);
+            // Don't overwrite jsonBox with error, just log it
+          }
+        }
+        
+        currentTabId = targetId;
         tabDefs.forEach(t => {
           const isActive = t.id === targetId;
           t.button.classList.toggle('is-active', isActive);
@@ -2938,6 +3091,32 @@
         sourceWrapper.appendChild(missing);
       }
       sourcePanel.appendChild(sourceWrapper);
+
+      // Create TOON panel
+      const toonWrapper = document.createElement('div');
+      toonWrapper.className = 'blockscape-source-panel';
+      const toonPanelContent = document.createElement('div');
+      toonPanelContent.className = 'blockscape-json-panel';
+      toonPanelContent.innerHTML = `
+        <p class="blockscape-json-panel__title">TOON format for the <b>active</b> model</p>
+        <div class="muted">
+          TOON (Token-Oriented Object Notation) is a compact, human-readable format optimized for LLM prompts.
+          It uses YAML-like indentation (no braces) and tabular arrays to reduce token usage by 30-60%.
+          Example: <code>users[2]{id,name,role}:<br/>&nbsp;&nbsp;1,Alice,admin<br/>&nbsp;&nbsp;2,Bob,user</code>
+          Changes are automatically synced with the Source tab.
+        </div>
+        <div class="blockscape-json-controls">
+          <textarea id="toonBox" class="pf-v5-c-form-control"
+            aria-label="TOON editor for the active model"></textarea>
+          <div class="blockscape-json-actions">
+            <button id="copyToon" class="pf-v5-c-button pf-m-tertiary" type="button"
+              title="Copy the current TOON to your clipboard">Copy</button>
+          </div>
+        </div>
+      `;
+      toonWrapper.appendChild(toonPanelContent);
+      toonPanel.appendChild(toonWrapper);
+
       mountApicurioTab(apicurioPanel);
 
       model.m.categories.forEach(cat => {
@@ -3837,6 +4016,25 @@
         }
       });
     }
+
+    // Event delegation for TOON copy button (created dynamically)
+    document.addEventListener('click', async (e) => {
+      if (e.target && e.target.id === 'copyToon') {
+        const toonBox = document.getElementById('toonBox');
+        if (!toonBox) return;
+        const text = toonBox.value || '';
+        if (!text.trim()) {
+          alert('TOON editor is empty.');
+          return;
+        }
+        const copied = await writeTextToClipboard(text);
+        if (copied) {
+          alert('TOON copied to clipboard.');
+        } else {
+          window.prompt('Copy this TOON manually:', text);
+        }
+      }
+    });
 
     if (pasteJsonButton) {
       pasteJsonButton.addEventListener('click', async () => {
