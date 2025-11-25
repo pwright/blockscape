@@ -2823,14 +2823,46 @@
 
     function tryParseJson(txt) { try { return JSON.parse(txt); } catch { return null; } }
 
+    // Collapse multi-doc imports with the same model id into a single entry with version navigation.
+    function collapseEntriesToVersionedModel(entries, { versionPrefix = 'v' } = {}) {
+      if (!Array.isArray(entries) || entries.length < 2) return entries;
+      const ids = entries.map((en) => getModelId(en)).filter(Boolean);
+      if (ids.length !== entries.length) return entries;
+      const uniqueIds = Array.from(new Set(ids));
+      if (uniqueIds.length !== 1) return entries;
+
+      const sharedId = uniqueIds[0];
+      const versions = entries.map((entry, idx) => {
+        const explicitVersion = (entry.data?.version ?? '').toString().trim();
+        return {
+          version: explicitVersion || `${versionPrefix}${idx + 1}`,
+          data: entry.data
+        };
+      });
+      const activeIdx = versions.length - 1;
+      const activeEntry = entries[activeIdx] || entries[0];
+      const activeTitle = getModelTitle(activeEntry, sharedId);
+
+      return [{
+        id: uid(),
+        title: activeTitle,
+        data: versions[activeIdx]?.data || activeEntry.data,
+        apicurioArtifactId: sharedId,
+        apicurioArtifactName: activeTitle,
+        apicurioVersions: versions,
+        apicurioActiveVersionIndex: activeIdx
+      }];
+    }
+
     // Accept 1) object, 2) array-of-objects, 3) '---' or '%%%' separated objects
     function normalizeToModelsFromText(txt, titleBase = "Pasted") {
       const trimmed = (txt || "").trim();
       if (!trimmed) return [];
       const parsed = tryParseJson(trimmed);
+      let entries = [];
       if (parsed) {
         const arr = Array.isArray(parsed) ? parsed : [parsed];
-        return arr.map((o, idx) => {
+        entries = arr.map((o, idx) => {
           ensureModelMetadata(o, { titleHint: `${titleBase} #${idx + 1}` });
           return {
             id: uid(),
@@ -2838,17 +2870,19 @@
             data: o
           };
         });
+      } else {
+        const parts = trimmed.split(/^\s*(?:---|%%%)\s*$/m).map(s => s.trim()).filter(Boolean);
+        entries = parts.map((p, i) => {
+          const obj = JSON.parse(p);
+          ensureModelMetadata(obj, { titleHint: `${titleBase} #${i + 1}` });
+          return {
+            id: uid(),
+            title: obj.title || `${titleBase} #${i + 1}`,
+            data: obj
+          };
+        });
       }
-      const parts = trimmed.split(/^\s*(?:---|%%%)\s*$/m).map(s => s.trim()).filter(Boolean);
-      return parts.map((p, i) => {
-        const obj = JSON.parse(p);
-        ensureModelMetadata(obj, { titleHint: `${titleBase} #${i + 1}` });
-        return {
-          id: uid(),
-          title: obj.title || `${titleBase} #${i + 1}`,
-          data: obj
-        };
-      });
+      return collapseEntriesToVersionedModel(entries);
     }
 
     function isEditableElement(el) {
@@ -3097,6 +3131,15 @@
       return versionEntry?.version ?? null;
     }
 
+    function getModelVersionLabel(entry) {
+      const apicurioVersion = getActiveApicurioVersionLabel(entry);
+      if (apicurioVersion) return apicurioVersion;
+      const rawVersion = entry?.data?.version;
+      if (rawVersion == null) return null;
+      const trimmed = rawVersion.toString().trim();
+      return trimmed || null;
+    }
+
     function setActiveApicurioVersion(entryIndex, versionIndex) {
       if (entryIndex < 0 || entryIndex >= models.length) return false;
       const entry = models[entryIndex];
@@ -3188,7 +3231,7 @@
       titleEl.textContent = (model.m.title && model.m.title.trim()) || getModelTitle(models[activeIndex]);
       meta.appendChild(titleEl);
 
-      const activeVersionLabel = getActiveApicurioVersionLabel(models[activeIndex]);
+      const activeVersionLabel = getModelVersionLabel(models[activeIndex]);
       const normalizedId = (model.m.id ?? '').toString().trim();
       if (normalizedId) {
         const idEl = document.createElement('div');
