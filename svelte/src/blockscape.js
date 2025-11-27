@@ -225,13 +225,13 @@ export function initBlockscape() {
       const target = models[existingIndex];
       if (!Array.isArray(target.apicurioVersions) || !target.apicurioVersions.length) {
         target.apicurioVersions = [{
-          version: target.apicurioVersions?.[0]?.version || 'v1',
+          version: '1',
           data: target.data,
           createdOn: target.apicurioVersions?.[0]?.createdOn
         }];
         target.apicurioActiveVersionIndex = 0;
       }
-      const label = versionLabel || `v${target.apicurioVersions.length + 1}`;
+      const label = String(target.apicurioVersions.length + 1);
       target.apicurioVersions.push({
         version: label,
         data: entry.data,
@@ -1740,7 +1740,7 @@ export function initBlockscape() {
       status.className = 'version-nav__status';
       const activeIdx = getActiveApicurioVersionIndex(entry);
       const activeVersionLabel = getActiveApicurioVersionLabel(entry) || 'latest';
-      status.textContent = `Version ${activeVersionLabel} (${activeIdx + 1} of ${entry.apicurioVersions.length})`;
+      status.textContent = `No. in series ${activeVersionLabel} (${activeIdx + 1} of ${entry.apicurioVersions.length})`;
       nav.appendChild(status);
 
       const controls = document.createElement('div');
@@ -1803,7 +1803,7 @@ export function initBlockscape() {
       if (activeVersionLabel) {
         const versionEl = document.createElement('div');
         versionEl.className = 'blockscape-model-id';
-        versionEl.textContent = `Version: ${activeVersionLabel}`;
+        versionEl.textContent = `No. in series: ${activeVersionLabel}`;
         meta.appendChild(versionEl);
       }
 
@@ -3035,7 +3035,7 @@ export function initBlockscape() {
 
     // Load JSON files from same directory (for static hosting)
     async function loadJsonFiles() {
-      const jsonFiles = ['blockscape.bs', 'planets.bs'];
+      const jsonFiles = ['NFR.bs', 'planets.bs'];
       const joinPath = (name) => {
         if (!ASSET_BASE) return name;
         return ASSET_BASE.endsWith('/') ? `${ASSET_BASE}${name}` : `${ASSET_BASE}/${name}`;
