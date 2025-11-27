@@ -7,11 +7,16 @@ A simple, interactive web application for creating and visualizing landscape-sty
 
 ## Quick Start
 
-1. Open `index.html` in your web browser
-2. Use the [prompt](map-generation-prompt.md) to generate json for your domain.
-3. Open https://pwright.github.io/blockscape/ and paste json (cmd-v or ctrl-v)
+1. Install deps: `npm install`
+2. Run the Svelte app: `npm run dev` then open http://localhost:5173
+3. Use the [prompt](map-generation-prompt.md) to generate json for your domain.
 4. Click tiles to see dependency relationships
 5. Click `Edit` to manually change the currently selected it (or whole map).
+
+To ship a static bundle: `npm run build` then serve the `dist/` folder (`npm run preview` for a local check).
+Legacy `index.html` remains checked in for reference; the Svelte build is now the primary entry.
+
+On startup the app auto-loads `blockscape.bs` and `planets.bs` from the public assets so you have data to explore immediately.
 
 ## Blockscape: mapping the architectural lifecycle, not just the system
 

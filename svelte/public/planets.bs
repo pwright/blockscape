@@ -1,5 +1,5 @@
 {
-"id": "mercury-model",
+"id": "planets",
 "title": "Mercury Exploration Model",
 "abstract": "Value chain for understanding and exploring Mercury.",
 "categories": [
@@ -49,7 +49,7 @@
 }
 %%%
 {
-"id": "venus-model",
+"id": "planets",
 "title": "Venus Exploration Model",
 "abstract": "Value chain for atmospheric and surface study of Venus.",
 "categories": [
@@ -98,7 +98,7 @@
 }
 %%%
 {
-"id": "earth-model",
+"id": "planets",
 "title": "Earth Systems Model",
 "abstract": "Value chain for observing and managing Earth systems.",
 "categories": [
@@ -149,7 +149,7 @@
 }
 %%%
 {
-"id": "mars-model",
+"id": "planets",
 "title": "Mars Exploration Model",
 "abstract": "Value chain for robotic and human exploration of Mars.",
 "categories": [
@@ -201,7 +201,7 @@
 }
 %%%
 {
-"id": "jupiter-model",
+"id": "planets",
 "title": "Jupiter Study Model",
 "abstract": "Value chain for observing Jupiter and its system.",
 "categories": [
@@ -255,7 +255,7 @@
 }
 %%%
 {
-"id": "saturn-model",
+"id": "planets",
 "title": "Saturn Study Model",
 "abstract": "Value chain for examining Saturn and its rings.",
 "categories": [
@@ -308,7 +308,7 @@
 }
 %%%
 {
-"id": "uranus-model",
+"id": "planets",
 "title": "Uranus Study Model",
 "abstract": "Value chain for analyzing Uranus' atmosphere and axial tilt effects.",
 "categories": [
@@ -362,7 +362,7 @@
 }
 %%%
 {
-"id": "neptune-model",
+"id": "planets",
 "title": "Neptune Study Model",
 "abstract": "Value chain for distant observation of Neptune.",
 "categories": [
