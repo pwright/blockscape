@@ -2,63 +2,142 @@
   import { onMount } from 'svelte';
   import { initBlockscape } from './blockscape';
 
-  const seedText = `{
+  const seedText = `
+  {
   "id": "blockscape",
   "title": "Blockscape (AI maps)",
-  "abstract": "Blockscape (pronounced BYK-shed) visualizes value chains and dependencies using a BS file. Inspired by Wardley maps, these maps emphasizes the Communication layer that makes maps comprehensible, alongside concrete user experiences, authoring & LLM flows, presentation semantics, and the platform services that enable them.",
+  "abstract": "Blockscape (pronounced BYK-shed) visualizes value chains and dependencies using a BS file. Inspired by Wardley maps, these maps emphasizes the topology that makes maps useful.",
   "categories": [
     {
       "id": "communication",
       "title": "Communication",
       "items": [
-        { "id": "gestalt", "name": "Visual schema", "deps": [] },
-        { "id": "value-chain", "name": "Value chain (y-axis)", "deps": [] },
-        { "id": "spacial-memory", "name": "Spacial memory", "deps": [] },
-        { "id": "evolution", "name": "Evolution (x-axis)", "deps": [] },
-        { "id": "legend-literacy", "name": "Legend literacy", "deps": [] },
-        { "id": "relational-awareness", "name": "Relational awareness", "deps": [] },
-        { "id": "icons", "name": "Iconography", "deps": [] }
+        {
+          "id": "gestalt",
+          "name": "Visualise to understand",
+          "deps": []
+        },
+        {
+          "id": "value-chain",
+          "name": "Visible value chain (y-axis)",
+          "deps": []
+        },
+        {
+          "id": "evolution",
+          "name": "Evolution and maturity (x-axis)",
+          "deps": []
+        },
+        {
+          "id": "relational-awareness",
+          "name": "Relations",
+          "deps": []
+        },
+        {
+          "id": "icons",
+          "name": "Icons",
+          "deps": []
+        }
       ]
     },
     {
       "id": "experience",
       "title": "User Experience",
       "items": [
-        { "id": "paste-bs-file", "name": "Paste BS File", "deps": ["bs-parser", "schema-validator"] },
-        { "id": "load-multidoc-file", "name": "Load Multi-Document File", "deps": ["multidoc-assembler", "bs-parser", "schema-validator"] },
-        { "id": "load-multidoc-from-url", "name": "Load Multi-Document from URL", "deps": ["url-fetcher", "multidoc-assembler", "bs-parser", "schema-validator"] },
-        { "id": "create-gist-multidoc", "name": "Create Header+Detail in Gist", "deps": ["gist-integration", "multidoc-assembler", "schema-validator"] },
-        { "id": "abstract-gist-loading", "name": "Abstract Supports Gist Loading", "deps": ["gist-integration", "bs-parser", "schema-validator"] }
+        {
+          "id": "paste-bs-file",
+          "name": "Paste (cmd-v)",
+          "deps": [
+            "bs-format-simple"
+          ]
+        },
+        {
+          "id": "load-multidoc-file",
+          "name": "Series",
+          "deps": [
+            "bs-format-simple"
+          ]
+        },
+        {
+          "id": "create-gist-multidoc",
+          "name": "Gist",
+          "deps": [
+            "gists",
+            "bs-format-simple"
+          ]
+        },
+        {
+          "id": "abstract-gist-loading",
+          "name": "Links",
+          "deps": [
+            "gists",
+            "bs-format-simple"
+          ]
+        },
+        {
+          "id": "model-collection",
+          "name": "Portfolio",
+          "deps": [
+            "apicurio",
+            "bs-format-simple"
+          ]
+        }
       ]
     },
     {
       "id": "authoring-ai",
-      "title": "Authoring and LLM",
+      "title": "Authoring (LLM)",
       "items": [
-        { "id": "bs-format-simple", "name": "BS format is simple", "deps": [] },
-        { "id": "editor-human-terms", "name": "Editor (human terms)", "deps": ["gestalt"] },
-        { "id": "llm-generate-bs", "name": "LLM generates BS", "deps": ["schema-validator"], "external": "https://github.com/pwright/blockscape/blob/main/map-generation-prompt.md" },
-        { "id": "llm-consume-bs", "name": "LLM consumes BS", "deps": ["bs-parser"] }
+        {
+          "id": "bs-format-simple",
+          "name": "BS Schema",
+          "deps": []
+        },
+        {
+          "id": "editor-human-terms",
+          "name": "Edit",
+          "deps": [
+            "bs-format-simple",
+            "gestalt"
+          ]
+        },
+        {
+          "id": "llm-generate-bs",
+          "name": "LLM generates BS",
+          "external": "https://github.com/pwright/blockscape/blob/main/map-generation-prompt.md",
+          "deps": [
+            "bs-format-simple"
+          ]
+        },
+        {
+          "id": "llm-consume-bs",
+          "name": "LLM consumes BS",
+          "deps": [
+            "bs-format-simple"
+          ]
+        },
+        {
+          "id": "move-items",
+          "name": "Move (shift - arrow keys)",
+          "deps": []
+        }
       ]
     },
     {
-      "id": "presentation",
-      "title": "Presentation Semantics",
+      "id": "platforms",
+      "title": "Platforms",
       "items": [
-        { "id": "layout_engine", "name": "Layout Engine", "deps": ["bs-parser", "gestalt", "icons"] },
-        { "id": "value_visibility_axis", "name": "Vertical Position = Visible Value", "deps": ["spacial-memory", "legend-literacy", "value-chain"] },
-        { "id": "evolution_axis", "name": "Horizontal Evolution (Optional)", "deps": ["legend-literacy", "evolution"] }
-      ]
-    },
-    {
-      "id": "platform",
-      "title": "Platform Services",
-      "items": [
-        { "id": "bs-parser", "name": "BS Parser", "deps": [] },
-        { "id": "multidoc-assembler", "name": "Multi-Doc Assembler", "deps": [] },
-        { "id": "gist-integration", "name": "Gist Integration", "deps": [] },
-        { "id": "url-fetcher", "name": "URL Fetcher", "deps": [] },
-        { "id": "schema-validator", "name": "Schema Validator", "deps": [] }
+        {
+          "id": "gists",
+          "name": "Gist",
+          "logo": "https://favicon.im/github.com",
+          "deps": []
+        },
+        {
+          "id": "apicurio",
+          "name": "Apicurio",
+          "logo": "https://www.google.com/s2/favicons?domain=apicur.io&sz=96",
+          "deps": []
+        }
       ]
     }
   ]
