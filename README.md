@@ -11,7 +11,7 @@ A simple, interactive web application for creating and visualizing landscape-sty
 2. Run the Svelte app: `npm run dev` then open http://localhost:5173
 3. Use the [prompt](map-generation-prompt.md) to generate json for your domain.
 4. Click tiles to see dependency relationships
-5. Click `Edit` to manually change the currently selected it (or whole map).
+5. Click `Edit` to manually change the currently selected tile (or whole map).
 
 To ship a static bundle: `npm run build` then serve the `dist/` folder (`npm run preview` for a local check).
 Legacy `index.html` remains checked in for reference; the Svelte build is now the primary entry.
@@ -213,7 +213,10 @@ NOTE: This process creates new tabs in your browser.
 
 ## Development
 
-This is a client-side only application with no build process required. Simply open `index.html` in a web browser to run the application.
+- Primary app lives in `svelte/` (Vite + Svelte). Run `npm run dev` for the dev server on http://localhost:5173.
+- Production bundle: `npm run build` (writes `dist/`). `npm run preview` uses Vite’s preview server; `npm run serve` serves the built assets via `http-server`.
+- The JSON editor (`editor.html`) ships from `svelte/public/` and is copied into `dist/` during the build, so the `Edit` button works in both dev and production.
+- Static legacy `index.html` remains for reference only; all active work should target the Svelte app.
 
 ### Adding New Logos
 

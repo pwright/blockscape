@@ -5,7 +5,7 @@ This project ships with two Cypress specs that cover the main entry points:
 - `index.html` (visual model browser) → `cypress/e2e/model-preview.cy.js`
 - `editor.html` (JSON editor) → `cypress/e2e/editor-workflow.cy.js`
 
-Both specs run against the static files served locally.
+Both specs run against the built static files under `dist/`.
 
 ## 1. Install Dependencies
 
@@ -16,10 +16,10 @@ npm install
 ## 2. Serve the App
 
 ```bash
-npm run serve
+npm run build && npm run serve
 ```
 
-This uses Vite’s preview server and aligns with the `baseUrl` configured in `cypress.config.js` (`http://localhost:4173`). Leave the server running while executing tests.
+This builds the Svelte app and serves the contents of `dist/` at `http://localhost:4173` (matching `baseUrl` in `cypress.config.js`). You can also use `npm run preview` for the same port if you prefer Vite’s preview server. Leave the server running while executing tests.
 
 ## 3. Run Cypress
 
