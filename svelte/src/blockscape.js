@@ -1,1444 +1,6 @@
-<!doctype html>
-<html lang="en">
+const ASSET_BASE = (typeof import.meta !== 'undefined' && import.meta.env?.BASE_URL) || '';
 
-<head>
-  <meta charset="utf-8" />
-  <title>Blockscape — simple landscape-style tiles</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-  <style>
-    :root {
-      color-scheme: light;
-      --space-2xs: 0.2rem;
-      --space-xs: 0.35rem;
-      --space-sm: 0.5rem;
-      --space-md: 0.75rem;
-      --space-lg: 1.25rem;
-      --space-xl: 2rem;
-      --space-2xl: 3rem;
-
-      --radius-sm: 6px;
-      --radius-md: 10px;
-      --radius-lg: 16px;
-
-      --font-text: "Inter", "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
-      --font-mono: "JetBrains Mono", "Fira Code", monospace;
-      --font-size-xs: 0.75rem;
-      --font-size-sm: 0.875rem;
-      --font-size-md: 1rem;
-      --font-size-lg: 1.2rem;
-      --font-weight-regular: 400;
-      --font-weight-medium: 500;
-      --font-weight-semibold: 600;
-      --font-weight-bold: 700;
-
-      --color-text: #1f2937;
-      --color-muted: #6b7280;
-      --color-border: #d8dde8;
-      --color-border-strong: #c3cad7;
-      --color-surface: #ffffff;
-      --color-surface-muted: #f4f6fb;
-      --color-surface-subtle: #eef2f8;
-      --color-shadow: 0 18px 36px -22px rgba(15, 23, 42, 0.45);
-
-      --color-primary: #2563eb;
-      --color-primary-soft: #e3edff;
-      --color-danger: #dc2626;
-      --color-danger-soft: #fde4e2;
-      --color-warning: #f97316;
-      --color-warning-soft: #ffe8d6;
-      --color-accent: #0ea5e9;
-      --color-external: #94a3b8;
-
-      --transition: 160ms ease;
-
-      --blockscape-tile: 6.5rem;
-      --blockscape-gap: var(--space-md);
-      --blockscape-radius: var(--radius-lg);
-      --blockscape-foreground: var(--color-text);
-      --blockscape-muted: var(--color-muted);
-      --blockscape-border: var(--color-border);
-      --blockscape-surface: var(--color-surface);
-      --blockscape-surface-alt: var(--color-surface-muted);
-      --blockscape-dep: var(--color-primary);
-      --blockscape-revdep: #ef4444;
-      --blockscape-reused: var(--color-warning);
-      --blockscape-external: var(--color-external);
-    }
-
-    *,
-    *::before,
-    *::after {
-      box-sizing: border-box;
-    }
-
-    html,
-    body {
-      height: 100%;
-    }
-
-    body {
-      margin: 0;
-      background: var(--color-surface-subtle);
-      color: var(--color-text);
-      font-family: var(--font-text);
-      -webkit-font-smoothing: antialiased;
-    }
-
-    a {
-      color: inherit;
-    }
-
-    .pf-v5-c-page {
-      min-height: 100%;
-      display: flex;
-      flex-direction: column;
-    }
-
-    .pf-v5-c-page__header {
-      position: sticky;
-      top: 0;
-      z-index: 100;
-      background: var(--color-surface);
-      box-shadow: 0 1px 0 var(--color-border);
-    }
-
-    .blockscape-masthead {
-      border-bottom: none;
-    }
-
-    .blockscape-toolbar {
-      display: flex;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: var(--space-md);
-      padding: var(--space-sm) var(--space-lg);
-      width: min(1180px, 100%);
-      margin: 0 auto;
-    }
-
-    .blockscape-brand {
-      display: inline-flex;
-      align-items: center;
-      gap: var(--space-sm);
-      font-weight: var(--font-weight-bold);
-      font-size: var(--font-size-lg);
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-      margin-right: var(--space-sm);
-    }
-
-    .blockscape-brand h1 {
-      font: inherit;
-      margin: 0;
-    }
-
-    .blockscape-brand__logo {
-      display: block;
-      height: 52px;
-      width: auto;
-      max-width: 320px;
-    }
-
-    .blockscape-toolbar__controls {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: var(--space-sm);
-      flex: 1 1 auto;
-      min-width: 280px;
-    }
-
-    .blockscape-url-form {
-      display: flex;
-      align-items: center;
-      gap: var(--space-sm);
-      margin: 0;
-    }
-
-    .url-hint {
-      min-height: 1.2rem;
-      font-size: var(--font-size-xs);
-      color: var(--color-muted);
-      margin-left: 0.1rem;
-    }
-
-    .apicurio-controls {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-2xs);
-      min-width: 18rem;
-    }
-
-    .apicurio-subnote {
-      margin-top: -0.25rem;
-    }
-
-    .apicurio-toggle {
-      display: inline-flex;
-      align-items: center;
-      gap: var(--space-sm);
-      font-size: var(--font-size-sm);
-      font-weight: var(--font-weight-medium);
-    }
-
-    .apicurio-toggle input {
-      width: 1.2rem;
-      height: 1.2rem;
-    }
-
-    .apicurio-artifacts {
-      border: 1px dashed var(--color-border);
-      border-radius: var(--radius-md);
-      padding: var(--space-sm);
-      background: var(--color-surface-muted);
-      min-height: 3rem;
-      font-size: var(--font-size-sm);
-    }
-
-    .apicurio-artifact-list {
-      list-style: none;
-      margin: 0;
-      padding: 0;
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-2xs);
-    }
-
-    .apicurio-artifact {
-      width: 100%;
-      border: 1px solid var(--color-border);
-      border-radius: var(--radius-sm);
-      background: var(--color-surface);
-      padding: var(--space-xs);
-      display: flex;
-      flex-direction: column;
-      align-items: flex-start;
-      text-align: left;
-      gap: var(--space-2xs);
-      cursor: pointer;
-      font-size: var(--font-size-sm);
-      transition: border-color var(--transition), background var(--transition), box-shadow var(--transition);
-    }
-
-    .apicurio-artifact:hover,
-    .apicurio-artifact:focus-visible {
-      border-color: var(--color-primary);
-      background: var(--color-primary-soft);
-      outline: none;
-      box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.2);
-    }
-
-    .apicurio-artifact-title {
-      font-weight: var(--font-weight-semibold);
-    }
-
-    .apicurio-artifact-meta {
-      font-size: var(--font-size-xs);
-      color: var(--color-muted);
-    }
-
-    .apicurio-version-list {
-      margin-top: var(--space-xs);
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-2xs);
-    }
-
-    .apicurio-version-button {
-      border: 1px dashed var(--color-border);
-      border-radius: var(--radius-sm);
-      padding: var(--space-2xs) var(--space-xs);
-      background: var(--color-surface);
-      font-size: var(--font-size-xs);
-      cursor: pointer;
-      text-align: left;
-    }
-
-    .apicurio-version-button:hover,
-    .apicurio-version-button:focus-visible {
-      border-color: var(--color-primary);
-      background: var(--color-primary-soft);
-      outline: none;
-    }
-
-    .apicurio-settings {
-      border: 1px solid var(--color-border);
-      border-radius: var(--radius-md);
-      padding: var(--space-2xs) var(--space-sm) var(--space-xs);
-      background: var(--color-surface);
-      font-size: var(--font-size-xs);
-    }
-
-    .apicurio-settings summary {
-      cursor: pointer;
-      font-weight: var(--font-weight-semibold);
-      list-style: none;
-      display: flex;
-      align-items: center;
-      gap: var(--space-2xs);
-    }
-
-    .apicurio-settings summary::marker,
-    .apicurio-settings summary::-webkit-details-marker {
-      display: none;
-    }
-
-    .apicurio-fields {
-      display: grid;
-      gap: var(--space-xs);
-      grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
-      margin-top: var(--space-xs);
-    }
-
-    .apicurio-fields label {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-2xs);
-    }
-
-    .apicurio-fields input {
-      font-size: var(--font-size-xs);
-      padding: var(--space-2xs) var(--space-xs);
-      border-radius: var(--radius-sm);
-      border: 1px solid var(--color-border);
-      background: var(--color-surface);
-      color: inherit;
-    }
-
-    .apicurio-hint {
-      margin: var(--space-xs) 0 0;
-      color: var(--color-muted);
-      font-size: var(--font-size-xs);
-    }
-
-    .apicurio-status {
-      font-size: var(--font-size-xs);
-      min-height: 1rem;
-      color: var(--color-muted);
-    }
-
-    .apicurio-status.is-error {
-      color: var(--color-danger);
-    }
-
-    .apicurio-status.is-success {
-      color: var(--color-accent);
-    }
-
-    .blockscape-toolbar__controls .pf-v5-c-form-control {
-      min-width: 11rem;
-    }
-
-    .blockscape-toolbar__controls .pf-v5-c-form-control.is-url {
-      min-width: 14rem;
-    }
-
-    .blockscape-file {
-      position: relative;
-    }
-
-    .blockscape-file input[type="file"] {
-      position: absolute;
-      inset: 0;
-      opacity: 0;
-      cursor: pointer;
-    }
-
-    .pf-v5-c-button {
-      appearance: none;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: var(--space-xs);
-      border-radius: 999px;
-      border: 1px solid transparent;
-      padding: 0.4rem 0.95rem;
-      font-size: var(--font-size-sm);
-      font-weight: var(--font-weight-semibold);
-      line-height: 1;
-      cursor: pointer;
-      transition: background var(--transition), border-color var(--transition), color var(--transition), box-shadow var(--transition);
-      background: transparent;
-      color: var(--blockscape-foreground);
-    }
-
-    .pf-v5-c-button:hover {
-      box-shadow: 0 8px 18px -12px rgba(15, 23, 42, 0.4);
-    }
-
-    .pf-v5-c-button:focus-visible {
-      outline: none;
-      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.25);
-    }
-
-    .pf-v5-c-button.pf-m-primary {
-      background: var(--color-primary);
-      border-color: var(--color-primary);
-      color: #fff;
-    }
-
-    .pf-v5-c-button.pf-m-primary:hover {
-      background: #1d4fd7;
-      border-color: #1d4fd7;
-    }
-
-    .pf-v5-c-button.pf-m-secondary {
-      background: var(--color-surface-muted);
-      border-color: var(--color-border-strong);
-      color: var(--blockscape-foreground);
-    }
-
-    .pf-v5-c-button.pf-m-secondary:hover {
-      background: #e5e9f4;
-    }
-
-    .pf-v5-c-button.pf-m-tertiary {
-      background: transparent;
-      border-color: var(--color-border);
-      color: var(--color-muted);
-    }
-
-    .pf-v5-c-button.pf-m-tertiary:hover {
-      color: var(--blockscape-foreground);
-      border-color: var(--color-border-strong);
-      background: var(--color-surface-muted);
-    }
-
-    .pf-v5-c-button.pf-m-plain {
-      border: none;
-      padding: 0.35rem;
-      color: var(--color-muted);
-      border-radius: 50%;
-    }
-
-    .pf-v5-c-button.pf-m-plain:hover {
-      background: var(--color-surface-muted);
-      color: var(--blockscape-foreground);
-      box-shadow: none;
-    }
-
-    .pf-v5-c-form-control {
-      height: 2.5rem;
-      padding: 0 0.85rem;
-      border-radius: 999px;
-      border: 1px solid var(--color-border);
-      background: var(--color-surface);
-      font-family: inherit;
-      font-size: var(--font-size-sm);
-      color: inherit;
-      transition: border-color var(--transition), box-shadow var(--transition);
-    }
-
-    .pf-v5-c-form-control::placeholder {
-      color: var(--color-muted);
-      opacity: 0.75;
-    }
-
-    .pf-v5-c-form-control:focus-visible {
-      outline: none;
-      border-color: var(--color-primary);
-      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
-    }
-
-    .blockscape-legend {
-      margin-left: auto;
-      display: flex;
-      align-items: center;
-      gap: var(--space-md);
-      font-size: var(--font-size-xs);
-      color: var(--blockscape-muted);
-      font-weight: var(--font-weight-medium);
-      flex-wrap: wrap;
-    }
-
-    .legend-entry {
-      display: inline-flex;
-      align-items: center;
-      gap: var(--space-xs);
-      white-space: nowrap;
-    }
-
-    .legend-dot {
-      width: 0.65rem;
-      height: 0.65rem;
-      border-radius: 50%;
-      border: 1px solid var(--blockscape-border);
-    }
-
-    .legend-dot--dep {
-      background: var(--color-primary-soft);
-      border-color: var(--blockscape-dep);
-    }
-
-    .legend-dot--revdep {
-      background: var(--color-danger-soft);
-      border-color: var(--blockscape-revdep);
-    }
-
-    .legend-dot--reused {
-      background: var(--color-warning-soft);
-      border-color: var(--blockscape-reused);
-    }
-
-    .legend-dot--external {
-      background: #edf1f7;
-      border-color: var(--blockscape-external);
-    }
-
-    .pf-v5-c-page__main {
-      flex: 1 1 auto;
-    }
-
-    .blockscape-content {
-      display: flex;
-      gap: var(--space-lg);
-      width: min(1180px, calc(100% - 2 * var(--space-lg)));
-      margin: 0 auto;
-      padding: var(--space-lg) 0 var(--space-xl);
-      align-items: flex-start;
-    }
-
-    .blockscape-sidebar {
-      flex: 0 0 240px;
-      background: var(--blockscape-surface);
-      border: 1px solid var(--blockscape-border);
-      border-radius: var(--radius-md);
-      padding: var(--space-md);
-      box-shadow: var(--color-shadow);
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-md);
-    }
-
-    .sidebar-heading {
-      font-size: var(--font-size-xs);
-      font-weight: var(--font-weight-semibold);
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      color: var(--blockscape-muted);
-    }
-
-    .model-nav-list {
-      list-style: none;
-      margin: 0;
-      padding: 0;
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-xs);
-    }
-
-    .model-nav-list li {
-      margin: 0;
-      padding: 0;
-    }
-
-    .model-nav-button {
-      width: 100%;
-      display: flex;
-      flex-direction: column;
-      align-items: flex-start;
-      text-align: left;
-      gap: var(--space-2xs);
-      border: 1px solid transparent;
-      border-radius: var(--radius-sm);
-      background: transparent;
-      color: var(--color-text);
-      font-size: var(--font-size-sm);
-      font-weight: var(--font-weight-medium);
-      padding: var(--space-sm);
-      cursor: pointer;
-      transition: background var(--transition), border-color var(--transition), color var(--transition);
-    }
-
-    .model-nav-button:hover,
-    .model-nav-button:focus-visible {
-      outline: none;
-      border-color: var(--color-border);
-      background: var(--color-surface-muted);
-    }
-
-    .model-nav-button.is-active {
-      border-color: var(--color-primary);
-      background: var(--color-primary-soft);
-      color: var(--color-primary);
-      box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.1);
-    }
-
-    .model-nav-label {
-      font-weight: var(--font-weight-semibold);
-      display: flex;
-      flex-direction: column;
-      align-items: flex-start;
-      gap: var(--space-2xs);
-    }
-
-    .model-nav-title {
-      font-size: var(--font-size-sm);
-    }
-
-    .model-nav-id {
-      font-size: var(--font-size-xs);
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--blockscape-muted);
-      border: 1px solid var(--color-border);
-      border-radius: var(--radius-sm);
-      padding: 0 var(--space-2xs);
-      background: var(--color-surface-muted);
-    }
-
-    .model-nav-meta {
-      font-size: var(--font-size-xs);
-      color: var(--blockscape-muted);
-    }
-
-    .model-nav-empty {
-      font-size: var(--font-size-xs);
-      color: var(--blockscape-muted);
-    }
-
-    .model-actions {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-xs);
-    }
-
-    .model-actions .pf-v5-c-button {
-      width: 100%;
-    }
-
-    .blockscape-main {
-      flex: 1 1 auto;
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-lg);
-    }
-
-    .blockscape-json-panel,
-    .blockscape-main-section {
-      width: 100%;
-      margin: 0;
-    }
-
-    .blockscape-json-panel {
-      padding: 0;
-      border: none;
-      background: transparent;
-      box-shadow: none;
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-sm);
-    }
-
-    .blockscape-json-panel__title {
-      font-weight: var(--font-weight-semibold);
-      font-size: var(--font-size-sm);
-      margin: 0;
-    }
-
-    .blockscape-json-panel .muted {
-      font-size: var(--font-size-xs);
-      margin: 0;
-      line-height: 1.4;
-    }
-
-    .blockscape-json-controls {
-      display: flex;
-      flex-wrap: wrap;
-      gap: var(--space-md);
-      align-items: flex-start;
-    }
-
-    .blockscape-json-controls textarea {
-      flex: 1 1 22rem;
-      min-height: 12rem;
-      font-family: var(--font-mono);
-      font-size: var(--font-size-sm);
-      border-radius: var(--radius-md);
-      border: 1px solid var(--color-border);
-      padding: var(--space-sm) var(--space-md);
-      background: var(--color-surface-muted);
-      color: var(--blockscape-foreground);
-      resize: vertical;
-      transition: border-color var(--transition), box-shadow var(--transition);
-    }
-
-    .blockscape-json-controls textarea:focus-visible {
-      outline: none;
-      border-color: var(--color-primary);
-      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
-      background: var(--color-surface);
-    }
-
-    .blockscape-json-actions {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-sm);
-      min-width: 12rem;
-    }
-
-    .blockscape-main-section {
-      padding: 0 var(--space-lg) var(--space-xl);
-    }
-
-    .blockscape-model-meta {
-      margin-bottom: var(--space-md);
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-2xs);
-    }
-
-    .version-nav {
-      display: flex;
-      align-items: center;
-      gap: var(--space-sm);
-      padding: var(--space-sm) var(--space-md);
-      margin-bottom: var(--space-md);
-      background: var(--color-surface);
-      border: 1px solid var(--color-border);
-      border-radius: var(--radius-md);
-      box-shadow: var(--color-shadow);
-      flex-wrap: wrap;
-    }
-
-    .version-nav__title {
-      font-weight: var(--font-weight-semibold);
-      color: var(--color-text);
-    }
-
-    .version-nav__status {
-      font-size: var(--font-size-xs);
-      color: var(--color-muted);
-    }
-
-    .version-nav__controls {
-      display: inline-flex;
-      align-items: center;
-      gap: var(--space-2xs);
-      margin-left: auto;
-    }
-
-    .version-nav__button {
-      border: 1px solid var(--color-border);
-      background: var(--color-surface-muted);
-      color: var(--color-text);
-      font-size: var(--font-size-xs);
-      padding: var(--space-2xs) var(--space-sm);
-      border-radius: var(--radius-sm);
-      cursor: pointer;
-    }
-
-    .version-nav__button:hover,
-    .version-nav__button:focus-visible {
-      background: var(--color-primary-soft);
-      border-color: var(--color-primary);
-      outline: none;
-    }
-
-    .blockscape-model-title {
-      font-size: var(--font-size-lg);
-      font-weight: var(--font-weight-semibold);
-      color: var(--color-text);
-    }
-
-    .blockscape-model-id {
-      font-size: var(--font-size-xs);
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      color: var(--blockscape-muted);
-    }
-
-    .blockscape-tabs {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-sm);
-      margin-top: var(--space-md);
-    }
-
-    .blockscape-tablist {
-      display: flex;
-      flex-wrap: wrap;
-      gap: var(--space-2xs);
-      border-bottom: 1px solid var(--color-border);
-    }
-
-    .blockscape-tab {
-      appearance: none;
-      border: 1px solid transparent;
-      border-bottom: none;
-      border-radius: var(--radius-md) var(--radius-md) 0 0;
-      background: transparent;
-      padding: var(--space-sm) var(--space-md);
-      font-size: var(--font-size-sm);
-      font-weight: var(--font-weight-semibold);
-      color: var(--blockscape-muted);
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: var(--space-2xs);
-      min-width: 6rem;
-      transition: color var(--transition), background var(--transition), border-color var(--transition);
-    }
-
-    .blockscape-tab.is-active {
-      color: var(--color-text);
-      background: var(--color-surface);
-      border-color: var(--color-border);
-      box-shadow: var(--color-shadow);
-      position: relative;
-      top: 1px;
-    }
-
-    .blockscape-tabpanels {
-      border: 1px solid var(--color-border);
-      border-radius: var(--radius-lg);
-      background: var(--color-surface);
-      box-shadow: var(--color-shadow);
-    }
-
-    .blockscape-tabpanel {
-      display: none;
-      padding: var(--space-lg);
-    }
-
-    .blockscape-tabpanel.is-active {
-      display: block;
-    }
-
-    .blockscape-registry-panel {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-md);
-      padding: var(--space-lg);
-      background: var(--blockscape-surface);
-      border: 1px solid var(--color-border);
-      border-radius: var(--radius-md);
-      box-shadow: var(--color-shadow);
-    }
-
-    .blockscape-registry-header {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-2xs);
-    }
-
-    .blockscape-registry-header h2 {
-      margin: 0;
-      font-size: var(--font-size-md);
-    }
-
-    .blockscape-registry-header p {
-      margin: 0;
-      font-size: var(--font-size-sm);
-      color: var(--color-muted);
-    }
-
-    .blockscape-source-panel {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-md);
-    }
-
-    .blockscape-abstract {
-      font-size: var(--font-size-sm);
-      color: var(--blockscape-muted);
-      line-height: 1.5;
-      padding: var(--space-md);
-      background: var(--blockscape-surface-alt);
-      border-radius: var(--radius-md);
-      border-left: 3px solid var(--blockscape-dep);
-      margin: 0;
-      box-shadow: var(--color-shadow);
-    }
-
-    .blockscape-abstract-panel {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-md);
-    }
-
-    .blockscape-abstract-placeholder {
-      border: 1px dashed var(--color-border);
-      border-radius: var(--radius-md);
-      padding: var(--space-lg);
-      background: var(--color-surface-muted);
-      color: var(--blockscape-muted);
-      font-size: var(--font-size-sm);
-    }
-
-    .blockscape-abstract a.blockscape-gist-link {
-      color: var(--color-primary);
-      font-weight: var(--font-weight-semibold);
-      text-decoration: underline;
-      cursor: pointer;
-      word-break: break-all;
-    }
-
-    .blockscape-abstract a.blockscape-gist-link.is-loading {
-      opacity: 0.65;
-      pointer-events: none;
-    }
-
-    .category {
-      margin: var(--space-lg) 0;
-    }
-
-    .blockscape-render {
-      position: relative;
-    }
-
-    .blockscape-tab-tooltip {
-      position: absolute;
-      max-width: min(420px, calc(100% - 2 * var(--space-md)));
-      padding: var(--space-md);
-      background: var(--color-surface);
-      box-shadow: var(--color-shadow);
-      border: 1px solid var(--color-border);
-      border-radius: var(--radius-md);
-      font-size: var(--font-size-sm);
-      color: var(--blockscape-muted);
-      z-index: 1000;
-      pointer-events: none;
-      transition: opacity var(--transition);
-      opacity: 0;
-    }
-
-    .blockscape-tab-tooltip.is-visible {
-      opacity: 1;
-    }
-
-    .cat-head {
-      display: inline-flex;
-      align-items: center;
-      gap: var(--space-sm);
-      margin-bottom: var(--space-sm);
-    }
-
-    .cat-title {
-      font-size: var(--font-size-xs);
-      font-weight: var(--font-weight-semibold);
-      text-transform: uppercase;
-      letter-spacing: 0.12em;
-      color: var(--blockscape-muted);
-    }
-
-    .cat-count {
-      font-size: var(--font-size-xs);
-      color: var(--color-muted);
-    }
-
-    .grid {
-      position: relative;
-      display: grid;
-      grid-auto-rows: var(--blockscape-tile);
-      grid-template-columns: repeat(auto-fill, minmax(var(--blockscape-tile), 1fr));
-      gap: var(--blockscape-gap);
-      padding: var(--blockscape-gap) 0;
-      border-top: 1px dashed var(--blockscape-border);
-    }
-
-    .tile {
-      position: relative;
-      background: var(--blockscape-surface);
-      border: 1px solid var(--blockscape-border);
-      border-radius: var(--blockscape-radius);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: var(--space-sm);
-      cursor: grab;
-      transition: box-shadow var(--transition), transform var(--transition), border-color var(--transition);
-      box-shadow: var(--color-shadow);
-    }
-
-    .tile:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 18px 30px -24px rgba(15, 23, 42, 0.55);
-    }
-
-    .tile:active {
-      transform: translateY(1px);
-    }
-
-    .tile.dragging {
-      opacity: 0.5;
-      cursor: grabbing;
-      transform: rotate(4deg);
-    }
-
-    .tile.drag-over {
-      border-color: var(--blockscape-dep);
-      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
-    }
-
-    .grid.drag-active {
-      background: var(--color-primary-soft);
-    }
-
-    .logo {
-      width: 44px;
-      height: 44px;
-      object-fit: contain;
-      opacity: .95;
-    }
-
-    .name {
-      font-size: var(--font-size-xs);
-      text-align: center;
-      line-height: 1.15;
-      padding: 0 var(--space-sm) var(--space-xs);
-    }
-
-    .badge {
-      position: absolute;
-      top: var(--space-sm);
-      right: var(--space-sm);
-      font-size: var(--font-size-xs);
-      background: var(--color-warning-soft);
-      color: var(--blockscape-reused);
-      border: 1px solid var(--color-warning);
-      border-radius: 999px;
-      padding: 0.1rem 0.45rem;
-      display: none;
-      font-weight: var(--font-weight-medium);
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-    }
-
-    .tile.reused .badge {
-      display: inline-block;
-    }
-
-    .tile.external {
-      border-style: dashed;
-      border-color: var(--color-external);
-      color: var(--blockscape-muted);
-      background: #f8fafc;
-    }
-
-    .tile .external-link {
-      position: absolute;
-      top: var(--space-sm);
-      left: var(--space-sm);
-      width: 24px;
-      height: 24px;
-      border-radius: 999px;
-      border: 1px solid transparent;
-      background: rgba(148, 163, 184, 0.16);
-      color: inherit;
-      font-size: 0.75rem;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      padding: 0;
-      transition: background var(--transition), color var(--transition), border var(--transition);
-    }
-
-    .tile .external-link:hover,
-    .tile .external-link:focus-visible {
-      background: rgba(148, 163, 184, 0.28);
-      border-color: rgba(148, 163, 184, 0.45);
-      color: var(--color-text);
-    }
-
-    .tile.dep {
-      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
-      border-color: var(--blockscape-dep);
-    }
-
-    .tile.revdep {
-      box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2);
-      border-color: var(--blockscape-revdep);
-    }
-
-    .tile.selected {
-      outline: 3px solid rgba(15, 23, 42, 0.25);
-      outline-offset: 2px;
-    }
-
-    .muted {
-      color: var(--blockscape-muted);
-    }
-
-    .svg-layer {
-      position: fixed;
-      inset: 0;
-      pointer-events: none;
-      z-index: 0;
-    }
-
-    .sr-only {
-      position: absolute;
-      width: 1px;
-      height: 1px;
-      padding: 0;
-      margin: -1px;
-      overflow: hidden;
-      clip: rect(0, 0, 0, 0);
-      white-space: nowrap;
-      border: 0;
-    }
-
-    .item-preview {
-      --item-preview-width: min(420px, calc(100vw - 2 * var(--space-md)));
-      --item-preview-height: min(70vh, calc(100vh - 2 * var(--space-md)));
-      position: fixed;
-      display: flex;
-      flex-direction: column;
-      width: var(--item-preview-width);
-      max-height: var(--item-preview-height);
-      background: var(--blockscape-surface);
-      border: 1px solid var(--blockscape-border);
-      border-radius: var(--radius-md);
-      box-shadow: var(--color-shadow);
-      opacity: 0;
-      transform: translateY(4px);
-      pointer-events: none;
-      transition: opacity var(--transition), transform var(--transition);
-      z-index: 999;
-    }
-
-    .item-preview--expanded {
-      --item-preview-width: min(630px, calc(100vw - 2 * var(--space-md)));
-      --item-preview-height: min(calc(100vh - 2 * var(--space-md)), 1200px);
-    }
-
-    .item-preview.is-visible {
-      opacity: 1;
-      transform: translateY(0);
-      pointer-events: auto;
-    }
-
-    .item-preview__header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: var(--space-xs);
-      padding: var(--space-xs) var(--space-sm);
-      border-bottom: 1px solid var(--color-border);
-      background: var(--color-surface-muted);
-      font-size: var(--font-size-xs);
-      font-weight: var(--font-weight-semibold);
-    }
-
-    .item-preview__title {
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      flex: 1 1 auto;
-    }
-
-    .item-preview__actions {
-      display: flex;
-      gap: var(--space-2xs);
-      align-items: center;
-      flex: 0 0 auto;
-    }
-
-    .item-preview__action {
-      border: 1px solid var(--color-border);
-      background: var(--color-surface);
-      color: var(--blockscape-foreground);
-      font-size: var(--font-size-xs);
-      padding: var(--space-2xs) var(--space-sm);
-      border-radius: var(--radius-sm);
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 0.2rem;
-    }
-
-    .item-preview__action:hover,
-    .item-preview__action:focus-visible {
-      background: var(--color-surface-muted);
-      border-color: var(--color-border-strong);
-    }
-
-    .item-preview__close {
-      border: none;
-      background: transparent;
-      color: var(--color-muted);
-      cursor: pointer;
-      font-size: 1.25rem;
-      line-height: 1;
-      border-radius: var(--radius-sm);
-      padding: 0 var(--space-2xs);
-    }
-
-    .item-preview__close:hover,
-    .item-preview__close:focus-visible {
-      color: var(--blockscape-foreground);
-      background: var(--color-surface-muted);
-      outline: none;
-    }
-
-    .item-preview__body {
-      flex: 1 1 auto;
-      overflow: auto;
-      padding: var(--space-sm);
-      background: var(--blockscape-surface);
-      font-size: var(--font-size-xs);
-      line-height: 1.4;
-    }
-
-    .item-preview__frame {
-      width: 100%;
-      height: 100%;
-      border: none;
-      display: block;
-    }
-
-    .item-preview--has-frame .item-preview__body {
-      padding: 0;
-    }
-
-    .item-preview__status {
-      color: var(--color-muted);
-    }
-
-    @media (max-width: 1024px) {
-      .blockscape-toolbar {
-        padding: var(--space-sm) var(--space-md);
-        gap: var(--space-sm);
-      }
-
-      .blockscape-content {
-        flex-direction: column;
-        gap: var(--space-md);
-        width: calc(100% - 2 * var(--space-md));
-        padding: var(--space-md) 0 var(--space-lg);
-      }
-
-      .blockscape-sidebar {
-        width: 100%;
-      }
-    }
-
-    @media (max-width: 720px) {
-      .blockscape-toolbar {
-        flex-direction: column;
-        align-items: stretch;
-      }
-
-      .blockscape-content {
-        width: calc(100% - 2 * var(--space-sm));
-        gap: var(--space-sm);
-      }
-
-      .blockscape-brand {
-        justify-content: space-between;
-        width: 100%;
-      }
-
-      .blockscape-brand__logo {
-        height: 44px;
-      }
-
-      .blockscape-toolbar__controls {
-        width: 100%;
-      }
-
-      .blockscape-toolbar__controls .pf-v5-c-form-control,
-      .blockscape-toolbar__controls .pf-v5-c-button {
-        flex: 1 1 auto;
-      }
-
-      .apicurio-controls {
-        min-width: auto;
-      }
-
-      .blockscape-legend {
-        width: 100%;
-        justify-content: flex-start;
-        margin-left: 0;
-      }
-
-      .blockscape-json-actions {
-        width: 100%;
-        flex-direction: row;
-        justify-content: flex-start;
-      }
-    }
-  </style>
-</head>
-
-<body>
-  <div class="pf-v5-c-page">
-    <header class="pf-v5-c-page__header">
-      <div class="pf-v5-c-masthead pf-m-display-inline blockscape-masthead">
-        <div class="pf-v5-c-masthead__content">
-          <div class="blockscape-toolbar">
-            <div class="blockscape-brand">
-              <h1 class="sr-only">Blockscape</h1>
-              <img class="blockscape-brand__logo" src="logos/blockscape-logo.svg"
-                alt="Blockscape — landscape tile explorer" decoding="async" />
-              <a href="https://github.com/pwright/blockscape" target="_blank"
-                class="pf-v5-c-button pf-m-plain" title="View on GitHub" aria-label="View Blockscape on GitHub">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                  <path
-                    d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
-                </svg>
-              </a>
-            </div>
-            <div class="blockscape-toolbar__controls">
-              <label class="sr-only" for="search">Search tiles</label>
-              <input id="search" class="pf-v5-c-form-control" type="text" placeholder="Search…" />
-               
-              <form id="urlForm" class="blockscape-url-form" autocomplete="on" novalidate>
-                <label class="sr-only" for="urlInput">Load JSON from URL</label>
-                <input id="urlInput" name="modelUrl" class="pf-v5-c-form-control is-url" type="url"
-                  placeholder="Load JSON from URL…" autocomplete="additional-name" />
-                <button id="loadUrl" class="pf-v5-c-button pf-m-secondary" type="submit">Load URL</button>
-                <div id="urlHint" class="url-hint" aria-live="polite"></div>
-              </form>
-              
- 
-              <label class="pf-v5-c-button pf-m-secondary blockscape-file" role="button">
-                <span>Load File(s)</span>
-                <input id="file" type="file" accept=".bs,.json,.txt" multiple />
-              </label>
- 
-              <button id="openInEditor" class="pf-v5-c-button pf-m-primary" type="button" title="Open current JSON in the editor">Edit</button>
-              
-              <button id="shareModel" class="pf-v5-c-button pf-m-primary" type="button" title="Copy a shareable URL for this model">Share</button>
-            </div>
-            <div class="blockscape-legend" role="presentation">
-              <span class="legend-entry"><span class="legend-dot legend-dot--dep"></span> enables</span>
-              <span class="legend-entry"><span class="legend-dot legend-dot--revdep"></span> dependents</span>
-              <span class="legend-entry"><span class="legend-dot legend-dot--reused"></span> reused</span>
-              <span class="legend-entry"><span class="legend-dot legend-dot--external"></span> external link</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </header>
-
-    <main class="pf-v5-c-page__main">
-      <div class="blockscape-content">
-        <aside class="blockscape-sidebar" aria-label="Models">
-          <div class="sidebar-heading">Models</div>
-          <ul id="modelList" class="model-nav-list"></ul>
-          <div class="model-actions">
-            <button id="removeModel" class="pf-v5-c-button pf-m-tertiary" type="button"
-              title="Remove selected model">Remove active</button>
-            <button id="clear" class="pf-v5-c-button pf-m-tertiary" type="button">Clear selection</button>
-          </div>
-        </aside>
-        <div class="blockscape-main">
-          <section class="pf-v5-c-page__main-section blockscape-json-panel" hidden
-            aria-label="Model source JSON editor">
-            <p class="blockscape-json-panel__title">Paste / edit JSON for the <b>active</b> model (schema below)</p>
-            <div class="muted">
-              Schema: <code>{ id, title, abstract?, categories:[{id,title,items:[{id,name,logo?,external?:url,color?,deps:[]}]}], links?:[{from,to}] }</code><br />
-              You can paste multiple objects separated by <code>---</code> or <code>%%%</code> to append several models.
-              A single object replaces only when you click “Replace active with JSON”. Tip: with no input focused, press
-              Cmd/Ctrl+V anywhere on the page to append clipboard JSON instantly.
-            </div>
-            <div class="blockscape-json-controls">
-              <textarea id="jsonBox" class="pf-v5-c-form-control"
-                aria-label="JSON editor for the active model"></textarea>
-              <div class="blockscape-json-actions">
-                <button id="copyJson" class="pf-v5-c-button pf-m-tertiary" type="button"
-                  title="Copy the current JSON to your clipboard">Copy</button>
-                <button id="pasteJson" class="pf-v5-c-button pf-m-tertiary" type="button"
-                  title="Paste clipboard JSON to replace the editor contents">Paste</button>
-                <button id="appendFromBox" class="pf-v5-c-button pf-m-primary" type="button">Append model(s)</button>
-                <button id="replaceActive" class="pf-v5-c-button pf-m-secondary" type="button">Replace active with
-                  JSON</button>
-              </div>
-            </div>
-          </section>
-
-          <section class="pf-v5-c-page__main-section blockscape-main-section">
-            <div id="app" aria-live="polite"></div>
-          </section>
-        </div>
-      </div>
-    </main>
-  </div>
-
-  <template id="seed">
-{
-  "id": "blockscape",
-  "title": "Blockscape (AI maps)",
-  "abstract": "Blockscape (pronounced BYK-shed) visualizes value chains and dependencies using a BS file. Inspired by Wardley maps, these maps emphasizes the Communication layer that makes maps comprehensible, alongside concrete user experiences, authoring & LLM flows, presentation semantics, and the platform services that enable them.",
-  "categories": [
-    {
-      "id": "communication",
-      "title": "Communication",
-      "items": [
-        { "id": "gestalt", "name": "Visual schema", "deps": [] },
-        { "id": "value-chain", "name": "Value chain (y-axis)", "deps": [] },
-        { "id": "spacial-memory", "name": "Spacial memory", "deps": [] },
-        { "id": "evolution", "name": "Evolution (x-axis)", "deps": [] },
-        { "id": "legend-literacy", "name": "Legend literacy", "deps": [] },
-        { "id": "relational-awareness", "name": "Relational awareness", "deps": [] },
-        { "id": "icons", "name": "Iconography", "deps": [] }
-      ]
-    },
-    {
-      "id": "experience",
-      "title": "User Experience",
-      "items": [
-        { "id": "paste-bs-file", "name": "Paste BS File", "deps": ["bs-parser", "schema-validator"] },
-        { "id": "load-multidoc-file", "name": "Load Multi-Document File", "deps": ["multidoc-assembler", "bs-parser", "schema-validator"] },
-        { "id": "load-multidoc-from-url", "name": "Load Multi-Document from URL", "deps": ["url-fetcher", "multidoc-assembler", "bs-parser", "schema-validator"] },
-        { "id": "create-gist-multidoc", "name": "Create Header+Detail in Gist", "deps": ["gist-integration", "multidoc-assembler", "schema-validator"] },
-        { "id": "abstract-gist-loading", "name": "Abstract Supports Gist Loading", "deps": ["gist-integration", "bs-parser", "schema-validator"] }
-      ]
-    },
-    {
-      "id": "authoring-ai",
-      "title": "Authoring and LLM",
-      "items": [
-        { "id": "bs-format-simple", "name": "BS format is simple", "deps": [] },
-        { "id": "editor-human-terms", "name": "Editor (human terms)", "deps": ["gestalt"] },
-        { "id": "llm-generate-bs", "name": "LLM generates BS", "deps": ["schema-validator"], "external": "https://github.com/pwright/blockscape/blob/main/map-generation-prompt.md" },
-        { "id": "llm-consume-bs", "name": "LLM consumes BS", "deps": ["bs-parser"] }
-      ]
-    },
-    {
-      "id": "presentation",
-      "title": "Presentation Semantics",
-      "items": [
-        { "id": "layout_engine", "name": "Layout Engine", "deps": ["bs-parser", "gestalt", "icons"] },
-        { "id": "value_visibility_axis", "name": "Vertical Position = Visible Value", "deps": ["spacial-memory", "legend-literacy", "value-chain"] },
-        { "id": "evolution_axis", "name": "Horizontal Evolution (Optional)", "deps": ["legend-literacy", "evolution"] }
-      ]
-    },
-    {
-      "id": "platform",
-      "title": "Platform Services",
-      "items": [
-        { "id": "bs-parser", "name": "BS Parser", "deps": [] },
-        { "id": "multidoc-assembler", "name": "Multi-Doc Assembler", "deps": [] },
-        { "id": "gist-integration", "name": "Gist Integration", "deps": [] },
-        { "id": "url-fetcher", "name": "URL Fetcher", "deps": [] },
-        { "id": "schema-validator", "name": "Schema Validator", "deps": [] }
-      ]
-    }
-  ]
-}
-  </template>
-
-  <svg id="overlay" class="svg-layer"></svg>
-  <div id="tabTooltip" class="blockscape-tab-tooltip" hidden aria-hidden="true"></div>
-
-  <div id="itemPreview" class="item-preview" hidden aria-hidden="true">
-    <div class="item-preview__header">
-      <span class="item-preview__title">Preview</span>
-      <div class="item-preview__actions" hidden></div>
-      <button type="button" class="item-preview__close" aria-label="Close preview">&times;</button>
-    </div>
-    <div class="item-preview__body">
-      <div class="item-preview__status">Right-click a tile to see related notes.</div>
-    </div>
-  </div>
-
-  <script>
+export function initBlockscape() {
     console.log("[Blockscape] init");
 
     const jsonBox = document.getElementById('jsonBox');
@@ -1479,7 +41,7 @@
     const DEFAULT_APICURIO_SEMVER_ENABLED = false;
 
     // Show the seed in the editor initially.
-    jsonBox.value = document.getElementById('seed').innerHTML.trim();
+    jsonBox.value = document.getElementById('seed').textContent.trim();
 
     // ===== State =====
     /** @type {{id:string,title:string,data:any}[]} */
@@ -1635,11 +197,51 @@
       return candidate || fallback;
     }
 
+    function getModelDisplayTitle(entry, fallback = 'Untitled Model') {
+      const modelId = getModelId(entry);
+      const isSeries = entry?.apicurioVersions?.length > 1 || entry?.isSeries;
+      if (isSeries && modelId) return `${modelId} series`;
+      return getModelTitle(entry, fallback);
+    }
+
     function getModelId(entry) {
       const candidate = entry?.data?.id;
       if (!candidate) return null;
       const trimmed = candidate.toString().trim();
       return trimmed || null;
+    }
+
+    function addModelEntry(entry, { versionLabel, createdOn } = {}) {
+      const modelId = getModelId(entry);
+      if (!modelId) {
+        models.push(entry);
+        return models.length - 1;
+      }
+      const existingIndex = models.findIndex((m) => getModelId(m) === modelId);
+      if (existingIndex === -1) {
+        models.push(entry);
+        return models.length - 1;
+      }
+      const target = models[existingIndex];
+      if (!Array.isArray(target.apicurioVersions) || !target.apicurioVersions.length) {
+        target.apicurioVersions = [{
+          version: '1',
+          data: target.data,
+          createdOn: target.apicurioVersions?.[0]?.createdOn
+        }];
+        target.apicurioActiveVersionIndex = 0;
+      }
+      const label = String(target.apicurioVersions.length + 1);
+      target.apicurioVersions.push({
+        version: label,
+        data: entry.data,
+        createdOn: createdOn || new Date().toISOString()
+      });
+      target.apicurioActiveVersionIndex = target.apicurioVersions.length - 1;
+      target.data = entry.data;
+      target.title = getModelTitle(entry) || target.title;
+      target.isSeries = true;
+      return existingIndex;
     }
 
     function sanitizeApicurioBaseUrl(value) {
@@ -2339,6 +941,9 @@
       if (existingIndex !== -1) {
         const preservedId = models[existingIndex].id;
         models[existingIndex] = { ...entry, id: preservedId || entry.id };
+        if (models[existingIndex].apicurioVersions?.length > 1) {
+          models[existingIndex].isSeries = true;
+        }
         setActive(existingIndex);
       } else {
         models.push(entry);
@@ -2786,7 +1391,7 @@
 
         const titleSpan = document.createElement('span');
         titleSpan.className = 'model-nav-title';
-        titleSpan.textContent = getModelTitle(m);
+        titleSpan.textContent = getModelDisplayTitle(m);
         label.appendChild(titleSpan);
 
         const dataId = getModelId(m);
@@ -2906,18 +1511,20 @@
         return null;
       }
       if (!entries.length) return null;
-      const startIndex = models.length;
-      entries.forEach(entry => models.push(entry));
+      let firstIndex = null;
+      entries.forEach(entry => {
+        const idx = addModelEntry(entry, { versionLabel: 'editor' });
+        if (firstIndex == null) firstIndex = idx;
+      });
       console.log(`[Blockscape] imported ${entries.length} model(s) from editor`);
-      return startIndex;
+      return { index: firstIndex, count: entries.length };
     }
 
     function importEditorPayload(trigger = 'storage') {
-      const startIndex = consumeEditorPayload();
-      if (typeof startIndex !== 'number') return false;
-      const importedCount = models.length - startIndex;
-      setActive(startIndex);
-      console.log(`[Blockscape] imported ${importedCount} model(s) from editor via ${trigger}.`);
+      const result = consumeEditorPayload();
+      if (!result || typeof result.index !== 'number') return false;
+      setActive(result.index);
+      console.log(`[Blockscape] imported ${result.count} model(s) from editor via ${trigger}.`);
       return true;
     }
 
@@ -2987,13 +1594,13 @@
 
       ensureModelMetadata(payload.data, { titleHint: payload.title || 'Shared Model' });
 
-      models.push({
+      const idx = addModelEntry({
         id: uid(),
         title: payload.data.title || payload.title || 'Shared Model',
         data: payload.data
-      });
+      }, { versionLabel: 'shared' });
 
-      return models.length - 1;
+      return idx;
     }
 
     async function consumeLoadParam() {
@@ -3019,11 +1626,8 @@
       if (!target) return null;
 
       try {
-        const startIndex = models.length;
-        const ok = await loadFromUrl(target);
-        if (!ok) return null;
-        const added = models.length - startIndex;
-        return added > 0 ? startIndex : null;
+        const idx = await loadFromUrl(target);
+        return typeof idx === 'number' ? idx : null;
       } catch (err) {
         console.warn('[Blockscape] load param failed', err);
         return null;
@@ -3136,7 +1740,7 @@
       status.className = 'version-nav__status';
       const activeIdx = getActiveApicurioVersionIndex(entry);
       const activeVersionLabel = getActiveApicurioVersionLabel(entry) || 'latest';
-      status.textContent = `Version ${activeVersionLabel} (${activeIdx + 1} of ${entry.apicurioVersions.length})`;
+      status.textContent = `No. in series ${activeVersionLabel} (${activeIdx + 1} of ${entry.apicurioVersions.length})`;
       nav.appendChild(status);
 
       const controls = document.createElement('div');
@@ -3199,7 +1803,7 @@
       if (activeVersionLabel) {
         const versionEl = document.createElement('div');
         versionEl.className = 'blockscape-model-id';
-        versionEl.textContent = `Version: ${activeVersionLabel}`;
+        versionEl.textContent = `No. in series: ${activeVersionLabel}`;
         meta.appendChild(versionEl);
       }
 
@@ -4250,8 +2854,12 @@
         const appended = normalizeToModelsFromText(jsonBox.value, "Pasted");
         if (!appended.length) { alert("No valid JSON found to append."); return; }
         console.log("[Blockscape] appending", appended.length, "model(s)");
-        models.push(...appended);
-        if (activeIndex === -1) setActive(0); else { renderModelList(); }
+        let firstIndex = null;
+        appended.forEach((entry, idx) => {
+          const idxResult = addModelEntry(entry, { versionLabel: appended.length > 1 ? `paste #${idx + 1}` : 'paste' });
+          if (firstIndex == null) firstIndex = idxResult;
+        });
+        if (activeIndex === -1 && firstIndex != null) setActive(firstIndex); else { renderModelList(); }
       } catch (e) {
         console.error("[Blockscape] append error:", e);
         alert("Append error (see console).");
@@ -4285,6 +2893,7 @@
       if (!files.length) return;
       try {
         console.log("[Blockscape] reading", files.length, "file(s)");
+        let firstIndex = null;
         for (const f of files) {
           const txt = await f.text();
           const entries = normalizeToModelsFromText(txt, f.name.replace(/\.[^.]+$/, '') || "File");
@@ -4293,13 +2902,14 @@
             continue;
           }
           // Ensure file-derived entries prefer embedded title/id but fall back to filename
-          models.push(...entries.map((en, i) => {
+          entries.forEach((en, i) => {
             const dataTitle = (en.data?.title ?? '').toString().trim();
             const fallbackTitle = entries.length > 1 ? `${f.name} #${i + 1}` : f.name;
-            return { ...en, title: dataTitle || fallbackTitle };
-          }));
+            const idxResult = addModelEntry({ ...en, title: dataTitle || fallbackTitle }, { versionLabel: f.name });
+            if (firstIndex == null) firstIndex = idxResult;
+          });
         }
-        if (activeIndex === -1 && models.length) setActive(0);
+        if (activeIndex === -1 && firstIndex != null) setActive(firstIndex);
         else renderModelList();
       } catch (err) {
         console.error("[Blockscape] file load error:", err);
@@ -4327,10 +2937,13 @@
       }
       if (!entries.length) return;
       event.preventDefault();
-      const startIndex = models.length;
-      models.push(...entries);
+      let firstIndex = null;
+      entries.forEach((entry, idx) => {
+        const idxResult = addModelEntry(entry, { versionLabel: entries.length > 1 ? `paste #${idx + 1}` : 'paste' });
+        if (firstIndex == null) firstIndex = idxResult;
+      });
       console.log(`[Blockscape] pasted ${entries.length} model(s) from clipboard`);
-      setActive(startIndex);
+      if (firstIndex != null) setActive(firstIndex);
     }
 
     // Switch active model from sidebar
@@ -4382,8 +2995,9 @@
           urlInput.focus();
           return;
         }
-        const ok = await loadFromUrl(url);
-        if (ok) {
+        const idx = await loadFromUrl(url);
+        if (typeof idx === 'number') {
+          setActive(idx);
           urlInput.value = '';
           const hint = document.getElementById('urlHint');
           if (hint) hint.textContent = '';
@@ -4421,12 +3035,19 @@
 
     // Load JSON files from same directory (for static hosting)
     async function loadJsonFiles() {
-      const jsonFiles = ['APIs.bs','wardley.bs'];
+      const jsonFiles = ['NFR.bs', 'planets.bs'];
+      const joinPath = (name) => {
+        if (!ASSET_BASE) return name;
+        return ASSET_BASE.endsWith('/') ? `${ASSET_BASE}${name}` : `${ASSET_BASE}/${name}`;
+      };
       
       for (const filename of jsonFiles) {
         try {
-          const response = await fetch(filename, { cache: 'no-store' });
-          if (!response.ok) continue;
+          const response = await fetch(joinPath(filename), { cache: 'no-store' });
+          if (!response.ok) {
+            console.warn(`[Blockscape] ${filename} not fetched (${response.status}); skipping`);
+            continue;
+          }
 
           const text = await response.text();
           const baseName = filename.replace(/\.[^.]+$/, '') || 'Model';
@@ -4436,12 +3057,16 @@
             continue;
           }
 
-          models.push(...entries);
+          entries.forEach((entry) => {
+            addModelEntry(entry, { versionLabel: filename });
+          });
           console.log(`[Blockscape] loaded ${entries.length} model(s) from ${filename}`);
         } catch (error) {
-          console.log("[Blockscape] could not load", filename, "- this is normal for file:// protocol");
+          console.log("[Blockscape] could not load", filename, "- this is normal for file:// protocol", error);
         }
       }
+
+      renderModelList();
     }
 
     async function fetchTextWithCacheBypass(url) {
@@ -4577,31 +3202,41 @@
         if (!entries.length) {
           throw new Error('No JSON objects found in response.');
         }
-        models.push(...entries.map((entry, idx) => {
+        let firstIndex = null;
+        entries.forEach((entry, idx) => {
           const dataTitle = (entry.data?.title ?? '').toString().trim();
           const fallbackTitle = entries.length > 1 ? `${baseName} #${idx + 1}` : baseName;
-          return {
+          const idxResult = addModelEntry({
             ...entry,
             title: dataTitle || fallbackTitle
-          };
-        }));
+          }, { versionLabel: baseName });
+          if (firstIndex == null) firstIndex = idxResult;
+        });
         console.log(`[Blockscape] loaded ${entries.length} model(s) from URL:`, baseName);
-        if (activeIndex === -1) {
-          setActive(0);
+        if (activeIndex === -1 && firstIndex != null) {
+          setActive(firstIndex);
         } else {
           renderModelList();
         }
-        return true;
+        return firstIndex;
       } catch (error) {
         console.error("[Blockscape] URL load error:", error);
         alert(`Failed to load JSON from URL: ${error.message}`);
-        return false;
+        return null;
       }
     }
 
     // Bootstrap with Blockscape
     (async function bootstrap() {
-      const seedObj = JSON.parse(document.getElementById('seed').innerHTML.trim());
+      const seedEl = document.getElementById('seed');
+      if (!seedEl) {
+        throw new Error('Seed template not found in document.');
+      }
+      const seedRaw = (seedEl.textContent || seedEl.innerHTML || '').trim();
+      if (!seedRaw) {
+        throw new Error('Seed template is empty.');
+      }
+      const seedObj = JSON.parse(seedRaw);
       ensureModelMetadata(seedObj, { titleHint: seedObj.title || 'Blockscape', idHint: seedObj.id || 'blockscape' });
       
       models.push({ id: uid(), title: seedObj.title || "Blockscape", data: seedObj });
@@ -4611,7 +3246,8 @@
       
       // Load explicit model from URL hash/search (?load= or #load=)
       const loadIndex = await consumeLoadParam();
-      const editorIndex = consumeEditorPayload();
+      const editorResult = consumeEditorPayload();
+      const editorIndex = editorResult?.index;
       const shareIndex = consumeShareLink();
       const initialIndex = typeof loadIndex === 'number'
         ? loadIndex
@@ -4620,7 +3256,4 @@
           : (typeof editorIndex === 'number' ? editorIndex : 0));
       setActive(initialIndex);
     })();
-  </script>
-</body>
-
-</html>
+}

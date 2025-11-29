@@ -1,5 +1,5 @@
 {
-"id": "mercury-model",
+"id": "planets",
 "title": "Mercury Exploration Model",
 "abstract": "Value chain for understanding and exploring Mercury.",
 "categories": [
@@ -49,7 +49,7 @@
 }
 %%%
 {
-"id": "venus-model",
+"id": "planets",
 "title": "Venus Exploration Model",
 "abstract": "Value chain for atmospheric and surface study of Venus.",
 "categories": [
@@ -98,7 +98,7 @@
 }
 %%%
 {
-"id": "earth-model",
+"id": "planets",
 "title": "Earth Systems Model",
 "abstract": "Value chain for observing and managing Earth systems.",
 "categories": [
@@ -142,14 +142,14 @@
 "id": "moons",
 "title": "Moons",
 "items": [
-{ "id": "moon-earth", "name": "Moon", "deps": [] }
+{ "id": "moon-earth", "name": "Moon", "deps": [], "external": "https://en.wikipedia.org/wiki/Moon", "logo": "https://favicon.im/wikipedia.org" }
 ]
 }
 ]
 }
 %%%
 {
-"id": "mars-model",
+"id": "planets",
 "title": "Mars Exploration Model",
 "abstract": "Value chain for robotic and human exploration of Mars.",
 "categories": [
@@ -193,15 +193,15 @@
 "id": "moons",
 "title": "Moons",
 "items": [
-{ "id": "phobos", "name": "Phobos", "deps": [] },
-{ "id": "deimos", "name": "Deimos", "deps": [] }
+{ "id": "phobos", "name": "Phobos", "deps": [], "external": "https://en.wikipedia.org/wiki/Phobos_(moon)", "logo": "https://favicon.im/wikipedia.org" },
+{ "id": "deimos", "name": "Deimos", "deps": [], "external": "https://en.wikipedia.org/wiki/Deimos", "logo": "https://favicon.im/wikipedia.org" }
 ]
 }
 ]
 }
 %%%
 {
-"id": "jupiter-model",
+"id": "planets",
 "title": "Jupiter Study Model",
 "abstract": "Value chain for observing Jupiter and its system.",
 "categories": [
@@ -245,17 +245,17 @@
 "id": "moons",
 "title": "Moons",
 "items": [
-{ "id": "io", "name": "Io", "deps": [] },
-{ "id": "europa", "name": "Europa", "deps": [] },
-{ "id": "ganymede", "name": "Ganymede", "deps": [] },
-{ "id": "callisto", "name": "Callisto", "deps": [] }
+{ "id": "io", "name": "Io", "deps": [], "external": "https://en.wikipedia.org/wiki/Io_(moon)", "logo": "https://favicon.im/wikipedia.org" },
+{ "id": "europa", "name": "Europa", "deps": [], "external": "https://en.wikipedia.org/wiki/Europa_(moon)", "logo": "https://favicon.im/wikipedia.org" },
+{ "id": "ganymede", "name": "Ganymede", "deps": [], "external": "https://en.wikipedia.org/wiki/Ganymede_(moon)", "logo": "https://favicon.im/wikipedia.org" },
+{ "id": "callisto", "name": "Callisto", "deps": [], "external": "https://en.wikipedia.org/wiki/Callisto_(moon)", "logo": "https://favicon.im/wikipedia.org" }
 ]
 }
 ]
 }
 %%%
 {
-"id": "saturn-model",
+"id": "planets",
 "title": "Saturn Study Model",
 "abstract": "Value chain for examining Saturn and its rings.",
 "categories": [
@@ -299,16 +299,16 @@
 "id": "moons",
 "title": "Moons",
 "items": [
-{ "id": "titan", "name": "Titan", "deps": [] },
-{ "id": "enceladus", "name": "Enceladus", "deps": [] },
-{ "id": "rhea", "name": "Rhea", "deps": [] }
+{ "id": "titan", "name": "Titan", "deps": [], "external": "https://en.wikipedia.org/wiki/Titan_(moon)", "logo": "https://favicon.im/wikipedia.org" },
+{ "id": "enceladus", "name": "Enceladus", "deps": [], "external": "https://en.wikipedia.org/wiki/Enceladus", "logo": "https://favicon.im/wikipedia.org" },
+{ "id": "rhea", "name": "Rhea", "deps": [], "external": "https://en.wikipedia.org/wiki/Rhea_(moon)", "logo": "https://favicon.im/wikipedia.org" }
 ]
 }
 ]
 }
 %%%
 {
-"id": "uranus-model",
+"id": "planets",
 "title": "Uranus Study Model",
 "abstract": "Value chain for analyzing Uranus' atmosphere and axial tilt effects.",
 "categories": [
@@ -352,17 +352,17 @@
 "id": "moons",
 "title": "Moons",
 "items": [
-{ "id": "titania", "name": "Titania", "deps": [] },
-{ "id": "oberon", "name": "Oberon", "deps": [] },
-{ "id": "umbriel", "name": "Umbriel", "deps": [] },
-{ "id": "ariel", "name": "Ariel", "deps": [] }
+{ "id": "titania", "name": "Titania", "deps": [], "external": "https://en.wikipedia.org/wiki/Titania_(moon)", "logo": "https://favicon.im/wikipedia.org" },
+{ "id": "oberon", "name": "Oberon", "deps": [], "external": "https://en.wikipedia.org/wiki/Oberon_(moon)", "logo": "https://favicon.im/wikipedia.org" },
+{ "id": "umbriel", "name": "Umbriel", "deps": [], "external": "https://en.wikipedia.org/wiki/Umbriel_(moon)", "logo": "https://favicon.im/wikipedia.org" },
+{ "id": "ariel", "name": "Ariel", "deps": [], "external": "https://en.wikipedia.org/wiki/Ariel_(moon)", "logo": "https://favicon.im/wikipedia.org" }
 ]
 }
 ]
 }
 %%%
 {
-"id": "neptune-model",
+"id": "planets",
 "title": "Neptune Study Model",
 "abstract": "Value chain for distant observation of Neptune.",
 "categories": [
@@ -406,9 +406,9 @@
 "id": "moons",
 "title": "Moons",
 "items": [
-{ "id": "triton", "name": "Triton", "deps": [] },
-{ "id": "proteus", "name": "Proteus", "deps": [] },
-{ "id": "nereid", "name": "Nereid", "deps": [] }
+{ "id": "triton", "name": "Triton", "deps": [], "external": "https://en.wikipedia.org/wiki/Triton_(moon)", "logo": "https://favicon.im/wikipedia.org" },
+{ "id": "proteus", "name": "Proteus", "deps": [], "external": "https://en.wikipedia.org/wiki/Proteus_(moon)", "logo": "https://favicon.im/wikipedia.org" },
+{ "id": "nereid", "name": "Nereid", "deps": [], "external": "https://en.wikipedia.org/wiki/Nereid_(moon)", "logo": "https://favicon.im/wikipedia.org" }
 ]
 }
 ]

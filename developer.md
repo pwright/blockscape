@@ -1,4 +1,6 @@
-# Developer Critique: `index.html`
+# Developer Notes (Svelte + legacy `index.html`)
+
+The primary experience now ships from `svelte/` (Vite + Svelte). The notes below remain relevant only if you keep maintaining the legacy root `index.html` fallback; the Svelte entry point avoids many of these concerns by splitting logic into modules and handling lifecycle through the framework.
 
 ## Architecture & Maintainability
 - All styling and client logic live inline in the HTML via the `<style>` and `<script>` blocks (`index.html:9`, `index.html:1281`). That makes the page a single ~3k line asset that cannot be linted, type-checked, or tree-shaken independently, so even small UI tweaks require editing this monolith and redeploying the whole file. Breaking the UI into modules (CSS files, ES modules, or a build step) would make reuse, testing, and code review dramatically simpler.
