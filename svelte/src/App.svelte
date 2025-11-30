@@ -150,7 +150,7 @@
 
 <svelte:head>
   <title>Blockscape — simple landscape-style tiles</title>
-  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
 </svelte:head>
 
 <div class="pf-v5-c-page">
