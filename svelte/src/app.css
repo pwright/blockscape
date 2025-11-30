@@ -843,6 +843,13 @@
       box-shadow: var(--color-shadow);
     }
 
+    .blockscape-abstract a {
+      color: var(--color-primary);
+      font-weight: var(--font-weight-semibold);
+      text-decoration: underline;
+      word-break: break-all;
+    }
+
     .blockscape-abstract-panel {
       display: flex;
       flex-direction: column;

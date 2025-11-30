@@ -2057,7 +2057,7 @@ export function initBlockscape() {
         textNodes.push(walker.currentNode);
       }
 
-      textNodes.forEach(node => convertTextNodeGistLinks(node));
+      textNodes.forEach(node => convertTextNodeLinks(node));
 
       container.querySelectorAll('a[href]').forEach(anchor => {
         const href = anchor.getAttribute('href');
@@ -2067,16 +2067,17 @@ export function initBlockscape() {
       });
     }
 
-    function convertTextNodeGistLinks(node) {
+    function convertTextNodeLinks(node) {
       if (!node || !node.nodeValue || !node.nodeValue.includes('http')) return;
+      if (node.parentNode?.closest?.('a')) {
+        return; // Skip text already wrapped in a link to avoid nesting anchors
+      }
       const text = node.nodeValue;
       const regex = /(https?:\/\/[^\s<]+)/gi;
       const matches = [];
       let match;
       while ((match = regex.exec(text)) !== null) {
-        if (isGistUrl(match[0])) {
-          matches.push({ url: match[0], index: match.index });
-        }
+        matches.push({ url: match[0], index: match.index });
       }
       if (!matches.length) return;
 
@@ -2086,7 +2087,7 @@ export function initBlockscape() {
         if (index > cursor) {
           fragment.appendChild(document.createTextNode(text.slice(cursor, index)));
         }
-        fragment.appendChild(createGistLinkAnchor(url));
+        fragment.appendChild(createAutoLinkAnchor(url));
         cursor = index + url.length;
       });
       if (cursor < text.length) {
@@ -2095,13 +2096,15 @@ export function initBlockscape() {
       node.parentNode.replaceChild(fragment, node);
     }
 
-    function createGistLinkAnchor(url) {
+    function createAutoLinkAnchor(url) {
       const anchor = document.createElement('a');
       anchor.href = url;
       anchor.textContent = url;
       anchor.target = '_blank';
       anchor.rel = 'noopener noreferrer';
-      attachGistLinkBehavior(anchor, url);
+      if (isGistUrl(url)) {
+        attachGistLinkBehavior(anchor, url);
+      }
       return anchor;
     }
 
