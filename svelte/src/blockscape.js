@@ -1,4 +1,5 @@
 import { createApicurioIntegration } from './apicurio';
+import { collectAllItemIds, createItemEditor, updateItemReferences } from './itemEditor';
 
 const ASSET_BASE = (typeof import.meta !== 'undefined' && import.meta.env?.BASE_URL) || '';
 
@@ -21,6 +22,7 @@ export function initBlockscape() {
     const previewClose = preview.querySelector('.item-preview__close');
     const downloadButton = document.getElementById('downloadJson');
     const shareButton = document.getElementById('shareModel');
+    const createVersionButton = document.getElementById('createVersion');
     const editButton = document.getElementById('openInEditor');
     const copyJsonButton = document.getElementById('copyJson');
     const pasteJsonButton = document.getElementById('pasteJson');
@@ -179,6 +181,10 @@ export function initBlockscape() {
       return data;
     }
 
+    function cloneModelData(data) {
+      return JSON.parse(JSON.stringify(data));
+    }
+
     function getModelTitle(entry, fallback = 'Untitled Model') {
       if (!entry) return fallback;
       const candidate = (entry.data?.title ?? entry.title ?? '').toString().trim();
@@ -198,6 +204,52 @@ export function initBlockscape() {
       const trimmed = candidate.toString().trim();
       return trimmed || null;
     }
+
+    function collectAllItemIds(modelData) {
+      const ids = new Set();
+      (modelData?.categories || []).forEach(cat => (cat.items || []).forEach(it => {
+        if (it?.id) ids.add(it.id);
+      }));
+      return ids;
+    }
+
+    function findItemAndCategoryById(itemId) {
+      if (activeIndex < 0 || !itemId) return null;
+      const mobj = models[activeIndex].data;
+      const categories = mobj?.categories || [];
+      for (const cat of categories) {
+        const items = cat.items || [];
+        const found = items.find(it => it.id === itemId);
+        if (found) {
+          return { category: cat, item: found, modelData: mobj };
+        }
+      }
+      return null;
+    }
+
+    function makeUniqueItemId(base, modelData) {
+      const ids = collectAllItemIds(modelData);
+      let candidate = makeDownloadName(base || 'item') || `item-${uid()}`;
+      if (!ids.has(candidate)) return candidate;
+      const suffix = () => uid().slice(0, 4);
+      while (ids.has(candidate)) {
+        candidate = `${makeDownloadName(base || 'item')}-${suffix()}`;
+      }
+      return candidate;
+    }
+
+    const itemEditor = createItemEditor({
+      findItemAndCategoryById,
+      collectAllItemIds,
+      updateItemReferences,
+      loadActiveIntoEditor,
+      rebuildFromActive,
+      select: (id) => select(id),
+      onSelectionRenamed: (oldId, newId) => {
+        if (selection === oldId) selection = newId;
+        if (lastDeletedItem?.item?.id === oldId) lastDeletedItem.item.id = newId;
+      }
+    });
 
     function addModelEntry(entry, { versionLabel, createdOn } = {}) {
       const modelId = getModelId(entry);
@@ -230,6 +282,28 @@ export function initBlockscape() {
       target.title = getModelTitle(entry) || target.title;
       target.isSeries = true;
       return existingIndex;
+    }
+
+    function createNewVersionFromActive({ versionLabel } = {}) {
+      if (activeIndex < 0 || !models[activeIndex]) {
+        throw new Error('Load or select a model before creating a version.');
+      }
+      let copy;
+      try {
+        copy = cloneModelData(models[activeIndex].data);
+      } catch (error) {
+        console.warn('[Blockscape] failed to clone active model for versioning', error);
+        throw new Error('Could not copy the current model.');
+      }
+      ensureModelMetadata(copy, {
+        titleHint: getModelTitle(models[activeIndex]),
+        idHint: getModelId(models[activeIndex])
+      });
+      const idx = addModelEntry({
+        title: getModelTitle(models[activeIndex]),
+        data: copy
+      }, { versionLabel: versionLabel || 'manual', createdOn: new Date().toISOString() });
+      return idx;
     }
 
     function syncDocumentTitle() {
@@ -939,6 +1013,13 @@ export function initBlockscape() {
         });
 
         renderHost.appendChild(section);
+
+        const addTile = document.createElement('button');
+        addTile.type = 'button';
+        addTile.className = 'tile-add';
+        addTile.innerHTML = '<span class="tile-add__icon" aria-hidden="true">+</span><span class="tile-add__label"></span>';
+        addTile.addEventListener('click', () => addItemToCategory(cat.id));
+        grid.appendChild(addTile);
       });
 
       model.reusedLocal.forEach(id => {
@@ -1105,7 +1186,7 @@ export function initBlockscape() {
       preview.classList.remove('is-visible', 'item-preview--has-frame', 'item-preview--expanded');
       preview.setAttribute('aria-hidden', 'true');
       preview.hidden = true;
-      setPreviewActions('');
+      setPreviewActions([]);
     }
 
     function showPreviewAt(x, y) {
@@ -1135,24 +1216,24 @@ export function initBlockscape() {
       preview.style.top = `${top}px`;
     }
 
-    function setPreviewActions(url) {
+    function setPreviewActions(actions = []) {
       if (!previewActions) return;
       previewActions.innerHTML = '';
-      if (url) {
+      actions.forEach((actionDef) => {
         const action = document.createElement('button');
         action.type = 'button';
         action.className = 'item-preview__action';
-        action.innerHTML = 'Open external link <span aria-hidden="true">↗</span>';
-        action.title = url;
+        action.textContent = actionDef.label || 'Action';
+        if (actionDef.title) action.title = actionDef.title;
         action.addEventListener('click', (event) => {
           event.stopPropagation();
-          window.open(url, '_blank', 'noopener');
+          if (typeof actionDef.onClick === 'function') {
+            actionDef.onClick(event);
+          }
         });
         previewActions.appendChild(action);
-        previewActions.hidden = false;
-      } else {
-        previewActions.hidden = true;
-      }
+      });
+      previewActions.hidden = actions.length === 0;
     }
 
     async function handleTileContextMenu(event, tile) {
@@ -1165,7 +1246,23 @@ export function initBlockscape() {
       const filepath = filename ? `items/${filename}` : '';
       const requestId = ++previewRequestId;
       const externalUrl = tile.dataset.externalUrl || '';
-      setPreviewActions(externalUrl);
+      const actionList = [{
+        label: 'Edit',
+        title: 'Edit this item',
+        onClick: () => {
+          hidePreview();
+          itemEditor.open(id);
+        }
+      }];
+      if (externalUrl) {
+        actionList.push({
+          label: 'Open link ↗',
+          title: externalUrl,
+          onClick: () => window.open(externalUrl, '_blank', 'noopener')
+        });
+      }
+      setPreviewActions(actionList);
+      if (id) select(id);
 
       previewTitle.textContent = displayName;
       previewBody.innerHTML = '<div class="item-preview__status">Loading…</div>';
@@ -1228,6 +1325,22 @@ export function initBlockscape() {
     if (downloadButton) {
       downloadButton.addEventListener('click', () => {
         downloadCurrentJson('button');
+      });
+    }
+
+    if (createVersionButton) {
+      createVersionButton.addEventListener('click', () => {
+        if (activeIndex < 0) {
+          alert('Load or select a model before creating a version.');
+          return;
+        }
+        try {
+          const idx = createNewVersionFromActive({ versionLabel: 'map edit' });
+          setActive(idx);
+          console.log('[Blockscape] created new version from map view');
+        } catch (error) {
+          alert(error?.message || 'Unable to create a new version right now.');
+        }
       });
     }
 
@@ -1349,6 +1462,11 @@ export function initBlockscape() {
     }
 
     document.addEventListener('keydown', (event) => {
+      const isEditingItem = itemEditor?.isOpen?.();
+      if (isEditingItem) {
+        return;
+      }
+
       if ((event.ctrlKey || event.metaKey) && event.code === 'KeyS') {
         event.preventDefault();
         downloadCurrentJson('shortcut');
@@ -1408,6 +1526,15 @@ export function initBlockscape() {
         const removed = deleteSelectedItem();
         if (removed) {
           event.preventDefault();
+        }
+      }
+
+      if (event.key === 'F2') {
+        if (!shouldHandleGlobalPaste()) return;
+        const targetId = selection || event.target?.closest?.('.tile')?.dataset?.id;
+        if (targetId) {
+          const opened = itemEditor.open(targetId);
+          if (opened) event.preventDefault();
         }
       }
     });
@@ -1510,6 +1637,34 @@ export function initBlockscape() {
       // keep editor in sync
       loadActiveIntoEditor();
       rebuildFromActive();
+    }
+
+    function addItemToCategory(categoryId) {
+      if (activeIndex < 0 || !categoryId) return;
+      const mobj = models[activeIndex].data;
+      const categories = mobj.categories || [];
+      const category = categories.find(cat => cat.id === categoryId);
+      if (!category) return;
+
+      category.items = category.items || [];
+      const defaultName = `New item ${category.items.length + 1}`;
+      const newId = makeUniqueItemId(`${categoryId}-${category.items.length + 1}`, mobj);
+      const newItem = {
+        id: newId,
+        name: defaultName,
+        deps: []
+      };
+      category.items.push(newItem);
+
+      loadActiveIntoEditor();
+      rebuildFromActive();
+      hidePreview();
+      select(newItem.id);
+      const created = index.get(newItem.id);
+      if (created?.el) {
+        created.el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+      }
+      console.log("[Blockscape] added item", newItem.id, "to", categoryId);
     }
 
     function moveSelectionWithinCategory(step) {

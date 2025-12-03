@@ -182,13 +182,14 @@
               <div id="urlHint" class="url-hint" aria-live="polite"></div>
             </form>
              
-  
+ 
             <label class="pf-v5-c-button pf-m-secondary blockscape-file">
               <span>Load File(s)</span>
               <input id="file" type="file" accept=".bs,.json,.txt" multiple />
             </label>
  
             <button id="openInEditor" class="pf-v5-c-button pf-m-primary" type="button" title="Open current JSON in the editor">Edit</button>
+            <button id="createVersion" class="pf-v5-c-button pf-m-secondary" type="button" title="Create a new version from the current map">New version</button>
             
             <button id="shareModel" class="pf-v5-c-button pf-m-primary" type="button" title="Copy a shareable URL for this model">Share</button>
           </div>
