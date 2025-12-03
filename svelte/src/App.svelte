@@ -15,6 +15,7 @@
         {
           "id": "gestalt",
           "name": "Visualise to understand",
+          "logo": "./logos/block-mind-blown.gif",
           "deps": []
         },
         {
@@ -30,6 +31,7 @@
         {
           "id": "relational-awareness",
           "name": "Relations",
+          "logo": "./logos/relations.png",
           "deps": []
         },
         {
@@ -118,6 +120,7 @@
         {
           "id": "move-items",
           "name": "Move (shift - arrow keys)",
+          "logo": "./logos/block-swap.gif",
           "deps": []
         }
       ]
