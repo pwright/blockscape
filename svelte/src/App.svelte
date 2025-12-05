@@ -234,6 +234,8 @@
             <div class="blockscape-json-actions">
               <button id="copyJson" class="pf-v5-c-button pf-m-tertiary" type="button"
                 title="Copy the current JSON to your clipboard">Copy</button>
+              <button id="copySeries" class="pf-v5-c-button pf-m-tertiary" type="button"
+                title="Copy every version in this series as an array">Copy series</button>
               <button id="pasteJson" class="pf-v5-c-button pf-m-tertiary" type="button"
                 title="Paste clipboard JSON to replace the editor contents">Paste</button>
               <button id="appendFromBox" class="pf-v5-c-button pf-m-primary" type="button">Append model(s)</button>
@@ -250,6 +252,11 @@
       </div>
     </div>
   </main>
+  <footer class="pf-v5-c-page__footer blockscape-footer">
+    <div class="blockscape-footer__inner">
+      <a href="https://pwright.github.io/backscape/" target="_blank" rel="noreferrer noopener">Old versions</a>
+    </div>
+  </footer>
 </div>
 
 {@html `<script id="seed" type="application/json">${seedText}</script>`}

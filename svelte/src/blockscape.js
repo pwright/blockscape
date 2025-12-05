@@ -25,6 +25,7 @@ export function initBlockscape() {
     const createVersionButton = document.getElementById('createVersion');
     const editButton = document.getElementById('openInEditor');
     const copyJsonButton = document.getElementById('copyJson');
+    const copySeriesButton = document.getElementById('copySeries');
     const pasteJsonButton = document.getElementById('pasteJson');
     const helpButton = document.getElementById('helpButton');
     const shortcutHelp = document.getElementById('shortcutHelp');
@@ -62,6 +63,16 @@ export function initBlockscape() {
     let lastDeletedItem = null;
     let shortcutHelpListBuilt = false;
     let lastShortcutTrigger = null;
+    const NOTICE_TIMEOUT_MS = 2000;
+    let pendingSeriesNavigation = null;
+    let noticeEl = null;
+    let noticeTextEl = null;
+    let noticeTimer = null;
+    let infoTooltipAutoHideTimer = null;
+    let infoTabButton = null;
+    let activeInfoTooltipHtml = '';
+    let pendingInfoPreview = false;
+    let infoTabTwinkleTimer = null;
     apicurio.hydrateConfig();
 
     // ===== Utilities =====
@@ -129,6 +140,21 @@ export function initBlockscape() {
         .replace(/[^a-z0-9._-]+/g, '-')
         .replace(/-+/g, '-')
         .replace(/^-|-$/g, '') || 'blockscape';
+    }
+
+    function promptForSeriesTitle(defaultTitle) {
+      if (typeof window === 'undefined' || typeof window.prompt !== 'function') return null;
+      const response = window.prompt('Name this series', defaultTitle);
+      const trimmed = (response || '').trim();
+      return trimmed || null;
+    }
+
+    function deriveSeriesTitleFromArray(list, titleBase = 'Pasted') {
+      const array = Array.isArray(list) ? list : [];
+      if (!array.length) return `${titleBase} series`;
+      const firstObj = array.find(obj => obj && typeof obj === 'object') || array[0];
+      const candidate = (firstObj?.title ?? '').toString().trim();
+      return candidate || `${titleBase} series`;
     }
 
     function stableStringify(value) {
@@ -214,9 +240,15 @@ export function initBlockscape() {
     }
 
     function getModelDisplayTitle(entry, fallback = 'Untitled Model') {
-      const modelId = getModelId(entry);
       const isSeries = entry?.apicurioVersions?.length > 1 || entry?.isSeries;
-      if (isSeries && modelId) return `${modelId} series`;
+      if (isSeries) {
+        const seriesTitle = (entry?.title ?? '').toString().trim()
+          || (entry?.apicurioArtifactName ?? '').toString().trim();
+        if (seriesTitle) return seriesTitle;
+        const modelId = getModelId(entry);
+        if (modelId) return `${modelId} series`;
+        return fallback;
+      }
       return getModelTitle(entry, fallback);
     }
 
@@ -369,6 +401,28 @@ export function initBlockscape() {
       document.title = modelId ? `${modelId}-blockscape` : defaultDocumentTitle;
     }
 
+    function buildSeriesPayload(entry) {
+      if (!entry) return null;
+      const versions = entry.apicurioVersions;
+      if (!Array.isArray(versions) || versions.length <= 1) return null;
+      return versions.map((ver) => {
+        if (ver && typeof ver === 'object' && 'data' in ver) return ver.data;
+        return ver;
+      });
+    }
+
+    function getActiveSeriesJson() {
+      const active = models[activeIndex];
+      const payload = buildSeriesPayload(active);
+      if (!payload) return null;
+      try {
+        return JSON.stringify(payload, null, 2);
+      } catch (err) {
+        console.warn('[Blockscape] failed to stringify series', err);
+        return null;
+      }
+    }
+
     function downloadCurrentJson(source = 'shortcut', preferSeries = false) {
       const text = jsonBox.value || '';
       if (!text.trim()) {
@@ -376,10 +430,11 @@ export function initBlockscape() {
         return false;
       }
       const active = models[activeIndex];
-      const isSeries = preferSeries && active?.apicurioVersions?.length > 1;
+      const seriesPayload = preferSeries ? buildSeriesPayload(active) : null;
+      const isSeries = Boolean(seriesPayload);
 
       const payloadText = isSeries
-        ? JSON.stringify(active.apicurioVersions.map(v => v.data), null, 2)
+        ? JSON.stringify(seriesPayload, null, 2)
         : text;
 
       const title = getModelTitle(active, 'blockscape');
@@ -427,6 +482,65 @@ export function initBlockscape() {
       } catch (err) {
         window.scrollTo(0, 0);
       }
+    }
+
+    function ensureNoticeElements() {
+      if (noticeEl) return;
+      noticeEl = document.createElement('div');
+      noticeEl.className = 'series-nav-notice';
+      const dot = document.createElement('span');
+      dot.className = 'series-nav-notice__dot';
+      noticeTextEl = document.createElement('span');
+      noticeTextEl.className = 'series-nav-notice__text';
+      noticeEl.appendChild(dot);
+      noticeEl.appendChild(noticeTextEl);
+      document.body.appendChild(noticeEl);
+    }
+
+    function clearNotice() {
+      if (noticeTimer) {
+        clearTimeout(noticeTimer);
+        noticeTimer = null;
+      }
+      if (noticeEl) noticeEl.classList.remove('is-visible');
+      if (noticeTextEl) noticeTextEl.textContent = '';
+    }
+
+    function clearSeriesNavNotice() {
+      pendingSeriesNavigation = null;
+      clearNotice();
+    }
+
+    function describeSeriesVersion(entry, versionIndex) {
+      if (!entry?.apicurioVersions?.[versionIndex]) return `version ${versionIndex + 1}`;
+      const label = entry.apicurioVersions[versionIndex].version;
+      return label ? `version "${label}"` : `version ${versionIndex + 1}`;
+    }
+
+    function showSeriesNavNotice(id, targetVersionIndex, entry) {
+      ensureNoticeElements();
+      pendingSeriesNavigation = { id, targetVersionIndex };
+      const label = describeSeriesVersion(entry, targetVersionIndex);
+      showNotice(`Click again to open ${label} in this series.`);
+    }
+
+    function showNotice(message, timeout = NOTICE_TIMEOUT_MS, linkHref = null) {
+      ensureNoticeElements();
+      noticeTextEl.textContent = '';
+      noticeTextEl.appendChild(document.createTextNode(message));
+      if (linkHref) {
+        const spacer = document.createTextNode(' ');
+        const link = document.createElement('a');
+        link.href = linkHref;
+        link.target = '_blank';
+        link.rel = 'noopener';
+        link.textContent = linkHref;
+        noticeTextEl.appendChild(spacer);
+        noticeTextEl.appendChild(link);
+      }
+      noticeEl.classList.add('is-visible');
+      if (noticeTimer) clearTimeout(noticeTimer);
+      noticeTimer = setTimeout(() => clearNotice(), timeout);
     }
 
     function renderShortcutHelpList() {
@@ -516,11 +630,13 @@ export function initBlockscape() {
 
     function setActive(i) {
       hidePreview();
+      clearSeriesNavNotice();
       lastDeletedItem = null;
       if (i < 0 || i >= models.length) {
         console.warn("[Blockscape] setActive called with out-of-range index:", i);
         return;
       }
+      pendingInfoPreview = true;
       activeIndex = i;
       console.log("[Blockscape] active model:", getModelTitle(models[i]), "(index", i + " )");
       syncDocumentTitle();
@@ -586,13 +702,21 @@ export function initBlockscape() {
     }
 
     function loadActiveIntoEditor() {
-      if (activeIndex < 0) { jsonBox.value = ""; return; }
-      jsonBox.value = JSON.stringify(models[activeIndex].data, null, 2);
+      if (activeIndex < 0) {
+        jsonBox.value = "";
+        if (copySeriesButton) copySeriesButton.disabled = true;
+        return;
+      }
+      const active = models[activeIndex];
+      jsonBox.value = JSON.stringify(active.data, null, 2);
+      if (copySeriesButton) {
+        copySeriesButton.disabled = !buildSeriesPayload(active);
+      }
     }
 
     function tryParseJson(txt) { try { return JSON.parse(txt); } catch { return null; } }
 
-    function buildSeriesEntry(list, titleBase = "Pasted") {
+    function buildSeriesEntry(list, titleBase = "Pasted", options = {}) {
       const array = Array.isArray(list) ? list : [];
       if (!array.length) return [];
 
@@ -607,7 +731,11 @@ export function initBlockscape() {
       if (!normalized.length) return [];
 
       const first = normalized[0].obj;
-      const seriesTitle = first.title || `${titleBase} series`;
+      const { seriesTitleOverride } = options;
+      let seriesTitle = seriesTitleOverride || first.title || `${titleBase} series`;
+      if (seriesTitleOverride && !first.title) {
+        first.title = seriesTitleOverride;
+      }
       const entry = {
         id: uid(),
         title: seriesTitle,
@@ -622,9 +750,9 @@ export function initBlockscape() {
       return [entry];
     }
 
-    function normalizeToModelsFromValue(value, titleBase = "Pasted") {
+    function normalizeToModelsFromValue(value, titleBase = "Pasted", options = {}) {
       if (Array.isArray(value)) {
-        return buildSeriesEntry(value, titleBase);
+        return buildSeriesEntry(value, titleBase, options);
       }
       if (!value || typeof value !== 'object') return [];
       ensureModelMetadata(value, { titleHint: `${titleBase} #1` });
@@ -636,12 +764,22 @@ export function initBlockscape() {
     }
 
     // Accept 1) object, 2) array-of-objects, 3) '---' or '%%%' separated objects
-    function normalizeToModelsFromText(txt, titleBase = "Pasted") {
+    function normalizeToModelsFromText(txt, titleBase = "Pasted", options = {}) {
       const trimmed = (txt || "").trim();
       if (!trimmed) return [];
       const parsed = tryParseJson(trimmed);
       if (parsed) {
-        const normalized = normalizeToModelsFromValue(parsed, titleBase);
+        let normalizeOptions = options;
+        if (Array.isArray(parsed) && options.promptForSeriesName) {
+          const defaultTitle = deriveSeriesTitleFromArray(parsed, titleBase);
+          const userTitle = promptForSeriesTitle(defaultTitle);
+          normalizeOptions = {
+            ...options,
+            promptForSeriesName: false,
+            seriesTitleOverride: userTitle || defaultTitle
+          };
+        }
+        const normalized = normalizeToModelsFromValue(parsed, titleBase, normalizeOptions);
         if (normalized.length) return normalized;
       }
       const parts = trimmed.split(/^\s*(?:---|%%%)\s*$/m).map(s => s.trim()).filter(Boolean);
@@ -966,6 +1104,7 @@ export function initBlockscape() {
     }
 
     function setActiveApicurioVersion(entryIndex, versionIndex) {
+      clearSeriesNavNotice();
       if (entryIndex < 0 || entryIndex >= models.length) return false;
       const entry = models[entryIndex];
       if (!entry?.apicurioVersions?.length) return false;
@@ -977,6 +1116,7 @@ export function initBlockscape() {
       if (!target?.data) return false;
       entry.apicurioActiveVersionIndex = normalized;
       entry.data = target.data;
+      pendingInfoPreview = true;
       selection = null;
       loadActiveIntoEditor();
       rebuildFromActive();
@@ -1117,6 +1257,8 @@ export function initBlockscape() {
       let infoTooltipHtml = '';
       const seriesIdLookup = buildModelIdToVersionIndex(models[activeIndex]);
       const activeSeriesIndex = getActiveApicurioVersionIndex(models[activeIndex]);
+      infoTabButton = null;
+      activeInfoTooltipHtml = '';
 
       const tabDefs = [
         { id: 'map', label: 'Map', panel: mapPanel },
@@ -1176,6 +1318,7 @@ export function initBlockscape() {
           activateTab(t.id);
         });
         if (t.id === 'abstract') {
+          infoTabButton = t.button;
           t.button.addEventListener('mouseenter', () => showTabTooltip(t.button, infoTooltipHtml, { offset: 12 }));
           t.button.addEventListener('mouseleave', hideTabTooltip);
           t.button.addEventListener('focus', () => showTabTooltip(t.button, infoTooltipHtml, { offset: 12 }));
@@ -1210,6 +1353,7 @@ export function initBlockscape() {
         abstractWrapper.appendChild(placeholder);
         infoTooltipHtml = placeholder.outerHTML;
       }
+      activeInfoTooltipHtml = infoTooltipHtml;
       abstractPanel.appendChild(abstractWrapper);
 
       const sourceWrapper = document.createElement('div');
@@ -1227,6 +1371,7 @@ export function initBlockscape() {
       sourcePanel.appendChild(sourceWrapper);
       apicurio.mount(apicurioPanel);
 
+      let tileCounter = 0;
       model.m.categories.forEach(cat => {
         const section = document.createElement('section');
         section.className = 'category';
@@ -1243,11 +1388,13 @@ export function initBlockscape() {
         section.appendChild(grid);
 
         (cat.items || []).forEach(it => {
+          tileCounter += 1;
           const externalMeta = resolveExternalMeta(it.external);
           const tile = document.createElement('div');
           tile.className = externalMeta.isExternal ? 'tile external' : 'tile';
           tile.tabIndex = 0;
           tile.dataset.id = it.id;
+          tile.dataset.globalIndex = String(tileCounter);
           if (externalMeta.url) { tile.dataset.externalUrl = externalMeta.url; }
           if (seriesIdLookup.has(it.id)) {
             const targetIdx = seriesIdLookup.get(it.id);
@@ -1309,6 +1456,7 @@ export function initBlockscape() {
       wireEvents();
       reflowRects();
       drawLinks();
+      maybeShowInfoTabPreview();
     }
 
     function wireEvents() {
@@ -1316,14 +1464,37 @@ export function initBlockscape() {
         t.addEventListener('click', (event) => {
           if (typeof event.button === 'number' && event.button !== 0) return;
           hidePreview();
-          if (t.dataset.seriesVersionIndex != null) {
-            const target = parseInt(t.dataset.seriesVersionIndex, 10);
-            const changed = Number.isInteger(target) && setActiveApicurioVersion(activeIndex, target);
-            if (changed) return;
-          }
           const id = t.dataset.id;
+          const targetSeriesIndex = t.dataset.seriesVersionIndex != null
+            ? parseInt(t.dataset.seriesVersionIndex, 10)
+            : null;
+          const globalIndex = t.dataset.globalIndex != null ? parseInt(t.dataset.globalIndex, 10) : null;
+          const activeEntry = models[activeIndex];
+          const currentSeriesIndex = activeEntry ? getActiveApicurioVersionIndex(activeEntry) : -1;
+          const canNavigateToSeries = activeEntry?.apicurioVersions?.length > 1
+            && Number.isInteger(targetSeriesIndex)
+            && targetSeriesIndex !== currentSeriesIndex;
+          const pendingMatch = pendingSeriesNavigation
+            && pendingSeriesNavigation.id === id
+            && pendingSeriesNavigation.targetVersionIndex === targetSeriesIndex;
+
+          if (pendingSeriesNavigation && !pendingMatch) {
+            clearSeriesNavNotice();
+          }
+
+          if (canNavigateToSeries) {
+            if (pendingMatch) {
+              clearSeriesNavNotice();
+              const changed = setActiveApicurioVersion(activeIndex, targetSeriesIndex);
+              if (changed) return;
+            } else {
+              showSeriesNavNotice(id, targetSeriesIndex, activeEntry);
+            }
+          } else if (Number.isInteger(globalIndex) && globalIndex > 0 && globalIndex % 5 === 0) {
+            showNotice('Use arrow keys to move between blocks. Shift arrow to move block.');
+          }
           console.log("[Blockscape] click", id);
-          if (selection === id) { clearSelection(); return; }
+          if (selection === id && !(canNavigateToSeries && pendingMatch)) { clearSelection(); return; }
           select(id);
         });
         t.addEventListener('keydown', (e) => {
@@ -1361,6 +1532,10 @@ export function initBlockscape() {
       deps.forEach(d => { const hit = index.get(d); if (hit) hit.el.classList.add('dep'); });
       revs.forEach(r => { const hit = index.get(r); if (hit) hit.el.classList.add('revdep'); });
       drawLinks();
+      const externalUrl = index.get(id)?.el?.dataset?.externalUrl;
+      if (externalUrl) {
+        showNotice('This item has link to', NOTICE_TIMEOUT_MS, externalUrl);
+      }
     }
 
     function clearSelection() { selection = null; clearStyles(); drawLinks(); }
@@ -1453,10 +1628,39 @@ export function initBlockscape() {
     }
 
     function hideTabTooltip() {
+      if (infoTooltipAutoHideTimer) {
+        clearTimeout(infoTooltipAutoHideTimer);
+        infoTooltipAutoHideTimer = null;
+      }
       if (!tabTooltip) return;
       tabTooltip.classList.remove('is-visible');
       tabTooltip.setAttribute('aria-hidden', 'true');
       tabTooltip.hidden = true;
+    }
+
+    function maybeShowInfoTabPreview() {
+      if (!pendingInfoPreview) return;
+      pendingInfoPreview = false;
+      if (!infoTabButton || !activeInfoTooltipHtml) return;
+      hideTabTooltip();
+      showTabTooltip(infoTabButton, activeInfoTooltipHtml, { offset: 12 });
+      infoTooltipAutoHideTimer = setTimeout(() => {
+        hideTabTooltip();
+        startInfoTabTwinkle();
+      }, 1000);
+    }
+
+    function startInfoTabTwinkle() {
+      if (!infoTabButton) return;
+      if (infoTabTwinkleTimer) {
+        clearTimeout(infoTabTwinkleTimer);
+        infoTabTwinkleTimer = null;
+      }
+      infoTabButton.classList.add('blockscape-tab--twinkle');
+      infoTabTwinkleTimer = setTimeout(() => {
+        infoTabButton.classList.remove('blockscape-tab--twinkle');
+        infoTabTwinkleTimer = null;
+      }, 1400);
     }
 
     window.addEventListener('scroll', hideTabTooltip, true);
@@ -2244,6 +2448,22 @@ export function initBlockscape() {
       });
     }
 
+    if (copySeriesButton) {
+      copySeriesButton.addEventListener('click', async () => {
+        const seriesJson = getActiveSeriesJson();
+        if (!seriesJson) {
+          alert('No series available to copy. Create another version first.');
+          return;
+        }
+        const copied = await writeTextToClipboard(seriesJson);
+        if (copied) {
+          alert('Series JSON copied to clipboard.');
+        } else {
+          window.prompt('Copy this series JSON manually:', seriesJson);
+        }
+      });
+    }
+
     if (pasteJsonButton) {
       pasteJsonButton.addEventListener('click', async () => {
         try {
@@ -2264,7 +2484,7 @@ export function initBlockscape() {
     // Append models from textarea
     document.getElementById('appendFromBox').onclick = () => {
       try {
-        const appended = normalizeToModelsFromText(jsonBox.value, "Pasted");
+        const appended = normalizeToModelsFromText(jsonBox.value, "Pasted", { promptForSeriesName: true });
         if (!appended.length) { alert("No valid JSON found to append."); return; }
         console.log("[Blockscape] appending", appended.length, "model(s)");
         let firstIndex = null;
@@ -2355,7 +2575,7 @@ export function initBlockscape() {
       if (!looksLikeModelJson(text)) return;
       let entries = [];
       try {
-        entries = normalizeToModelsFromText(text, 'Clipboard');
+        entries = normalizeToModelsFromText(text, 'Clipboard', { promptForSeriesName: true });
       } catch (err) {
         console.warn('[Blockscape] clipboard paste ignored (invalid JSON)', err);
         return;
