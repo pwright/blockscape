@@ -989,6 +989,11 @@
       padding: 0 var(--space-sm) var(--space-xs);
     }
 
+    .tile--series-link .name {
+      color: var(--color-danger);
+      font-weight: var(--font-weight-semibold);
+    }
+
     .badge {
       position: absolute;
       top: var(--space-sm);

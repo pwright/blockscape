@@ -455,21 +455,57 @@ export function initBlockscape() {
 
     function tryParseJson(txt) { try { return JSON.parse(txt); } catch { return null; } }
 
+    function buildSeriesEntry(list, titleBase = "Pasted") {
+      const array = Array.isArray(list) ? list : [];
+      if (!array.length) return [];
+
+      const normalized = array
+        .map((obj, idx) => {
+          if (!obj || typeof obj !== 'object') return null;
+          ensureModelMetadata(obj, { titleHint: `${titleBase} #${idx + 1}` });
+          return { obj, idx };
+        })
+        .filter(Boolean);
+
+      if (!normalized.length) return [];
+
+      const first = normalized[0].obj;
+      const seriesTitle = first.title || `${titleBase} series`;
+      const entry = {
+        id: uid(),
+        title: seriesTitle,
+        data: first,
+        apicurioVersions: normalized.map(({ obj, idx }) => ({
+          version: String(idx + 1),
+          data: obj
+        })),
+        apicurioActiveVersionIndex: 0,
+        isSeries: true
+      };
+      return [entry];
+    }
+
+    function normalizeToModelsFromValue(value, titleBase = "Pasted") {
+      if (Array.isArray(value)) {
+        return buildSeriesEntry(value, titleBase);
+      }
+      if (!value || typeof value !== 'object') return [];
+      ensureModelMetadata(value, { titleHint: `${titleBase} #1` });
+      return [{
+        id: uid(),
+        title: value.title || `${titleBase} #1`,
+        data: value
+      }];
+    }
+
     // Accept 1) object, 2) array-of-objects, 3) '---' or '%%%' separated objects
     function normalizeToModelsFromText(txt, titleBase = "Pasted") {
       const trimmed = (txt || "").trim();
       if (!trimmed) return [];
       const parsed = tryParseJson(trimmed);
       if (parsed) {
-        const arr = Array.isArray(parsed) ? parsed : [parsed];
-        return arr.map((o, idx) => {
-          ensureModelMetadata(o, { titleHint: `${titleBase} #${idx + 1}` });
-          return {
-            id: uid(),
-            title: o.title || `${titleBase} #${idx + 1}`,
-            data: o
-          };
-        });
+        const normalized = normalizeToModelsFromValue(parsed, titleBase);
+        if (normalized.length) return normalized;
       }
       const parts = trimmed.split(/^\s*(?:---|%%%)\s*$/m).map(s => s.trim()).filter(Boolean);
       return parts.map((p, i) => {
@@ -614,20 +650,24 @@ export function initBlockscape() {
         return null;
       }
 
-      if (!payload || typeof payload !== 'object' || typeof payload.data !== 'object') {
+      if (!payload || typeof payload !== 'object' || payload.data == null) {
         console.warn('[Blockscape] share payload missing data');
         return null;
       }
 
-      ensureModelMetadata(payload.data, { titleHint: payload.title || 'Shared Model' });
+      const entries = normalizeToModelsFromValue(payload.data, payload.title || 'Shared Model');
+      if (!entries.length) {
+        console.warn('[Blockscape] share payload did not contain usable models');
+        return null;
+      }
 
-      const idx = addModelEntry({
-        id: uid(),
-        title: payload.data.title || payload.title || 'Shared Model',
-        data: payload.data
-      }, { versionLabel: 'shared' });
+      let firstIndex = null;
+      entries.forEach((entry) => {
+        const idx = addModelEntry(entry, { versionLabel: 'shared' });
+        if (firstIndex == null) firstIndex = idx;
+      });
 
-      return idx;
+      return firstIndex;
     }
 
     async function consumeLoadParam() {
@@ -726,6 +766,15 @@ export function initBlockscape() {
       if (idx === -1) return null;
       const versionEntry = entry.apicurioVersions[idx];
       return versionEntry?.version ?? null;
+    }
+
+    function buildModelIdToVersionIndex(entry) {
+      const map = new Map();
+      (entry?.apicurioVersions || []).forEach((ver, idx) => {
+        const id = (ver?.data?.id ?? '').toString().trim();
+        if (id) map.set(id, idx);
+      });
+      return map;
     }
 
     function setActiveApicurioVersion(entryIndex, versionIndex) {
@@ -852,6 +901,8 @@ export function initBlockscape() {
       const sourcePanel = document.createElement('div');
       const apicurioPanel = document.createElement('div');
       let infoTooltipHtml = '';
+      const seriesIdLookup = buildModelIdToVersionIndex(models[activeIndex]);
+      const activeSeriesIndex = getActiveApicurioVersionIndex(models[activeIndex]);
 
       const tabDefs = [
         { id: 'map', label: 'Map', panel: mapPanel },
@@ -982,6 +1033,15 @@ export function initBlockscape() {
           tile.tabIndex = 0;
           tile.dataset.id = it.id;
           if (externalMeta.url) { tile.dataset.externalUrl = externalMeta.url; }
+          if (seriesIdLookup.has(it.id)) {
+            const targetIdx = seriesIdLookup.get(it.id);
+            tile.dataset.seriesVersionIndex = String(targetIdx);
+            tile.classList.add('tile--series-link');
+            const label = targetIdx === activeSeriesIndex
+              ? 'Current map in this series'
+              : `Open version ${targetIdx + 1} in this series`;
+            tile.title = label;
+          }
 
           const img = document.createElement('img');
           img.className = 'logo';
@@ -1040,6 +1100,11 @@ export function initBlockscape() {
         t.addEventListener('click', (event) => {
           if (typeof event.button === 'number' && event.button !== 0) return;
           hidePreview();
+          if (t.dataset.seriesVersionIndex != null) {
+            const target = parseInt(t.dataset.seriesVersionIndex, 10);
+            const changed = Number.isInteger(target) && setActiveApicurioVersion(activeIndex, target);
+            if (changed) return;
+          }
           const id = t.dataset.id;
           console.log("[Blockscape] click", id);
           if (selection === id) { clearSelection(); return; }
@@ -2347,10 +2412,16 @@ export function initBlockscape() {
       if (!seedRaw) {
         throw new Error('Seed template is empty.');
       }
-      const seedObj = JSON.parse(seedRaw);
-      ensureModelMetadata(seedObj, { titleHint: seedObj.title || 'Blockscape', idHint: seedObj.id || 'blockscape' });
-      
-      models.push({ id: uid(), title: seedObj.title || "Blockscape", data: seedObj });
+      const seedEntries = normalizeToModelsFromText(seedRaw, 'Blockscape');
+      if (!seedEntries.length) {
+        throw new Error('Seed template could not be parsed.');
+      }
+
+      let firstSeedIndex = null;
+      seedEntries.forEach((entry) => {
+        const idx = addModelEntry(entry, { versionLabel: 'seed' });
+        if (firstSeedIndex == null) firstSeedIndex = idx;
+      });
       
       // Try to load JSON files from same directory
       await loadJsonFiles();
@@ -2364,7 +2435,7 @@ export function initBlockscape() {
         ? loadIndex
         : (typeof shareIndex === 'number'
           ? shareIndex
-          : (typeof editorIndex === 'number' ? editorIndex : 0));
+          : (typeof editorIndex === 'number' ? editorIndex : (firstSeedIndex ?? 0)));
       setActive(initialIndex);
     })();
 }
