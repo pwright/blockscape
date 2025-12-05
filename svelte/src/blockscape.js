@@ -26,6 +26,11 @@ export function initBlockscape() {
     const editButton = document.getElementById('openInEditor');
     const copyJsonButton = document.getElementById('copyJson');
     const pasteJsonButton = document.getElementById('pasteJson');
+    const helpButton = document.getElementById('helpButton');
+    const shortcutHelp = document.getElementById('shortcutHelp');
+    const shortcutHelpList = document.getElementById('shortcutHelpList');
+    const shortcutHelpClose = document.getElementById('shortcutHelpClose');
+    const shortcutHelpBackdrop = document.getElementById('shortcutHelpBackdrop');
     const EDITOR_TRANSFER_KEY = 'blockscape:editorPayload';
     const EDITOR_TRANSFER_MESSAGE_TYPE = 'blockscape:editorTransfer';
     const defaultDocumentTitle = document.title;
@@ -53,7 +58,10 @@ export function initBlockscape() {
     let selection = null;
     let previewRequestId = 0;
     let previewAnchor = { x: 0, y: 0 };
+    let lastActiveTabId = 'map';
     let lastDeletedItem = null;
+    let shortcutHelpListBuilt = false;
+    let lastShortcutTrigger = null;
     apicurio.hydrateConfig();
 
     // ===== Utilities =====
@@ -161,6 +169,20 @@ export function initBlockscape() {
       }
     }
 
+    const SHORTCUT_CONFIG = [
+      { keys: [['Cmd/Ctrl', 'S']], description: 'Download the active model JSON (series if multiple versions are open).' },
+      { keys: [['Cmd/Ctrl', 'Z']], description: 'Undo the last deleted tile.' },
+      { keys: [['Arrow Left'], ['Arrow Right']], description: 'Move selection to the previous or next item in the current category.' },
+      { keys: [['Shift', 'Arrow Left'], ['Shift', 'Arrow Right']], description: 'Reorder the selected item inside its category.' },
+      { keys: [['Arrow Up'], ['Arrow Down']], description: 'Jump to the previous or next category while keeping position where possible.' },
+      { keys: [['Shift', 'Arrow Up'], ['Shift', 'Arrow Down']], description: 'Move the selected item to the previous or next category.' },
+      { keys: [['Delete']], description: 'Delete the selected item (use Cmd/Ctrl+Z to undo).' },
+      { keys: [['F2']], description: 'Open the item editor for the selected tile.' },
+      { keys: [['Escape']], description: 'Close the open preview popover.' },
+      { keys: [['Enter'], ['Space']], description: 'Activate a focused tile, same as clicking it.' },
+      { keys: [['Cmd/Ctrl', 'V']], description: 'Append JSON models from the clipboard when focus is outside inputs.' }
+    ];
+
     function ensureModelMetadata(data, { titleHint = 'Untitled Model', idHint } = {}) {
       if (!data || typeof data !== 'object') return data;
       const trimmedTitle = (data.title ?? '').toString().trim();
@@ -203,6 +225,41 @@ export function initBlockscape() {
       if (!candidate) return null;
       const trimmed = candidate.toString().trim();
       return trimmed || null;
+    }
+
+    function getIdFirstWord(idValue) {
+      const raw = (idValue ?? '').toString().trim();
+      if (!raw) return '';
+      const parts = raw.split(/[^a-zA-Z0-9]+/).filter(Boolean);
+      return parts[0] || raw;
+    }
+
+    function persistActiveEdits(entryIndex) {
+      if (entryIndex < 0 || entryIndex >= models.length) return true;
+      if (!jsonBox) return true;
+      const entry = models[entryIndex];
+      const text = (jsonBox.value || '').trim();
+      if (!text) return true;
+      let parsed;
+      try {
+        parsed = JSON.parse(text);
+      } catch (err) {
+        alert('Current JSON is invalid. Fix it before switching versions.');
+        return false;
+      }
+      ensureModelMetadata(parsed, {
+        titleHint: getModelTitle(entry),
+        idHint: getModelId(entry)
+      });
+      const currentFp = computeJsonFingerprint(entry.data);
+      const editedFp = computeJsonFingerprint(parsed);
+      if (currentFp === editedFp) return true;
+      entry.data = parsed;
+      const activeVerIdx = getActiveApicurioVersionIndex(entry);
+      if (activeVerIdx >= 0 && entry.apicurioVersions?.[activeVerIdx]) {
+        entry.apicurioVersions[activeVerIdx].data = parsed;
+      }
+      return true;
     }
 
     function collectAllItemIds(modelData) {
@@ -312,15 +369,23 @@ export function initBlockscape() {
       document.title = modelId ? `${modelId}-blockscape` : defaultDocumentTitle;
     }
 
-    function downloadCurrentJson(source = 'shortcut') {
+    function downloadCurrentJson(source = 'shortcut', preferSeries = false) {
       const text = jsonBox.value || '';
       if (!text.trim()) {
         console.warn("[Blockscape] download ignored: JSON box is empty.");
         return false;
       }
-      const title = getModelTitle(models[activeIndex], 'blockscape');
-      const filename = `${makeDownloadName(title)}.json`;
-      download(filename, text);
+      const active = models[activeIndex];
+      const isSeries = preferSeries && active?.apicurioVersions?.length > 1;
+
+      const payloadText = isSeries
+        ? JSON.stringify(active.apicurioVersions.map(v => v.data), null, 2)
+        : text;
+
+      const title = getModelTitle(active, 'blockscape');
+      const suffix = isSeries ? '-series' : '';
+      const filename = `${makeDownloadName(title)}${suffix}.json`;
+      download(filename, payloadText);
       console.log(`[Blockscape] saved JSON (${source}):`, filename);
       return true;
     }
@@ -361,6 +426,78 @@ export function initBlockscape() {
         window.scrollTo({ top: 0, behavior: 'smooth' });
       } catch (err) {
         window.scrollTo(0, 0);
+      }
+    }
+
+    function renderShortcutHelpList() {
+      if (!shortcutHelpList) return;
+      shortcutHelpList.innerHTML = '';
+      SHORTCUT_CONFIG.forEach((entry) => {
+        const row = document.createElement('div');
+        row.className = 'shortcut-help__row';
+
+        const keys = document.createElement('div');
+        keys.className = 'shortcut-help__keys';
+        entry.keys.forEach((combo, comboIdx) => {
+          if (comboIdx > 0) {
+            const or = document.createElement('span');
+            or.className = 'shortcut-help__or';
+            or.textContent = 'or';
+            keys.appendChild(or);
+          }
+          const comboEl = document.createElement('div');
+          comboEl.className = 'shortcut-help__combo';
+          combo.forEach((part, partIdx) => {
+            if (partIdx > 0) {
+              const sep = document.createElement('span');
+              sep.className = 'shortcut-help__sep';
+              sep.textContent = '+';
+              comboEl.appendChild(sep);
+            }
+            const chip = document.createElement('kbd');
+            chip.className = 'shortcut-help__key';
+            chip.textContent = part;
+            comboEl.appendChild(chip);
+          });
+          keys.appendChild(comboEl);
+        });
+
+        const desc = document.createElement('div');
+        desc.className = 'shortcut-help__desc';
+        desc.textContent = entry.description;
+
+        row.appendChild(keys);
+        row.appendChild(desc);
+        shortcutHelpList.appendChild(row);
+      });
+      shortcutHelpListBuilt = true;
+    }
+
+    function isShortcutHelpOpen() {
+      return !!shortcutHelp && shortcutHelp.hidden === false;
+    }
+
+    function openShortcutHelp() {
+      if (!shortcutHelp) return;
+      if (!shortcutHelpListBuilt) renderShortcutHelpList();
+      lastShortcutTrigger = document.activeElement;
+      shortcutHelp.hidden = false;
+      shortcutHelp.setAttribute('aria-hidden', 'false');
+      document.body.classList.add('shortcut-help-open');
+      const panel = shortcutHelp.querySelector('.shortcut-help__panel');
+      panel?.focus({ preventScroll: true });
+    }
+
+    function closeShortcutHelp() {
+      if (!shortcutHelp || shortcutHelp.hidden) return;
+      shortcutHelp.hidden = true;
+      shortcutHelp.setAttribute('aria-hidden', 'true');
+      document.body.classList.remove('shortcut-help-open');
+      const target = lastShortcutTrigger;
+      if (target?.focus) {
+        target.focus({ preventScroll: true });
+      } else if (helpButton?.focus) {
+        helpButton.focus({ preventScroll: true });
       }
     }
 
@@ -663,7 +800,11 @@ export function initBlockscape() {
 
       let firstIndex = null;
       entries.forEach((entry) => {
-        const idx = addModelEntry(entry, { versionLabel: 'shared' });
+        const seriesName = entry.isSeries ? (payload.title || entry.title) : null;
+        const idx = addModelEntry({
+          ...entry,
+          apicurioArtifactName: seriesName || entry.apicurioArtifactName
+        }, { versionLabel: 'shared' });
         if (firstIndex == null) firstIndex = idx;
       });
 
@@ -777,10 +918,59 @@ export function initBlockscape() {
       return map;
     }
 
+    const thumbnailCache = new WeakMap();
+    function getSeriesThumbnail(entry, versionIdx) {
+      if (!entry?.apicurioVersions?.[versionIdx]) return null;
+      const version = entry.apicurioVersions[versionIdx];
+      const payload = version.data;
+      const fp = computeJsonFingerprint(payload);
+      const cached = thumbnailCache.get(version);
+      if (cached && cached.fingerprint === fp) return cached.dataUrl;
+
+      const width = 160;
+      const height = 90;
+      const canvas = document.createElement('canvas');
+      canvas.width = width; canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#f8fafc';
+      ctx.fillRect(0, 0, width, height);
+      ctx.strokeStyle = '#e5e7eb';
+      ctx.strokeRect(0.5, 0.5, width - 1, height - 1);
+
+      const cats = Array.isArray(payload?.categories) ? payload.categories : [];
+      const catCount = Math.max(cats.length, 1);
+      const colWidth = width / catCount;
+      const topPad = 8;
+      const bottomPad = 8;
+      const dotRadius = 4;
+
+      cats.forEach((cat, cIdx) => {
+        const xCenter = cIdx * colWidth + colWidth / 2;
+        const items = Array.isArray(cat.items) ? cat.items : [];
+        const itemCount = Math.max(items.length, 1);
+        items.forEach((it, iIdx) => {
+          const y = topPad + (iIdx + 0.5) * ((height - topPad - bottomPad) / itemCount);
+          ctx.beginPath();
+          ctx.arc(xCenter, y, dotRadius, 0, Math.PI * 2);
+          const fill = getBadgeColor(it.name || it.id || '', it.color);
+          ctx.fillStyle = fill;
+          ctx.strokeStyle = 'rgba(15,23,42,0.25)';
+          ctx.fill();
+          ctx.stroke();
+        });
+      });
+
+      const dataUrl = canvas.toDataURL('image/png');
+      thumbnailCache.set(version, { fingerprint: fp, dataUrl });
+      return dataUrl;
+    }
+
     function setActiveApicurioVersion(entryIndex, versionIndex) {
       if (entryIndex < 0 || entryIndex >= models.length) return false;
       const entry = models[entryIndex];
       if (!entry?.apicurioVersions?.length) return false;
+      const persisted = persistActiveEdits(entryIndex);
+      if (!persisted) return false;
       const count = entry.apicurioVersions.length;
       const normalized = ((versionIndex % count) + count) % count;
       const target = entry.apicurioVersions[normalized];
@@ -836,6 +1026,30 @@ export function initBlockscape() {
       controls.appendChild(prevBtn);
       controls.appendChild(nextBtn);
       nav.appendChild(controls);
+
+      const thumbs = document.createElement('div');
+      thumbs.className = 'version-nav__thumbs';
+      entry.apicurioVersions.forEach((ver, idx) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'version-nav__thumb';
+        if (idx === activeIdx) btn.classList.add('is-active');
+        const thumbUrl = getSeriesThumbnail(entry, idx);
+        if (thumbUrl) {
+          const img = document.createElement('img');
+          img.src = thumbUrl;
+          img.alt = `Version ${idx + 1}`;
+          btn.appendChild(img);
+        }
+        const lbl = document.createElement('div');
+        lbl.className = 'version-nav__thumb-label';
+        const labelFromId = getIdFirstWord(ver?.data?.id || ver?.id || '');
+        lbl.textContent = labelFromId || (ver?.version ? `v${ver.version}` : `${idx + 1}`);
+        btn.appendChild(lbl);
+        btn.addEventListener('click', () => setActiveApicurioVersion(activeIndex, idx));
+        thumbs.appendChild(btn);
+      });
+      nav.appendChild(thumbs);
 
       return nav;
     }
@@ -945,6 +1159,7 @@ export function initBlockscape() {
       });
 
       const activateTab = (targetId) => {
+        lastActiveTabId = targetId;
         tabDefs.forEach(t => {
           const isActive = t.id === targetId;
           t.button.classList.toggle('is-active', isActive);
@@ -968,7 +1183,8 @@ export function initBlockscape() {
         }
       });
 
-      activateTab(tabDefs[0].id);
+      const initialTabId = tabDefs.find(t => t.id === lastActiveTabId)?.id || tabDefs[0].id;
+      activateTab(initialTabId);
 
       app.appendChild(tabsWrapper);
 
@@ -1372,6 +1588,20 @@ export function initBlockscape() {
       previewClose.addEventListener('click', hidePreview);
     }
 
+    if (helpButton) {
+      helpButton.addEventListener('click', () => {
+        openShortcutHelp();
+      });
+    }
+
+    if (shortcutHelpClose) {
+      shortcutHelpClose.addEventListener('click', closeShortcutHelp);
+    }
+
+    if (shortcutHelpBackdrop) {
+      shortcutHelpBackdrop.addEventListener('click', closeShortcutHelp);
+    }
+
     if (app) {
       app.addEventListener('contextmenu', (event) => {
         const tile = event.target.closest('.tile');
@@ -1527,6 +1757,14 @@ export function initBlockscape() {
     }
 
     document.addEventListener('keydown', (event) => {
+      if (isShortcutHelpOpen()) {
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          closeShortcutHelp();
+        }
+        return;
+      }
+
       const isEditingItem = itemEditor?.isOpen?.();
       if (isEditingItem) {
         return;
@@ -1534,7 +1772,9 @@ export function initBlockscape() {
 
       if ((event.ctrlKey || event.metaKey) && event.code === 'KeyS') {
         event.preventDefault();
-        downloadCurrentJson('shortcut');
+        const active = models[activeIndex];
+        const preferSeries = !!(active?.apicurioVersions?.length > 1);
+        downloadCurrentJson('shortcut', preferSeries);
         return;
       }
 
@@ -2067,18 +2307,30 @@ export function initBlockscape() {
       try {
         console.log("[Blockscape] reading", files.length, "file(s)");
         let firstIndex = null;
-        for (const f of files) {
-          const txt = await f.text();
-          const entries = normalizeToModelsFromText(txt, f.name.replace(/\.[^.]+$/, '') || "File");
-          if (!entries.length) {
-            console.warn("[Blockscape] no models in file:", f.name);
-            continue;
+      for (const f of files) {
+        const txt = await f.text();
+        const baseName = f.name.replace(/\.[^.]+$/, '') || "File";
+        const entries = normalizeToModelsFromText(txt, baseName);
+        if (!entries.length) {
+          console.warn("[Blockscape] no models in file:", f.name);
+          continue;
+        }
+        // Ensure file-derived entries prefer embedded title/id but fall back to filename
+        entries.forEach((en, i) => {
+          const dataTitle = (en.data?.title ?? '').toString().trim();
+          const fallbackTitle = entries.length > 1 ? `${f.name} #${i + 1}` : f.name;
+          const seriesName = en.isSeries ? baseName : null;
+          if (en.isSeries) {
+            const slug = makeDownloadName(baseName) || baseName;
+            en.data.title = dataTitle || seriesName || en.data.title || fallbackTitle;
+            en.data.id = slug;
+            en.title = en.data.title;
           }
-          // Ensure file-derived entries prefer embedded title/id but fall back to filename
-          entries.forEach((en, i) => {
-            const dataTitle = (en.data?.title ?? '').toString().trim();
-            const fallbackTitle = entries.length > 1 ? `${f.name} #${i + 1}` : f.name;
-            const idxResult = addModelEntry({ ...en, title: dataTitle || fallbackTitle }, { versionLabel: f.name });
+          const idxResult = addModelEntry({
+            ...en,
+            title: dataTitle || fallbackTitle,
+            apicurioArtifactName: seriesName || en.apicurioArtifactName
+          }, { versionLabel: f.name });
             if (firstIndex == null) firstIndex = idxResult;
           });
         }
@@ -2208,7 +2460,7 @@ export function initBlockscape() {
 
     // Load JSON files from same directory (for static hosting)
     async function loadJsonFiles() {
-      const jsonFiles = ['NFR.bs', 'planets.bs', 'letters.bs'];
+      const jsonFiles = ['NFR.bs', 'planets.bs', 'styleguide.bs'];
       const joinPath = (name) => {
         if (!ASSET_BASE) return name;
         return ASSET_BASE.endsWith('/') ? `${ASSET_BASE}${name}` : `${ASSET_BASE}/${name}`;
@@ -2223,20 +2475,30 @@ export function initBlockscape() {
           }
 
           const text = await response.text();
-          const baseName = filename.replace(/\.[^.]+$/, '') || 'Model';
-          const entries = normalizeToModelsFromText(text, baseName);
-          if (!entries.length) {
-            console.warn("[Blockscape] no models found in", filename);
-            continue;
-          }
-
-          entries.forEach((entry) => {
-            addModelEntry(entry, { versionLabel: filename });
-          });
-          console.log(`[Blockscape] loaded ${entries.length} model(s) from ${filename}`);
-        } catch (error) {
-          console.log("[Blockscape] could not load", filename, "- this is normal for file:// protocol", error);
+        const baseName = filename.replace(/\.[^.]+$/, '') || 'Model';
+        const entries = normalizeToModelsFromText(text, baseName);
+        if (!entries.length) {
+          console.warn("[Blockscape] no models found in", filename);
+          continue;
         }
+
+        entries.forEach((entry) => {
+            let payload = { ...entry };
+            if (entry.isSeries) {
+              const slug = makeDownloadName(baseName) || baseName;
+              payload = {
+                ...entry,
+                title: baseName,
+                apicurioArtifactName: baseName,
+                data: { ...entry.data, id: slug, title: entry.data?.title || baseName }
+              };
+            }
+            addModelEntry(payload, { versionLabel: filename });
+        });
+        console.log(`[Blockscape] loaded ${entries.length} model(s) from ${filename}`);
+      } catch (error) {
+        console.log("[Blockscape] could not load", filename, "- this is normal for file:// protocol", error);
+      }
       }
 
       renderModelList();
@@ -2382,9 +2644,21 @@ export function initBlockscape() {
         entries.forEach((entry, idx) => {
           const dataTitle = (entry.data?.title ?? '').toString().trim();
           const fallbackTitle = entries.length > 1 ? `${baseName} #${idx + 1}` : baseName;
+          const seriesName = entry.isSeries ? baseName : null;
+          let payload = { ...entry };
+          if (entry.isSeries) {
+            const slug = makeDownloadName(baseName) || baseName;
+            payload = {
+              ...entry,
+              title: dataTitle || seriesName || fallbackTitle,
+              apicurioArtifactName: seriesName || entry.apicurioArtifactName,
+              data: { ...entry.data, id: slug, title: entry.data?.title || seriesName || fallbackTitle }
+            };
+          }
           const idxResult = addModelEntry({
-            ...entry,
-            title: dataTitle || fallbackTitle
+            ...payload,
+            title: dataTitle || payload.title || fallbackTitle,
+            apicurioArtifactName: payload.apicurioArtifactName || seriesName || entry.apicurioArtifactName
           }, { versionLabel: baseName });
           if (firstIndex == null) firstIndex = idxResult;
         });

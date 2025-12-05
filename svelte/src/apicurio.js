@@ -22,6 +22,7 @@ export function createApicurioIntegration({
   let apicurioToggleInput = null;
   let apicurioSemverInput = null;
   let apicurioStatusNode = null;
+  let pushApicurioSeriesButton = null;
   let apicurioArtifactsContainer = null;
   const apicurioConfig = {
     baseUrl: DEFAULT_APICURIO_BASE,
@@ -85,6 +86,8 @@ export function createApicurioIntegration({
     const activeIndex = getActiveIndex();
     const enabled = isApicurioEnabled();
     const haveDetails = hasApicurioDetails();
+    const activeModel = activeIndex >= 0 ? models[activeIndex] : null;
+    const hasSeries = !!(activeModel?.apicurioVersions && activeModel.apicurioVersions.length > 1);
     if (pushApicurioButton) {
       const isBusy = pushApicurioButton.dataset.loading === 'true';
       const ready = enabled && haveDetails && activeIndex >= 0 && !!getModelId(models[activeIndex]);
@@ -93,6 +96,17 @@ export function createApicurioIntegration({
         pushApicurioButton.textContent = 'Enable Apicurio to push';
       } else if (!isBusy) {
         pushApicurioButton.textContent = 'Push to Apicurio';
+      }
+    }
+    if (pushApicurioSeriesButton) {
+      const isBusy = pushApicurioSeriesButton.dataset.loading === 'true';
+      const ready = enabled && haveDetails && hasSeries && !!getModelId(activeModel);
+      pushApicurioSeriesButton.disabled = !ready || isBusy;
+      pushApicurioSeriesButton.hidden = !hasSeries;
+      if (!enabled) {
+        pushApicurioSeriesButton.textContent = 'Enable Apicurio to push series';
+      } else if (!isBusy) {
+        pushApicurioSeriesButton.textContent = 'Push series';
       }
     }
     if (apicurioListButton) {
@@ -431,6 +445,7 @@ export function createApicurioIntegration({
 
   function bindApicurioElements(scope = document) {
     pushApicurioButton = scope.querySelector('#pushApicurio') || document.getElementById('pushApicurio');
+    pushApicurioSeriesButton = scope.querySelector('#pushApicurioSeries') || document.getElementById('pushApicurioSeries');
     apicurioListButton = scope.querySelector('#listApicurioArtifacts') || document.getElementById('listApicurioArtifacts');
     apicurioUrlInput = scope.querySelector('#apicurioUrl') || document.getElementById('apicurioUrl');
     apicurioGroupInput = scope.querySelector('#apicurioGroup') || document.getElementById('apicurioGroup');
@@ -469,6 +484,11 @@ export function createApicurioIntegration({
     if (pushApicurioButton) {
       pushApicurioButton.addEventListener('click', () => {
         pushActiveModelToApicurio();
+      });
+    }
+    if (pushApicurioSeriesButton) {
+      pushApicurioSeriesButton.addEventListener('click', () => {
+        pushActiveSeriesToApicurio();
       });
     }
     if (apicurioToggleInput) {
@@ -532,6 +552,8 @@ export function createApicurioIntegration({
         <p class="apicurio-hint apicurio-subnote">When on, Blockscape reads the latest version and auto-bumps the next semver on each push.</p>
         <button id="pushApicurio" class="pf-v5-c-button pf-m-secondary" type="button" disabled
           title="Enter Apicurio connection details to enable pushes">Push to Apicurio</button>
+        <button id="pushApicurioSeries" class="pf-v5-c-button pf-m-secondary" type="button" disabled hidden
+          title="Push all versions in this series as a JSON array">Push series</button>
         <button id="listApicurioArtifacts" class="pf-v5-c-button pf-m-secondary" type="button" disabled
           title="List artifacts in the configured group">List artifacts</button>
         <details id="apicurioSettings" class="apicurio-settings">
@@ -861,6 +883,136 @@ export function createApicurioIntegration({
       setApicurioStatus(`Apicurio push failed: ${error.message}`, 'error');
     } finally {
       pushApicurioButton.dataset.loading = 'false';
+      updateApicurioAvailability();
+    }
+  }
+
+  async function pushActiveSeriesToApicurio() {
+    if (!pushApicurioSeriesButton || pushApicurioSeriesButton.dataset.loading === 'true') return;
+    if (!isApicurioEnabled()) {
+      setApicurioStatus('Apicurio integration is off. Enable it first.', 'error');
+      return;
+    }
+    if (!hasApicurioDetails()) {
+      setApicurioStatus('Enter the registry base URL and group ID before pushing.', 'error');
+      return;
+    }
+    const activeIndex = getActiveIndex();
+    const activeEntry = activeIndex >= 0 ? models[activeIndex] : null;
+    if (!activeEntry || !activeEntry.apicurioVersions || activeEntry.apicurioVersions.length < 2) {
+      setApicurioStatus('Series push requires a model with multiple versions.', 'error');
+      return;
+    }
+    const artifactId = getModelId(activeEntry);
+    if (!artifactId) {
+      setApicurioStatus('Active series needs an id before pushing.', 'error');
+      return;
+    }
+    const baseUrl = sanitizeApicurioBaseUrl(apicurioConfig.baseUrl);
+    const groupId = apicurioConfig.groupId.trim();
+    const payloadArray = activeEntry.apicurioVersions.map(v => v.data);
+    const payload = JSON.stringify(payloadArray, null, 2);
+    const headers = buildApicurioHeaders();
+
+    pushApicurioSeriesButton.dataset.loading = 'true';
+    pushApicurioSeriesButton.textContent = 'Pushing…';
+    pushApicurioSeriesButton.disabled = true;
+    setApicurioStatus('Pushing series to Apicurio…', 'muted');
+
+    try {
+      const exists = await apicurioArtifactExists(baseUrl, groupId, artifactId, headers);
+      const localFingerprint = computeJsonFingerprint(payloadArray);
+      if (exists) {
+        try {
+          const compareVersion = await resolveApicurioCompareVersion(baseUrl, groupId, artifactId);
+          const { data: registryData, fingerprint: registryFingerprint } = await fetchApicurioArtifactFingerprint(baseUrl, groupId, artifactId, compareVersion);
+          console.group('[Blockscape] Apicurio series push compare');
+          console.log('compare version', compareVersion);
+          console.log('local fingerprint', localFingerprint);
+          console.log('registry fingerprint', registryFingerprint);
+          console.log('local payload (series)', payloadArray);
+          console.log('registry payload', registryData);
+          console.groupEnd();
+          if (localFingerprint && registryFingerprint && localFingerprint === registryFingerprint) {
+            const proceed = window.confirm('The current registry version matches this series. Push anyway?');
+            if (!proceed) {
+              setApicurioStatus('Series push cancelled (content matches latest).', 'muted');
+              return;
+            }
+            setApicurioStatus('Pushing identical series by user choice.', 'muted');
+          } else if (!registryFingerprint) {
+            setApicurioStatus('Unable to compare with registry content (skipping confirmation).', 'muted');
+          } else {
+            console.log('[Blockscape] Apicurio compare mismatch (proceeding with series push)');
+          }
+        } catch (compareError) {
+          console.warn('[Blockscape] unable to compare registry content before series push', compareError);
+          setApicurioStatus('Skipped comparison with registry (content fetch failed). Proceeding with series push.', 'muted');
+        }
+      }
+
+      const targetVersion = apicurioConfig.useSemver
+        ? await resolveApicurioSemverTarget(baseUrl, groupId, artifactId, exists)
+        : null;
+      if (apicurioConfig.useSemver && !targetVersion) {
+        throw new Error('Semantic versioning is enabled but no version could be computed.');
+      }
+
+      const encodedGroup = encodeURIComponent(groupId);
+      const encodedId = encodeURIComponent(artifactId);
+      const endpoint = exists
+        ? `${baseUrl}/groups/${encodedGroup}/artifacts/${encodedId}/versions`
+        : `${baseUrl}/groups/${encodedGroup}/artifacts`;
+
+      const requestHeaders = {
+        ...headers,
+        'Content-Type': 'application/json'
+      };
+      if (targetVersion) {
+        requestHeaders['X-Registry-Version'] = targetVersion;
+        setApicurioStatus(`Pushing series to Apicurio as version ${targetVersion}…`, 'muted');
+      }
+
+      const bodyObject = exists
+        ? buildApicurioUpdateBody(payload, { version: targetVersion })
+        : buildApicurioCreateBody(artifactId, payload, {
+          title: activeEntry.apicurioArtifactName || activeEntry.data?.title || artifactId,
+          description: activeEntry.data?.abstract,
+          version: targetVersion
+        });
+
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: requestHeaders,
+        body: JSON.stringify(bodyObject)
+      });
+
+      if (!response.ok) {
+        let detail = response.statusText || 'Unknown error';
+        try {
+          const text = await response.text();
+          if (text) detail = text.slice(0, 400);
+        } catch {
+          // ignore
+        }
+        throw new Error(`Registry rejected the series push (${response.status}): ${detail}`);
+      }
+
+      let info = null;
+      try {
+        info = await response.json();
+      } catch {
+        info = null;
+      }
+      const label = info?.version || info?.globalId || '';
+      const prefix = exists ? 'Updated' : 'Created';
+      const suffix = label ? ` (version ${label})` : '';
+      setApicurioStatus(`${prefix} ${artifactId} series${suffix}`, 'success');
+    } catch (error) {
+      console.error('[Blockscape] Apicurio series push failed', error);
+      setApicurioStatus(`Apicurio series push failed: ${error.message}`, 'error');
+    } finally {
+      pushApicurioSeriesButton.dataset.loading = 'false';
       updateApicurioAvailability();
     }
   }

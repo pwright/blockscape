@@ -192,7 +192,7 @@
             </label>
  
             <button id="openInEditor" class="pf-v5-c-button pf-m-primary" type="button" title="Open current JSON in the editor">Edit</button>
-            <button id="createVersion" class="pf-v5-c-button pf-m-secondary" type="button" title="Create a new version from the current map">New version</button>
+            <button id="helpButton" class="pf-v5-c-button pf-m-tertiary" type="button" title="Show keyboard shortcuts">Help</button>
             
             <button id="shareModel" class="pf-v5-c-button pf-m-primary" type="button" title="Copy a shareable URL for this model">Share</button>
           </div>
@@ -239,6 +239,7 @@
               <button id="appendFromBox" class="pf-v5-c-button pf-m-primary" type="button">Append model(s)</button>
               <button id="replaceActive" class="pf-v5-c-button pf-m-secondary" type="button">Replace active with
                 JSON</button>
+              <button id="createVersion" class="pf-v5-c-button pf-m-secondary" type="button" title="Create a new version from the current map">New version</button>
             </div>
           </div>
         </section>
@@ -264,5 +265,19 @@
   </div>
   <div class="item-preview__body">
     <div class="item-preview__status">Right-click a tile to see related notes.</div>
+  </div>
+</div>
+
+<div id="shortcutHelp" class="shortcut-help" hidden aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="shortcutHelpTitle">
+  <div id="shortcutHelpBackdrop" class="shortcut-help__backdrop"></div>
+  <div class="shortcut-help__panel" tabindex="-1">
+    <div class="shortcut-help__header">
+      <div class="shortcut-help__title">
+        <h2 id="shortcutHelpTitle">Keyboard shortcuts</h2>
+        <p class="shortcut-help__subtitle">Stay in flow with navigation, editing, and quick exports.</p>
+      </div>
+      <button id="shortcutHelpClose" class="shortcut-help__close" type="button" aria-label="Close keyboard shortcuts">&times;</button>
+    </div>
+    <div id="shortcutHelpList" class="shortcut-help__list" aria-live="polite"></div>
   </div>
 </div>

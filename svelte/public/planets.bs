@@ -24,7 +24,7 @@
             "id": "mercury",
             "name": "Mercury",
             "deps": [],
-            "logo": "https://upload.wikimedia.org/wikipedia/commons/2/2e/Mercury_in_true_color.jpg"
+            "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4a/Mercury_in_true_color.jpg/250px-Mercury_in_true_color.jpg"
           },
           {
             "id": "venus",
@@ -67,6 +67,19 @@
             "name": "Neptune",
             "deps": [],
             "logo": "https://upload.wikimedia.org/wikipedia/commons/5/56/Neptune_Full.jpg"
+          }
+        ]
+      },
+      {
+        "id": "former-planets",
+        "title": "Former Planets",
+        "items": [
+          {
+            "id": "pluto",
+            "name": "Pluto",
+            "color": "#000000",
+            "deps": [],
+            "external": "https://en.wikipedia.org/wiki/Pluto"
           }
         ]
       }

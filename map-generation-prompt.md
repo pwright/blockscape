@@ -43,6 +43,8 @@ In **[one paragraph]**, summarize the domain’s user‑visible goals and the ke
 
 ### Output
 
+If the user asks for a 'series', create an array of json using the following criteria.
+
 Return **only the JSON** matching this schema:
 
 ```
@@ -67,7 +69,7 @@ Return **only the JSON** matching this schema:
 * Top-level `id`, `title`, and `abstract` are present and non-empty.
 * All `deps` reference **existing** item IDs.
 * No duplicate `id`s across all items.
-* 3–5 categories; each has 2–5 items.
+* 3–6/7 categories; each has 2–6/7 items.
 * No extra fields beyond those listed above.
 * JSON parses.
 
@@ -82,7 +84,7 @@ Generate a **Blockscape value‑chain JSON** for the domain of **machine learnin
 ### Requirements
 
 * Output **valid JSON only** with this structure (no commentary).
-* Use **4 categories**, **3–4 items each**.
+* Use **3 - 6/7 categories**, **3–6/7 items each**.
 * Order from abstract (user‑facing) to concrete (infrastructure).
 * Vertical axis is **visible user value**; `deps` should point from user‑visible items down to enablers they rely on.
 * Optional `logo` paths may use placeholders like `"logos/[slug].svg"`.
@@ -147,4 +149,5 @@ Users need **reliable predictions** surfaced via **APIs/UI**, backed by **versio
 
 * Keep **names** user‑friendly; keep **ids** short and consistent.
 * If an item feels too broad, introduce a new category rather than bloating `deps`.
+* If there's a link (external), use the favicon from the website as logo
 * If you’re unsure about `logo`, omit it; you can add paths later.
