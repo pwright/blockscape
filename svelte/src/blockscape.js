@@ -477,11 +477,11 @@ export function initBlockscape() {
     // --- NEW: letter → color mapping and helpers ---
     // Letter → color mapping (tailwind-ish palette). G => green.
     const LETTER_COLOR_MAP = {
-      A: '#ef4444', B: '#3b82f6', C: '#06b6d4', D: '#a855f7',
+      A: '#0284c7', B: '#3b82f6', C: '#06b6d4', D: '#a855f7',
       E: '#f59e0b', F: '#f97316', G: '#22c55e', H: '#84cc16',
       I: '#10b981', J: '#14b8a6', K: '#0ea5e9', L: '#60a5fa',
-      M: '#8b5cf6', N: '#d946ef', O: '#f43f5e', P: '#e11d48',
-      Q: '#dc2626', R: '#f59e0b', S: '#eab308', T: '#a3e635',
+      M: '#8b5cf6', N: '#d946ef', O: '#e879f9', P: '#67e8f9',
+      Q: '#4ade80', R: '#facc15', S: '#eab308', T: '#a3e635',
       U: '#22d3ee', V: '#38bdf8', W: '#818cf8', X: '#a78bfa',
       Y: '#f472b6', Z: '#fb7185'
     };

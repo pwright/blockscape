@@ -143,3 +143,39 @@ Users need **reliable predictions** surfaced via **APIs/UI**, backed by **versio
 * If an item feels too broad, introduce a new category rather than bloating `deps`.
 * If there's a link (external), use the favicon from the website as logo
 * If you’re unsure about `logo`, omit it; you can add paths later.
+
+The following map shows color conventions:
+
+```
+{
+  "id": "conventions",
+  "title": "Color Conventions",
+  "abstract": "Reference for color conventions.",
+  "categories": [
+    {
+      "id": "color-conventions",
+      "title": "Color conventions",
+      "items": [
+        {
+          "id": "old",
+          "name": "Old",
+          "color": "#000000",
+          "deps": []
+        },
+        {
+          "id": "new",
+          "name": "New",
+          "color": "#FFFFFF",
+          "deps": []
+        },
+        {
+          "id": "important",
+          "name": "Important",
+          "deps": [],
+          "color": "#FF0000"
+        }
+      ]
+    }
+  ]
+}
+```
