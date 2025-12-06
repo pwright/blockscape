@@ -2771,7 +2771,7 @@ export function initBlockscape() {
 
     // Load JSON files from same directory (for static hosting)
     async function loadJsonFiles() {
-      const jsonFiles = ['NFR.bs', 'planets.bs', 'styleguide.bs'];
+      const jsonFiles = ['comms.bs', 'planets.bs', 'styleguide.bs'];
       const joinPath = (name) => {
         if (!ASSET_BASE) return name;
         return ASSET_BASE.endsWith('/') ? `${ASSET_BASE}${name}` : `${ASSET_BASE}/${name}`;
