@@ -1,12 +1,4 @@
-# Blockscape JSON Prompt Template
-
-Use this prompt to generate a concise value‑chain/landscape JSON for any domain. Copy, paste, and replace the bracketed placeholders.
-
----
-
-## Prompt (fill in the brackets)
-
-Generate a **Blockscape value‑chain JSON** for the domain of **[DOMAIN NAME]**.
+Generate a blockscape [map|series] for the domain of [DOMAIN]
 
 ### Requirements
 
