@@ -1494,6 +1494,45 @@
       font-size: var(--font-size-sm);
     }
 
+    .shortcut-help__section {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-sm);
+      border-top: 1px solid var(--color-border);
+      padding-top: var(--space-sm);
+    }
+
+    .shortcut-help__section:first-of-type {
+      border-top: 0;
+      padding-top: 0;
+    }
+
+    .shortcut-help__section-title {
+      margin: 0;
+      font-size: var(--font-size-md);
+    }
+
+    .shortcut-help__tips {
+      margin: 0;
+      padding-left: 1.2rem;
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2xs);
+      color: var(--blockscape-foreground);
+      font-size: var(--font-size-sm);
+      line-height: 1.5;
+    }
+
+    .shortcut-help__tips a {
+      color: var(--color-primary);
+    }
+
+    .shortcut-help__tips a:hover,
+    .shortcut-help__tips a:focus-visible {
+      text-decoration: underline;
+      outline: none;
+    }
+
     .shortcut-help__close {
       border: 1px solid var(--color-border);
       background: var(--color-surface);
