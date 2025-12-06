@@ -1,5 +1,6 @@
 import { createApicurioIntegration } from './apicurio';
 import { collectAllItemIds, createItemEditor, updateItemReferences } from './itemEditor';
+import { ensureSeriesId, getSeriesId, makeSeriesId } from './series';
 
 const ASSET_BASE = (typeof import.meta !== 'undefined' && import.meta.env?.BASE_URL) || '';
 
@@ -28,10 +29,14 @@ export function initBlockscape() {
     const copySeriesButton = document.getElementById('copySeries');
     const pasteJsonButton = document.getElementById('pasteJson');
     const helpButton = document.getElementById('helpButton');
+    const newPanelButton = document.getElementById('newPanelButton');
     const shortcutHelp = document.getElementById('shortcutHelp');
     const shortcutHelpList = document.getElementById('shortcutHelpList');
     const shortcutHelpClose = document.getElementById('shortcutHelpClose');
     const shortcutHelpBackdrop = document.getElementById('shortcutHelpBackdrop');
+    const newPanel = document.getElementById('newPanel');
+    const newPanelClose = document.getElementById('newPanelClose');
+    const newPanelBackdrop = document.getElementById('newPanelBackdrop');
     const EDITOR_TRANSFER_KEY = 'blockscape:editorPayload';
     const EDITOR_TRANSFER_MESSAGE_TYPE = 'blockscape:editorTransfer';
     const defaultDocumentTitle = document.title;
@@ -49,6 +54,8 @@ export function initBlockscape() {
       setActive,
       ensureModelMetadata,
       getModelId,
+      getSeriesId,
+      ensureSeriesId,
       getModelTitle,
       computeJsonFingerprint,
       uid
@@ -142,6 +149,7 @@ export function initBlockscape() {
         .replace(/^-|-$/g, '') || 'blockscape';
     }
 
+
     function promptForSeriesTitle(defaultTitle) {
       if (typeof window === 'undefined' || typeof window.prompt !== 'function') return null;
       const response = window.prompt('Name this series', defaultTitle);
@@ -155,6 +163,13 @@ export function initBlockscape() {
       const firstObj = array.find(obj => obj && typeof obj === 'object') || array[0];
       const candidate = (firstObj?.title ?? '').toString().trim();
       return candidate || `${titleBase} series`;
+    }
+
+    function applySeriesSlug(entry, slug) {
+      if (!slug || !entry || typeof entry !== 'object') return;
+      entry.seriesId = slug;
+      entry.apicurioArtifactId = slug;
+      entry.id = slug;
     }
 
     function stableStringify(value) {
@@ -253,6 +268,8 @@ export function initBlockscape() {
     }
 
     function getModelId(entry) {
+      const seriesId = getSeriesId(entry);
+      if (seriesId) return seriesId;
       const candidate = entry?.data?.id;
       if (!candidate) return null;
       const trimmed = candidate.toString().trim();
@@ -341,6 +358,10 @@ export function initBlockscape() {
     });
 
     function addModelEntry(entry, { versionLabel, createdOn } = {}) {
+      if (entry?.isSeries || (entry?.apicurioVersions?.length > 1)) {
+        const name = entry.title || getModelTitle(entry);
+        ensureSeriesId(entry, { seriesName: name, fallbackTitle: name });
+      }
       const modelId = getModelId(entry);
       if (!modelId) {
         models.push(entry);
@@ -359,6 +380,8 @@ export function initBlockscape() {
           createdOn: target.apicurioVersions?.[0]?.createdOn
         }];
         target.apicurioActiveVersionIndex = 0;
+        const mergedName = target.title || getModelTitle(target);
+        ensureSeriesId(target, { seriesName: mergedName, fallbackTitle: mergedName });
       }
       const label = String(target.apicurioVersions.length + 1);
       target.apicurioVersions.push({
@@ -370,6 +393,8 @@ export function initBlockscape() {
       target.data = entry.data;
       target.title = getModelTitle(entry) || target.title;
       target.isSeries = true;
+      const seriesName = target.title || getModelTitle(target);
+      ensureSeriesId(target, { seriesName, fallbackTitle: seriesName });
       return existingIndex;
     }
 
@@ -405,6 +430,8 @@ export function initBlockscape() {
       if (!entry) return null;
       const versions = entry.apicurioVersions;
       if (!Array.isArray(versions) || versions.length <= 1) return null;
+      const seriesName = entry.title || entry.apicurioArtifactName || getModelTitle(entry);
+      ensureSeriesId(entry, { seriesName, fallbackTitle: seriesName });
       return versions.map((ver) => {
         if (ver && typeof ver === 'object' && 'data' in ver) return ver.data;
         return ver;
@@ -437,7 +464,9 @@ export function initBlockscape() {
         ? JSON.stringify(seriesPayload, null, 2)
         : text;
 
-      const title = getModelTitle(active, 'blockscape');
+      const title = isSeries
+        ? (getSeriesId(active) || getModelTitle(active, 'blockscape'))
+        : getModelTitle(active, 'blockscape');
       const suffix = isSeries ? '-series' : '';
       const filename = `${makeDownloadName(title)}${suffix}.json`;
       download(filename, payloadText);
@@ -615,6 +644,25 @@ export function initBlockscape() {
       }
     }
 
+    function openNewPanel() {
+      if (!newPanel) return;
+      newPanel.hidden = false;
+      newPanel.setAttribute('aria-hidden', 'false');
+      document.body.classList.add('shortcut-help-open');
+      const panel = newPanel.querySelector('.shortcut-help__panel');
+      panel?.focus({ preventScroll: true });
+    }
+
+    function closeNewPanel() {
+      if (!newPanel || newPanel.hidden) return;
+      newPanel.hidden = true;
+      newPanel.setAttribute('aria-hidden', 'true');
+      document.body.classList.remove('shortcut-help-open');
+      if (newPanelButton?.focus) {
+        newPanelButton.focus({ preventScroll: true });
+      }
+    }
+
     let overlaySyncPending = false;
     function scheduleOverlaySync() {
       if (overlaySyncPending) return;
@@ -747,6 +795,8 @@ export function initBlockscape() {
         apicurioActiveVersionIndex: 0,
         isSeries: true
       };
+      const seriesId = ensureSeriesId(entry, { seriesName: seriesTitle, fallbackTitle: seriesTitle });
+      if (seriesId) entry.id = seriesId;
       return [entry];
     }
 
@@ -1052,6 +1102,8 @@ export function initBlockscape() {
       (entry?.apicurioVersions || []).forEach((ver, idx) => {
         const id = (ver?.data?.id ?? '').toString().trim();
         if (id) map.set(id, idx);
+        const seriesId = (ver?.data?.seriesId ?? '').toString().trim();
+        if (seriesId && !map.has(seriesId)) map.set(seriesId, idx);
       });
       return map;
     }
@@ -1222,12 +1274,19 @@ export function initBlockscape() {
       titleEl.textContent = (model.m.title && model.m.title.trim()) || getModelTitle(models[activeIndex]);
       meta.appendChild(titleEl);
 
+      // Ensure series ID is present for display if this entry is a series.
+      if (models[activeIndex]?.isSeries || (models[activeIndex]?.apicurioVersions?.length > 1)) {
+        ensureSeriesId(models[activeIndex], { seriesName: models[activeIndex].title || model.m.title || getModelTitle(models[activeIndex]) });
+      }
+
       const activeVersionLabel = getActiveApicurioVersionLabel(models[activeIndex]);
+      const seriesId = getSeriesId(models[activeIndex]);
       const normalizedId = (model.m.id ?? '').toString().trim();
-      if (normalizedId) {
+      const displayId = seriesId || normalizedId;
+      if (displayId) {
         const idEl = document.createElement('div');
         idEl.className = 'blockscape-model-id';
-        idEl.textContent = `ID: ${normalizedId}`;
+        idEl.textContent = `ID: ${displayId}`;
         meta.appendChild(idEl);
       }
       if (activeVersionLabel) {
@@ -1798,12 +1857,26 @@ export function initBlockscape() {
       });
     }
 
+    if (newPanelButton) {
+      newPanelButton.addEventListener('click', () => {
+        openNewPanel();
+      });
+    }
+
     if (shortcutHelpClose) {
       shortcutHelpClose.addEventListener('click', closeShortcutHelp);
     }
 
     if (shortcutHelpBackdrop) {
       shortcutHelpBackdrop.addEventListener('click', closeShortcutHelp);
+    }
+
+    if (newPanelClose) {
+      newPanelClose.addEventListener('click', closeNewPanel);
+    }
+
+    if (newPanelBackdrop) {
+      newPanelBackdrop.addEventListener('click', closeNewPanel);
     }
 
     if (app) {
@@ -1966,6 +2039,12 @@ export function initBlockscape() {
           event.preventDefault();
           closeShortcutHelp();
         }
+        return;
+      }
+
+      if (!newPanel?.hidden && event.key === 'Escape') {
+        event.preventDefault();
+        closeNewPanel();
         return;
       }
 
@@ -2510,6 +2589,10 @@ export function initBlockscape() {
         });
         models[activeIndex].data = obj;
         models[activeIndex].title = obj.title || models[activeIndex].title;
+        if (models[activeIndex].isSeries || (models[activeIndex].apicurioVersions?.length > 1)) {
+          const seriesName = models[activeIndex].title || getModelTitle(models[activeIndex]);
+          ensureSeriesId(models[activeIndex], { seriesName, fallbackTitle: seriesName });
+        }
         syncDocumentTitle();
         console.log("[Blockscape] replaced active model:", getModelTitle(models[activeIndex]));
         rebuildFromActive();
@@ -2530,7 +2613,7 @@ export function initBlockscape() {
       for (const f of files) {
         const txt = await f.text();
         const baseName = f.name.replace(/\.[^.]+$/, '') || "File";
-        const entries = normalizeToModelsFromText(txt, baseName);
+        const entries = normalizeToModelsFromText(txt, baseName, { seriesTitleOverride: `${baseName} series` });
         if (!entries.length) {
           console.warn("[Blockscape] no models in file:", f.name);
           continue;
@@ -2539,17 +2622,22 @@ export function initBlockscape() {
         entries.forEach((en, i) => {
           const dataTitle = (en.data?.title ?? '').toString().trim();
           const fallbackTitle = entries.length > 1 ? `${f.name} #${i + 1}` : f.name;
-          const seriesName = en.isSeries ? baseName : null;
+          const fileSeriesName = `${baseName} series`;
+          const seriesName = en.isSeries ? fileSeriesName : null;
+          let payload = { ...en };
           if (en.isSeries) {
-            const slug = makeDownloadName(baseName) || baseName;
-            en.data.title = dataTitle || seriesName || en.data.title || fallbackTitle;
-            en.data.id = slug;
-            en.title = en.data.title;
+            const seriesTitle = seriesName || dataTitle || en.title || fallbackTitle || 'unknown';
+            payload.title = seriesTitle;
+            const forcedSlug = makeSeriesId(seriesTitle || 'unknown');
+            applySeriesSlug(payload, forcedSlug);
+            ensureSeriesId(payload, { seriesName: seriesTitle, fallbackTitle: 'unknown' });
+            payload.apicurioArtifactName = payload.apicurioArtifactName || seriesTitle;
+          } else {
+            payload.title = dataTitle || fallbackTitle;
           }
           const idxResult = addModelEntry({
-            ...en,
-            title: dataTitle || fallbackTitle,
-            apicurioArtifactName: seriesName || en.apicurioArtifactName
+            ...payload,
+            apicurioArtifactName: payload.apicurioArtifactName || seriesName || payload.apicurioArtifactName
           }, { versionLabel: f.name });
             if (firstIndex == null) firstIndex = idxResult;
           });
@@ -2604,6 +2692,9 @@ export function initBlockscape() {
     // Remove selected model
     document.getElementById('removeModel').onclick = () => {
       if (activeIndex < 0) return;
+      const title = getModelTitle(models[activeIndex]);
+      const ok = window.confirm(`Remove "${title}" from this session?`);
+      if (!ok) return;
       console.log("[Blockscape] removing model:", getModelTitle(models[activeIndex]));
       models.splice(activeIndex, 1);
       if (!models.length) {
@@ -2696,7 +2787,7 @@ export function initBlockscape() {
 
           const text = await response.text();
         const baseName = filename.replace(/\.[^.]+$/, '') || 'Model';
-        const entries = normalizeToModelsFromText(text, baseName);
+        const entries = normalizeToModelsFromText(text, baseName, { seriesTitleOverride: `${baseName} series` });
         if (!entries.length) {
           console.warn("[Blockscape] no models found in", filename);
           continue;
@@ -2705,13 +2796,11 @@ export function initBlockscape() {
         entries.forEach((entry) => {
             let payload = { ...entry };
             if (entry.isSeries) {
-              const slug = makeDownloadName(baseName) || baseName;
-              payload = {
-                ...entry,
-                title: baseName,
-                apicurioArtifactName: baseName,
-                data: { ...entry.data, id: slug, title: entry.data?.title || baseName }
-              };
+              const seriesTitle = `${baseName} series`;
+              payload = { ...entry, title: seriesTitle, apicurioArtifactName: seriesTitle };
+              const forcedSlug = makeSeriesId(seriesTitle || 'unknown');
+              applySeriesSlug(payload, forcedSlug);
+              ensureSeriesId(payload, { seriesName: seriesTitle, fallbackTitle: 'unknown' });
             }
             addModelEntry(payload, { versionLabel: filename });
         });
@@ -2864,16 +2953,19 @@ export function initBlockscape() {
         entries.forEach((entry, idx) => {
           const dataTitle = (entry.data?.title ?? '').toString().trim();
           const fallbackTitle = entries.length > 1 ? `${baseName} #${idx + 1}` : baseName;
-          const seriesName = entry.isSeries ? baseName : null;
+          const seriesName = entry.isSeries ? `${baseName} series` : null;
           let payload = { ...entry };
           if (entry.isSeries) {
-            const slug = makeDownloadName(baseName) || baseName;
+            const seriesTitle = seriesName || dataTitle || payload.title || fallbackTitle;
             payload = {
               ...entry,
-              title: dataTitle || seriesName || fallbackTitle,
-              apicurioArtifactName: seriesName || entry.apicurioArtifactName,
-              data: { ...entry.data, id: slug, title: entry.data?.title || seriesName || fallbackTitle }
+              title: seriesTitle,
+              apicurioArtifactName: seriesTitle || entry.apicurioArtifactName,
             };
+            const forcedSlug = makeSeriesId(seriesTitle || 'unknown');
+            applySeriesSlug(payload, forcedSlug);
+            ensureSeriesId(payload, { seriesName: seriesTitle || seriesName || 'unknown', fallbackTitle: 'unknown' });
+            console.log('[Blockscape] loadFromUrl: series slug applied', { seriesSlug: forcedSlug, url, baseName, seriesTitle });
           }
           const idxResult = addModelEntry({
             ...payload,

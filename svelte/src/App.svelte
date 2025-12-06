@@ -1,6 +1,8 @@
 <script>
   import { onMount } from 'svelte';
   import { initBlockscape } from './blockscape';
+  import ShortcutHelp from './components/ShortcutHelp.svelte';
+  import NewPanel from './components/NewPanel.svelte';
 
   const seedText = `
   {
@@ -146,6 +148,19 @@
   ]
 }`;
 
+  let headerExpanded = false;
+
+  const toggleHeaderExpanded = () => {
+    headerExpanded = !headerExpanded;
+    if (!headerExpanded) {
+      const searchInput = document.getElementById('search');
+      if (searchInput && searchInput.value) {
+        searchInput.value = '';
+        searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+    }
+  };
+
   onMount(() => {
     initBlockscape();
   });
@@ -173,28 +188,46 @@
               </svg>
             </a>
           </div>
-          <div class="blockscape-toolbar__controls">
-            <label class="sr-only" for="search">Search tiles</label>
-            <input id="search" class="pf-v5-c-form-control" type="text" placeholder="Search…" />
-             
-            <form id="urlForm" class="blockscape-url-form" autocomplete="on" novalidate>
-              <label class="sr-only" for="urlInput">Load JSON from URL</label>
-              <input id="urlInput" name="modelUrl" class="pf-v5-c-form-control is-url" type="url"
-                placeholder="Load JSON from URL…" autocomplete="additional-name" />
-              <button id="loadUrl" class="pf-v5-c-button pf-m-secondary" type="submit">Load URL</button>
-              <div id="urlHint" class="url-hint" aria-live="polite"></div>
-            </form>
-             
- 
-            <label class="pf-v5-c-button pf-m-secondary blockscape-file">
-              <span>Load File(s)</span>
-              <input id="file" type="file" accept=".bs,.json,.txt" multiple />
-            </label>
- 
-            <button id="openInEditor" class="pf-v5-c-button pf-m-primary" type="button" title="Open current JSON in the editor">Edit</button>
-            <button id="helpButton" class="pf-v5-c-button pf-m-tertiary" type="button" title="Show keyboard shortcuts">Help</button>
-            
-            <button id="shareModel" class="pf-v5-c-button pf-m-primary" type="button" title="Copy a shareable URL for this model">Share</button>
+          <div class="blockscape-toolbar__controls" data-expanded={headerExpanded ? 'true' : 'false'}>
+            <div class="blockscape-toolbar__primary">
+              <button
+                class="pf-v5-c-button pf-m-plain blockscape-toolbar__toggle"
+                type="button"
+                aria-expanded={headerExpanded}
+                aria-controls="blockscapeHeaderExtras"
+                on:click={toggleHeaderExpanded}
+              >
+                <span class="sr-only">Toggle search and edit tools</span>
+                <span class="blockscape-toolbar__toggle-icon" aria-hidden="true">▾</span>
+              </button>
+              <button id="newPanelButton" class="pf-v5-c-button pf-m-primary" type="button" title="Create something new">New</button>
+              <form id="urlForm" class="blockscape-url-form" autocomplete="on" novalidate>
+                <label class="sr-only" for="urlInput">Load JSON from URL</label>
+                <input id="urlInput" name="modelUrl" class="pf-v5-c-form-control is-url" type="url"
+                  placeholder="Load JSON from URL…" autocomplete="additional-name" />
+                <button id="loadUrl" class="pf-v5-c-button pf-m-primary" type="submit">Load URL</button>
+                <div id="urlHint" class="url-hint" aria-live="polite"></div>
+              </form>
+               
+              <label class="pf-v5-c-button pf-m-primary blockscape-file">
+                <span>Open</span>
+                <input id="file" type="file" accept=".bs,.json,.txt" multiple />
+              </label>
+
+              <button id="helpButton" class="pf-v5-c-button pf-m-primary" type="button" title="Show keyboard shortcuts">Help</button>
+            </div>
+
+            <div
+              id="blockscapeHeaderExtras"
+              class="blockscape-toolbar__extras"
+              hidden={!headerExpanded}
+              aria-hidden={!headerExpanded}
+            >
+              <label class="sr-only" for="search">Search tiles</label>
+              <input id="search" class="pf-v5-c-form-control" type="text" placeholder="Search…" />
+              <button id="openInEditor" class="pf-v5-c-button pf-m-secondary" type="button" title="Open current JSON in the editor">Edit</button>
+              <button id="shareModel" class="pf-v5-c-button pf-m-secondary" type="button" title="Copy a shareable URL for this model">Share</button>
+            </div>
           </div>
           <div class="blockscape-legend" role="presentation">
             <span class="legend-entry"><span class="legend-dot legend-dot--dep"></span> enables</span>
@@ -275,16 +308,5 @@
   </div>
 </div>
 
-<div id="shortcutHelp" class="shortcut-help" hidden aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="shortcutHelpTitle">
-  <div id="shortcutHelpBackdrop" class="shortcut-help__backdrop"></div>
-  <div class="shortcut-help__panel" tabindex="-1">
-    <div class="shortcut-help__header">
-      <div class="shortcut-help__title">
-        <h2 id="shortcutHelpTitle">Keyboard shortcuts</h2>
-        <p class="shortcut-help__subtitle">Stay in flow with navigation, editing, and quick exports.</p>
-      </div>
-      <button id="shortcutHelpClose" class="shortcut-help__close" type="button" aria-label="Close keyboard shortcuts">&times;</button>
-    </div>
-    <div id="shortcutHelpList" class="shortcut-help__list" aria-live="polite"></div>
-  </div>
-</div>
+<ShortcutHelp />
+<NewPanel />

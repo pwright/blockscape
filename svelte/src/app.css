@@ -133,11 +133,60 @@
 
     .blockscape-toolbar__controls {
       display: flex;
-      flex-wrap: wrap;
-      align-items: center;
+      flex-direction: column;
       gap: var(--space-sm);
       flex: 1 1 auto;
       min-width: 280px;
+    }
+
+    .blockscape-toolbar__primary {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: var(--space-sm);
+    }
+
+    .blockscape-toolbar__toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2xs);
+      font-weight: var(--font-weight-medium);
+      white-space: nowrap;
+      width: 2.5rem;
+      justify-content: center;
+      transition: transform 0.2s ease;
+    }
+
+    .blockscape-toolbar__toggle-icon {
+      font-size: 1.1em;
+      line-height: 1;
+      display: inline-block;
+      transition: transform 0.2s ease;
+    }
+
+    .blockscape-toolbar__controls[data-expanded="true"] .blockscape-toolbar__toggle-icon {
+      transform: rotate(180deg);
+    }
+
+    .blockscape-toolbar__extras {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      flex: 1 1 100%;
+      width: 100%;
+      margin-top: var(--space-sm);
+      padding-top: var(--space-xs);
+      border-top: 1px solid var(--color-border);
+      justify-content: flex-start;
+    }
+
+    .blockscape-toolbar__extras[hidden] {
+      display: none;
+    }
+
+    .blockscape-toolbar__extras #search {
+      flex: 1 1 240px;
+      min-width: 200px;
     }
 
     .blockscape-url-form {
@@ -1726,9 +1775,29 @@
         width: 100%;
       }
 
+      .blockscape-toolbar__primary {
+        width: 100%;
+      }
+
       .blockscape-toolbar__controls .pf-v5-c-form-control,
       .blockscape-toolbar__controls .pf-v5-c-button {
         flex: 1 1 auto;
+      }
+
+      .blockscape-toolbar__toggle {
+        align-self: flex-start;
+      }
+
+      .blockscape-toolbar__extras {
+        width: 100%;
+        flex-direction: column;
+        align-items: stretch;
+        margin-top: var(--space-sm);
+        padding-top: var(--space-xs);
+      }
+
+      .blockscape-toolbar__extras #search {
+        width: 100%;
       }
 
       .apicurio-controls {
