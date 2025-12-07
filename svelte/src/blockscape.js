@@ -64,6 +64,8 @@ export function initBlockscape() {
     let model = null;           // parsed result of active model: { m, fwd, rev, reusedLocal, seen }
     let index = new Map();      // id -> {el, catId, rect}
     let selection = null;
+    let selectionRelations = null;
+    let showSecondaryLinks = false;
     let previewRequestId = 0;
     let previewAnchor = { x: 0, y: 0 };
     let lastActiveTabId = 'map';
@@ -1170,6 +1172,7 @@ export function initBlockscape() {
       entry.data = target.data;
       pendingInfoPreview = true;
       selection = null;
+      selectionRelations = null;
       loadActiveIntoEditor();
       rebuildFromActive();
       return true;
@@ -1281,19 +1284,31 @@ export function initBlockscape() {
 
       const activeVersionLabel = getActiveApicurioVersionLabel(models[activeIndex]);
       const seriesId = getSeriesId(models[activeIndex]);
-      const normalizedId = (model.m.id ?? '').toString().trim();
-      const displayId = seriesId || normalizedId;
-      if (displayId) {
-        const idEl = document.createElement('div');
-        idEl.className = 'blockscape-model-id';
-        idEl.textContent = `ID: ${displayId}`;
-        meta.appendChild(idEl);
-      }
-      if (activeVersionLabel) {
-        const versionEl = document.createElement('div');
-        versionEl.className = 'blockscape-model-id';
-        versionEl.textContent = `No. in series: ${activeVersionLabel}`;
-        meta.appendChild(versionEl);
+      const modelId = (model.m.id ?? '').toString().trim();
+
+      const detailsRow = document.createElement('div');
+      detailsRow.className = 'blockscape-model-meta__details';
+
+      const addMetaDetail = (label, value) => {
+        if (!value) return;
+        const wrapper = document.createElement('div');
+        wrapper.className = 'blockscape-model-id';
+        const labelSpan = document.createElement('span');
+        labelSpan.className = 'blockscape-model-id__label';
+        labelSpan.textContent = label;
+        const valueSpan = document.createElement('span');
+        valueSpan.className = 'blockscape-model-id__value';
+        valueSpan.textContent = value;
+        wrapper.append(labelSpan, valueSpan);
+        detailsRow.appendChild(wrapper);
+      };
+
+      addMetaDetail('Series ID', seriesId);
+      addMetaDetail('Model ID', modelId);
+      addMetaDetail('No. in series', activeVersionLabel);
+
+      if (detailsRow.childElementCount) {
+        meta.appendChild(detailsRow);
       }
 
       app.appendChild(meta);
@@ -1389,6 +1404,30 @@ export function initBlockscape() {
       activateTab(initialTabId);
 
       app.appendChild(tabsWrapper);
+
+      const mapControls = document.createElement('div');
+      mapControls.className = 'map-controls';
+      const secondaryToggle = document.createElement('label');
+      secondaryToggle.className = 'map-controls__toggle';
+      const secondaryInput = document.createElement('input');
+      secondaryInput.type = 'checkbox';
+      secondaryInput.id = 'toggleSecondaryLinks';
+      secondaryInput.checked = showSecondaryLinks;
+      const secondaryLabel = document.createElement('span');
+      secondaryLabel.textContent = 'Show indirect links';
+      secondaryToggle.appendChild(secondaryInput);
+      secondaryToggle.appendChild(secondaryLabel);
+      secondaryInput.addEventListener('change', () => {
+        showSecondaryLinks = secondaryInput.checked;
+        if (selection) {
+          select(selection);
+        } else {
+          clearStyles();
+          drawLinks();
+        }
+      });
+      mapControls.appendChild(secondaryToggle);
+      mapPanel.appendChild(mapControls);
 
       const renderHost = document.createElement('div');
       renderHost.className = 'blockscape-render';
@@ -1581,15 +1620,66 @@ export function initBlockscape() {
 
     function reflowRects() { index.forEach((v) => { v.rect = v.el.getBoundingClientRect(); }); }
 
+    function getSelectionRelations(id, { includeSecondary = showSecondaryLinks } = {}) {
+      if (!id || !model) {
+        return { deps: new Set(), revs: new Set(), secondaryDeps: new Set(), secondaryRevs: new Set(), edges: [] };
+      }
+
+      const deps = new Set(model.fwd.get(id) || []);
+      const revs = new Set(model.rev.get(id) || []);
+      const secondaryDeps = new Set();
+      const secondaryRevs = new Set();
+      const edges = [];
+      const edgeKeys = new Set();
+      const addEdge = (from, to, type, depth) => {
+        if (!from || !to) return;
+        const key = `${from}->${to}:${type}:${depth}`;
+        if (edgeKeys.has(key)) return;
+        edgeKeys.add(key);
+        edges.push({ from, to, type, depth });
+      };
+
+      deps.forEach(dep => addEdge(id, dep, 'dep', 1));
+      revs.forEach(dependent => addEdge(id, dependent, 'revdep', 1));
+
+      if (includeSecondary) {
+        const firstLevel = new Set([...deps, ...revs]);
+        firstLevel.forEach(node => {
+          const nodeDeps = model.fwd.get(node) || new Set();
+          nodeDeps.forEach(dep => {
+            const isLoopToSelection = dep === id;
+            if (!isLoopToSelection) secondaryDeps.add(dep);
+            if (!isLoopToSelection) addEdge(node, dep, 'dep', 2);
+          });
+
+          const nodeDependents = model.rev.get(node) || new Set();
+          nodeDependents.forEach(dependent => {
+            const isLoopToSelection = dependent === id;
+            if (!isLoopToSelection) secondaryRevs.add(dependent);
+            if (!isLoopToSelection) addEdge(node, dependent, 'revdep', 2);
+          });
+        });
+      }
+
+      return { deps, revs, secondaryDeps, secondaryRevs, edges };
+    }
+
+    function markTile(id, className) {
+      const hit = index.get(id);
+      if (hit) hit.el.classList.add(className);
+    }
+
     function select(id) {
       selection = id;
+      selectionRelations = getSelectionRelations(id);
       clearStyles();
-      const deps = Array.from(model.fwd.get(id) || []);
-      const revs = Array.from(model.rev.get(id) || []);
-      console.log("[Blockscape] selecting id=", id, "deps=", deps, "revs=", revs);
+      const { deps, revs, secondaryDeps, secondaryRevs } = selectionRelations;
+      console.log("[Blockscape] selecting id=", id, "deps=", Array.from(deps), "revs=", Array.from(revs));
       const sel = index.get(id); if (sel) sel.el.classList.add('selected');
-      deps.forEach(d => { const hit = index.get(d); if (hit) hit.el.classList.add('dep'); });
-      revs.forEach(r => { const hit = index.get(r); if (hit) hit.el.classList.add('revdep'); });
+      deps.forEach(d => markTile(d, 'dep'));
+      revs.forEach(r => markTile(r, 'revdep'));
+      secondaryDeps.forEach(d => { if (!deps.has(d) && d !== id) markTile(d, 'dep-indirect'); });
+      secondaryRevs.forEach(r => { if (!revs.has(r) && !deps.has(r) && r !== id) markTile(r, 'revdep-indirect'); });
       drawLinks();
       const externalUrl = index.get(id)?.el?.dataset?.externalUrl;
       if (externalUrl) {
@@ -1597,31 +1687,30 @@ export function initBlockscape() {
       }
     }
 
-    function clearSelection() { selection = null; clearStyles(); drawLinks(); }
-    function clearStyles() { app.querySelectorAll('.tile').forEach(t => t.classList.remove('dep', 'revdep', 'selected')); }
+    function clearSelection() { selection = null; selectionRelations = null; clearStyles(); drawLinks(); }
+    function clearStyles() { app.querySelectorAll('.tile').forEach(t => t.classList.remove('dep', 'revdep', 'dep-indirect', 'revdep-indirect', 'selected')); }
 
     function drawLinks() {
       while (overlay.firstChild) overlay.removeChild(overlay.firstChild);
       if (!selection || overlay.hidden) return;
+      selectionRelations = getSelectionRelations(selection);
+      const relations = selectionRelations;
 
-      const fromRect = index.get(selection)?.rect;
-      if (!fromRect) return;
-
-      const toList = new Set([...(model.fwd.get(selection) || []), ...(model.rev.get(selection) || [])]);
-      toList.forEach(to => {
-        const target = index.get(to);
-        if (!target || !target.rect) return;
+      relations.edges.forEach(edge => {
+        const fromRect = index.get(edge.from)?.rect;
+        const toRect = index.get(edge.to)?.rect;
+        if (!fromRect || !toRect) return;
         const a = center(fromRect);
-        const b = center(target.rect);
+        const b = center(toRect);
         const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
         const c1x = (a.x + b.x) / 2, c1y = a.y;
         const c2x = (a.x + b.x) / 2, c2y = b.y;
-        const isDep = (model.fwd.get(selection) || new Set()).has(to);
         path.setAttribute("d", `M ${a.x},${a.y} C ${c1x},${c1y} ${c2x},${c2y} ${b.x},${b.y}`);
         path.setAttribute("fill", "none");
-        path.setAttribute("stroke", isDep ? "var(--blockscape-dep)" : "var(--blockscape-revdep)");
-        path.setAttribute("stroke-opacity", "0.45");
-        path.setAttribute("stroke-width", "2");
+        path.setAttribute("stroke", edge.type === 'dep' ? "var(--blockscape-dep)" : "var(--blockscape-revdep)");
+        path.setAttribute("stroke-opacity", edge.depth === 1 ? "0.45" : "0.22");
+        path.setAttribute("stroke-width", edge.depth === 1 ? "2" : "1.5");
+        if (edge.depth > 1) path.setAttribute("stroke-dasharray", "4 3");
         path.setAttribute("vector-effect", "non-scaling-stroke");
         overlay.appendChild(path);
       });
@@ -2438,6 +2527,7 @@ export function initBlockscape() {
       lastDeletedItem = null;
       hidePreview();
       selection = null;
+      selectionRelations = null;
       loadActiveIntoEditor();
       rebuildFromActive();
       render();
@@ -2497,6 +2587,7 @@ export function initBlockscape() {
       const nextSelectionId = findNextSelection();
       hidePreview();
       selection = null;
+      selectionRelations = null;
       loadActiveIntoEditor();
       rebuildFromActive();
       render();

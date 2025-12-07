@@ -8,8 +8,10 @@ function slugify(base, fallback = 'series') {
 }
 
 export function makeSeriesId(seriesName, fallback = 'series') {
-  const slug = slugify(seriesName, fallback).replace(/\./g, '-');
-  return slug || slugify(fallback, 'series');
+  const rawSlug = slugify(seriesName, fallback).replace(/\./g, '-');
+  const withoutSuffix = rawSlug.replace(/-series$/i, '').replace(/-+$/, '');
+  const cleaned = withoutSuffix || rawSlug;
+  return cleaned || slugify(fallback, 'series');
 }
 
 export function deriveSeriesId(entry, { seriesName, fallbackTitle = 'unknown' } = {}) {
