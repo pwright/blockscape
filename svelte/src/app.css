@@ -227,6 +227,23 @@
       height: 1.2rem;
     }
 
+    .blockscape-settings-panel .map-controls__toggle,
+    .blockscape-settings-panel .apicurio-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-sm);
+      font-size: var(--font-size-sm);
+      font-weight: var(--font-weight-medium);
+      color: var(--blockscape-foreground);
+    }
+
+    .blockscape-settings-panel .map-controls__toggle input[type="checkbox"],
+    .blockscape-settings-panel .apicurio-toggle input[type="checkbox"] {
+      width: 1.2rem;
+      height: 1.2rem;
+      accent-color: var(--color-primary);
+    }
+
     .apicurio-artifacts {
       border: 1px dashed var(--color-border);
       border-radius: var(--radius-md);
@@ -703,6 +720,23 @@
       display: flex;
       flex-direction: column;
       gap: var(--space-sm);
+    }
+
+    .blockscape-settings-panel {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2xs);
+      padding: var(--space-sm);
+      margin-top: var(--space-xs);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      background: var(--color-surface-muted);
+    }
+
+    .blockscape-settings-panel__title {
+      margin: 0;
+      font-weight: var(--font-weight-semibold);
+      font-size: var(--font-size-sm);
     }
 
     .blockscape-json-panel__title {

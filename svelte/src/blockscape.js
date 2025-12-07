@@ -82,6 +82,7 @@ export function initBlockscape() {
     let activeInfoTooltipHtml = '';
     let pendingInfoPreview = false;
     let infoTabTwinkleTimer = null;
+    let apicurioSettingsToggle = null;
     apicurio.hydrateConfig();
 
     // ===== Utilities =====
@@ -1337,9 +1338,10 @@ export function initBlockscape() {
       const tabDefs = [
         { id: 'map', label: 'Map', panel: mapPanel },
         { id: 'abstract', label: 'Info', panel: abstractPanel },
-        { id: 'source', label: 'Source', panel: sourcePanel },
+        { id: 'source', label: 'Settings', panel: sourcePanel },
         { id: 'apicurio', label: 'Apicurio', panel: apicurioPanel }
       ];
+      const apicurioInitiallyEnabled = typeof apicurio.isEnabled === 'function' ? apicurio.isEnabled() : false;
 
       const handleTabVisibility = (tabId) => {
         if (!overlay) return;
@@ -1362,6 +1364,12 @@ export function initBlockscape() {
         button.setAttribute('aria-controls', `panel-${tab.id}`);
         button.setAttribute('aria-selected', idx === 0 ? 'true' : 'false');
         button.textContent = tab.label;
+        if (tab.id === 'apicurio' && !apicurioInitiallyEnabled) {
+          button.hidden = true;
+          button.tabIndex = -1;
+          button.setAttribute('aria-hidden', 'true');
+          button.style.display = 'none';
+        }
         tab.button = button;
         tabList.appendChild(button);
 
@@ -1386,6 +1394,36 @@ export function initBlockscape() {
         handleTabVisibility(targetId);
       };
 
+      const apicurioTab = tabDefs.find(t => t.id === 'apicurio');
+      const syncApicurioTabVisibility = (enabled) => {
+        if (!apicurioTab || !apicurioTab.button || !apicurioTab.panel) return;
+        const show = !!enabled;
+        apicurioTab.button.hidden = !show;
+        apicurioTab.button.tabIndex = show ? 0 : -1;
+        apicurioTab.button.setAttribute('aria-hidden', show ? 'false' : 'true');
+        apicurioTab.button.style.display = show ? '' : 'none';
+        if (!show) {
+          const wasActive = apicurioTab.panel.classList.contains('is-active');
+          apicurioTab.button.classList.remove('is-active');
+          apicurioTab.button.setAttribute('aria-selected', 'false');
+          apicurioTab.panel.classList.remove('is-active');
+          apicurioTab.panel.hidden = true;
+          if (wasActive) {
+            const fallback = tabDefs.find(t => t.id !== 'apicurio');
+            if (fallback) activateTab(fallback.id);
+          }
+        } else {
+          const isActive = lastActiveTabId === 'apicurio';
+          apicurioTab.button.classList.toggle('is-active', isActive);
+          apicurioTab.button.setAttribute('aria-selected', isActive ? 'true' : 'false');
+          apicurioTab.panel.classList.toggle('is-active', isActive);
+          apicurioTab.panel.hidden = !isActive;
+        }
+        if (apicurioSettingsToggle) {
+          apicurioSettingsToggle.checked = show;
+        }
+      };
+
       tabDefs.forEach(t => {
         t.button.addEventListener('click', () => {
           hideTabTooltip();
@@ -1400,34 +1438,21 @@ export function initBlockscape() {
         }
       });
 
-      const initialTabId = tabDefs.find(t => t.id === lastActiveTabId)?.id || tabDefs[0].id;
+      const resolveInitialTabId = (apicurioEnabled) => {
+        const preferred = tabDefs.find(t => t.id === lastActiveTabId);
+        if (preferred && (preferred.id !== 'apicurio' || apicurioEnabled)) return preferred.id;
+        const firstVisible = tabDefs.find(t => t.id !== 'apicurio' || apicurioEnabled);
+        return firstVisible?.id || tabDefs[0].id;
+      };
+
+      const initialTabId = resolveInitialTabId(apicurioInitiallyEnabled);
       activateTab(initialTabId);
+      syncApicurioTabVisibility(apicurioInitiallyEnabled);
+      if (typeof apicurio.onEnabledChange === 'function') {
+        apicurio.onEnabledChange(syncApicurioTabVisibility);
+      }
 
       app.appendChild(tabsWrapper);
-
-      const mapControls = document.createElement('div');
-      mapControls.className = 'map-controls';
-      const secondaryToggle = document.createElement('label');
-      secondaryToggle.className = 'map-controls__toggle';
-      const secondaryInput = document.createElement('input');
-      secondaryInput.type = 'checkbox';
-      secondaryInput.id = 'toggleSecondaryLinks';
-      secondaryInput.checked = showSecondaryLinks;
-      const secondaryLabel = document.createElement('span');
-      secondaryLabel.textContent = 'Show indirect links';
-      secondaryToggle.appendChild(secondaryInput);
-      secondaryToggle.appendChild(secondaryLabel);
-      secondaryInput.addEventListener('change', () => {
-        showSecondaryLinks = secondaryInput.checked;
-        if (selection) {
-          select(selection);
-        } else {
-          clearStyles();
-          drawLinks();
-        }
-      });
-      mapControls.appendChild(secondaryToggle);
-      mapPanel.appendChild(mapControls);
 
       const renderHost = document.createElement('div');
       renderHost.className = 'blockscape-render';
@@ -1456,6 +1481,54 @@ export function initBlockscape() {
 
       const sourceWrapper = document.createElement('div');
       sourceWrapper.className = 'blockscape-source-panel';
+      const settingsPanel = document.createElement('div');
+      settingsPanel.className = 'blockscape-settings-panel';
+      const settingsHeading = document.createElement('p');
+      settingsHeading.className = 'blockscape-settings-panel__title';
+      settingsHeading.textContent = 'Feature toggles';
+      settingsPanel.appendChild(settingsHeading);
+      const secondaryToggleRow = document.createElement('label');
+      secondaryToggleRow.className = 'map-controls__toggle';
+      const secondaryToggleInput = document.createElement('input');
+      secondaryToggleInput.type = 'checkbox';
+      secondaryToggleInput.id = 'toggleSecondaryLinks';
+      secondaryToggleInput.checked = showSecondaryLinks;
+      const secondaryToggleLabel = document.createElement('span');
+      secondaryToggleLabel.textContent = 'Show indirect links';
+      secondaryToggleRow.appendChild(secondaryToggleInput);
+      secondaryToggleRow.appendChild(secondaryToggleLabel);
+      secondaryToggleInput.addEventListener('change', () => {
+        showSecondaryLinks = secondaryToggleInput.checked;
+        if (selection) {
+          select(selection);
+        } else {
+          clearStyles();
+          drawLinks();
+        }
+      });
+      settingsPanel.appendChild(secondaryToggleRow);
+      const apicurioToggleRow = document.createElement('label');
+      apicurioToggleRow.className = 'apicurio-toggle';
+      const apicurioToggleInput = document.createElement('input');
+      apicurioToggleInput.type = 'checkbox';
+      apicurioToggleInput.id = 'apicurioFeatureToggle';
+      apicurioToggleInput.checked = typeof apicurio.isEnabled === 'function' ? apicurio.isEnabled() : false;
+      apicurioSettingsToggle = apicurioToggleInput;
+      const apicurioToggleLabel = document.createElement('span');
+      apicurioToggleLabel.textContent = 'Apicurio';
+      apicurioToggleRow.appendChild(apicurioToggleInput);
+      apicurioToggleRow.appendChild(apicurioToggleLabel);
+      settingsPanel.appendChild(apicurioToggleRow);
+      const apicurioToggleHint = document.createElement('p');
+      apicurioToggleHint.className = 'apicurio-hint';
+      apicurioToggleHint.textContent = 'Show the Apicurio registry tab when enabled.';
+      settingsPanel.appendChild(apicurioToggleHint);
+      apicurioToggleInput.addEventListener('change', () => {
+        if (typeof apicurio.setEnabled === 'function') {
+          apicurio.setEnabled(apicurioToggleInput.checked);
+        }
+      });
+      sourceWrapper.appendChild(settingsPanel);
       if (jsonPanel) {
         jsonPanel.hidden = false;
         jsonPanel.classList.remove('pf-v5-c-page__main-section');

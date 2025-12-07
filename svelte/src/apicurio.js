@@ -27,6 +27,7 @@ export function createApicurioIntegration({
   let apicurioStatusNode = null;
   let pushApicurioSeriesButton = null;
   let apicurioArtifactsContainer = null;
+  const apicurioEnabledListeners = new Set();
   const apicurioConfig = {
     baseUrl: DEFAULT_APICURIO_BASE,
     groupId: DEFAULT_APICURIO_GROUP,
@@ -53,6 +54,23 @@ export function createApicurioIntegration({
 
   function isApicurioEnabled() {
     return apicurioConfig.enabled !== false;
+  }
+
+  function notifyApicurioEnabledChange() {
+    apicurioEnabledListeners.forEach((listener) => {
+      try {
+        listener(isApicurioEnabled());
+      } catch (err) {
+        console.warn('[Blockscape] failed to run Apicurio enabled listener', err);
+      }
+    });
+  }
+
+  function onApicurioEnabledChange(listener) {
+    if (typeof listener === 'function') {
+      apicurioEnabledListeners.add(listener);
+    }
+    return () => apicurioEnabledListeners.delete(listener);
   }
 
   function syncApicurioInputsFromConfig() {
@@ -194,6 +212,7 @@ export function createApicurioIntegration({
     apicurioConfig.enabled = restoredEnabled;
     apicurioConfig.useSemver = restoredSemver;
     refreshApicurioUiState();
+    notifyApicurioEnabledChange();
   }
 
   function buildApicurioHeaders() {
@@ -511,10 +530,15 @@ export function createApicurioIntegration({
     refreshApicurioUiState();
   }
 
-  function handleApicurioToggleChange() {
-    apicurioConfig.enabled = apicurioToggleInput ? apicurioToggleInput.checked : DEFAULT_APICURIO_ENABLED;
+  function setApicurioEnabled(nextValue) {
+    apicurioConfig.enabled = nextValue !== false;
     persistApicurioConfig();
     refreshApicurioUiState();
+    notifyApicurioEnabledChange();
+  }
+
+  function handleApicurioToggleChange() {
+    setApicurioEnabled(apicurioToggleInput ? apicurioToggleInput.checked : DEFAULT_APICURIO_ENABLED);
   }
 
   function handleApicurioSemverToggleChange() {
@@ -1273,6 +1297,9 @@ export function createApicurioIntegration({
   return {
     hydrateConfig: hydrateApicurioConfig,
     mount,
-    updateAvailability: updateApicurioAvailability
+    updateAvailability: updateApicurioAvailability,
+    isEnabled: isApicurioEnabled,
+    setEnabled: setApicurioEnabled,
+    onEnabledChange: onApicurioEnabledChange
   };
 }
