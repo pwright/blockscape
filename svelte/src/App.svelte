@@ -223,8 +223,11 @@
               hidden={!headerExpanded}
               aria-hidden={!headerExpanded}
             >
-              <label class="sr-only" for="search">Search tiles</label>
-              <input id="search" class="pf-v5-c-form-control" type="text" placeholder="Search…" />
+              <div class="blockscape-search">
+                <label class="sr-only" for="search">Search tiles</label>
+                <input id="search" class="pf-v5-c-form-control" type="text" placeholder="Search…" />
+                <div id="searchResults" class="search-results" role="listbox" aria-label="Search across all models" hidden></div>
+              </div>
               <button id="openInEditor" class="pf-v5-c-button pf-m-secondary" type="button" title="Open current JSON in the editor">Edit</button>
               <button id="shareModel" class="pf-v5-c-button pf-m-secondary" type="button" title="Copy a shareable URL for this model">Share</button>
             </div>

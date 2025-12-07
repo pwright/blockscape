@@ -37,6 +37,8 @@ export function initBlockscape() {
     const newPanel = document.getElementById('newPanel');
     const newPanelClose = document.getElementById('newPanelClose');
     const newPanelBackdrop = document.getElementById('newPanelBackdrop');
+    const searchInput = document.getElementById('search');
+    const searchResults = document.getElementById('searchResults');
     const EDITOR_TRANSFER_KEY = 'blockscape:editorPayload';
     const EDITOR_TRANSFER_MESSAGE_TYPE = 'blockscape:editorTransfer';
     const defaultDocumentTitle = document.title;
@@ -83,6 +85,7 @@ export function initBlockscape() {
     let pendingInfoPreview = false;
     let infoTabTwinkleTimer = null;
     let apicurioSettingsToggle = null;
+    const MAX_SEARCH_RESULTS = 30;
     apicurio.hydrateConfig();
 
     // ===== Utilities =====
@@ -679,6 +682,157 @@ export function initBlockscape() {
 
     let globalEventsBound = false;
 
+    function getSearchTerms(query) {
+      return (query || '')
+        .toString()
+        .toLowerCase()
+        .split(/\s+/)
+        .map(t => t.trim())
+        .filter(Boolean);
+    }
+
+    function applyActiveSearchFilter(query) {
+      const terms = getSearchTerms(query);
+      if (!terms.length) {
+        app.querySelectorAll('.tile').forEach(t => { t.style.opacity = ''; });
+        return;
+      }
+      app.querySelectorAll('.tile').forEach(t => {
+        const name = (t.querySelector('.name')?.textContent || '').toLowerCase();
+        const id = (t.dataset.id || '').toLowerCase();
+        const matches = terms.every(term => name.includes(term) || id.includes(term));
+        t.style.opacity = matches ? '1' : '0.2';
+      });
+    }
+
+    function collectSearchMatches(query) {
+      const terms = getSearchTerms(query);
+      if (!terms.length) return [];
+      const results = [];
+      models.forEach((entry, modelIndex) => {
+        const modelTitle = getModelDisplayTitle(entry);
+        const modelId = getModelId(entry) || '';
+        const modelHaystack = `${modelTitle} ${modelId}`.toLowerCase();
+        if (terms.every(t => modelHaystack.includes(t))) {
+          results.push({
+            type: 'model',
+            modelIndex,
+            modelTitle,
+            modelId
+          });
+        }
+        const categories = Array.isArray(entry.data?.categories) ? entry.data.categories : [];
+        categories.forEach((cat) => {
+          const catTitle = (cat.title || cat.id || '').toString();
+          (cat.items || []).forEach((it) => {
+            const name = (it.name || it.id || '').toString();
+            const haystack = `${name} ${it.id || ''} ${catTitle}`.toLowerCase();
+            if (terms.every(t => haystack.includes(t))) {
+              results.push({
+                type: 'item',
+                modelIndex,
+                modelTitle,
+                modelId,
+                itemId: it.id,
+                itemName: name,
+                categoryTitle: catTitle
+              });
+            }
+          });
+        });
+      });
+      return results.slice(0, MAX_SEARCH_RESULTS);
+    }
+
+    function renderSearchResults(query) {
+      if (!searchResults) return;
+      searchResults.innerHTML = '';
+      const trimmed = (query || '').toString();
+      if (!trimmed.trim()) {
+        searchResults.hidden = true;
+        return;
+      }
+      if (!models.length) {
+        const empty = document.createElement('div');
+        empty.className = 'search-results__empty';
+        empty.textContent = 'Load models to search';
+        searchResults.appendChild(empty);
+        searchResults.hidden = false;
+        return;
+      }
+      const matches = collectSearchMatches(trimmed);
+      if (!matches.length) {
+        const empty = document.createElement('div');
+        empty.className = 'search-results__empty';
+        empty.textContent = 'No matches yet';
+        searchResults.appendChild(empty);
+        searchResults.hidden = false;
+        return;
+      }
+      matches.forEach((match) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'search-result';
+        btn.dataset.modelIndex = String(match.modelIndex);
+        if (match.itemId) btn.dataset.itemId = match.itemId;
+        if (match.type) btn.dataset.type = match.type;
+        if (match.modelIndex === activeIndex && (!match.itemId || selection === match.itemId)) {
+          btn.classList.add('is-active');
+        }
+
+        const primary = document.createElement('div');
+        primary.className = 'search-result__primary';
+        const title = document.createElement('span');
+        title.textContent = match.type === 'model' ? match.modelTitle : (match.itemName || match.itemId || 'Item');
+        primary.appendChild(title);
+        const badge = document.createElement('span');
+        badge.className = 'search-result__badge';
+        badge.textContent = match.type === 'item' ? (match.categoryTitle || 'Item') : 'Model';
+        primary.appendChild(badge);
+
+        const meta = document.createElement('div');
+        meta.className = 'search-result__meta';
+        const modelMeta = document.createElement('span');
+        modelMeta.textContent = match.modelId
+          ? `${match.modelTitle} · ${match.modelId}`
+          : match.modelTitle;
+        meta.appendChild(modelMeta);
+        if (match.type === 'item' && match.itemId) {
+          const itemMeta = document.createElement('span');
+          itemMeta.textContent = `Item ID: ${match.itemId}`;
+          meta.appendChild(itemMeta);
+        } else if (match.type === 'model') {
+          const scopeMeta = document.createElement('span');
+          scopeMeta.textContent = 'Matches model title';
+          meta.appendChild(scopeMeta);
+        }
+
+        btn.appendChild(primary);
+        btn.appendChild(meta);
+        searchResults.appendChild(btn);
+      });
+      searchResults.hidden = false;
+    }
+
+    function handleSearchInput(value) {
+      applyActiveSearchFilter(value || '');
+      renderSearchResults(value || '');
+    }
+
+    function activateSearchResult(match) {
+      if (!match || !Number.isInteger(match.modelIndex)) return;
+      setActive(match.modelIndex);
+      if (!match.itemId) return;
+      requestAnimationFrame(() => {
+        if (activeIndex !== match.modelIndex) return;
+        const tile = index.get(match.itemId)?.el;
+        if (!tile) return;
+        select(match.itemId);
+        tile.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+        tile.focus({ preventScroll: true });
+      });
+    }
+
     function setActive(i) {
       hidePreview();
       clearSeriesNavNotice();
@@ -694,6 +848,9 @@ export function initBlockscape() {
       renderModelList();
       loadActiveIntoEditor();
       rebuildFromActive();
+      if (searchInput) {
+        handleSearchInput(searchInput.value || '');
+      }
       apicurio.updateAvailability();
     }
 
@@ -2875,14 +3032,33 @@ export function initBlockscape() {
       setActive(next);
     };
 
-    // Search filter
-    document.getElementById('search').addEventListener('input', (e) => {
-      const q = e.target.value.trim().toLowerCase();
-      console.log("[Blockscape] search:", q);
-      app.querySelectorAll('.tile').forEach(t => {
-        const name = t.querySelector('.name').textContent.toLowerCase();
-        t.style.opacity = (!q || name.includes(q)) ? 1 : .2;
+    if (searchInput) {
+      searchInput.addEventListener('input', (e) => {
+        handleSearchInput(e.target.value || '');
       });
+      searchInput.addEventListener('focus', () => {
+        if (searchInput.value && searchInput.value.trim()) {
+          renderSearchResults(searchInput.value);
+        }
+      });
+    }
+
+    if (searchResults) {
+      searchResults.addEventListener('click', (event) => {
+        const button = event.target.closest('.search-result');
+        if (!button) return;
+        const modelIndex = parseInt(button.dataset.modelIndex || '-1', 10);
+        const itemId = button.dataset.itemId;
+        activateSearchResult({ modelIndex, itemId });
+      });
+    }
+
+    document.addEventListener('click', (event) => {
+      if (!searchResults || searchResults.hidden) return;
+      const target = event.target;
+      if (searchResults.contains(target)) return;
+      if (searchInput && (target === searchInput || searchInput.contains(target))) return;
+      searchResults.hidden = true;
     });
 
     // Load from URL
