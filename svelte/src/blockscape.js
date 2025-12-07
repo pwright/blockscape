@@ -67,7 +67,8 @@ export function initBlockscape() {
     let index = new Map();      // id -> {el, catId, rect}
     let selection = null;
     let selectionRelations = null;
-    let showSecondaryLinks = false;
+    let showSecondaryLinks = true;
+    let showReusedInMap = false;
     let previewRequestId = 0;
     let previewAnchor = { x: 0, y: 0 };
     let lastActiveTabId = 'map';
@@ -85,7 +86,11 @@ export function initBlockscape() {
     let pendingInfoPreview = false;
     let infoTabTwinkleTimer = null;
     let apicurioSettingsToggle = null;
+    let activeSeriesPreviewTarget = null;
+    let versionThumbLabels = [];
+    let thumbLabelMeasureTimer = null;
     const MAX_SEARCH_RESULTS = 30;
+    const SERIES_INFO_PREVIEW_DELAY = 1000;
     apicurio.hydrateConfig();
 
     // ===== Utilities =====
@@ -280,13 +285,6 @@ export function initBlockscape() {
       if (!candidate) return null;
       const trimmed = candidate.toString().trim();
       return trimmed || null;
-    }
-
-    function getIdFirstWord(idValue) {
-      const raw = (idValue ?? '').toString().trim();
-      if (!raw) return '';
-      const parts = raw.split(/[^a-zA-Z0-9]+/).filter(Boolean);
-      return parts[0] || raw;
     }
 
     function persistActiveEdits(entryIndex) {
@@ -1396,10 +1394,17 @@ export function initBlockscape() {
         }
         const lbl = document.createElement('div');
         lbl.className = 'version-nav__thumb-label';
-        const labelFromId = getIdFirstWord(ver?.data?.id || ver?.id || '');
-        lbl.textContent = labelFromId || (ver?.version ? `v${ver.version}` : `${idx + 1}`);
+        const lblText = document.createElement('span');
+        lblText.className = 'version-nav__thumb-label-text';
+        const fullId = (ver?.data?.id ?? ver?.id ?? '').toString().trim();
+        const labelValue = fullId || (ver?.version ? `v${ver.version}` : `${idx + 1}`);
+        lblText.textContent = labelValue;
+        lbl.title = fullId || labelValue;
+        lbl.appendChild(lblText);
         btn.appendChild(lbl);
+        registerThumbLabel(lbl, lblText);
         btn.addEventListener('click', () => setActiveApicurioVersion(activeIndex, idx));
+        attachSeriesPreviewHover(btn, ver);
         thumbs.appendChild(btn);
       });
       nav.appendChild(thumbs);
@@ -1418,6 +1423,7 @@ export function initBlockscape() {
       console.log("[Blockscape] model.m has abstract?", !!model.m.abstract, "- value:", model.m.abstract ? model.m.abstract.substring(0, 50) + "..." : "none");
       app.innerHTML = "";
       index.clear();
+      versionThumbLabels = [];
 
       const versionNav = renderVersionNavigator(models[activeIndex]);
       if (versionNav) {
@@ -1644,47 +1650,78 @@ export function initBlockscape() {
       settingsHeading.className = 'blockscape-settings-panel__title';
       settingsHeading.textContent = 'Feature toggles';
       settingsPanel.appendChild(settingsHeading);
-      const secondaryToggleRow = document.createElement('label');
-      secondaryToggleRow.className = 'map-controls__toggle';
-      const secondaryToggleInput = document.createElement('input');
-      secondaryToggleInput.type = 'checkbox';
-      secondaryToggleInput.id = 'toggleSecondaryLinks';
-      secondaryToggleInput.checked = showSecondaryLinks;
-      const secondaryToggleLabel = document.createElement('span');
-      secondaryToggleLabel.textContent = 'Show indirect links';
-      secondaryToggleRow.appendChild(secondaryToggleInput);
-      secondaryToggleRow.appendChild(secondaryToggleLabel);
-      secondaryToggleInput.addEventListener('change', () => {
-        showSecondaryLinks = secondaryToggleInput.checked;
-        if (selection) {
-          select(selection);
-        } else {
-          clearStyles();
-          drawLinks();
+      const createSettingsToggle = ({ id, label, hint, checked, className = '', onChange }) => {
+        const row = document.createElement('label');
+        row.className = ['settings-toggle', className].filter(Boolean).join(' ');
+        const input = document.createElement('input');
+        input.type = 'checkbox';
+        input.id = id;
+        input.checked = checked;
+        const text = document.createElement('span');
+        text.className = 'settings-toggle__text';
+        const labelSpan = document.createElement('span');
+        labelSpan.className = 'settings-toggle__label';
+        labelSpan.textContent = label;
+        text.appendChild(labelSpan);
+        if (hint) {
+          const hintSpan = document.createElement('span');
+          hintSpan.className = 'settings-toggle__hint';
+          hintSpan.textContent = hint;
+          text.appendChild(hintSpan);
+        }
+        row.appendChild(input);
+        row.appendChild(text);
+        if (typeof onChange === 'function') {
+          input.addEventListener('change', () => onChange(input.checked));
+        }
+        return { row, input };
+      };
+
+      const { row: secondaryToggleRow, input: secondaryToggleInput } = createSettingsToggle({
+        id: 'toggleSecondaryLinks',
+        label: 'Show indirect links',
+        checked: showSecondaryLinks,
+        className: 'map-controls__toggle',
+        onChange: (checked) => {
+          showSecondaryLinks = checked;
+          if (selection) {
+            select(selection);
+          } else {
+            clearStyles();
+            drawLinks();
+          }
         }
       });
       settingsPanel.appendChild(secondaryToggleRow);
-      const apicurioToggleRow = document.createElement('label');
-      apicurioToggleRow.className = 'apicurio-toggle';
-      const apicurioToggleInput = document.createElement('input');
-      apicurioToggleInput.type = 'checkbox';
-      apicurioToggleInput.id = 'apicurioFeatureToggle';
-      apicurioToggleInput.checked = typeof apicurio.isEnabled === 'function' ? apicurio.isEnabled() : false;
-      apicurioSettingsToggle = apicurioToggleInput;
-      const apicurioToggleLabel = document.createElement('span');
-      apicurioToggleLabel.textContent = 'Apicurio';
-      apicurioToggleRow.appendChild(apicurioToggleInput);
-      apicurioToggleRow.appendChild(apicurioToggleLabel);
-      settingsPanel.appendChild(apicurioToggleRow);
-      const apicurioToggleHint = document.createElement('p');
-      apicurioToggleHint.className = 'apicurio-hint';
-      apicurioToggleHint.textContent = 'Show the Apicurio registry tab when enabled.';
-      settingsPanel.appendChild(apicurioToggleHint);
-      apicurioToggleInput.addEventListener('change', () => {
-        if (typeof apicurio.setEnabled === 'function') {
-          apicurio.setEnabled(apicurioToggleInput.checked);
+
+      const { row: reusedToggleRow } = createSettingsToggle({
+        id: 'toggleReusedInMap',
+        label: 'Display reused in map view',
+        hint: 'Show markers for nodes used multiple times.',
+        checked: showReusedInMap,
+        className: 'map-controls__toggle',
+        onChange: (checked) => {
+          showReusedInMap = checked;
+          applyReusedHighlights();
         }
       });
+      settingsPanel.appendChild(reusedToggleRow);
+
+      const apicurioEnabled = typeof apicurio.isEnabled === 'function' ? apicurio.isEnabled() : false;
+      const { row: apicurioToggleRow, input: apicurioToggleInput } = createSettingsToggle({
+        id: 'apicurioFeatureToggle',
+        label: 'Apicurio',
+        hint: 'Show the Apicurio registry tab when enabled.',
+        checked: apicurioEnabled,
+        className: 'apicurio-toggle',
+        onChange: (checked) => {
+          if (typeof apicurio.setEnabled === 'function') {
+            apicurio.setEnabled(checked);
+          }
+        }
+      });
+      apicurioSettingsToggle = apicurioToggleInput;
+      settingsPanel.appendChild(apicurioToggleRow);
       sourceWrapper.appendChild(settingsPanel);
       if (jsonPanel) {
         jsonPanel.hidden = false;
@@ -1773,13 +1810,7 @@ export function initBlockscape() {
         grid.appendChild(addTile);
       });
 
-      model.reusedLocal.forEach(id => {
-        const hit = index.get(id);
-        if (hit) {
-          hit.el.classList.add('reused');
-          hit.el.querySelector('.badge').style.display = 'inline-block';
-        }
-      });
+      applyReusedHighlights();
 
       wireEvents();
       reflowRects();
@@ -1844,6 +1875,7 @@ export function initBlockscape() {
         globalEventsBound = true;
         window.addEventListener('resize', scheduleOverlaySync);
         window.addEventListener('scroll', scheduleOverlaySync, { passive: true });
+        window.addEventListener('resize', scheduleThumbLabelMeasure);
       }
       document.getElementById('clear').onclick = () => clearSelection();
     }
@@ -1920,6 +1952,17 @@ export function initBlockscape() {
     function clearSelection() { selection = null; selectionRelations = null; clearStyles(); drawLinks(); }
     function clearStyles() { app.querySelectorAll('.tile').forEach(t => t.classList.remove('dep', 'revdep', 'dep-indirect', 'revdep-indirect', 'selected')); }
 
+    function applyReusedHighlights() {
+      if (!model?.reusedLocal) return;
+      model.reusedLocal.forEach(id => {
+        const hit = index.get(id);
+        if (!hit) return;
+        hit.el.classList.toggle('reused', showReusedInMap);
+        const badge = hit.el.querySelector('.badge');
+        if (badge) badge.style.display = showReusedInMap ? 'inline-block' : 'none';
+      });
+    }
+
     function drawLinks() {
       while (overlay.firstChild) overlay.removeChild(overlay.firstChild);
       if (!selection || overlay.hidden) return;
@@ -1983,6 +2026,48 @@ export function initBlockscape() {
       return button;
     }
 
+    function scheduleThumbLabelMeasure() {
+      if (thumbLabelMeasureTimer) return;
+      thumbLabelMeasureTimer = requestAnimationFrame(() => {
+        thumbLabelMeasureTimer = null;
+        versionThumbLabels = versionThumbLabels.filter(({ labelEl, textEl }) => labelEl?.isConnected && textEl?.isConnected);
+        versionThumbLabels.forEach(({ labelEl, textEl }) => {
+          const overflow = Math.max(textEl.scrollWidth - labelEl.clientWidth, 0);
+          if (overflow > 4) {
+            const duration = Math.max(4, Math.min(14, 4 + overflow / 30));
+            labelEl.classList.add('version-nav__thumb-label--scroll');
+            textEl.style.setProperty('--marquee-distance', `${overflow}px`);
+            textEl.style.setProperty('--marquee-duration', `${duration}s`);
+          } else {
+            labelEl.classList.remove('version-nav__thumb-label--scroll');
+            textEl.style.removeProperty('--marquee-distance');
+            textEl.style.removeProperty('--marquee-duration');
+          }
+        });
+      });
+    }
+
+    function registerThumbLabel(labelEl, textEl) {
+      if (!labelEl || !textEl) return;
+      versionThumbLabels.push({ labelEl, textEl });
+      scheduleThumbLabelMeasure();
+    }
+
+    function buildSeriesInfoTooltipHtml(versionEntry, titleText) {
+      const parts = [`<div class="version-nav__tooltip-title">${escapeHtml(titleText)}</div>`];
+      const versionLabel = (versionEntry?.version ?? versionEntry?.data?.version ?? '').toString().trim();
+      if (versionLabel) {
+        parts.push(`<div class="version-nav__tooltip-meta">Version ${escapeHtml(versionLabel)}</div>`);
+      }
+      const abstractHtml = (versionEntry?.data?.abstract ?? '').toString().trim();
+      if (abstractHtml) {
+        parts.push(`<div class="version-nav__tooltip-body">${abstractHtml}</div>`);
+      } else {
+        parts.push('<div class="version-nav__tooltip-body muted">No info available for this version.</div>');
+      }
+      return parts.join('');
+    }
+
     function showTabTooltip(target, html, { offset = 8 } = {}) {
       if (!tabTooltip || !target || !html) return;
       tabTooltip.innerHTML = html;
@@ -2014,6 +2099,62 @@ export function initBlockscape() {
       tabTooltip.classList.remove('is-visible');
       tabTooltip.setAttribute('aria-hidden', 'true');
       tabTooltip.hidden = true;
+    }
+
+    function attachSeriesPreviewHover(thumbEl, versionEntry) {
+      if (!thumbEl) return;
+      const titleText = getModelTitle(versionEntry?.data || versionEntry, 'Series version');
+      thumbEl.title = titleText;
+      thumbEl.setAttribute('aria-label', titleText);
+      const infoHtml = buildSeriesInfoTooltipHtml(versionEntry, titleText);
+      let hoverTimer = null;
+
+      const clearHoverTimer = () => {
+        if (hoverTimer) {
+          clearTimeout(hoverTimer);
+          hoverTimer = null;
+        }
+      };
+
+      const showTitleTooltip = () => {
+        activeSeriesPreviewTarget = thumbEl;
+        showTabTooltip(thumbEl, `<div class="version-nav__tooltip-title">${escapeHtml(titleText)}</div>`, { offset: 10 });
+      };
+
+      const scheduleInfoTooltip = () => {
+        clearHoverTimer();
+        hoverTimer = setTimeout(() => {
+          if (activeSeriesPreviewTarget !== thumbEl) return;
+          showTabTooltip(thumbEl, infoHtml, { offset: 10 });
+        }, SERIES_INFO_PREVIEW_DELAY);
+      };
+
+      const handleEnter = () => {
+        showTitleTooltip();
+        scheduleInfoTooltip();
+      };
+
+      const handleMove = () => {
+        if (activeSeriesPreviewTarget !== thumbEl) {
+          showTitleTooltip();
+        }
+        scheduleInfoTooltip();
+      };
+
+      const handleLeave = () => {
+        clearHoverTimer();
+        if (activeSeriesPreviewTarget === thumbEl) {
+          activeSeriesPreviewTarget = null;
+          hideTabTooltip();
+        }
+      };
+
+      thumbEl.addEventListener('mouseenter', handleEnter);
+      thumbEl.addEventListener('focus', handleEnter);
+      thumbEl.addEventListener('pointermove', handleMove);
+      thumbEl.addEventListener('mouseleave', handleLeave);
+      thumbEl.addEventListener('blur', handleLeave);
+      thumbEl.addEventListener('click', handleLeave);
     }
 
     function maybeShowInfoTabPreview() {

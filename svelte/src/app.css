@@ -227,26 +227,38 @@
       font-weight: var(--font-weight-medium);
     }
 
-    .apicurio-toggle input {
-      width: 1.2rem;
-      height: 1.2rem;
-    }
-
-    .blockscape-settings-panel .map-controls__toggle,
-    .blockscape-settings-panel .apicurio-toggle {
+    .blockscape-settings-panel .settings-toggle {
       display: inline-flex;
       align-items: center;
       gap: var(--space-sm);
       font-size: var(--font-size-sm);
       font-weight: var(--font-weight-medium);
       color: var(--blockscape-foreground);
+      cursor: pointer;
     }
 
-    .blockscape-settings-panel .map-controls__toggle input[type="checkbox"],
-    .blockscape-settings-panel .apicurio-toggle input[type="checkbox"] {
+    .blockscape-settings-panel .settings-toggle input[type="checkbox"] {
       width: 1.2rem;
       height: 1.2rem;
       accent-color: var(--color-primary);
+      margin: 0;
+      flex-shrink: 0;
+    }
+
+    .settings-toggle__text {
+      display: inline-flex;
+      align-items: baseline;
+      gap: var(--space-xs);
+      flex-wrap: wrap;
+    }
+
+    .settings-toggle__label {
+      font-weight: var(--font-weight-medium);
+    }
+
+    .settings-toggle__hint {
+      font-size: var(--font-size-xs);
+      color: var(--color-muted);
     }
 
     .apicurio-artifacts {
@@ -995,6 +1007,30 @@
     .version-nav__thumb-label {
       font-size: var(--font-size-2xs, 0.75rem);
       color: var(--color-muted);
+      width: 100%;
+      overflow: hidden;
+      white-space: nowrap;
+      position: relative;
+    }
+
+    .version-nav__thumb-label-text {
+      display: inline-block;
+      min-width: 100%;
+      padding-right: var(--space-md);
+      transform: translateX(0);
+    }
+
+    .version-nav__thumb-label--scroll .version-nav__thumb-label-text {
+      animation: version-thumb-marquee var(--marquee-duration, 6s) linear infinite;
+    }
+
+    @keyframes version-thumb-marquee {
+      0%, 10% {
+        transform: translateX(0);
+      }
+      90%, 100% {
+        transform: translateX(calc(-1 * var(--marquee-distance, 0px)));
+      }
     }
 
     .version-nav__thumb.is-active {
@@ -1259,6 +1295,24 @@
 
     .blockscape-tab-tooltip.is-visible {
       opacity: 1;
+    }
+
+    .version-nav__tooltip-title {
+      font-weight: var(--font-weight-semibold);
+      color: var(--color-text);
+      margin-bottom: var(--space-2xs);
+    }
+
+    .version-nav__tooltip-meta {
+      font-size: var(--font-size-xs);
+      color: var(--color-muted);
+      margin-bottom: var(--space-2xs);
+    }
+
+    .version-nav__tooltip-body {
+      font-size: var(--font-size-sm);
+      color: var(--color-muted);
+      line-height: 1.4;
     }
 
     .cat-head {
