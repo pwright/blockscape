@@ -361,6 +361,30 @@ export function initBlockscape() {
       }
     });
 
+    function ensureVersionContainer(entry, { versionLabel = '1', createdOn } = {}) {
+      if (!entry) return entry;
+      if (Array.isArray(entry.apicurioVersions) && entry.apicurioVersions.length) {
+        if (entry.apicurioActiveVersionIndex == null) {
+          entry.apicurioActiveVersionIndex = 0;
+        }
+        if (!entry.data && entry.apicurioVersions[entry.apicurioActiveVersionIndex]) {
+          entry.data = entry.apicurioVersions[entry.apicurioActiveVersionIndex].data;
+        }
+        return entry;
+      }
+      const initialVersion = {
+        version: versionLabel,
+        data: entry.data,
+        createdOn: createdOn || new Date().toISOString()
+      };
+      entry.apicurioVersions = [initialVersion];
+      entry.apicurioActiveVersionIndex = 0;
+      const seriesName = entry.title || getModelTitle(entry);
+      ensureSeriesId(entry, { seriesName, fallbackTitle: seriesName });
+      entry.isSeries = true;
+      return entry;
+    }
+
     function addModelEntry(entry, { versionLabel, createdOn } = {}) {
       if (entry?.isSeries || (entry?.apicurioVersions?.length > 1)) {
         const name = entry.title || getModelTitle(entry);
@@ -368,11 +392,13 @@ export function initBlockscape() {
       }
       const modelId = getModelId(entry);
       if (!modelId) {
+        ensureVersionContainer(entry, { versionLabel: versionLabel || '1', createdOn });
         models.push(entry);
         return models.length - 1;
       }
       const existingIndex = models.findIndex((m) => getModelId(m) === modelId);
       if (existingIndex === -1) {
+        ensureVersionContainer(entry, { versionLabel: versionLabel || '1', createdOn });
         models.push(entry);
         return models.length - 1;
       }
@@ -406,22 +432,32 @@ export function initBlockscape() {
       if (activeIndex < 0 || !models[activeIndex]) {
         throw new Error('Load or select a model before creating a version.');
       }
+      const target = models[activeIndex];
+      ensureVersionContainer(target, { versionLabel: '1' });
       let copy;
       try {
-        copy = cloneModelData(models[activeIndex].data);
+        copy = cloneModelData(target.data);
       } catch (error) {
         console.warn('[Blockscape] failed to clone active model for versioning', error);
         throw new Error('Could not copy the current model.');
       }
       ensureModelMetadata(copy, {
-        titleHint: getModelTitle(models[activeIndex]),
-        idHint: getModelId(models[activeIndex])
+        titleHint: getModelTitle(target),
+        idHint: getModelId(target) || getSeriesId(target)
       });
-      const idx = addModelEntry({
-        title: getModelTitle(models[activeIndex]),
-        data: copy
-      }, { versionLabel: versionLabel || 'manual', createdOn: new Date().toISOString() });
-      return idx;
+      const label = versionLabel || String((target.apicurioVersions?.length || 0) + 1);
+      const newVersion = {
+        version: label,
+        data: copy,
+        createdOn: new Date().toISOString()
+      };
+      target.apicurioVersions.push(newVersion);
+      target.apicurioActiveVersionIndex = target.apicurioVersions.length - 1;
+      target.data = copy;
+      target.isSeries = true;
+      const seriesName = target.title || getModelTitle(target);
+      ensureSeriesId(target, { seriesName, fallbackTitle: seriesName });
+      return activeIndex;
     }
 
     function syncDocumentTitle() {
@@ -1344,7 +1380,7 @@ export function initBlockscape() {
     }
 
     function renderVersionNavigator(entry) {
-      if (!entry?.apicurioVersions || entry.apicurioVersions.length <= 1) return null;
+      if (!entry?.apicurioVersions || !entry.apicurioVersions.length) return null;
       const nav = document.createElement('div');
       nav.className = 'version-nav';
 
@@ -1407,6 +1443,25 @@ export function initBlockscape() {
         attachSeriesPreviewHover(btn, ver);
         thumbs.appendChild(btn);
       });
+
+      const addThumb = document.createElement('button');
+      addThumb.type = 'button';
+      addThumb.className = 'version-nav__thumb version-nav__thumb--add';
+      addThumb.title = 'Create a new version from this map';
+      addThumb.addEventListener('click', () => {
+        try {
+          const idx = createNewVersionFromActive({ versionLabel: 'manual' });
+          setActive(idx);
+        } catch (err) {
+          alert(err?.message || 'Unable to create a new version right now.');
+        }
+      });
+      const addIcon = document.createElement('span');
+      addIcon.className = 'version-nav__thumb-add-icon';
+      addIcon.textContent = '+';
+      addThumb.appendChild(addIcon);
+      thumbs.appendChild(addThumb);
+
       nav.appendChild(thumbs);
 
       return nav;
@@ -1425,6 +1480,7 @@ export function initBlockscape() {
       index.clear();
       versionThumbLabels = [];
 
+      ensureVersionContainer(models[activeIndex], { versionLabel: '1' });
       const versionNav = renderVersionNavigator(models[activeIndex]);
       if (versionNav) {
         app.appendChild(versionNav);
@@ -1442,7 +1498,7 @@ export function initBlockscape() {
       meta.appendChild(titleEl);
 
       // Ensure series ID is present for display if this entry is a series.
-      if (models[activeIndex]?.isSeries || (models[activeIndex]?.apicurioVersions?.length > 1)) {
+      if (models[activeIndex]?.isSeries || (models[activeIndex]?.apicurioVersions?.length)) {
         ensureSeriesId(models[activeIndex], { seriesName: models[activeIndex].title || model.m.title || getModelTitle(models[activeIndex]) });
       }
 
