@@ -55,6 +55,7 @@
       --blockscape-revdep: #ef4444;
       --blockscape-reused: var(--color-warning);
       --blockscape-external: var(--color-external);
+      --blockscape-tile-hover-scale: 1.5;
     }
 
     *,
@@ -243,6 +244,47 @@
       accent-color: var(--color-primary);
       margin: 0;
       flex-shrink: 0;
+    }
+
+    .settings-slider {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: var(--space-sm);
+      font-size: var(--font-size-sm);
+      color: var(--blockscape-foreground);
+      width: min(320px, 100%);
+    }
+
+    .settings-slider__text {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2xs);
+      min-width: 0;
+    }
+
+    .settings-slider__label {
+      font-weight: var(--font-weight-medium);
+    }
+
+    .settings-slider__hint {
+      font-size: var(--font-size-xs);
+      color: var(--color-muted);
+    }
+
+    .settings-slider__value {
+      font-variant-numeric: tabular-nums;
+      color: var(--color-muted);
+      justify-self: end;
+    }
+
+    .settings-slider__input {
+      grid-column: 1 / -1;
+      width: 100%;
+    }
+
+    .settings-slider input[type="range"] {
+      accent-color: var(--color-primary);
     }
 
     .settings-toggle__text {
@@ -998,6 +1040,7 @@
       cursor: pointer;
       min-width: 74px;
       transition: border-color var(--transition), box-shadow var(--transition), transform var(--transition);
+      position: relative;
     }
 
     .version-nav__thumb img {
@@ -1025,7 +1068,8 @@
       transform: translateX(0);
     }
 
-    .version-nav__thumb-label--scroll .version-nav__thumb-label-text {
+    .version-nav:hover .version-nav__thumb-label--scroll .version-nav__thumb-label-text,
+    .version-nav:focus-within .version-nav__thumb-label--scroll .version-nav__thumb-label-text {
       animation: version-thumb-marquee var(--marquee-duration, 6s) linear infinite;
     }
 
@@ -1042,6 +1086,41 @@
       border-color: var(--color-primary);
       box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.18);
       transform: translateY(-1px);
+    }
+
+    .version-nav__thumb-remove {
+      position: absolute;
+      top: 4px;
+      left: 4px;
+      width: 20px;
+      height: 20px;
+      border-radius: 999px;
+      border: 1px solid transparent;
+      background: rgba(15, 23, 42, 0.08);
+      color: var(--color-muted);
+      font-size: 0.8rem;
+      line-height: 1;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      z-index: 1;
+      transition: opacity var(--transition), background var(--transition), border-color var(--transition), color var(--transition);
+    }
+
+    .version-nav__thumb:hover .version-nav__thumb-remove,
+    .version-nav__thumb:focus-within .version-nav__thumb-remove {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .version-nav__thumb-remove:hover,
+    .version-nav__thumb-remove:focus-visible {
+      background: var(--color-surface);
+      border-color: var(--color-border);
+      color: var(--color-text);
+      outline: none;
     }
 
     @media (max-width: 720px) {
@@ -1395,15 +1474,32 @@
       cursor: grab;
       transition: box-shadow var(--transition), transform var(--transition), border-color var(--transition);
       box-shadow: var(--color-shadow);
+      transform: translateY(0) scale(1);
+      transform-origin: center;
+      will-change: transform;
+      z-index: 1;
     }
 
-    .tile:hover {
-      transform: translateY(-1px);
+    .tile:hover,
+    .tile:focus-visible {
+      transform: translateY(-1px) scale(var(--blockscape-tile-hover-scale));
       box-shadow: 0 18px 30px -24px rgba(15, 23, 42, 0.55);
+      z-index: 2;
+      outline: none;
     }
 
     .tile:active {
-      transform: translateY(1px);
+      transform: translateY(1px) scale(var(--blockscape-tile-hover-scale));
+    }
+
+    .blockscape-has-selection .tile:hover,
+    .blockscape-has-selection .tile:focus-visible,
+    .blockscape-has-selection .tile:active {
+      transform: translateY(-1px) scale(1);
+    }
+
+    .blockscape-has-selection .tile:active {
+      transform: translateY(1px) scale(1);
     }
 
     .tile.dragging {
@@ -1470,7 +1566,7 @@
     .tile .external-link {
       position: absolute;
       top: var(--space-sm);
-      left: var(--space-sm);
+      left: calc(var(--space-sm) + 2.4rem);
       width: 24px;
       height: 24px;
       border-radius: 999px;
@@ -1484,6 +1580,41 @@
       cursor: pointer;
       padding: 0;
       transition: background var(--transition), color var(--transition), border var(--transition);
+    }
+
+    .tile .tile-delete {
+      position: absolute;
+      top: var(--space-sm);
+      left: var(--space-sm);
+      width: 26px;
+      height: 26px;
+      border-radius: 999px;
+      border: 1px solid var(--color-border);
+      background: var(--color-danger-soft);
+      color: var(--color-danger);
+      font-weight: var(--font-weight-bold);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      padding: 0;
+      line-height: 1;
+      transition: background var(--transition), color var(--transition), border var(--transition), box-shadow var(--transition);
+    }
+
+    .tile:hover .tile-delete,
+    .tile:focus-visible .tile-delete,
+    .tile:focus-within .tile-delete {
+      display: inline-flex;
+    }
+
+    .tile .tile-delete:hover,
+    .tile .tile-delete:focus-visible {
+      background: var(--color-danger);
+      color: #fff;
+      border-color: var(--color-danger);
+      outline: none;
+      box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.15);
     }
 
     .tile .external-link:hover,
