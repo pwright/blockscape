@@ -10,21 +10,21 @@
 "items": [
 {
 "id": "email",
-"name": "Internet Email & Outlook Era",
+"name": "Internet Email",
 "deps": [
 "proprietary.email"
 ]
 },
 {
 "id": "slack",
-"name": "Slack/Teams & Enterprise Social Era",
+"name": "Slack& Enterprise Social",
 "deps": [
 "im"
 ]
 },
 {
 "id": "ai-layer",
-"name": "AI-layered Communication Era",
+"name": "AI-layered",
 "deps": [
 "slack"
 ]
@@ -37,14 +37,14 @@
 "items": [
 {
 "id": "im",
-"name": "Enterprise IM & Early Social Era",
+"name": "Enterprise IM",
 "deps": [
 "email"
 ]
 },
 {
 "id": "telephony.fax",
-"name": "Telephony, Telex & Fax Era",
+"name": "Telephony & Fax",
 "deps": [
 "postal.courier"
 ]
@@ -57,7 +57,7 @@
 "items": [
 {
 "id": "proprietary.email",
-"name": "Proprietary Email & Groupware Era",
+"name": "Proprietary Email",
 "deps": [
 "telephony.fax"
 ]
@@ -70,7 +70,7 @@
 "items": [
 {
 "id": "postal.courier",
-"name": "Postal & Courier Era",
+"name": "Postal Era",
 "deps": []
 }
 ]

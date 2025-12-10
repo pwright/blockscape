@@ -101,7 +101,26 @@ export function initBlockscape() {
   const DEFAULT_TILE_HOVER_SCALE = 1.5;
   const MIN_TILE_HOVER_SCALE = 1;
   const MAX_TILE_HOVER_SCALE = 2.5;
+  const TITLE_WRAP_STORAGE_KEY = "blockscape:titleWrap";
+  const TITLE_HOVER_WIDTH_STORAGE_KEY = "blockscape:titleHoverWidth";
+  const TITLE_HOVER_TEXT_PORTION_STORAGE_KEY =
+    "blockscape:titleHoverTextPortion";
+  const DEFAULT_TITLE_WRAP_MODE = "wrap";
+  const DEFAULT_TITLE_HOVER_WIDTH_MULTIPLIER = 1.3;
+  const MIN_TITLE_HOVER_WIDTH_MULTIPLIER = 1;
+  const MAX_TITLE_HOVER_WIDTH_MULTIPLIER = 1.6;
+  const DEFAULT_TITLE_HOVER_TEXT_PORTION = 0.25;
+  const MIN_TITLE_HOVER_TEXT_PORTION = 0;
+  const MAX_TITLE_HOVER_TEXT_PORTION = 0.6;
+  const TILE_COMPACTNESS_STORAGE_KEY = "blockscape:tileCompactness";
+  const DEFAULT_TILE_COMPACTNESS = 1;
+  const MIN_TILE_COMPACTNESS = 0.75;
+  const MAX_TILE_COMPACTNESS = 1.25;
   let tileHoverScale = DEFAULT_TILE_HOVER_SCALE;
+  let tileCompactness = DEFAULT_TILE_COMPACTNESS;
+  let titleWrapMode = DEFAULT_TITLE_WRAP_MODE;
+  let titleHoverWidthMultiplier = DEFAULT_TITLE_HOVER_WIDTH_MULTIPLIER;
+  let titleHoverTextPortion = DEFAULT_TITLE_HOVER_TEXT_PORTION;
   const SERIES_NAV_DOUBLE_CLICK_STORAGE_KEY =
     "blockscape:seriesNavDoubleClickMs";
   const DEFAULT_SERIES_NAV_DOUBLE_CLICK_MS = 900;
@@ -110,6 +129,10 @@ export function initBlockscape() {
   let seriesNavDoubleClickWaitMs = DEFAULT_SERIES_NAV_DOUBLE_CLICK_MS;
   apicurio.hydrateConfig();
   initializeTileHoverScale();
+  initializeTileCompactness();
+  initializeTitleWrapMode();
+  initializeTitleHoverWidthMultiplier();
+  initializeTitleHoverTextPortion();
   initializeSeriesNavDoubleClickWait();
   syncSelectionClass();
 
@@ -211,6 +234,74 @@ export function initBlockscape() {
     return tileHoverScale;
   }
 
+  function clampTileCompactness(value) {
+    if (!Number.isFinite(value)) return DEFAULT_TILE_COMPACTNESS;
+    return Math.min(
+      MAX_TILE_COMPACTNESS,
+      Math.max(MIN_TILE_COMPACTNESS, value)
+    );
+  }
+
+  function applyTileCompactness(value) {
+    tileCompactness = clampTileCompactness(value);
+    document.documentElement.style.setProperty(
+      "--blockscape-tile-compactness",
+      tileCompactness
+    );
+    return tileCompactness;
+  }
+
+  function clampTitleHoverWidthMultiplier(value) {
+    if (!Number.isFinite(value))
+      return DEFAULT_TITLE_HOVER_WIDTH_MULTIPLIER;
+    return Math.min(
+      MAX_TITLE_HOVER_WIDTH_MULTIPLIER,
+      Math.max(MIN_TITLE_HOVER_WIDTH_MULTIPLIER, value)
+    );
+  }
+
+  function applyTitleHoverWidthMultiplier(value) {
+    titleHoverWidthMultiplier = clampTitleHoverWidthMultiplier(value);
+    document.documentElement.style.setProperty(
+      "--blockscape-title-hover-width-multiplier",
+      titleHoverWidthMultiplier
+    );
+    return titleHoverWidthMultiplier;
+  }
+
+  function clampTitleHoverTextPortion(value) {
+    if (!Number.isFinite(value)) return DEFAULT_TITLE_HOVER_TEXT_PORTION;
+    return Math.min(
+      MAX_TITLE_HOVER_TEXT_PORTION,
+      Math.max(MIN_TITLE_HOVER_TEXT_PORTION, value)
+    );
+  }
+
+  function applyTitleHoverTextPortion(value) {
+    titleHoverTextPortion = clampTitleHoverTextPortion(value);
+    document.documentElement.style.setProperty(
+      "--blockscape-tile-hover-text-portion",
+      titleHoverTextPortion
+    );
+    return titleHoverTextPortion;
+  }
+
+  function applyTitleWrapMode(mode) {
+    const normalized = mode === "nowrap" ? "nowrap" : "wrap";
+    titleWrapMode = normalized;
+    const whiteSpace = normalized === "nowrap" ? "nowrap" : "normal";
+    const textWrap = normalized === "nowrap" ? "nowrap" : "normal";
+    document.documentElement.style.setProperty(
+      "--blockscape-title-white-space",
+      whiteSpace
+    );
+    document.documentElement.style.setProperty(
+      "--blockscape-title-text-wrap",
+      textWrap
+    );
+    return normalized;
+  }
+
   function persistTileHoverScale(scale) {
     if (typeof window === "undefined" || !window.localStorage) return;
     try {
@@ -232,6 +323,121 @@ export function initBlockscape() {
     } catch (error) {
       console.warn("[Blockscape] failed to read hover scale", error);
       return applyTileHoverScale(DEFAULT_TILE_HOVER_SCALE);
+    }
+  }
+
+  function persistTileCompactness(value) {
+    if (typeof window === "undefined" || !window.localStorage) return;
+    try {
+      window.localStorage.setItem(
+        TILE_COMPACTNESS_STORAGE_KEY,
+        String(value)
+      );
+    } catch (error) {
+      console.warn("[Blockscape] failed to persist tile compactness", error);
+    }
+  }
+
+  function initializeTileCompactness() {
+    if (typeof window === "undefined" || !window.localStorage) {
+      return applyTileCompactness(DEFAULT_TILE_COMPACTNESS);
+    }
+    try {
+      const raw = window.localStorage.getItem(TILE_COMPACTNESS_STORAGE_KEY);
+      if (!raw) return applyTileCompactness(DEFAULT_TILE_COMPACTNESS);
+      const parsed = parseFloat(raw);
+      return applyTileCompactness(parsed);
+    } catch (error) {
+      console.warn("[Blockscape] failed to read tile compactness", error);
+      return applyTileCompactness(DEFAULT_TILE_COMPACTNESS);
+    }
+  }
+
+  function persistTitleHoverWidthMultiplier(value) {
+    if (typeof window === "undefined" || !window.localStorage) return;
+    try {
+      window.localStorage.setItem(
+        TITLE_HOVER_WIDTH_STORAGE_KEY,
+        String(value)
+      );
+    } catch (error) {
+      console.warn("[Blockscape] failed to persist title hover width", error);
+    }
+  }
+
+  function initializeTitleHoverWidthMultiplier() {
+    if (typeof window === "undefined" || !window.localStorage) {
+      return applyTitleHoverWidthMultiplier(
+        DEFAULT_TITLE_HOVER_WIDTH_MULTIPLIER
+      );
+    }
+    try {
+      const raw = window.localStorage.getItem(TITLE_HOVER_WIDTH_STORAGE_KEY);
+      if (!raw) {
+        return applyTitleHoverWidthMultiplier(
+          DEFAULT_TITLE_HOVER_WIDTH_MULTIPLIER
+        );
+      }
+      const parsed = parseFloat(raw);
+      return applyTitleHoverWidthMultiplier(parsed);
+    } catch (error) {
+      console.warn("[Blockscape] failed to read title hover width", error);
+      return applyTitleHoverWidthMultiplier(
+        DEFAULT_TITLE_HOVER_WIDTH_MULTIPLIER
+      );
+    }
+  }
+
+  function persistTitleHoverTextPortion(value) {
+    if (typeof window === "undefined" || !window.localStorage) return;
+    try {
+      window.localStorage.setItem(
+        TITLE_HOVER_TEXT_PORTION_STORAGE_KEY,
+        String(value)
+      );
+    } catch (error) {
+      console.warn("[Blockscape] failed to persist title text zoom", error);
+    }
+  }
+
+  function initializeTitleHoverTextPortion() {
+    if (typeof window === "undefined" || !window.localStorage) {
+      return applyTitleHoverTextPortion(DEFAULT_TITLE_HOVER_TEXT_PORTION);
+    }
+    try {
+      const raw = window.localStorage.getItem(
+        TITLE_HOVER_TEXT_PORTION_STORAGE_KEY
+      );
+      if (!raw)
+        return applyTitleHoverTextPortion(DEFAULT_TITLE_HOVER_TEXT_PORTION);
+      const parsed = parseFloat(raw);
+      return applyTitleHoverTextPortion(parsed);
+    } catch (error) {
+      console.warn("[Blockscape] failed to read title text zoom", error);
+      return applyTitleHoverTextPortion(DEFAULT_TITLE_HOVER_TEXT_PORTION);
+    }
+  }
+
+  function persistTitleWrapMode(mode) {
+    if (typeof window === "undefined" || !window.localStorage) return;
+    try {
+      window.localStorage.setItem(TITLE_WRAP_STORAGE_KEY, mode);
+    } catch (error) {
+      console.warn("[Blockscape] failed to persist title wrap mode", error);
+    }
+  }
+
+  function initializeTitleWrapMode() {
+    if (typeof window === "undefined" || !window.localStorage) {
+      return applyTitleWrapMode(DEFAULT_TITLE_WRAP_MODE);
+    }
+    try {
+      const stored = window.localStorage.getItem(TITLE_WRAP_STORAGE_KEY);
+      if (!stored) return applyTitleWrapMode(DEFAULT_TITLE_WRAP_MODE);
+      return applyTitleWrapMode(stored);
+    } catch (error) {
+      console.warn("[Blockscape] failed to read title wrap mode", error);
+      return applyTitleWrapMode(DEFAULT_TITLE_WRAP_MODE);
     }
   }
 
@@ -2318,6 +2524,147 @@ export function initBlockscape() {
     hoverScaleRow.append(hoverScaleText, hoverScaleValue, hoverScaleInput);
     settingsPanel.appendChild(hoverScaleRow);
 
+    const formatCompactness = (value) =>
+      value === 1 ? "Default" : `${Math.round(value * 100)}%`;
+    const compactRow = document.createElement("label");
+    compactRow.className = "settings-slider";
+    compactRow.setAttribute("for", "tileCompactnessSlider");
+
+    const compactText = document.createElement("div");
+    compactText.className = "settings-slider__text";
+    const compactLabel = document.createElement("span");
+    compactLabel.className = "settings-slider__label";
+    compactLabel.textContent = "Tile compactness";
+    const compactHint = document.createElement("span");
+    compactHint.className = "settings-slider__hint";
+    compactHint.textContent =
+      "Adjust padding, gap, and logo size for tiles.";
+    compactText.append(compactLabel, compactHint);
+
+    const compactValue = document.createElement("span");
+    compactValue.className = "settings-slider__value";
+    compactValue.textContent = formatCompactness(tileCompactness);
+
+    const compactInput = document.createElement("input");
+    compactInput.type = "range";
+    compactInput.id = "tileCompactnessSlider";
+    compactInput.className = "settings-slider__input";
+    compactInput.min = String(MIN_TILE_COMPACTNESS);
+    compactInput.max = String(MAX_TILE_COMPACTNESS);
+    compactInput.step = "0.05";
+    compactInput.value = String(tileCompactness);
+    compactInput.setAttribute("aria-label", "Adjust tile compactness");
+    compactInput.addEventListener("input", () => {
+      const applied = applyTileCompactness(parseFloat(compactInput.value));
+      compactValue.textContent = formatCompactness(applied);
+      persistTileCompactness(applied);
+      if (selection) scheduleOverlaySync();
+    });
+
+    compactRow.append(compactText, compactValue, compactInput);
+    settingsPanel.appendChild(compactRow);
+
+    const { row: titleWrapRow, input: titleWrapInput } = createSettingsToggle({
+      id: "titleWrapToggle",
+      label: "Wrap titles",
+      hint: "Allow long titles to wrap instead of truncating.",
+      checked: titleWrapMode !== "nowrap",
+      className: "map-controls__toggle",
+      onChange: (checked) => {
+        const mode = checked ? "wrap" : "nowrap";
+        applyTitleWrapMode(mode);
+        persistTitleWrapMode(mode);
+      },
+    });
+    settingsPanel.appendChild(titleWrapRow);
+
+    const formatTitleWidth = (value) =>
+      `${Math.round((value - 1) * 100)}% extra`;
+    const titleWidthRow = document.createElement("label");
+    titleWidthRow.className = "settings-slider";
+    titleWidthRow.setAttribute("for", "titleHoverWidthSlider");
+
+    const titleWidthText = document.createElement("div");
+    titleWidthText.className = "settings-slider__text";
+    const titleWidthLabel = document.createElement("span");
+    titleWidthLabel.className = "settings-slider__label";
+    titleWidthLabel.textContent = "Title width on hover";
+    const titleWidthHint = document.createElement("span");
+    titleWidthHint.className = "settings-slider__hint";
+    titleWidthHint.textContent = "Give titles more room horizontally when zoomed.";
+    titleWidthText.append(titleWidthLabel, titleWidthHint);
+
+    const titleWidthValue = document.createElement("span");
+    titleWidthValue.className = "settings-slider__value";
+    titleWidthValue.textContent = formatTitleWidth(titleHoverWidthMultiplier);
+
+    const titleWidthInput = document.createElement("input");
+    titleWidthInput.type = "range";
+    titleWidthInput.id = "titleHoverWidthSlider";
+    titleWidthInput.className = "settings-slider__input";
+    titleWidthInput.min = String(MIN_TITLE_HOVER_WIDTH_MULTIPLIER);
+    titleWidthInput.max = String(MAX_TITLE_HOVER_WIDTH_MULTIPLIER);
+    titleWidthInput.step = "0.05";
+    titleWidthInput.value = String(titleHoverWidthMultiplier);
+    titleWidthInput.setAttribute(
+      "aria-label",
+      "Adjust title width boost on hover"
+    );
+    titleWidthInput.addEventListener("input", () => {
+      const applied = applyTitleHoverWidthMultiplier(
+        parseFloat(titleWidthInput.value)
+      );
+      titleWidthValue.textContent = formatTitleWidth(applied);
+      persistTitleHoverWidthMultiplier(applied);
+    });
+
+    titleWidthRow.append(titleWidthText, titleWidthValue, titleWidthInput);
+    settingsPanel.appendChild(titleWidthRow);
+
+    const formatTitleZoomPortion = (value) =>
+      `${Math.round(value * 100)}% of hover zoom`;
+    const titleZoomRow = document.createElement("label");
+    titleZoomRow.className = "settings-slider";
+    titleZoomRow.setAttribute("for", "titleZoomPortionSlider");
+
+    const titleZoomText = document.createElement("div");
+    titleZoomText.className = "settings-slider__text";
+    const titleZoomLabel = document.createElement("span");
+    titleZoomLabel.className = "settings-slider__label";
+    titleZoomLabel.textContent = "Title zoom influence";
+    const titleZoomHint = document.createElement("span");
+    titleZoomHint.className = "settings-slider__hint";
+    titleZoomHint.textContent =
+      "How much the title scales relative to tile hover zoom.";
+    titleZoomText.append(titleZoomLabel, titleZoomHint);
+
+    const titleZoomValue = document.createElement("span");
+    titleZoomValue.className = "settings-slider__value";
+    titleZoomValue.textContent = formatTitleZoomPortion(titleHoverTextPortion);
+
+    const titleZoomInput = document.createElement("input");
+    titleZoomInput.type = "range";
+    titleZoomInput.id = "titleZoomPortionSlider";
+    titleZoomInput.className = "settings-slider__input";
+    titleZoomInput.min = String(MIN_TITLE_HOVER_TEXT_PORTION);
+    titleZoomInput.max = String(MAX_TITLE_HOVER_TEXT_PORTION);
+    titleZoomInput.step = "0.05";
+    titleZoomInput.value = String(titleHoverTextPortion);
+    titleZoomInput.setAttribute(
+      "aria-label",
+      "Adjust how much titles scale on hover"
+    );
+    titleZoomInput.addEventListener("input", () => {
+      const applied = applyTitleHoverTextPortion(
+        parseFloat(titleZoomInput.value)
+      );
+      titleZoomValue.textContent = formatTitleZoomPortion(applied);
+      persistTitleHoverTextPortion(applied);
+    });
+
+    titleZoomRow.append(titleZoomText, titleZoomValue, titleZoomInput);
+    settingsPanel.appendChild(titleZoomRow);
+
     const apicurioEnabled =
       typeof apicurio.isEnabled === "function" ? apicurio.isEnabled() : false;
     const { row: apicurioToggleRow, input: apicurioToggleInput } =
@@ -2406,6 +2753,10 @@ export function initBlockscape() {
         nm.className = "name";
         nm.textContent = it.name || it.id;
 
+        const idLine = document.createElement("div");
+        idLine.className = "tile-id";
+        idLine.textContent = it.id || "";
+
         const badge = document.createElement("div");
         badge.className = "badge";
         badge.textContent = "reused";
@@ -2426,6 +2777,7 @@ export function initBlockscape() {
         tile.appendChild(deleteBtn);
         tile.appendChild(img);
         tile.appendChild(nm);
+        tile.appendChild(idLine);
         tile.appendChild(badge);
         grid.appendChild(tile);
 
