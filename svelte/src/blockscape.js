@@ -70,14 +70,18 @@ export function initBlockscape() {
 
   let model = null; // parsed result of active model: { m, fwd, rev, reusedLocal, seen }
   let index = new Map(); // id -> {el, catId, rect}
+  let categoryIndex = new Map(); // catId -> { el, headEl }
   let selection = null;
+  let selectedCategoryId = null;
   let selectionRelations = null;
+  let categoryEntryHint = null;
   let showSecondaryLinks = true;
   let showReusedInMap = false;
   let previewRequestId = 0;
   let previewAnchor = { x: 0, y: 0 };
   let lastActiveTabId = "map";
   let lastDeletedItem = null;
+  let lastDeletedCategory = null;
   let shortcutHelpListBuilt = false;
   let lastShortcutTrigger = null;
   const NOTICE_TIMEOUT_MS = 2000;
@@ -222,7 +226,8 @@ export function initBlockscape() {
 
   function syncSelectionClass() {
     if (!app) return;
-    app.classList.toggle("blockscape-has-selection", !!selection);
+    const hasSelection = !!selection || !!selectedCategoryId;
+    app.classList.toggle("blockscape-has-selection", hasSelection);
   }
 
   function applyTileHoverScale(scale) {
@@ -569,7 +574,15 @@ export function initBlockscape() {
     {
       keys: [["Arrow Up"], ["Arrow Down"]],
       description:
-        "Jump to the previous or next category while keeping position where possible.",
+        "Move up/down through items, pausing on category headers before entering the next category at the same relative position.",
+    },
+    {
+      keys: [
+        ["Cmd/Ctrl", "Arrow Up"],
+        ["Cmd/Ctrl", "Arrow Down"],
+      ],
+      description:
+        "Reorder the selected category (or the category that holds the selected item).",
     },
 
     // --- STRUCTURAL MANIPULATION (Moving Items) ---
@@ -598,7 +611,10 @@ export function initBlockscape() {
     },
 
     // --- ESSENTIALS & GLOBAL ---
-    { keys: [["Cmd/Ctrl", "Z"]], description: "Undo the last deleted tile." },
+    {
+      keys: [["Cmd/Ctrl", "Z"]],
+      description: "Undo the last deleted tile or category.",
+    },
     {
       keys: [["Cmd/Ctrl", "S"]],
       description:
@@ -617,11 +633,16 @@ export function initBlockscape() {
     },
     {
       keys: [["F2"]],
-      description: "Open the item editor for the selected tile.",
+      description:
+        "Edit the selected item; when a category (not an item) is selected, open the category editor.",
     },
     {
       keys: [["Delete"]],
-      description: "Delete the selected item (use Cmd/Ctrl+Z to undo).",
+      description: "Delete the selected item or category (use Cmd/Ctrl+Z to undo).",
+    },
+    {
+      keys: [["Insert"]],
+      description: "Add a new category at the bottom of the map.",
     },
 
     { keys: [["Escape"]], description: "Unselect item or close the open preview popover." },
@@ -747,6 +768,19 @@ export function initBlockscape() {
     return candidate;
   }
 
+  function makeUniqueCategoryId(base = "category", modelData) {
+    const categories = modelData?.categories || [];
+    const slug = makeDownloadName(base || "category");
+    const exists = (id) => categories.some((cat) => cat.id === id);
+    let candidate = slug || `category-${uid()}`;
+    if (!exists(candidate)) return candidate;
+    let counter = categories.length + 1;
+    while (exists(`${slug}-${counter}`)) {
+      counter += 1;
+    }
+    return `${slug}-${counter}`;
+  }
+
   const itemEditor = createItemEditor({
     findItemAndCategoryById,
     collectAllItemIds,
@@ -760,6 +794,252 @@ export function initBlockscape() {
         syncSelectionClass();
       }
       if (lastDeletedItem?.item?.id === oldId) lastDeletedItem.item.id = newId;
+    },
+  });
+
+  function createCategoryEditor({
+    getActiveModelData,
+    loadActiveIntoEditor,
+    rebuildFromActive,
+    selectCategory,
+    onCategoryRenamed,
+  }) {
+    const state = {
+      wrapper: null,
+      fields: {},
+      categoryId: null,
+      modelData: null,
+    };
+
+    const setError = (message) => {
+      if (!state.fields.errorEl) return;
+      if (!message) {
+        state.fields.errorEl.hidden = true;
+        state.fields.errorEl.textContent = "";
+        return;
+      }
+      state.fields.errorEl.hidden = false;
+      state.fields.errorEl.textContent = message;
+    };
+
+    const hide = () => {
+      if (!state.wrapper) return;
+      state.wrapper.hidden = true;
+      state.wrapper.setAttribute("aria-hidden", "true");
+      setError("");
+      state.categoryId = null;
+      state.modelData = null;
+      document.body.classList.remove("category-editor-open");
+    };
+
+    const show = () => {
+      if (!state.wrapper) return;
+      state.wrapper.hidden = false;
+      state.wrapper.setAttribute("aria-hidden", "false");
+      document.body.classList.add("category-editor-open");
+      requestAnimationFrame(() => {
+        state.fields.titleInput?.focus();
+        state.fields.titleInput?.select();
+      });
+    };
+
+    const applyEdits = () => {
+      if (!state.modelData || !state.categoryId) {
+        throw new Error("No category loaded.");
+      }
+      const categories = state.modelData.categories || [];
+      const category = categories.find((cat) => cat.id === state.categoryId);
+      if (!category) throw new Error("Category not found.");
+      const nextId = (state.fields.idInput.value || "").trim();
+      if (!nextId) throw new Error("ID is required.");
+      const nextTitle = (state.fields.titleInput.value || "").trim();
+      const duplicate = categories.some(
+        (cat) => cat.id === nextId && cat.id !== category.id
+      );
+      if (duplicate) throw new Error("Another category already uses that ID.");
+      const oldId = category.id;
+      category.id = nextId;
+      category.title = nextTitle || category.id;
+      if (oldId !== nextId && typeof onCategoryRenamed === "function") {
+        onCategoryRenamed(oldId, nextId);
+      }
+      loadActiveIntoEditor();
+      rebuildFromActive();
+      selectCategory(nextId, { scrollIntoView: true });
+      return true;
+    };
+
+    const save = () => {
+      try {
+        applyEdits();
+        hide();
+        return true;
+      } catch (error) {
+        console.warn("[CategoryEditor] save failed", error);
+        setError(error?.message || "Unable to save category.");
+        return false;
+      }
+    };
+
+    const ensureModal = () => {
+      if (state.wrapper) return state.wrapper;
+      const wrapper = document.createElement("div");
+      wrapper.className = "item-editor-modal category-editor-modal";
+      wrapper.hidden = true;
+      wrapper.setAttribute("role", "dialog");
+      wrapper.setAttribute("aria-modal", "true");
+
+      const backdrop = document.createElement("div");
+      backdrop.className = "item-editor-modal__backdrop";
+      wrapper.appendChild(backdrop);
+
+      const dialog = document.createElement("div");
+      dialog.className = "item-editor";
+      wrapper.appendChild(dialog);
+
+      const header = document.createElement("div");
+      header.className = "item-editor__header";
+      const title = document.createElement("h2");
+      title.className = "item-editor__title";
+      title.textContent = "Edit category";
+      const closeBtn = document.createElement("button");
+      closeBtn.type = "button";
+      closeBtn.className = "item-editor__close";
+      closeBtn.setAttribute("aria-label", "Close category editor");
+      closeBtn.textContent = "×";
+      header.appendChild(title);
+      header.appendChild(closeBtn);
+      dialog.appendChild(header);
+
+      const form = document.createElement("form");
+      form.className = "item-editor__form";
+      dialog.appendChild(form);
+
+      const meta = document.createElement("div");
+      meta.className = "item-editor__meta";
+      meta.innerHTML =
+        '<div class="item-editor__meta-label">Category</div><div class="item-editor__meta-value"></div>';
+      form.appendChild(meta);
+
+      const errorEl = document.createElement("div");
+      errorEl.className = "item-editor__error";
+      errorEl.hidden = true;
+      form.appendChild(errorEl);
+
+      const makeField = (labelText, inputEl, hintText) => {
+        const field = document.createElement("label");
+        field.className = "item-editor__field";
+        const label = document.createElement("span");
+        label.className = "item-editor__label";
+        label.textContent = labelText;
+        field.appendChild(label);
+        inputEl.classList.add("item-editor__control");
+        field.appendChild(inputEl);
+        if (hintText) {
+          const hint = document.createElement("div");
+          hint.className = "item-editor__hint";
+          hint.textContent = hintText;
+          field.appendChild(hint);
+        }
+        return field;
+      };
+
+      const titleInput = document.createElement("input");
+      titleInput.type = "text";
+      form.appendChild(
+        makeField("Title", titleInput, "Display label shown in the map.")
+      );
+
+      const idInput = document.createElement("input");
+      idInput.type = "text";
+      idInput.required = true;
+      form.appendChild(
+        makeField(
+          "ID",
+          idInput,
+          "Unique identifier for this category (used in URLs and references)."
+        )
+      );
+
+      const actions = document.createElement("div");
+      actions.className = "item-editor__actions";
+
+      const saveBtn = document.createElement("button");
+      saveBtn.type = "submit";
+      saveBtn.className = "item-editor__action item-editor__action--primary";
+      saveBtn.textContent = "Save";
+
+      const cancelBtn = document.createElement("button");
+      cancelBtn.type = "button";
+      cancelBtn.className = "item-editor__action";
+      cancelBtn.textContent = "Cancel";
+
+      actions.appendChild(saveBtn);
+      actions.appendChild(cancelBtn);
+      form.appendChild(actions);
+
+      form.addEventListener("submit", (event) => {
+        event.preventDefault();
+        save();
+      });
+      cancelBtn.addEventListener("click", hide);
+      closeBtn.addEventListener("click", hide);
+      backdrop.addEventListener("click", hide);
+      wrapper.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          hide();
+        }
+      });
+
+      document.body.appendChild(wrapper);
+
+      state.wrapper = wrapper;
+      state.fields = {
+        titleInput,
+        idInput,
+        errorEl,
+        metaLabel: meta.querySelector(".item-editor__meta-value"),
+      };
+      return wrapper;
+    };
+
+    const open = (catId) => {
+      if (!catId) return false;
+      const modal = ensureModal();
+      if (!modal) return false;
+      const modelData = getActiveModelData();
+      const categories = modelData?.categories || [];
+      const category = categories.find((cat) => cat.id === catId);
+      if (!category) return false;
+      state.categoryId = category.id;
+      state.modelData = modelData;
+      state.fields.metaLabel.textContent =
+        category.title || category.id || "Category";
+      state.fields.titleInput.value = category.title || category.id || "";
+      state.fields.idInput.value = category.id || "";
+      setError("");
+      show();
+      return true;
+    };
+
+    return {
+      open,
+      hide,
+      isOpen: () => !!state.wrapper && state.wrapper.hidden === false,
+    };
+  }
+
+  const categoryEditor = createCategoryEditor({
+    getActiveModelData: () => models[activeIndex]?.data,
+    loadActiveIntoEditor,
+    rebuildFromActive,
+    selectCategory: (catId, opts = {}) => selectCategory(catId, opts),
+    onCategoryRenamed: (oldId, newId) => {
+      if (selectedCategoryId === oldId) {
+        selectedCategoryId = newId;
+        syncSelectionClass();
+      }
     },
   });
 
@@ -1367,6 +1647,9 @@ export function initBlockscape() {
     hidePreview();
     clearSeriesNavNotice();
     lastDeletedItem = null;
+    lastDeletedCategory = null;
+    selectedCategoryId = null;
+    categoryEntryHint = null;
     if (i < 0 || i >= models.length) {
       console.warn("[Blockscape] setActive called with out-of-range index:", i);
       return;
@@ -2119,6 +2402,7 @@ export function initBlockscape() {
     );
     app.innerHTML = "";
     index.clear();
+    categoryIndex.clear();
     versionThumbLabels = [];
 
     ensureVersionContainer(models[activeIndex], { versionLabel: "1" });
@@ -2704,12 +2988,25 @@ export function initBlockscape() {
 
       const head = document.createElement("div");
       head.className = "cat-head";
+      head.dataset.cat = cat.id;
+      head.tabIndex = 0;
+      head.title = "Select category";
       head.innerHTML = `<div class="cat-title">${escapeHtml(
         cat.title || cat.id
       )}</div>
                           <div class="muted cat-count">${
                             (cat.items || []).length
                           } items</div>`;
+      head.addEventListener("click", () => selectCategory(cat.id));
+      head.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          selectCategory(cat.id);
+        }
+      });
+      head.addEventListener("focus", () =>
+        selectCategory(cat.id, { scrollIntoView: false })
+      );
       section.appendChild(head);
 
       const grid = document.createElement("div");
@@ -2785,6 +3082,7 @@ export function initBlockscape() {
       });
 
       renderHost.appendChild(section);
+      categoryIndex.set(cat.id, { el: section, headEl: head });
 
       const addTile = document.createElement("button");
       addTile.type = "button";
@@ -2795,11 +3093,20 @@ export function initBlockscape() {
       grid.appendChild(addTile);
     });
 
+    const addCategoryButton = document.createElement("button");
+    addCategoryButton.type = "button";
+    addCategoryButton.className = "category-add";
+    addCategoryButton.innerHTML =
+      '<span class="category-add__icon" aria-hidden="true">+</span><span class="category-add__label">Add category</span><span class="category-add__hint">(Insert)</span>';
+    addCategoryButton.addEventListener("click", () => addCategoryAtEnd());
+    renderHost.appendChild(addCategoryButton);
+
     applyReusedHighlights();
 
     wireEvents();
     reflowRects();
     drawLinks();
+    renderCategorySelection();
     maybeShowInfoTabPreview();
   }
 
@@ -2960,10 +3267,14 @@ export function initBlockscape() {
   }
 
   function select(id) {
+    if (!id) return;
+    selectedCategoryId = null;
     selection = id;
+    categoryEntryHint = null;
     selectionRelations = getSelectionRelations(id);
     syncSelectionClass();
     clearStyles();
+    renderCategorySelection();
     const { deps, revs, secondaryDeps, secondaryRevs } = selectionRelations;
     console.log(
       "[Blockscape] selecting id=",
@@ -2991,13 +3302,89 @@ export function initBlockscape() {
     }
   }
 
-  function clearSelection() {
+  function selectCategory(
+    catId,
+    { scrollIntoView = true, preserveEntryHint = false } = {}
+  ) {
+    if (!model?.m?.categories || !catId) return false;
+    const categories = model.m.categories || [];
+    const target = categories.find((cat) => cat.id === catId);
+    if (!target) return false;
+    hidePreview();
+    clearItemSelection();
+    if (!preserveEntryHint) categoryEntryHint = null;
+    selectedCategoryId = target.id;
+    syncSelectionClass();
+    renderCategorySelection();
+    const entry = categoryIndex.get(target.id);
+    if (scrollIntoView && entry?.el) {
+      entry.el.scrollIntoView({ behavior: "smooth", block: "center" });
+      entry.headEl?.focus({ preventScroll: true });
+    }
+    return true;
+  }
+
+  function renderCategorySelection() {
+    categoryIndex.forEach(({ el, headEl }) => {
+      el.classList.remove("category--selected");
+      if (headEl) headEl.removeAttribute("aria-current");
+    });
+    if (!selectedCategoryId) return;
+    const hit = categoryIndex.get(selectedCategoryId);
+    if (!hit?.el) {
+      selectedCategoryId = null;
+      categoryEntryHint = null;
+      syncSelectionClass();
+      return;
+    }
+    hit.el.classList.add("category--selected");
+    if (hit.headEl) hit.headEl.setAttribute("aria-current", "true");
+  }
+
+  function getCurrentCategoryId() {
+    if (selectedCategoryId) return selectedCategoryId;
+    const selectedMeta = selection ? index.get(selection) : null;
+    if (selectedMeta?.catId) return selectedMeta.catId;
+    return null;
+  }
+
+  function selectCategoryByStep(step) {
+    if (!model?.m?.categories?.length || !step) return false;
+    const categories = model.m.categories;
+    const currentCatId = getCurrentCategoryId();
+    let currentIndex = categories.findIndex((cat) => cat.id === currentCatId);
+    if (currentIndex === -1) {
+      const fallback =
+        categories.find((cat) => (cat.items || []).length)?.id ||
+        categories[0]?.id;
+      if (!fallback) return false;
+      return selectCategory(fallback);
+    }
+    const targetIndex = currentIndex + step;
+    if (targetIndex < 0 || targetIndex >= categories.length) return false;
+    return selectCategory(categories[targetIndex].id);
+  }
+
+  function clearItemSelection() {
     selection = null;
     selectionRelations = null;
-    syncSelectionClass();
     clearStyles();
     drawLinks();
   }
+
+  function clearCategorySelection() {
+    selectedCategoryId = null;
+    categoryEntryHint = null;
+    renderCategorySelection();
+  }
+
+  function clearSelection() {
+    clearItemSelection();
+    clearCategorySelection();
+    categoryEntryHint = null;
+    syncSelectionClass();
+  }
+
   function clearStyles() {
     app
       .querySelectorAll(".tile")
@@ -3674,7 +4061,7 @@ export function initBlockscape() {
         hidePreview();
         handled = true;
       }
-      if (selection) {
+      if (selection || selectedCategoryId) {
         clearSelection();
         handled = true;
       }
@@ -3695,6 +4082,10 @@ export function initBlockscape() {
         return;
       }
       if (event.ctrlKey || event.metaKey) return;
+      if (selectedCategoryId && !event.shiftKey) {
+        event.preventDefault();
+        return;
+      }
       if (event.shiftKey) {
         const moved = moveSelectionWithinCategory(step);
         if (moved) {
@@ -3710,8 +4101,27 @@ export function initBlockscape() {
 
     if (event.key === "ArrowUp" || event.key === "ArrowDown") {
       if (!shouldHandleGlobalPaste()) return;
-      if (event.altKey || event.ctrlKey || event.metaKey) return;
       const step = event.key === "ArrowUp" ? -1 : 1;
+      if ((event.ctrlKey || event.metaKey) && !event.altKey) {
+        const movedCategory = moveCategoryByStep(step);
+        if (movedCategory) {
+          event.preventDefault();
+        }
+        return;
+      }
+      if (event.altKey) return;
+      if (selectedCategoryId && !selection && !event.shiftKey) {
+        const entered = enterSelectedCategoryItems(step);
+        if (entered) {
+          event.preventDefault();
+          return;
+        }
+        const movedCatSelection = selectCategoryByStep(step);
+        if (movedCatSelection) {
+          event.preventDefault();
+          return;
+        }
+      }
       if (event.shiftKey) {
         const moved = moveSelectionAcrossCategories(step);
         if (moved) {
@@ -3729,19 +4139,44 @@ export function initBlockscape() {
       if (!shouldHandleGlobalPaste()) return;
       if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey)
         return;
-      const removed = deleteSelectedItem();
-      if (removed) {
+      const removedCategory = selectedCategoryId
+        ? deleteSelectedCategory()
+        : false;
+      const removedItem = removedCategory ? true : deleteSelectedItem();
+      if (removedCategory || removedItem) {
         event.preventDefault();
       }
     }
 
     if (event.key === "F2") {
       if (!shouldHandleGlobalPaste()) return;
+      const targetCategoryId =
+        (selectedCategoryId && !selection && selectedCategoryId) ||
+        (!selection &&
+          event.target?.closest?.(".category")?.dataset?.cat) ||
+        null;
+      if (targetCategoryId && !selection) {
+        const edited = openCategoryEditor(targetCategoryId);
+        if (edited) {
+          event.preventDefault();
+          return;
+        }
+      }
       const targetId =
         selection || event.target?.closest?.(".tile")?.dataset?.id;
       if (targetId) {
         const opened = itemEditor.open(targetId);
         if (opened) event.preventDefault();
+      }
+    }
+
+    if (event.key === "Insert") {
+      if (!shouldHandleGlobalPaste()) return;
+      if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey)
+        return;
+      const added = addCategoryAtEnd();
+      if (added) {
+        event.preventDefault();
       }
     }
   });
@@ -3922,6 +4357,36 @@ export function initBlockscape() {
     console.log("[Blockscape] added item", newItem.id, "to", categoryId);
   }
 
+  function addCategoryAtEnd() {
+    if (activeIndex < 0) return false;
+    const mobj = models[activeIndex].data;
+    mobj.categories = mobj.categories || [];
+    const defaultTitle = `New category ${mobj.categories.length + 1}`;
+    const newId = makeUniqueCategoryId(defaultTitle, mobj);
+    const newCategory = { id: newId, title: defaultTitle, items: [] };
+    mobj.categories.push(newCategory);
+    selectedCategoryId = newId;
+    selection = null;
+    selectionRelations = null;
+    categoryEntryHint = null;
+    loadActiveIntoEditor();
+    rebuildFromActive();
+    selectCategory(newId);
+    console.log("[Blockscape] added category", newId);
+    return true;
+  }
+
+  function openCategoryEditor(catId = getCurrentCategoryId()) {
+    if (activeIndex < 0 || !catId) return false;
+    const opened = categoryEditor.open(catId);
+    if (opened) {
+      selection = null;
+      selectionRelations = null;
+      syncSelectionClass();
+    }
+    return opened;
+  }
+
   function moveSelectionWithinCategory(step) {
     if (!selection || activeIndex < 0 || !step) return false;
     const mobj = models[activeIndex].data;
@@ -4008,60 +4473,48 @@ export function initBlockscape() {
     if (!model || !model.m || !step) return false;
     const categories = model.m.categories || [];
     if (!categories.length) return false;
-
-    const getFirstSelectable = () => {
-      for (const cat of categories) {
-        if (cat.items && cat.items.length) {
-          return cat.items[0].id;
-        }
-      }
-      return null;
-    };
-
-    const resolveCategoryIndexForSelection = () => {
-      if (!selection) return -1;
-      const selectedMeta = index.get(selection);
-      if (selectedMeta?.catId) {
-        const idx = categories.findIndex(
-          (cat) => cat.id === selectedMeta.catId
-        );
-        if (idx !== -1) return idx;
-      }
-      return categories.findIndex((cat) =>
-        (cat.items || []).some((item) => item.id === selection)
+    const currentCatId = getCurrentCategoryId();
+    let currentIndex = categories.findIndex((cat) => cat.id === currentCatId);
+    let targetIndex = currentIndex + step;
+    if (currentIndex === -1) {
+      targetIndex = step > 0 ? 0 : categories.length - 1;
+    }
+    if (targetIndex < 0 || targetIndex >= categories.length) return false;
+    const targetCat = categories[targetIndex];
+    if (selection) {
+      const currentItems = categories[currentIndex].items || [];
+      const currentItemPosition = currentItems.findIndex(
+        (item) => item.id === selection
       );
-    };
-
-    let currentCategoryIndex = resolveCategoryIndexForSelection();
-    if (currentCategoryIndex === -1) {
-      const first = getFirstSelectable();
-      if (!first) return false;
-      select(first);
-      return true;
+      categoryEntryHint = {
+        catId: targetCat.id,
+        position: currentItemPosition === -1 ? 0 : currentItemPosition,
+      };
+    } else {
+      categoryEntryHint = null;
     }
+    return selectCategory(targetCat.id, { preserveEntryHint: true });
+  }
 
-    const currentItems = categories[currentCategoryIndex].items || [];
-    let currentItemPosition = currentItems.findIndex(
-      (item) => item.id === selection
-    );
-    if (currentItemPosition === -1) currentItemPosition = 0;
-
-    let targetIndex = currentCategoryIndex + step;
-    while (targetIndex >= 0 && targetIndex < categories.length) {
-      const targetCat = categories[targetIndex];
-      const items = targetCat.items || [];
-      if (items.length) {
-        const pos = Math.min(
-          items.length - 1,
-          Math.max(0, currentItemPosition)
-        );
-        select(items[pos].id);
-        return true;
-      }
-      targetIndex += step > 0 ? 1 : -1;
+  function enterSelectedCategoryItems(step) {
+    if (!selectedCategoryId || !model?.m?.categories || !step) return false;
+    const categories = model.m.categories || [];
+    const targetCat = categories.find((cat) => cat.id === selectedCategoryId);
+    if (!targetCat) return false;
+    const items = targetCat.items || [];
+    if (!items.length) return false;
+    let targetIndex =
+      step > 0 ? 0 : Math.max(0, items.length - 1);
+    if (categoryEntryHint?.catId === targetCat.id) {
+      const hinted = Math.min(
+        items.length - 1,
+        Math.max(0, categoryEntryHint.position || 0)
+      );
+      targetIndex = hinted;
     }
-
-    return false;
+    categoryEntryHint = null;
+    select(items[targetIndex].id);
+    return true;
   }
 
   function moveSelectionAcrossCategories(step) {
@@ -4114,13 +4567,70 @@ export function initBlockscape() {
     return true;
   }
 
-  function undoLastDeletion() {
-    if (!lastDeletedItem || activeIndex < 0) return false;
-    const activeModel = models[activeIndex];
-    if (!activeModel || activeModel.id !== lastDeletedItem.modelId)
-      return false;
+  function moveCategoryByStep(step) {
+    if (activeIndex < 0 || !step) return false;
+    const mobj = models[activeIndex].data;
+    const categories = mobj.categories || [];
+    if (!categories.length) return false;
+    const currentCatId = getCurrentCategoryId();
+    if (!currentCatId) return false;
+    const currentIndex = categories.findIndex((cat) => cat.id === currentCatId);
+    if (currentIndex === -1) return false;
+    const targetIndex = currentIndex + step;
+    if (targetIndex < 0 || targetIndex >= categories.length) return false;
+    const [moved] = categories.splice(currentIndex, 1);
+    categories.splice(targetIndex, 0, moved);
+    selectedCategoryId = moved.id;
+    clearItemSelection();
+    categoryEntryHint = null;
+    syncSelectionClass();
+    loadActiveIntoEditor();
+    rebuildFromActive();
+    renderCategorySelection();
+    console.log(
+      "[Blockscape] moved category",
+      moved.id,
+      "from",
+      currentIndex,
+      "to",
+      targetIndex
+    );
+    return true;
+  }
 
-    const deleted = lastDeletedItem;
+  function undoLastDeletion() {
+    if (activeIndex < 0) return false;
+    const activeModel = models[activeIndex];
+    const activeModelId =
+      getModelId(activeModel) || (activeModel ? activeModel.id : null);
+    const candidates = [];
+    if (lastDeletedItem && activeModelId === lastDeletedItem.modelId) {
+      candidates.push({ ...lastDeletedItem, type: "item" });
+    }
+    if (lastDeletedCategory && activeModelId === lastDeletedCategory.modelId) {
+      candidates.push({ ...lastDeletedCategory, type: "category" });
+    }
+    if (!candidates.length) return false;
+    const latest = candidates.reduce((acc, entry) => {
+      if (!acc) return entry;
+      return (entry.ts || 0) > (acc.ts || 0) ? entry : acc;
+    }, null);
+    if (!latest) return false;
+    if (latest.type === "category") {
+      const restored = restoreCategoryDeletion(latest);
+      if (restored) return true;
+    } else if (latest.type === "item") {
+      const restored = restoreItemDeletion(latest);
+      if (restored) return true;
+    }
+    return false;
+  }
+
+  function restoreItemDeletion(deleted) {
+    const activeModel = models[activeIndex];
+    const activeModelId =
+      getModelId(activeModel) || (activeModel ? activeModel.id : null);
+    if (!activeModel || activeModelId !== deleted.modelId) return false;
     const mobj = activeModel.data;
     const categories = mobj.categories || [];
     const category = categories.find((cat) => cat.id === deleted.categoryId);
@@ -4143,6 +4653,32 @@ export function initBlockscape() {
     render();
     select(deleted.item.id);
     console.log("[Blockscape] undo delete restored", deleted.item.id);
+    return true;
+  }
+
+  function restoreCategoryDeletion(deleted) {
+    const activeModel = models[activeIndex];
+    const activeModelId =
+      getModelId(activeModel) || (activeModel ? activeModel.id : null);
+    if (!activeModel || activeModelId !== deleted.modelId) return false;
+    const mobj = activeModel.data;
+    mobj.categories = mobj.categories || [];
+    const insertIndex = Math.min(
+      Math.max(deleted.index, 0),
+      mobj.categories.length
+    );
+    mobj.categories.splice(insertIndex, 0, deleted.category);
+    lastDeletedCategory = null;
+    selection = null;
+    selectionRelations = null;
+    selectedCategoryId = deleted.category.id;
+    categoryEntryHint = null;
+    syncSelectionClass();
+    loadActiveIntoEditor();
+    rebuildFromActive();
+    renderCategorySelection();
+    selectCategory(deleted.category.id);
+    console.log("[Blockscape] undo delete restored category", deleted.category.id);
     return true;
   }
 
@@ -4177,7 +4713,9 @@ export function initBlockscape() {
       item: removed,
       categoryId: category.id,
       index: currentIndex,
-      modelId: activeModel ? activeModel.id : null,
+      modelId:
+        getModelId(activeModel) || (activeModel ? activeModel.id : null),
+      ts: Date.now(),
     };
 
     const findNextSelection = () => {
@@ -4202,6 +4740,7 @@ export function initBlockscape() {
     hidePreview();
     selection = null;
     selectionRelations = null;
+    categoryEntryHint = null;
     syncSelectionClass();
     loadActiveIntoEditor();
     rebuildFromActive();
@@ -4212,6 +4751,44 @@ export function initBlockscape() {
       clearSelection();
     }
     console.log("[Blockscape] removed item", removed.id);
+    return true;
+  }
+
+  function deleteSelectedCategory() {
+    const catId = getCurrentCategoryId();
+    if (!catId || activeIndex < 0) return false;
+    const mobj = models[activeIndex].data;
+    const categories = mobj.categories || [];
+    if (!categories.length) return false;
+    const currentIndex = categories.findIndex((cat) => cat.id === catId);
+    if (currentIndex === -1) return false;
+    const [removed] = categories.splice(currentIndex, 1);
+    if (!removed) return false;
+    const activeModel = models[activeIndex];
+    lastDeletedCategory = {
+      category: removed,
+      index: currentIndex,
+      modelId:
+        getModelId(activeModel) || (activeModel ? activeModel.id : null),
+      ts: Date.now(),
+    };
+    selectedCategoryId = null;
+    selection = null;
+    selectionRelations = null;
+    categoryEntryHint = null;
+    syncSelectionClass();
+    loadActiveIntoEditor();
+    rebuildFromActive();
+    const nextId =
+      categories[currentIndex]?.id ||
+      categories[currentIndex - 1]?.id ||
+      null;
+    if (nextId) {
+      selectCategory(nextId);
+    } else {
+      clearSelection();
+    }
+    console.log("[Blockscape] removed category", removed.id);
     return true;
   }
 
