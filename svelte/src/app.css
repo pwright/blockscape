@@ -1755,7 +1755,6 @@
     .tile .external-link,
     .tile .obsidian-link {
       position: absolute;
-      top: var(--space-sm);
       right: var(--space-sm);
       left: auto;
       width: 24px;
@@ -1773,13 +1772,33 @@
       transition: background var(--transition), color var(--transition), border var(--transition);
     }
 
+    .tile .external-link {
+      top: var(--space-sm);
+    }
+
+    .tile .obsidian-link {
+      top: auto;
+      bottom: var(--space-sm);
+      right: var(--space-sm);
+      width: 22px;
+      height: 22px;
+      font-size: 0.65rem;
+      display: none;
+    }
+
+    .tile:hover .obsidian-link,
+    .tile:focus-visible .obsidian-link,
+    .tile:focus-within .obsidian-link {
+      display: inline-flex;
+    }
+
     .tile .tile-delete {
       position: absolute;
-      top: var(--space-sm);
-      left: var(--space-sm);
+      top: calc(var(--space-sm) - 2px);
+      left: calc(var(--space-sm) - 2px);
       right: auto;
-      width: 26px;
-      height: 26px;
+      width: 22px;
+      height: 22px;
       border-radius: 999px;
       border: 1px solid var(--color-border);
       background: var(--color-danger-soft);

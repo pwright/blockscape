@@ -1871,7 +1871,7 @@ export function initBlockscape() {
       meta.className = "model-nav-meta";
       const versionsInfo =
         m.apicurioVersions && m.apicurioVersions.length > 1
-          ? ` · ${m.apicurioVersions.length} versions`
+          ? ` · ${m.apicurioVersions.length} maps`
           : "";
       meta.textContent = `${categories.length} cat · ${itemsCount} items${versionsInfo}`;
 
@@ -2862,9 +2862,7 @@ export function initBlockscape() {
           externalMeta: itemExternalMeta,
           seriesIdLookup,
         });
-        applyObsidianLinkToTile(tile, obsidianUrl, {
-          hasExternal: !!itemExternalMeta.url || itemExternalMeta.isExternal,
-        });
+        applyObsidianLinkToTile(tile, obsidianUrl);
       });
     };
 
@@ -3350,9 +3348,7 @@ export function initBlockscape() {
         if (externalMeta.url) {
           tile.appendChild(createExternalLinkButton(externalMeta.url));
         }
-        applyObsidianLinkToTile(tile, obsidianUrl, {
-          hasExternal: externalMeta.isExternal || !!externalMeta.url,
-        });
+        applyObsidianLinkToTile(tile, obsidianUrl);
         tile.appendChild(deleteBtn);
         tile.appendChild(img);
         tile.appendChild(nm);
@@ -3774,8 +3770,6 @@ export function initBlockscape() {
   function getObsidianLink(item, { externalMeta, seriesIdLookup } = {}) {
     if (!obsidianLinksEnabled) return "";
     if (!item) return "";
-    const resolvedExternal = externalMeta ?? resolveExternalMeta(item.external);
-    if (resolvedExternal.isExternal) return "";
     if (seriesIdLookup?.has?.(item.id)) return "";
     const targetText = getObsidianTargetText(item);
     return buildObsidianUrl(targetText);
@@ -3831,10 +3825,10 @@ export function initBlockscape() {
     return button;
   }
 
-  function applyObsidianLinkToTile(tile, url, { hasExternal = false } = {}) {
+  function applyObsidianLinkToTile(tile, url) {
     if (!tile) return;
     const existing = tile.querySelector(".obsidian-link");
-    if (!url || hasExternal) {
+    if (!url) {
       if (existing) existing.remove();
       tile.removeAttribute("data-obsidian-url");
       return;
@@ -5492,7 +5486,7 @@ export function initBlockscape() {
 
   // Load JSON files from same directory (for static hosting)
   async function loadJsonFiles() {
-    const jsonFiles = ["comms.bs", "planets.bs", "styleguide.bs"];
+    const jsonFiles = ["comms.bs", "planets.bs", "styleguide.bs", "blockscape-features.bs"];
     const joinPath = (name) => {
       if (!ASSET_BASE) return name;
       return ASSET_BASE.endsWith("/")
