@@ -120,11 +120,20 @@ export function initBlockscape() {
   const DEFAULT_TILE_COMPACTNESS = 1;
   const MIN_TILE_COMPACTNESS = 0.75;
   const MAX_TILE_COMPACTNESS = 1.25;
+  const OBSIDIAN_LINK_ENABLED_STORAGE_KEY = "blockscape:obsidianLinksEnabled";
+  const OBSIDIAN_LINK_MODE_STORAGE_KEY = "blockscape:obsidianLinkMode";
+  const OBSIDIAN_VAULT_STORAGE_KEY = "blockscape:obsidianVault";
+  const OBSIDIAN_LINK_MODE_TITLE = "title";
+  const OBSIDIAN_LINK_MODE_ID = "id";
+  const DEFAULT_OBSIDIAN_LINK_MODE = OBSIDIAN_LINK_MODE_TITLE;
   let tileHoverScale = DEFAULT_TILE_HOVER_SCALE;
   let tileCompactness = DEFAULT_TILE_COMPACTNESS;
   let titleWrapMode = DEFAULT_TITLE_WRAP_MODE;
   let titleHoverWidthMultiplier = DEFAULT_TITLE_HOVER_WIDTH_MULTIPLIER;
   let titleHoverTextPortion = DEFAULT_TITLE_HOVER_TEXT_PORTION;
+  let obsidianLinksEnabled = false;
+  let obsidianLinkMode = DEFAULT_OBSIDIAN_LINK_MODE;
+  let obsidianVaultName = "";
   const SERIES_NAV_DOUBLE_CLICK_STORAGE_KEY =
     "blockscape:seriesNavDoubleClickMs";
   const DEFAULT_SERIES_NAV_DOUBLE_CLICK_MS = 900;
@@ -138,6 +147,9 @@ export function initBlockscape() {
   initializeTitleHoverWidthMultiplier();
   initializeTitleHoverTextPortion();
   initializeSeriesNavDoubleClickWait();
+  initializeObsidianLinksEnabled();
+  initializeObsidianLinkMode();
+  initializeObsidianVaultName();
   syncSelectionClass();
 
   // ===== Utilities =====
@@ -497,6 +509,102 @@ export function initBlockscape() {
     }
   }
 
+  function normalizeObsidianLinkMode(mode) {
+    return mode === OBSIDIAN_LINK_MODE_ID
+      ? OBSIDIAN_LINK_MODE_ID
+      : OBSIDIAN_LINK_MODE_TITLE;
+  }
+
+  function applyObsidianLinkMode(mode) {
+    obsidianLinkMode = normalizeObsidianLinkMode(mode);
+    return obsidianLinkMode;
+  }
+
+  function persistObsidianLinkMode(mode) {
+    if (typeof window === "undefined" || !window.localStorage) return;
+    try {
+      window.localStorage.setItem(OBSIDIAN_LINK_MODE_STORAGE_KEY, mode);
+    } catch (error) {
+      console.warn("[Blockscape] failed to persist Obsidian link mode", error);
+    }
+  }
+
+  function initializeObsidianLinkMode() {
+    if (typeof window === "undefined" || !window.localStorage) {
+      return applyObsidianLinkMode(DEFAULT_OBSIDIAN_LINK_MODE);
+    }
+    try {
+      const raw = window.localStorage.getItem(OBSIDIAN_LINK_MODE_STORAGE_KEY);
+      if (!raw) return applyObsidianLinkMode(DEFAULT_OBSIDIAN_LINK_MODE);
+      return applyObsidianLinkMode(raw);
+    } catch (error) {
+      console.warn("[Blockscape] failed to read Obsidian link mode", error);
+      return applyObsidianLinkMode(DEFAULT_OBSIDIAN_LINK_MODE);
+    }
+  }
+
+  function applyObsidianLinksEnabled(enabled) {
+    obsidianLinksEnabled = !!enabled;
+    return obsidianLinksEnabled;
+  }
+
+  function persistObsidianLinksEnabled(enabled) {
+    if (typeof window === "undefined" || !window.localStorage) return;
+    try {
+      window.localStorage.setItem(
+        OBSIDIAN_LINK_ENABLED_STORAGE_KEY,
+        enabled ? "1" : "0"
+      );
+    } catch (error) {
+      console.warn("[Blockscape] failed to persist Obsidian toggle", error);
+    }
+  }
+
+  function initializeObsidianLinksEnabled() {
+    if (typeof window === "undefined" || !window.localStorage) {
+      return applyObsidianLinksEnabled(false);
+    }
+    try {
+      const raw = window.localStorage.getItem(
+        OBSIDIAN_LINK_ENABLED_STORAGE_KEY
+      );
+      if (raw == null) return applyObsidianLinksEnabled(false);
+      return applyObsidianLinksEnabled(raw === "1");
+    } catch (error) {
+      console.warn("[Blockscape] failed to read Obsidian toggle", error);
+      return applyObsidianLinksEnabled(false);
+    }
+  }
+
+  function applyObsidianVaultName(value) {
+    const trimmed = (value ?? "").toString().trim();
+    obsidianVaultName = trimmed;
+    return obsidianVaultName;
+  }
+
+  function persistObsidianVaultName(value) {
+    if (typeof window === "undefined" || !window.localStorage) return;
+    try {
+      window.localStorage.setItem(OBSIDIAN_VAULT_STORAGE_KEY, value);
+    } catch (error) {
+      console.warn("[Blockscape] failed to persist Obsidian vault", error);
+    }
+  }
+
+  function initializeObsidianVaultName() {
+    if (typeof window === "undefined" || !window.localStorage) {
+      return applyObsidianVaultName("");
+    }
+    try {
+      const raw = window.localStorage.getItem(OBSIDIAN_VAULT_STORAGE_KEY);
+      if (!raw) return applyObsidianVaultName("");
+      return applyObsidianVaultName(raw);
+    } catch (error) {
+      console.warn("[Blockscape] failed to read Obsidian vault", error);
+      return applyObsidianVaultName("");
+    }
+  }
+
   function promptForSeriesTitle(defaultTitle) {
     if (typeof window === "undefined" || typeof window.prompt !== "function")
       return null;
@@ -519,6 +627,48 @@ export function initBlockscape() {
     entry.seriesId = slug;
     entry.apicurioArtifactId = slug;
     entry.id = slug;
+    if (entry.data && typeof entry.data === "object") {
+      entry.data.seriesId = slug;
+    }
+    if (Array.isArray(entry.apicurioVersions)) {
+      entry.apicurioVersions.forEach((ver) => {
+        if (ver?.data && typeof ver.data === "object") {
+          ver.data.seriesId = slug;
+        }
+      });
+    }
+  }
+
+  function renameSeries(entry) {
+    if (
+      !entry ||
+      typeof window === "undefined" ||
+      typeof window.prompt !== "function"
+    )
+      return false;
+    const currentName =
+      (entry.title ?? entry.apicurioArtifactName ?? "").toString().trim() ||
+      getModelDisplayTitle(entry, "Series");
+    const nameResponse = window.prompt("Series name", currentName);
+    if (nameResponse == null) return false;
+    const nextName = nameResponse.trim();
+    if (!nextName) return false;
+    const existingId =
+      getSeriesId(entry, { seriesName: nextName, fallbackTitle: nextName }) ||
+      makeSeriesId(nextName, nextName);
+    const idResponse = window.prompt(
+      "Series ID (used for linking and downloads)",
+      existingId
+    );
+    if (idResponse == null) return false;
+    const nextId = makeSeriesId(
+      idResponse.trim() || nextName,
+      nextName || "series"
+    );
+    entry.title = nextName;
+    entry.apicurioArtifactName = nextName;
+    applySeriesSlug(entry, nextId);
+    return true;
   }
 
   function stableStringify(value) {
@@ -1216,11 +1366,11 @@ export function initBlockscape() {
       ? JSON.stringify(seriesPayload, null, 2)
       : text;
 
-    const title = isSeries
-      ? getSeriesId(active) || getModelTitle(active, "blockscape")
-      : getModelTitle(active, "blockscape");
+    const seriesId = getSeriesId(active);
+    const modelId = getModelId(active);
+    const title = seriesId || modelId || getModelTitle(active, "blockscape");
     const suffix = isSeries ? "-series" : "";
-    const filename = `${makeDownloadName(title)}${suffix}.json`;
+    const filename = `${makeDownloadName(title)}${suffix}.bs`;
     download(filename, payloadText);
     console.log(`[Blockscape] saved JSON (${source}):`, filename);
     return true;
@@ -2276,6 +2426,18 @@ export function initBlockscape() {
       entry.apicurioArtifactId ||
       getModelId(entry) ||
       "Artifact";
+    title.title = "Double-click to rename this series";
+    title.setAttribute("role", "button");
+    title.tabIndex = 0;
+    title.addEventListener("dblclick", () => {
+      const target = models[activeIndex];
+      if (!target?.apicurioVersions?.length) return;
+      const renamed = renameSeries(target);
+      if (!renamed) return;
+      renderModelList();
+      loadActiveIntoEditor();
+      rebuildFromActive();
+    });
     nav.appendChild(title);
 
     const status = document.createElement("div");
@@ -2690,6 +2852,22 @@ export function initBlockscape() {
       return { row, input };
     };
 
+    const refreshObsidianLinks = () => {
+      app.querySelectorAll(".tile").forEach((tile) => {
+        const id = tile.dataset.id;
+        const match = findItemAndCategoryById(id);
+        if (!match?.item) return;
+        const itemExternalMeta = resolveExternalMeta(match.item.external);
+        const obsidianUrl = getObsidianLink(match.item, {
+          externalMeta: itemExternalMeta,
+          seriesIdLookup,
+        });
+        applyObsidianLinkToTile(tile, obsidianUrl, {
+          hasExternal: !!itemExternalMeta.url || itemExternalMeta.isExternal,
+        });
+      });
+    };
+
     const { row: secondaryToggleRow, input: secondaryToggleInput } =
       createSettingsToggle({
         id: "toggleSecondaryLinks",
@@ -2720,6 +2898,100 @@ export function initBlockscape() {
       },
     });
     settingsPanel.appendChild(reusedToggleRow);
+
+    const obsidianModeInputs = [];
+    const { row: obsidianToggleRow } = createSettingsToggle({
+      id: "toggleObsidianLinks",
+      label: "Obsidian",
+      hint: "Make tiles open Obsidian when no external URL exists.",
+      checked: obsidianLinksEnabled,
+      className: "map-controls__toggle",
+      onChange: (checked) => {
+        const applied = applyObsidianLinksEnabled(checked);
+        persistObsidianLinksEnabled(applied);
+        obsidianModeInputs.forEach((input) => {
+          input.disabled = !applied;
+        });
+        refreshObsidianLinks();
+      },
+    });
+    settingsPanel.appendChild(obsidianToggleRow);
+
+    const obsidianModeRow = document.createElement("div");
+    obsidianModeRow.className = "settings-radio";
+    const obsidianModeLabel = document.createElement("div");
+    obsidianModeLabel.className = "settings-radio__label";
+    obsidianModeLabel.textContent = "Obsidian link format";
+    const obsidianModeHint = document.createElement("div");
+    obsidianModeHint.className = "settings-radio__hint";
+    obsidianModeHint.textContent =
+      "Use the tile title or id when building Obsidian links.";
+    const obsidianModeOptions = document.createElement("div");
+    obsidianModeOptions.className = "settings-radio__options";
+
+    const registerObsidianModeOption = (value, text) => {
+      const option = document.createElement("label");
+      option.className = "settings-radio__option";
+      const radio = document.createElement("input");
+      radio.type = "radio";
+      radio.name = "obsidianLinkMode";
+      radio.value = value;
+      radio.checked = obsidianLinkMode === value;
+      radio.disabled = !obsidianLinksEnabled;
+      radio.addEventListener("change", () => {
+        if (!radio.checked) return;
+        const applied = applyObsidianLinkMode(value);
+        persistObsidianLinkMode(applied);
+        refreshObsidianLinks();
+      });
+      const textNode = document.createElement("span");
+      textNode.textContent = text;
+      option.append(radio, textNode);
+      obsidianModeInputs.push(radio);
+      obsidianModeOptions.appendChild(option);
+    };
+
+    registerObsidianModeOption(OBSIDIAN_LINK_MODE_TITLE, "Use title");
+    registerObsidianModeOption(OBSIDIAN_LINK_MODE_ID, "Use id");
+    obsidianModeRow.append(
+      obsidianModeLabel,
+      obsidianModeOptions,
+      obsidianModeHint
+    );
+    settingsPanel.appendChild(obsidianModeRow);
+
+    const obsidianVaultRow = document.createElement("label");
+    obsidianVaultRow.className = "settings-text";
+    obsidianVaultRow.setAttribute("for", "obsidianVaultInput");
+    const obsidianVaultText = document.createElement("div");
+    obsidianVaultText.className = "settings-text__text";
+    const obsidianVaultLabel = document.createElement("span");
+    obsidianVaultLabel.className = "settings-text__label";
+    obsidianVaultLabel.textContent = "Obsidian vault";
+    const obsidianVaultHint = document.createElement("span");
+    obsidianVaultHint.className = "settings-text__hint";
+    obsidianVaultHint.textContent =
+      "Optional. Set the vault name to avoid duplicates.";
+    obsidianVaultText.append(obsidianVaultLabel, obsidianVaultHint);
+    const obsidianVaultInput = document.createElement("input");
+    obsidianVaultInput.type = "text";
+    obsidianVaultInput.id = "obsidianVaultInput";
+    obsidianVaultInput.className = "settings-text__input";
+    obsidianVaultInput.placeholder = "Vault name";
+    obsidianVaultInput.value = obsidianVaultName;
+    obsidianVaultInput.addEventListener("input", () => {
+      const applied = applyObsidianVaultName(obsidianVaultInput.value);
+      persistObsidianVaultName(applied);
+      refreshObsidianLinks();
+    });
+    obsidianVaultRow.append(obsidianVaultText, obsidianVaultInput);
+    settingsPanel.appendChild(obsidianVaultRow);
+
+    const obsidianPluginNote = document.createElement("p");
+    obsidianPluginNote.className = "settings-note";
+    obsidianPluginNote.innerHTML =
+      'Requires the Obsidian <a href="https://vinzent03.github.io/obsidian-advanced-uri/" target="_blank" rel="noreferrer noopener">Advanced URI</a> plugin for create/open behavior.';
+    settingsPanel.appendChild(obsidianPluginNote);
 
     const formatSeriesNavWait = (value) => `${(value / 1000).toFixed(1)}s`;
     const seriesNavWaitRow = document.createElement("label");
@@ -3016,6 +3288,10 @@ export function initBlockscape() {
       (cat.items || []).forEach((it) => {
         tileCounter += 1;
         const externalMeta = resolveExternalMeta(it.external);
+        const obsidianUrl = getObsidianLink(it, {
+          externalMeta,
+          seriesIdLookup,
+        });
         const tile = document.createElement("div");
         tile.className = externalMeta.isExternal ? "tile external" : "tile";
         tile.tabIndex = 0;
@@ -3033,6 +3309,9 @@ export function initBlockscape() {
               ? "Current map in this series"
               : `Open version ${targetIdx + 1} in this series`;
           tile.title = label;
+        }
+        if (obsidianUrl) {
+          tile.dataset.obsidianUrl = obsidianUrl;
         }
 
         const img = document.createElement("img");
@@ -3071,6 +3350,9 @@ export function initBlockscape() {
         if (externalMeta.url) {
           tile.appendChild(createExternalLinkButton(externalMeta.url));
         }
+        applyObsidianLinkToTile(tile, obsidianUrl, {
+          hasExternal: externalMeta.isExternal || !!externalMeta.url,
+        });
         tile.appendChild(deleteBtn);
         tile.appendChild(img);
         tile.appendChild(nm);
@@ -3462,9 +3744,41 @@ export function initBlockscape() {
           "<": "&lt;",
           ">": "&gt;",
           '"': "&quot;",
-          "'": "&#39;",
+      "'": "&#39;",
         }[m])
     );
+  }
+
+  function buildObsidianUrl(targetText) {
+    const trimmed = (targetText ?? "").toString().trim();
+    if (!trimmed) return "";
+    const filepath = trimmed.endsWith(".md") ? trimmed : `${trimmed}.md`;
+    const params = new URLSearchParams();
+    params.set("filepath", filepath);
+    params.set("data", " ");
+    params.set("mode", "append");
+    if (obsidianVaultName) {
+      params.set("vault", obsidianVaultName);
+    }
+    return `obsidian://advanced-uri?${params.toString()}`;
+  }
+
+  function getObsidianTargetText(item) {
+    if (!item) return "";
+    if (obsidianLinkMode === OBSIDIAN_LINK_MODE_ID) {
+      return item.id ?? item.name ?? "";
+    }
+    return item.name ?? item.id ?? "";
+  }
+
+  function getObsidianLink(item, { externalMeta, seriesIdLookup } = {}) {
+    if (!obsidianLinksEnabled) return "";
+    if (!item) return "";
+    const resolvedExternal = externalMeta ?? resolveExternalMeta(item.external);
+    if (resolvedExternal.isExternal) return "";
+    if (seriesIdLookup?.has?.(item.id)) return "";
+    const targetText = getObsidianTargetText(item);
+    return buildObsidianUrl(targetText);
   }
 
   function resolveExternalMeta(value) {
@@ -3487,6 +3801,21 @@ export function initBlockscape() {
     return { isExternal: false, url: "" };
   }
 
+  function createObsidianLinkButton(url) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "external-link obsidian-link";
+    button.setAttribute("aria-label", "Open in Obsidian");
+    button.title = url;
+    button.textContent = "O";
+    button.addEventListener("click", (event) => {
+      event.stopPropagation();
+      window.open(url, "_blank", "noopener");
+    });
+    button.addEventListener("keydown", (event) => event.stopPropagation());
+    return button;
+  }
+
   function createExternalLinkButton(url) {
     const button = document.createElement("button");
     button.type = "button";
@@ -3500,6 +3829,22 @@ export function initBlockscape() {
     });
     button.addEventListener("keydown", (event) => event.stopPropagation());
     return button;
+  }
+
+  function applyObsidianLinkToTile(tile, url, { hasExternal = false } = {}) {
+    if (!tile) return;
+    const existing = tile.querySelector(".obsidian-link");
+    if (!url || hasExternal) {
+      if (existing) existing.remove();
+      tile.removeAttribute("data-obsidian-url");
+      return;
+    }
+    tile.dataset.obsidianUrl = url;
+    if (existing) {
+      existing.title = url;
+      return;
+    }
+    tile.appendChild(createObsidianLinkButton(url));
   }
 
   function scheduleThumbLabelMeasure() {
@@ -3758,6 +4103,7 @@ export function initBlockscape() {
     const filepath = filename ? `items/${filename}` : "";
     const requestId = ++previewRequestId;
     const externalUrl = tile.dataset.externalUrl || "";
+    const obsidianUrl = tile.dataset.obsidianUrl || "";
     const actionList = [
       {
         label: "Edit",
@@ -3773,6 +4119,13 @@ export function initBlockscape() {
         label: "Open link ↗",
         title: externalUrl,
         onClick: () => window.open(externalUrl, "_blank", "noopener"),
+      });
+    }
+    if (obsidianUrl) {
+      actionList.push({
+        label: "Open in Obsidian",
+        title: obsidianUrl,
+        onClick: () => window.open(obsidianUrl, "_blank", "noopener"),
       });
     }
     setPreviewActions(actionList);
