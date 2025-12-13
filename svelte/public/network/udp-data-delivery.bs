@@ -1,0 +1,101 @@
+{
+  "id": "udp-delivery",
+  "title": "UDP Data Delivery",
+  "abstract": "UDP provides a minimal, connectionless transport with no reliability or congestion guarantees. Its low overhead and lack of kernel-imposed behavior make it ideal as a substrate for application-defined transports like QUIC, real-time media, and custom protocols.",
+  "categories": [
+    {
+      "id": "application-outcomes",
+      "title": "Application Outcomes",
+      "items": [
+        {
+          "id": "low-latency-delivery",
+          "name": "Low Latency Delivery",
+          "deps": [
+            "no-handshake",
+            "minimal-overhead"
+          ]
+        },
+        {
+          "id": "app-controlled-reliability",
+          "name": "Application-Controlled Reliability",
+          "deps": [
+            "user-space-transport"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "transport-characteristics",
+      "title": "Transport Characteristics",
+      "items": [
+        {
+          "id": "unreliable-datagrams",
+          "name": "Unreliable Datagrams",
+          "deps": []
+        },
+        {
+          "id": "unordered-delivery",
+          "name": "Unordered Delivery",
+          "deps": []
+        }
+      ]
+    },
+    {
+      "id": "design-tradeoffs",
+      "title": "Design Tradeoffs",
+      "items": [
+        {
+          "id": "no-congestion-control",
+          "name": "No Built-in Congestion Control",
+          "deps": []
+        },
+        {
+          "id": "packet-loss-exposure",
+          "name": "Direct Exposure to Packet Loss",
+          "deps": []
+        }
+      ]
+    },
+    {
+      "id": "innovation-surface",
+      "title": "Innovation Surface",
+      "items": [
+        {
+          "id": "user-space-transport",
+          "name": "User-Space Transport Innovation",
+          "deps": [
+            "udp-core"
+          ]
+        },
+        {
+          "id": "kernel-bypass-evolution",
+          "name": "Rapid Protocol Evolution",
+          "deps": [
+            "udp-core"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "foundation",
+      "title": "Foundation",
+      "items": [
+        {
+          "id": "udp-core",
+          "name": "UDP Protocol",
+          "deps": []
+        },
+        {
+          "id": "no-handshake",
+          "name": "No Connection Handshake",
+          "deps": []
+        },
+        {
+          "id": "minimal-overhead",
+          "name": "Minimal Header Overhead",
+          "deps": []
+        }
+      ]
+    }
+  ]
+}

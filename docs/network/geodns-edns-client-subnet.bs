@@ -1,0 +1,107 @@
+{
+  "id": "geodns-edns",
+  "title": "GeoDNS & EDNS Client Subnet",
+  "abstract": "GeoDNS and EDNS Client Subnet (ECS) influence where users connect by exposing location signals during DNS resolution. When used correctly, they improve initial routing and reduce long-haul traffic; when misused, they fragment caches and increase latency.",
+  "categories": [
+    {
+      "id": "user-visible-results",
+      "title": "User-Visible Results",
+      "items": [
+        {
+          "id": "shorter-paths",
+          "name": "Shorter Network Paths",
+          "deps": [
+            "geo-routing-decision"
+          ]
+        },
+        {
+          "id": "faster-first-connection",
+          "name": "Faster First Connection",
+          "deps": [
+            "ecs-signal",
+            "authoritative-logic"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "routing-decisions",
+      "title": "Routing Decisions",
+      "items": [
+        {
+          "id": "geo-routing-decision",
+          "name": "Geographic Routing Decision",
+          "deps": [
+            "client-location-estimate"
+          ]
+        },
+        {
+          "id": "fallback-routing",
+          "name": "Fallback / Default Routing",
+          "deps": [
+            "authoritative-logic"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "location-signals",
+      "title": "Location Signals",
+      "items": [
+        {
+          "id": "ecs-signal",
+          "name": "EDNS Client Subnet Signal",
+          "deps": [
+            "recursive-support"
+          ]
+        },
+        {
+          "id": "resolver-location",
+          "name": "Resolver Location Heuristics",
+          "deps": []
+        }
+      ]
+    },
+    {
+      "id": "authoritative-logic",
+      "title": "Authoritative Logic",
+      "items": [
+        {
+          "id": "authoritative-logic",
+          "name": "Authoritative Geo Logic",
+          "deps": [
+            "zone-data"
+          ]
+        },
+        {
+          "id": "record-selection",
+          "name": "Record Selection Logic",
+          "deps": [
+            "zone-data"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "foundation",
+      "title": "Foundation",
+      "items": [
+        {
+          "id": "zone-data",
+          "name": "DNS Zone Data",
+          "deps": []
+        },
+        {
+          "id": "recursive-support",
+          "name": "Recursive Resolver ECS Support",
+          "deps": []
+        },
+        {
+          "id": "client-location-estimate",
+          "name": "Client Location Estimation",
+          "deps": []
+        }
+      ]
+    }
+  ]
+}

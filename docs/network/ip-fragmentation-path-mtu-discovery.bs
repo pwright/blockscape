@@ -1,0 +1,109 @@
+{
+  "id": "mtu-pmtud-delivery",
+  "title": "IP Fragmentation & Path MTU Discovery",
+  "abstract": "MTU handling and Path MTU Discovery determine the maximum packet size that can safely traverse a network path. Failures or misconfigurations lead to fragmentation, black holes, retransmissions, and catastrophic throughput collapse—especially for TCP and QUIC.",
+  "categories": [
+    {
+      "id": "user-impact",
+      "title": "User-Visible Impact",
+      "items": [
+        {
+          "id": "throughput-collapse",
+          "name": "Throughput Collapse",
+          "deps": [
+            "packet-fragmentation",
+            "black-hole-mtu"
+          ]
+        },
+        {
+          "id": "connection-instability",
+          "name": "Connection Instability & Timeouts",
+          "deps": [
+            "icmp-filtering"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "transport-effects",
+      "title": "Transport Effects",
+      "items": [
+        {
+          "id": "tcp-mss-clamping",
+          "name": "TCP MSS Clamping",
+          "deps": [
+            "path-mtu"
+          ]
+        },
+        {
+          "id": "quic-pmtud",
+          "name": "QUIC PMTUD Handling",
+          "deps": [
+            "path-mtu"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "discovery-mechanisms",
+      "title": "Discovery Mechanisms",
+      "items": [
+        {
+          "id": "pmtud-classic",
+          "name": "Classic PMTUD (ICMP-based)",
+          "deps": [
+            "icmp-too-big"
+          ]
+        },
+        {
+          "id": "pmtud-probing",
+          "name": "Packetization Layer PMTUD",
+          "deps": [
+            "path-mtu"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "failure-modes",
+      "title": "Failure Modes",
+      "items": [
+        {
+          "id": "black-hole-mtu",
+          "name": "PMTUD Black Holes",
+          "deps": [
+            "icmp-filtering"
+          ]
+        },
+        {
+          "id": "packet-fragmentation",
+          "name": "IP Fragmentation",
+          "deps": [
+            "path-mtu"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "path-constraints",
+      "title": "Path Constraints",
+      "items": [
+        {
+          "id": "path-mtu",
+          "name": "Path MTU",
+          "deps": []
+        },
+        {
+          "id": "icmp-too-big",
+          "name": "ICMP Fragmentation Needed",
+          "deps": []
+        },
+        {
+          "id": "icmp-filtering",
+          "name": "ICMP Filtering / Blocking",
+          "deps": []
+        }
+      ]
+    }
+  ]
+}

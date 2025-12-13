@@ -1,0 +1,111 @@
+{
+  "id": "observability-troubleshooting",
+  "title": "Observability & Troubleshooting Concepts",
+  "abstract": "When delivery fails, observability tools expose where latency, loss, or routing breaks down across DNS, network paths, transport, and application layers. These signals are essential for rapid diagnosis and safe remediation during incidents.",
+  "categories": [
+    {
+      "id": "user-visible-metrics",
+      "title": "User-Visible Metrics",
+      "items": [
+        {
+          "id": "ttfb-metric",
+          "name": "Time To First Byte (TTFB)",
+          "deps": [
+            "dns-timing",
+            "handshake-timing",
+            "origin-response"
+          ]
+        },
+        {
+          "id": "connection-reuse-impact",
+          "name": "Connection Reuse Effectiveness",
+          "deps": [
+            "keepalive-settings"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "path-diagnostics",
+      "title": "Path Diagnostics",
+      "items": [
+        {
+          "id": "traceroute-mtr",
+          "name": "Traceroute / MTR",
+          "deps": [
+            "icmp-responses"
+          ]
+        },
+        {
+          "id": "latency-hop-analysis",
+          "name": "Per-Hop Latency Analysis",
+          "deps": [
+            "traceroute-mtr"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "packet-level-analysis",
+      "title": "Packet-Level Analysis",
+      "items": [
+        {
+          "id": "pcap-capture",
+          "name": "Packet Capture (tcpdump)",
+          "deps": [
+            "interface-access"
+          ]
+        },
+        {
+          "id": "wireshark-analysis",
+          "name": "Wireshark Analysis",
+          "deps": [
+            "pcap-capture"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "timing-breakdown",
+      "title": "Timing Breakdown",
+      "items": [
+        {
+          "id": "dns-timing",
+          "name": "DNS Resolution Timing",
+          "deps": []
+        },
+        {
+          "id": "handshake-timing",
+          "name": "Transport & TLS Handshake Timing",
+          "deps": []
+        },
+        {
+          "id": "origin-response",
+          "name": "Origin Response Time",
+          "deps": []
+        }
+      ]
+    },
+    {
+      "id": "foundation",
+      "title": "Foundation",
+      "items": [
+        {
+          "id": "keepalive-settings",
+          "name": "Keepalive & Idle Timeouts",
+          "deps": []
+        },
+        {
+          "id": "icmp-responses",
+          "name": "ICMP Responses",
+          "deps": []
+        },
+        {
+          "id": "interface-access",
+          "name": "Network Interface Access",
+          "deps": []
+        }
+      ]
+    }
+  ]
+}

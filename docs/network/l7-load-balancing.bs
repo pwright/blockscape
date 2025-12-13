@@ -1,0 +1,117 @@
+{
+  "id": "l7-load-balancing",
+  "title": "L7 Load Balancing",
+  "abstract": "Layer 7 load balancing operates at the application layer, using protocol awareness (typically HTTP) to make routing decisions based on URLs, headers, cookies, and request context. This enables flexible traffic shaping and advanced delivery patterns, at the cost of additional processing and latency.",
+  "categories": [
+    {
+      "id": "user-visible-impact",
+      "title": "User-Visible Impact",
+      "items": [
+        {
+          "id": "smart-request-routing",
+          "name": "Smart Request Routing",
+          "deps": [
+            "request-inspection",
+            "routing-rules"
+          ]
+        },
+        {
+          "id": "feature-targeting",
+          "name": "Feature Targeting & Experiments",
+          "deps": [
+            "header-routing",
+            "cookie-routing"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "routing-capabilities",
+      "title": "Routing Capabilities",
+      "items": [
+        {
+          "id": "path-routing",
+          "name": "Path-Based Routing",
+          "deps": [
+            "request-inspection"
+          ]
+        },
+        {
+          "id": "header-routing",
+          "name": "Header-Based Routing",
+          "deps": [
+            "request-inspection"
+          ]
+        },
+        {
+          "id": "cookie-routing",
+          "name": "Cookie-Based Routing",
+          "deps": [
+            "request-inspection"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "protocol-awareness",
+      "title": "Protocol Awareness",
+      "items": [
+        {
+          "id": "request-inspection",
+          "name": "Request Inspection & Parsing",
+          "deps": [
+            "http-parsing"
+          ]
+        },
+        {
+          "id": "response-modification",
+          "name": "Response Modification",
+          "deps": [
+            "http-parsing"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "operational-controls",
+      "title": "Operational Controls",
+      "items": [
+        {
+          "id": "routing-rules",
+          "name": "Routing Rules & Policies",
+          "deps": [
+            "config-management"
+          ]
+        },
+        {
+          "id": "canary-rollouts",
+          "name": "Canary & Blue-Green Rollouts",
+          "deps": [
+            "traffic-splitting"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "foundation",
+      "title": "Foundation",
+      "items": [
+        {
+          "id": "http-parsing",
+          "name": "HTTP Parsing & Semantics",
+          "deps": []
+        },
+        {
+          "id": "traffic-splitting",
+          "name": "Traffic Splitting Logic",
+          "deps": []
+        },
+        {
+          "id": "config-management",
+          "name": "Configuration Management",
+          "deps": []
+        }
+      ]
+    }
+  ]
+}

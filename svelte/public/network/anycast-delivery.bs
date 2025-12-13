@@ -1,0 +1,115 @@
+{
+  "id": "anycast-delivery",
+  "title": "Anycast Delivery",
+  "abstract": "Anycast delivers traffic to the nearest or best-performing instance of a service by advertising the same IP address from multiple locations. It is foundational to modern CDNs, DNS, and edge platforms, directly shaping latency, failover behavior, and blast radius.",
+  "categories": [
+    {
+      "id": "user-visible-outcomes",
+      "title": "User-Visible Outcomes",
+      "items": [
+        {
+          "id": "low-latency-access",
+          "name": "Low-Latency Access",
+          "deps": [
+            "nearest-pop-selection"
+          ]
+        },
+        {
+          "id": "implicit-failover",
+          "name": "Implicit Failover",
+          "deps": [
+            "route-withdrawal"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "traffic-behavior",
+      "title": "Traffic Behavior",
+      "items": [
+        {
+          "id": "nearest-pop-selection",
+          "name": "Nearest PoP Selection",
+          "deps": [
+            "bgp-path-selection"
+          ]
+        },
+        {
+          "id": "traffic-shift",
+          "name": "Traffic Shifts on Routing Change",
+          "deps": [
+            "bgp-convergence"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "operational-dynamics",
+      "title": "Operational Dynamics",
+      "items": [
+        {
+          "id": "blast-radius-control",
+          "name": "Blast Radius Control",
+          "deps": [
+            "site-isolation"
+          ]
+        },
+        {
+          "id": "capacity-dilution",
+          "name": "Capacity Dilution Risk",
+          "deps": [
+            "traffic-distribution"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "routing-mechanics",
+      "title": "Routing Mechanics",
+      "items": [
+        {
+          "id": "bgp-path-selection",
+          "name": "BGP Path Selection",
+          "deps": [
+            "bgp-announcements"
+          ]
+        },
+        {
+          "id": "bgp-convergence",
+          "name": "BGP Convergence",
+          "deps": [
+            "bgp-announcements"
+          ]
+        },
+        {
+          "id": "route-withdrawal",
+          "name": "Route Withdrawal",
+          "deps": [
+            "bgp-announcements"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "foundation",
+      "title": "Foundation",
+      "items": [
+        {
+          "id": "bgp-announcements",
+          "name": "BGP Announcements",
+          "deps": []
+        },
+        {
+          "id": "site-isolation",
+          "name": "Site-Level Isolation",
+          "deps": []
+        },
+        {
+          "id": "traffic-distribution",
+          "name": "Traffic Distribution Across PoPs",
+          "deps": []
+        }
+      ]
+    }
+  ]
+}

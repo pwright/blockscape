@@ -1,0 +1,354 @@
+[
+  {
+    "id": "throughput-latency-congestion",
+    "title": "Throughput, Latency & Congestion",
+    "abstract": "Performance on real networks is governed by congestion dynamics, queueing behavior, and impairments like loss and jitter. Operators tune congestion control and queue management to balance throughput with consistent low latency under load.",
+    "categories": [
+      {
+        "id": "user-perception",
+        "title": "User Perception",
+        "items": [
+          {
+            "id": "interactive-snappiness",
+            "name": "Interactive Snappiness",
+            "deps": [
+              "queueing-delay",
+              "rtt-signal"
+            ]
+          },
+          {
+            "id": "streaming-quality",
+            "name": "Streaming Quality",
+            "deps": [
+              "jitter-signal",
+              "packet-loss-signal",
+              "throughput-ceiling"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "control-loops",
+        "title": "Control Loops",
+        "items": [
+          {
+            "id": "congestion-control-algos",
+            "name": "Congestion Control Algorithms (BBR/CUBIC/Reno)",
+            "deps": [
+              "rtt-signal",
+              "packet-loss-signal"
+            ]
+          },
+          {
+            "id": "loss-recovery-mechanisms",
+            "name": "Loss Recovery",
+            "deps": [
+              "packet-loss-signal"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "queue-management",
+        "title": "Queue Management",
+        "items": [
+          {
+            "id": "aqm",
+            "name": "Active Queue Management (fq_codel/PIE)",
+            "deps": [
+              "queueing-delay"
+            ]
+          },
+          {
+            "id": "bufferbloat",
+            "name": "Bufferbloat",
+            "deps": [
+              "queueing-delay"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "network-signals",
+        "title": "Network Signals",
+        "items": [
+          {
+            "id": "rtt-signal",
+            "name": "Round-Trip Time (RTT)",
+            "deps": []
+          },
+          {
+            "id": "packet-loss-signal",
+            "name": "Packet Loss",
+            "deps": []
+          },
+          {
+            "id": "jitter-signal",
+            "name": "Jitter",
+            "deps": []
+          },
+          {
+            "id": "queueing-delay",
+            "name": "Queueing Delay",
+            "deps": []
+          },
+          {
+            "id": "throughput-ceiling",
+            "name": "Path Bottleneck Capacity",
+            "deps": []
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "application-layer-delivery-protocols",
+    "title": "Application Layer Protocols Used in Delivery",
+    "abstract": "Application protocols (HTTP variants, WebSockets, gRPC) define request/stream semantics on top of transport. Their multiplexing, framing, and connection behavior determine head-of-line blocking risk, cache-friendliness, and end-to-end latency.",
+    "categories": [
+      {
+        "id": "user-experience",
+        "title": "User Experience",
+        "items": [
+          {
+            "id": "page-load-speed",
+            "name": "Page Load Speed",
+            "deps": [
+              "http2",
+              "http3",
+              "connection-reuse-app"
+            ]
+          },
+          {
+            "id": "realtime-interactivity",
+            "name": "Realtime Interactivity",
+            "deps": [
+              "websockets",
+              "grpc"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "protocol-capabilities",
+        "title": "Protocol Capabilities",
+        "items": [
+          {
+            "id": "multiplexing",
+            "name": "Multiplexing & Prioritization",
+            "deps": [
+              "http2",
+              "http3"
+            ]
+          },
+          {
+            "id": "hol-blocking",
+            "name": "Head-of-Line Blocking Risk",
+            "deps": [
+              "tcp-transport-app",
+              "quic-transport-app"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "application-protocols",
+        "title": "Application Protocols",
+        "items": [
+          {
+            "id": "http11",
+            "name": "HTTP/1.1",
+            "deps": [
+              "tcp-transport-app",
+              "tls-transport-app"
+            ]
+          },
+          {
+            "id": "http2",
+            "name": "HTTP/2",
+            "deps": [
+              "tcp-transport-app",
+              "tls-transport-app"
+            ]
+          },
+          {
+            "id": "http3",
+            "name": "HTTP/3",
+            "deps": [
+              "quic-transport-app"
+            ]
+          },
+          {
+            "id": "websockets",
+            "name": "WebSockets",
+            "deps": [
+              "http11"
+            ]
+          },
+          {
+            "id": "grpc",
+            "name": "gRPC",
+            "deps": [
+              "http2"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "connection-management",
+        "title": "Connection Management",
+        "items": [
+          {
+            "id": "connection-reuse-app",
+            "name": "Connection Reuse / Keepalive",
+            "deps": [
+              "tcp-transport-app"
+            ]
+          },
+          {
+            "id": "tls-session-resumption-app",
+            "name": "TLS Session Resumption",
+            "deps": [
+              "tls-transport-app"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "transport-foundation",
+        "title": "Transport Foundation",
+        "items": [
+          {
+            "id": "tcp-transport-app",
+            "name": "TCP Transport",
+            "deps": []
+          },
+          {
+            "id": "quic-transport-app",
+            "name": "QUIC Transport",
+            "deps": [
+              "udp-transport-app"
+            ]
+          },
+          {
+            "id": "udp-transport-app",
+            "name": "UDP Transport",
+            "deps": []
+          },
+          {
+            "id": "tls-transport-app",
+            "name": "TLS",
+            "deps": []
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "traffic-steering-acceleration",
+    "title": "Traffic Steering and Acceleration",
+    "abstract": "Acceleration systems combine routing decisions, edge logic, and protective controls to make delivery fast and stable. Feedback loops (RUM) and steering algorithms adapt where traffic goes, while optimizers and rate limiting keep systems performant and resilient.",
+    "categories": [
+      {
+        "id": "user-outcomes",
+        "title": "User Outcomes",
+        "items": [
+          {
+            "id": "fastest-edge-selection",
+            "name": "Fastest Edge Selection",
+            "deps": [
+              "cdn-steering",
+              "rum-feedback"
+            ]
+          },
+          {
+            "id": "origin-protection",
+            "name": "Origin Protection",
+            "deps": [
+              "rate-limiting",
+              "tcp-acceleration"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "steering-logic",
+        "title": "Steering Logic",
+        "items": [
+          {
+            "id": "cdn-steering",
+            "name": "CDN Routing Algorithms",
+            "deps": [
+              "latency-metrics",
+              "congestion-metrics"
+            ]
+          },
+          {
+            "id": "rum-feedback",
+            "name": "RUM Feedback Loops",
+            "deps": [
+              "client-telemetry"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "acceleration-techniques",
+        "title": "Acceleration Techniques",
+        "items": [
+          {
+            "id": "tcp-acceleration",
+            "name": "TCP Acceleration / Optimizers",
+            "deps": [
+              "connection-pooling-accel"
+            ]
+          },
+          {
+            "id": "connection-pooling-accel",
+            "name": "Connection Pooling / Warm Connections",
+            "deps": []
+          }
+        ]
+      },
+      {
+        "id": "protection-controls",
+        "title": "Protection Controls",
+        "items": [
+          {
+            "id": "rate-limiting",
+            "name": "Rate Limiting (Token/Leaky Bucket)",
+            "deps": [
+              "request-meters"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "measurement-signals",
+        "title": "Measurement Signals",
+        "items": [
+          {
+            "id": "client-telemetry",
+            "name": "Client Telemetry Collection",
+            "deps": []
+          },
+          {
+            "id": "latency-metrics",
+            "name": "Latency Metrics",
+            "deps": []
+          },
+          {
+            "id": "congestion-metrics",
+            "name": "Congestion / Throughput Metrics",
+            "deps": []
+          },
+          {
+            "id": "request-meters",
+            "name": "Request Meters & Counters",
+            "deps": []
+          }
+        ]
+      }
+    ]
+  }
+]

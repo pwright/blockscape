@@ -1,0 +1,113 @@
+{
+  "id": "health-checks",
+  "title": "Health Checks",
+  "abstract": "Health checks determine whether traffic should be sent to a given backend or endpoint. Their design directly affects failure detection speed, blast radius, and the likelihood of cascading outages during partial failures.",
+  "categories": [
+    {
+      "id": "user-visible-effects",
+      "title": "User-Visible Effects",
+      "items": [
+        {
+          "id": "error-rate-reduction",
+          "name": "Reduced Error Rates",
+          "deps": [
+            "unhealthy-node-removal"
+          ]
+        },
+        {
+          "id": "faster-recovery",
+          "name": "Faster Failure Recovery",
+          "deps": [
+            "detection-speed"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "decision-outcomes",
+      "title": "Decision Outcomes",
+      "items": [
+        {
+          "id": "unhealthy-node-removal",
+          "name": "Unhealthy Node Removal",
+          "deps": [
+            "health-evaluation"
+          ]
+        },
+        {
+          "id": "traffic-restoration",
+          "name": "Traffic Restoration",
+          "deps": [
+            "recovery-detection"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "health-evaluation",
+      "title": "Health Evaluation",
+      "items": [
+        {
+          "id": "active-check-results",
+          "name": "Active Check Results",
+          "deps": [
+            "active-health-checks"
+          ]
+        },
+        {
+          "id": "passive-check-results",
+          "name": "Passive Check Results",
+          "deps": [
+            "passive-health-checks"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "check-types",
+      "title": "Check Types",
+      "items": [
+        {
+          "id": "active-health-checks",
+          "name": "Active Health Checks",
+          "deps": [
+            "probe-logic"
+          ]
+        },
+        {
+          "id": "passive-health-checks",
+          "name": "Passive Health Checks",
+          "deps": [
+            "traffic-observation"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "foundation",
+      "title": "Foundation",
+      "items": [
+        {
+          "id": "probe-logic",
+          "name": "Probe Logic (HTTP/TCP/UDP)",
+          "deps": []
+        },
+        {
+          "id": "traffic-observation",
+          "name": "Live Traffic Observation",
+          "deps": []
+        },
+        {
+          "id": "detection-speed",
+          "name": "Failure Detection Speed",
+          "deps": []
+        },
+        {
+          "id": "recovery-detection",
+          "name": "Recovery Detection",
+          "deps": []
+        }
+      ]
+    }
+  ]
+}

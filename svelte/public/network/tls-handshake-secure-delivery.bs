@@ -1,0 +1,101 @@
+{
+  "id": "tls-delivery",
+  "title": "TLS Handshake & Secure Delivery",
+  "abstract": "TLS secures transport connections but also materially impacts delivery latency. Handshake design, certificate validation, and resumption mechanisms strongly influence Time To First Byte, especially for first-time and mobile users.",
+  "categories": [
+    {
+      "id": "user-impact",
+      "title": "User-Visible Impact",
+      "items": [
+        {
+          "id": "ttfb-first-load",
+          "name": "First-Load TTFB",
+          "deps": [
+            "tls-handshake",
+            "certificate-validation"
+          ]
+        },
+        {
+          "id": "repeat-visit-speed",
+          "name": "Repeat Visit Speed",
+          "deps": [
+            "session-resumption",
+            "zero-rtt"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "handshake-optimization",
+      "title": "Handshake Optimization",
+      "items": [
+        {
+          "id": "session-resumption",
+          "name": "Session Resumption",
+          "deps": [
+            "session-tickets"
+          ]
+        },
+        {
+          "id": "zero-rtt",
+          "name": "0-RTT Data",
+          "deps": [
+            "session-resumption"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "protocol-mechanics",
+      "title": "Protocol Mechanics",
+      "items": [
+        {
+          "id": "tls-handshake",
+          "name": "TLS Handshake",
+          "deps": [
+            "rtt-signal"
+          ]
+        },
+        {
+          "id": "certificate-validation",
+          "name": "Certificate Validation",
+          "deps": [
+            "certificate-chain"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "crypto-material",
+      "title": "Cryptographic Material",
+      "items": [
+        {
+          "id": "certificate-chain",
+          "name": "Certificate Chain",
+          "deps": []
+        },
+        {
+          "id": "key-exchange",
+          "name": "Key Exchange (ECDHE)",
+          "deps": []
+        }
+      ]
+    },
+    {
+      "id": "supporting-signals",
+      "title": "Supporting Signals",
+      "items": [
+        {
+          "id": "session-tickets",
+          "name": "Session Tickets / PSKs",
+          "deps": []
+        },
+        {
+          "id": "rtt-signal",
+          "name": "Round-Trip Time",
+          "deps": []
+        }
+      ]
+    }
+  ]
+}

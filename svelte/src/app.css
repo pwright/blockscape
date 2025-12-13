@@ -560,6 +560,17 @@
       cursor: pointer;
     }
 
+    .model-nav-list--sets {
+      margin-top: var(--space-md);
+    }
+
+    .sidebar-heading--sub {
+      margin-top: var(--space-lg);
+      font-size: var(--font-size-xs);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
     .pf-v5-c-button {
       appearance: none;
       display: inline-flex;
