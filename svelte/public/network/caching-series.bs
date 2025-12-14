@@ -1,0 +1,376 @@
+[
+  {
+    "id": "http-caching",
+    "title": "HTTP Caching",
+    "abstract": "HTTP caching defines how responses are stored and reused across browsers, CDNs, and intermediaries. Correct cache semantics directly reduce origin load and global latency while preserving correctness.",
+    "categories": [
+      {
+        "id": "user-impact",
+        "title": "User Impact",
+        "items": [
+          {
+            "id": "reduced-origin-latency",
+            "name": "Reduced Origin Latency",
+            "deps": [
+              "cache-hit"
+            ]
+          },
+          {
+            "id": "faster-repeat-loads",
+            "name": "Faster Repeat Loads",
+            "deps": [
+              "freshness-lifetime"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "cache-behavior",
+        "title": "Cache Behavior",
+        "items": [
+          {
+            "id": "cache-hit",
+            "name": "Cache Hits",
+            "deps": [
+              "cache-storage"
+            ]
+          },
+          {
+            "id": "cache-miss",
+            "name": "Cache Misses",
+            "deps": [
+              "cache-storage"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "cache-controls",
+        "title": "Cache Controls",
+        "items": [
+          {
+            "id": "cache-control",
+            "name": "Cache-Control Directives",
+            "deps": []
+          },
+          {
+            "id": "etag-validation",
+            "name": "ETag / Revalidation",
+            "deps": []
+          },
+          {
+            "id": "stale-while-revalidate",
+            "name": "Stale-While-Revalidate",
+            "deps": []
+          }
+        ]
+      },
+      {
+        "id": "correctness-signals",
+        "title": "Correctness Signals",
+        "items": [
+          {
+            "id": "vary-header",
+            "name": "Vary Header",
+            "deps": []
+          }
+        ]
+      },
+      {
+        "id": "foundation",
+        "title": "Foundation",
+        "items": [
+          {
+            "id": "cache-storage",
+            "name": "Cache Storage (Browser / CDN)",
+            "deps": []
+          },
+          {
+            "id": "freshness-lifetime",
+            "name": "Freshness Lifetime",
+            "deps": []
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "content-negotiation",
+    "title": "Content Negotiation",
+    "abstract": "Content negotiation allows a single URL to serve multiple representations based on client capabilities. While powerful for performance, it requires careful cache key design to avoid fragmentation and inefficiency.",
+    "categories": [
+      {
+        "id": "user-visible-effects",
+        "title": "User-Visible Effects",
+        "items": [
+          {
+            "id": "smaller-payloads",
+            "name": "Smaller Payloads",
+            "deps": [
+              "compression-selection"
+            ]
+          },
+          {
+            "id": "format-optimized-content",
+            "name": "Format-Optimized Content",
+            "deps": [
+              "representation-selection"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "representation-selection",
+        "title": "Representation Selection",
+        "items": [
+          {
+            "id": "compression-selection",
+            "name": "Compression Selection (gzip/brotli)",
+            "deps": [
+              "accept-encoding"
+            ]
+          },
+          {
+            "id": "image-format-selection",
+            "name": "Image Format Selection (webp/avif)",
+            "deps": [
+              "accept-header"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "cache-key-design",
+        "title": "Cache Key Design",
+        "items": [
+          {
+            "id": "vary-usage",
+            "name": "Vary Usage",
+            "deps": [
+              "accept-header"
+            ]
+          },
+          {
+            "id": "cache-fragmentation",
+            "name": "Cache Fragmentation Risk",
+            "deps": [
+              "vary-usage"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "client-signals",
+        "title": "Client Signals",
+        "items": [
+          {
+            "id": "accept-header",
+            "name": "Accept / Accept-Encoding Headers",
+            "deps": []
+          }
+        ]
+      },
+      {
+        "id": "foundation",
+        "title": "Foundation",
+        "items": [
+          {
+            "id": "representation-variants",
+            "name": "Multiple Representations",
+            "deps": []
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "origin-shield",
+    "title": "Origin Shield & Mid-Tier Caching",
+    "abstract": "Origin shields and mid-tier caches introduce an additional caching layer between edges and origins. They dramatically reduce origin load and prevent request amplification during cache misses or traffic spikes.",
+    "categories": [
+      {
+        "id": "user-visible-outcomes",
+        "title": "User-Visible Outcomes",
+        "items": [
+          {
+            "id": "stable-latency",
+            "name": "Stable Latency During Spikes",
+            "deps": [
+              "request-coalescing"
+            ]
+          },
+          {
+            "id": "higher-availability",
+            "name": "Higher Availability",
+            "deps": [
+              "origin-protection"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "load-reduction",
+        "title": "Load Reduction",
+        "items": [
+          {
+            "id": "origin-protection",
+            "name": "Origin Protection",
+            "deps": [
+              "mid-tier-cache"
+            ]
+          },
+          {
+            "id": "request-coalescing",
+            "name": "Request Coalescing",
+            "deps": [
+              "mid-tier-cache"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "cache-topology",
+        "title": "Cache Topology",
+        "items": [
+          {
+            "id": "edge-cache",
+            "name": "Edge Cache",
+            "deps": []
+          },
+          {
+            "id": "mid-tier-cache",
+            "name": "Mid-Tier / Shield Cache",
+            "deps": [
+              "edge-cache"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "failure-modes",
+        "title": "Failure Modes",
+        "items": [
+          {
+            "id": "thundering-herd",
+            "name": "Thundering Herd Prevention",
+            "deps": [
+              "request-coalescing"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "foundation",
+        "title": "Foundation",
+        "items": [
+          {
+            "id": "origin-service",
+            "name": "Origin Service",
+            "deps": []
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "resource-hints",
+    "title": "Prefetch, Preconnect & Resource Hints",
+    "abstract": "Resource hints allow browsers to proactively establish connections or fetch critical resources. When used correctly, they reduce startup latency and smooth page load waterfalls.",
+    "categories": [
+      {
+        "id": "user-experience",
+        "title": "User Experience",
+        "items": [
+          {
+            "id": "faster-startup",
+            "name": "Faster Page Startup",
+            "deps": [
+              "early-connection"
+            ]
+          },
+          {
+            "id": "reduced-blocking",
+            "name": "Reduced Blocking Time",
+            "deps": [
+              "critical-resource-fetch"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "hint-types",
+        "title": "Hint Types",
+        "items": [
+          {
+            "id": "preconnect",
+            "name": "Preconnect",
+            "deps": [
+              "dns-resolution"
+            ]
+          },
+          {
+            "id": "preload",
+            "name": "Preload",
+            "deps": [
+              "resource-priority"
+            ]
+          },
+          {
+            "id": "prefetch",
+            "name": "Prefetch",
+            "deps": [
+              "idle-bandwidth"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "browser-behavior",
+        "title": "Browser Behavior",
+        "items": [
+          {
+            "id": "early-connection",
+            "name": "Early Connection Establishment",
+            "deps": [
+              "preconnect"
+            ]
+          },
+          {
+            "id": "critical-resource-fetch",
+            "name": "Critical Resource Fetching",
+            "deps": [
+              "preload"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "scheduling-signals",
+        "title": "Scheduling Signals",
+        "items": [
+          {
+            "id": "resource-priority",
+            "name": "Resource Priority",
+            "deps": []
+          },
+          {
+            "id": "idle-bandwidth",
+            "name": "Idle Bandwidth Availability",
+            "deps": []
+          }
+        ]
+      },
+      {
+        "id": "foundation",
+        "title": "Foundation",
+        "items": [
+          {
+            "id": "dns-resolution",
+            "name": "DNS Resolution",
+            "deps": []
+          }
+        ]
+      }
+    ]
+  }
+]

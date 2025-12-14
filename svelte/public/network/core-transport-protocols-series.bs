@@ -1,0 +1,528 @@
+[
+  {
+    "id": "transport-protocols",
+    "title": "Core Transport Protocols",
+    "abstract": "Transport protocols define how bytes move across the network, trading off reliability, latency, and control. Their design and tuning directly shape user-perceived speed, stability, and throughput.",
+    "categories": [
+      {
+        "id": "user-impact",
+        "title": "User Impact",
+        "items": [
+          {
+            "id": "latency-experience",
+            "name": "Latency Experience",
+            "deps": [
+              "handshake-cost",
+              "congestion-control"
+            ]
+          },
+          {
+            "id": "throughput-experience",
+            "name": "Throughput Experience",
+            "deps": [
+              "flow-control",
+              "packet-loss"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "transport-semantics",
+        "title": "Transport Semantics",
+        "items": [
+          {
+            "id": "reliability-model",
+            "name": "Reliability Model",
+            "deps": [
+              "tcp-transport",
+              "udp-transport"
+            ]
+          },
+          {
+            "id": "ordering-model",
+            "name": "Ordering Guarantees",
+            "deps": [
+              "tcp-transport",
+              "quic-transport"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "connection-setup",
+        "title": "Connection Setup",
+        "items": [
+          {
+            "id": "handshake-cost",
+            "name": "Handshake Cost",
+            "deps": [
+              "tcp-transport",
+              "tls-handshake",
+              "quic-transport"
+            ]
+          },
+          {
+            "id": "session-resumption",
+            "name": "Session Resumption",
+            "deps": [
+              "tls-handshake"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "transport-mechanics",
+        "title": "Transport Mechanics",
+        "items": [
+          {
+            "id": "congestion-control",
+            "name": "Congestion Control",
+            "deps": [
+              "packet-loss",
+              "rtt"
+            ]
+          },
+          {
+            "id": "flow-control",
+            "name": "Flow Control & Windows",
+            "deps": [
+              "mss-mtu"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "foundations",
+        "title": "Foundations",
+        "items": [
+          {
+            "id": "tcp-transport",
+            "name": "TCP",
+            "deps": []
+          },
+          {
+            "id": "udp-transport",
+            "name": "UDP",
+            "deps": []
+          },
+          {
+            "id": "quic-transport",
+            "name": "QUIC",
+            "deps": [
+              "udp-transport"
+            ]
+          },
+          {
+            "id": "tls-handshake",
+            "name": "TLS",
+            "deps": []
+          },
+          {
+            "id": "packet-loss",
+            "name": "Packet Loss",
+            "deps": []
+          },
+          {
+            "id": "rtt",
+            "name": "Round Trip Time",
+            "deps": []
+          },
+          {
+            "id": "mss-mtu",
+            "name": "MSS / MTU",
+            "deps": []
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "routing-path-selection",
+    "title": "Routing & Path Selection",
+    "abstract": "Internet routing determines which physical and logical paths traffic takes between endpoints. Control-plane decisions and convergence behavior heavily influence latency, reliability, and reachability.",
+    "categories": [
+      {
+        "id": "delivery-effects",
+        "title": "Delivery Effects",
+        "items": [
+          {
+            "id": "global-latency",
+            "name": "Global Latency",
+            "deps": [
+              "path-selection",
+              "anycast"
+            ]
+          },
+          {
+            "id": "availability",
+            "name": "Availability & Resilience",
+            "deps": [
+              "route-convergence"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "traffic-steering",
+        "title": "Traffic Steering",
+        "items": [
+          {
+            "id": "path-selection",
+            "name": "Path Selection",
+            "deps": [
+              "bgp-policy"
+            ]
+          },
+          {
+            "id": "anycast",
+            "name": "Anycast",
+            "deps": [
+              "bgp-announcements"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "routing-dynamics",
+        "title": "Routing Dynamics",
+        "items": [
+          {
+            "id": "route-convergence",
+            "name": "Route Convergence",
+            "deps": [
+              "bgp-announcements"
+            ]
+          },
+          {
+            "id": "propagation-delay",
+            "name": "Propagation Delay",
+            "deps": [
+              "bgp-announcements"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "control-plane",
+        "title": "Control Plane",
+        "items": [
+          {
+            "id": "bgp-policy",
+            "name": "BGP Policy",
+            "deps": []
+          },
+          {
+            "id": "bgp-announcements",
+            "name": "BGP Announcements",
+            "deps": []
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "dns-level-delivery",
+    "title": "DNS-Level Delivery",
+    "abstract": "DNS decides where users connect before transport even begins. Resolver behavior, record strategy, and geographic steering significantly influence first-hop latency and backend load distribution.",
+    "categories": [
+      {
+        "id": "user-routing",
+        "title": "User Routing Outcome",
+        "items": [
+          {
+            "id": "initial-latency",
+            "name": "Initial Connection Latency",
+            "deps": [
+              "authoritative-dns",
+              "geodns"
+            ]
+          },
+          {
+            "id": "region-selection",
+            "name": "Region Selection Accuracy",
+            "deps": [
+              "edns-client-subnet"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "resolution-strategy",
+        "title": "Resolution Strategy",
+        "items": [
+          {
+            "id": "geodns",
+            "name": "GeoDNS",
+            "deps": [
+              "authoritative-dns"
+            ]
+          },
+          {
+            "id": "dns-weighting",
+            "name": "Weighted Records",
+            "deps": [
+              "authoritative-dns"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "dns-roles",
+        "title": "DNS Roles",
+        "items": [
+          {
+            "id": "recursive-dns",
+            "name": "Recursive Resolvers",
+            "deps": []
+          },
+          {
+            "id": "authoritative-dns",
+            "name": "Authoritative DNS",
+            "deps": []
+          }
+        ]
+      },
+      {
+        "id": "signals",
+        "title": "Routing Signals",
+        "items": [
+          {
+            "id": "edns-client-subnet",
+            "name": "EDNS Client Subnet",
+            "deps": []
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "load-distribution",
+    "title": "L4 / L7 Load Distribution",
+    "abstract": "Load distribution systems spread traffic across healthy backends while preserving performance. The layer at which balancing occurs determines flexibility, overhead, and observability.",
+    "categories": [
+      {
+        "id": "service-outcomes",
+        "title": "Service Outcomes",
+        "items": [
+          {
+            "id": "service-reliability",
+            "name": "Service Reliability",
+            "deps": [
+              "health-checks"
+            ]
+          },
+          {
+            "id": "backend-efficiency",
+            "name": "Backend Efficiency",
+            "deps": [
+              "connection-pooling"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "balancing-modes",
+        "title": "Balancing Modes",
+        "items": [
+          {
+            "id": "l4-balancing",
+            "name": "L4 Load Balancing",
+            "deps": []
+          },
+          {
+            "id": "l7-balancing",
+            "name": "L7 Load Balancing",
+            "deps": [
+              "http-awareness"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "proxy-functions",
+        "title": "Proxy Functions",
+        "items": [
+          {
+            "id": "reverse-proxy",
+            "name": "Reverse Proxying",
+            "deps": [
+              "connection-pooling"
+            ]
+          },
+          {
+            "id": "connection-pooling",
+            "name": "Connection Pooling",
+            "deps": []
+          }
+        ]
+      },
+      {
+        "id": "health-management",
+        "title": "Health Management",
+        "items": [
+          {
+            "id": "health-checks",
+            "name": "Health Checks",
+            "deps": []
+          }
+        ]
+      },
+      {
+        "id": "protocol-awareness",
+        "title": "Protocol Awareness",
+        "items": [
+          {
+            "id": "http-awareness",
+            "name": "HTTP Awareness",
+            "deps": []
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "caching-edge",
+    "title": "Caching & Edge Delivery",
+    "abstract": "Caching and edge strategies reduce distance and load by serving content closer to users. Correct cache semantics are essential for both performance and correctness.",
+    "categories": [
+      {
+        "id": "user-benefits",
+        "title": "User Benefits",
+        "items": [
+          {
+            "id": "reduced-latency",
+            "name": "Reduced Latency",
+            "deps": [
+              "edge-cache"
+            ]
+          },
+          {
+            "id": "faster-startup",
+            "name": "Faster Startup",
+            "deps": [
+              "preconnect-hints"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "cache-behavior",
+        "title": "Cache Behavior",
+        "items": [
+          {
+            "id": "http-caching",
+            "name": "HTTP Caching Semantics",
+            "deps": []
+          },
+          {
+            "id": "content-variation",
+            "name": "Content Negotiation",
+            "deps": [
+              "http-caching"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "cache-topology",
+        "title": "Cache Topology",
+        "items": [
+          {
+            "id": "edge-cache",
+            "name": "Edge Caching",
+            "deps": []
+          },
+          {
+            "id": "origin-shield",
+            "name": "Origin Shield / Mid-Tier",
+            "deps": [
+              "edge-cache"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "client-hints",
+        "title": "Client Hints",
+        "items": [
+          {
+            "id": "preconnect-hints",
+            "name": "Preconnect / Preload / Prefetch",
+            "deps": []
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "observability-troubleshooting",
+    "title": "Observability & Troubleshooting",
+    "abstract": "Observability tools expose where delivery breaks down across DNS, routing, transport, and application layers. They are essential for diagnosing latency, loss, and availability issues.",
+    "categories": [
+      {
+        "id": "user-metrics",
+        "title": "User Metrics",
+        "items": [
+          {
+            "id": "ttfb",
+            "name": "Time To First Byte",
+            "deps": [
+              "dns-latency",
+              "handshake-latency"
+            ]
+          },
+          {
+            "id": "connection-reuse",
+            "name": "Connection Reuse",
+            "deps": [
+              "keepalive"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "path-analysis",
+        "title": "Path Analysis",
+        "items": [
+          {
+            "id": "traceroute",
+            "name": "Traceroute / MTR",
+            "deps": []
+          }
+        ]
+      },
+      {
+        "id": "packet-analysis",
+        "title": "Packet Analysis",
+        "items": [
+          {
+            "id": "pcap-analysis",
+            "name": "PCAP / tcpdump / Wireshark",
+            "deps": []
+          }
+        ]
+      },
+      {
+        "id": "supporting-signals",
+        "title": "Supporting Signals",
+        "items": [
+          {
+            "id": "dns-latency",
+            "name": "DNS Latency",
+            "deps": []
+          },
+          {
+            "id": "handshake-latency",
+            "name": "Handshake Latency",
+            "deps": []
+          },
+          {
+            "id": "keepalive",
+            "name": "Keepalive & Idle Timeouts",
+            "deps": []
+          }
+        ]
+      }
+    ]
+  }
+]

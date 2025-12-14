@@ -1,0 +1,454 @@
+[
+  {
+    "id": "congestion-control-algorithms",
+    "title": "Congestion Control Algorithms",
+    "abstract": "Congestion control algorithms (e.g., BBR, CUBIC, Reno) determine how quickly a sender increases or reduces sending rate in response to network signals. Their behavior directly impacts throughput, latency under load, and fairness across competing flows.",
+    "categories": [
+      {
+        "id": "user-impact",
+        "title": "User Impact",
+        "items": [
+          {
+            "id": "cca-snappiness",
+            "name": "Interactive Snappiness",
+            "deps": [
+              "cca-queue-control",
+              "cca-rtt-signal"
+            ]
+          },
+          {
+            "id": "cca-throughput",
+            "name": "Sustained Throughput",
+            "deps": [
+              "cca-rate-control",
+              "cca-path-capacity"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "algorithm-choices",
+        "title": "Algorithm Choices",
+        "items": [
+          {
+            "id": "cca-bbr",
+            "name": "BBR (Model-Based)",
+            "deps": [
+              "cca-bw-estimation",
+              "cca-rtt-signal"
+            ]
+          },
+          {
+            "id": "cca-cubic",
+            "name": "CUBIC (Loss-Based)",
+            "deps": [
+              "cca-loss-signal",
+              "cca-ack-clock"
+            ]
+          },
+          {
+            "id": "cca-reno",
+            "name": "Reno/NewReno (Classic)",
+            "deps": [
+              "cca-loss-signal",
+              "cca-ack-clock"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "control-loop",
+        "title": "Control Loop Mechanics",
+        "items": [
+          {
+            "id": "cca-rate-control",
+            "name": "Rate/Pacing Control",
+            "deps": [
+              "cca-ack-clock"
+            ]
+          },
+          {
+            "id": "cca-queue-control",
+            "name": "Queue/Delay Sensitivity",
+            "deps": [
+              "cca-queueing-delay"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "signals",
+        "title": "Signals",
+        "items": [
+          {
+            "id": "cca-rtt-signal",
+            "name": "RTT Signal",
+            "deps": []
+          },
+          {
+            "id": "cca-loss-signal",
+            "name": "Loss Signal",
+            "deps": []
+          },
+          {
+            "id": "cca-queueing-delay",
+            "name": "Queueing Delay",
+            "deps": []
+          }
+        ]
+      },
+      {
+        "id": "foundation",
+        "title": "Foundation",
+        "items": [
+          {
+            "id": "cca-ack-clock",
+            "name": "ACK Clocking",
+            "deps": []
+          },
+          {
+            "id": "cca-bw-estimation",
+            "name": "Bandwidth Estimation",
+            "deps": [
+              "cca-path-capacity"
+            ]
+          },
+          {
+            "id": "cca-path-capacity",
+            "name": "Path Bottleneck Capacity",
+            "deps": []
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "bufferbloat-aqm",
+    "title": "Bufferbloat & AQM",
+    "abstract": "Bufferbloat is excessive queueing that increases latency and jitter under load. Active Queue Management (AQM) and fair queuing reduce queue buildup, improving responsiveness while maintaining good throughput.",
+    "categories": [
+      {
+        "id": "user-outcomes",
+        "title": "User Outcomes",
+        "items": [
+          {
+            "id": "aqm-low-latency",
+            "name": "Low Latency Under Load",
+            "deps": [
+              "aqm-queue-control",
+              "aqm-fairness"
+            ]
+          },
+          {
+            "id": "aqm-stable-streaming",
+            "name": "Stable Real-Time Streams",
+            "deps": [
+              "aqm-jitter-control",
+              "aqm-queue-control"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "queue-management",
+        "title": "Queue Management",
+        "items": [
+          {
+            "id": "aqm-fqcodel",
+            "name": "fq_codel",
+            "deps": [
+              "aqm-fair-queuing",
+              "aqm-delay-targets"
+            ]
+          },
+          {
+            "id": "aqm-pie",
+            "name": "PIE",
+            "deps": [
+              "aqm-delay-targets"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "control-mechanisms",
+        "title": "Control Mechanisms",
+        "items": [
+          {
+            "id": "aqm-queue-control",
+            "name": "Queue Control (Drop/Mark)",
+            "deps": [
+              "aqm-delay-targets"
+            ]
+          },
+          {
+            "id": "aqm-jitter-control",
+            "name": "Jitter Smoothing",
+            "deps": [
+              "aqm-fair-queuing"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "signals-metrics",
+        "title": "Signals & Metrics",
+        "items": [
+          {
+            "id": "aqm-queue-delay",
+            "name": "Queueing Delay",
+            "deps": []
+          },
+          {
+            "id": "aqm-sojourn-time",
+            "name": "Sojourn Time",
+            "deps": [
+              "aqm-queue-delay"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "foundation",
+        "title": "Foundation",
+        "items": [
+          {
+            "id": "aqm-fair-queuing",
+            "name": "Fair Queuing",
+            "deps": []
+          },
+          {
+            "id": "aqm-delay-targets",
+            "name": "Delay Targets/Thresholds",
+            "deps": []
+          },
+          {
+            "id": "aqm-link-buffers",
+            "name": "Link Buffers",
+            "deps": []
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "jitter-delivery",
+    "title": "Jitter",
+    "abstract": "Jitter is variability in packet arrival times. It is especially harmful to real-time voice/video and interactive traffic, and is typically driven by queueing dynamics, path changes, and contention.",
+    "categories": [
+      {
+        "id": "user-impact",
+        "title": "User Impact",
+        "items": [
+          {
+            "id": "jit-media-quality",
+            "name": "Media Quality (Voice/Video)",
+            "deps": [
+              "jit-playout-buffer",
+              "jit-jitter-signal"
+            ]
+          },
+          {
+            "id": "jit-interactive-feel",
+            "name": "Interactive Responsiveness",
+            "deps": [
+              "jit-queue-control",
+              "jit-jitter-signal"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "application-mitigation",
+        "title": "Application Mitigation",
+        "items": [
+          {
+            "id": "jit-playout-buffer",
+            "name": "Playout Buffering",
+            "deps": [
+              "jit-jitter-signal"
+            ]
+          },
+          {
+            "id": "jit-adaptive-bitrate",
+            "name": "Adaptive Bitrate / Rate Adaptation",
+            "deps": [
+              "jit-loss-signal",
+              "jit-jitter-signal"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "network-controls",
+        "title": "Network Controls",
+        "items": [
+          {
+            "id": "jit-queue-control",
+            "name": "Queue Control (AQM/FQ)",
+            "deps": [
+              "jit-queueing-delay"
+            ]
+          },
+          {
+            "id": "jit-traffic-shaping",
+            "name": "Traffic Shaping",
+            "deps": [
+              "jit-link-contention"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "signals",
+        "title": "Signals",
+        "items": [
+          {
+            "id": "jit-jitter-signal",
+            "name": "Jitter Signal",
+            "deps": []
+          },
+          {
+            "id": "jit-queueing-delay",
+            "name": "Queueing Delay",
+            "deps": []
+          },
+          {
+            "id": "jit-loss-signal",
+            "name": "Packet Loss",
+            "deps": []
+          }
+        ]
+      },
+      {
+        "id": "foundation",
+        "title": "Foundation",
+        "items": [
+          {
+            "id": "jit-link-contention",
+            "name": "Link Contention",
+            "deps": []
+          },
+          {
+            "id": "jit-path-changes",
+            "name": "Path Changes",
+            "deps": []
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "packet-loss-delivery",
+    "title": "Packet Loss",
+    "abstract": "Packet loss reduces effective throughput and increases latency via retransmissions and recovery behavior. TCP performance is particularly sensitive to loss, while QUIC can improve recovery patterns but still depends on loss conditions. If I missed a heading from your original list, tell me which one and I’ll continue from there.",
+    "categories": [
+      {
+        "id": "user-visible-effects",
+        "title": "User-Visible Effects",
+        "items": [
+          {
+            "id": "loss-slow-pages",
+            "name": "Slow Page Loads",
+            "deps": [
+              "loss-retransmissions",
+              "loss-rtt"
+            ]
+          },
+          {
+            "id": "loss-media-glitches",
+            "name": "Media Glitches / Rebuffering",
+            "deps": [
+              "loss-jitter",
+              "loss-recovery"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "transport-reactions",
+        "title": "Transport Reactions",
+        "items": [
+          {
+            "id": "loss-tcp-throughput",
+            "name": "TCP Throughput Degradation",
+            "deps": [
+              "loss-congestion-backoff",
+              "loss-retransmissions"
+            ]
+          },
+          {
+            "id": "loss-quic-resilience",
+            "name": "QUIC Loss Resilience",
+            "deps": [
+              "loss-recovery",
+              "loss-pacing"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "recovery-mechanics",
+        "title": "Recovery Mechanics",
+        "items": [
+          {
+            "id": "loss-retransmissions",
+            "name": "Retransmissions",
+            "deps": [
+              "loss-detection"
+            ]
+          },
+          {
+            "id": "loss-recovery",
+            "name": "Loss Recovery (SACK/ACK Ranges)",
+            "deps": [
+              "loss-detection"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "signals",
+        "title": "Signals",
+        "items": [
+          {
+            "id": "loss-rate",
+            "name": "Loss Rate",
+            "deps": []
+          },
+          {
+            "id": "loss-rtt",
+            "name": "RTT",
+            "deps": []
+          },
+          {
+            "id": "loss-jitter",
+            "name": "Jitter",
+            "deps": []
+          }
+        ]
+      },
+      {
+        "id": "foundation",
+        "title": "Foundation",
+        "items": [
+          {
+            "id": "loss-detection",
+            "name": "Loss Detection (Timeout/DupACK)",
+            "deps": []
+          },
+          {
+            "id": "loss-congestion-backoff",
+            "name": "Congestion Backoff",
+            "deps": []
+          },
+          {
+            "id": "loss-pacing",
+            "name": "Packet Pacing",
+            "deps": []
+          }
+        ]
+      }
+    ]
+  }
+]

@@ -1,0 +1,107 @@
+{
+  "id": "tcp-delivery",
+  "title": "TCP Data Delivery",
+  "abstract": "TCP delivers reliable, ordered byte streams with built-in congestion control. While foundational to the web, its performance is highly sensitive to RTT, loss, and tuning choices; misconfiguration can severely degrade latency and throughput.",
+  "categories": [
+    {
+      "id": "user-visible-effects",
+      "title": "User-Visible Effects",
+      "items": [
+        {
+          "id": "page-load-latency",
+          "name": "Page Load Latency",
+          "deps": [
+            "tcp-handshake",
+            "slow-start"
+          ]
+        },
+        {
+          "id": "bulk-transfer-speed",
+          "name": "Bulk Transfer Speed",
+          "deps": [
+            "congestion-control",
+            "window-scaling"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "connection-lifecycle",
+      "title": "Connection Lifecycle",
+      "items": [
+        {
+          "id": "tcp-handshake",
+          "name": "3-Way Handshake",
+          "deps": [
+            "rtt-signal"
+          ]
+        },
+        {
+          "id": "connection-teardown",
+          "name": "Connection Teardown (FIN/RST)",
+          "deps": []
+        }
+      ]
+    },
+    {
+      "id": "congestion-dynamics",
+      "title": "Congestion Dynamics",
+      "items": [
+        {
+          "id": "slow-start",
+          "name": "Slow Start",
+          "deps": [
+            "congestion-control"
+          ]
+        },
+        {
+          "id": "congestion-control",
+          "name": "Congestion Control (BBR/CUBIC)",
+          "deps": [
+            "packet-loss-signal",
+            "rtt-signal"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "flow-control",
+      "title": "Flow & Window Control",
+      "items": [
+        {
+          "id": "window-scaling",
+          "name": "TCP Window Scaling",
+          "deps": [
+            "mss-mtu"
+          ]
+        },
+        {
+          "id": "receiver-window",
+          "name": "Receiver Window (rwnd)",
+          "deps": []
+        }
+      ]
+    },
+    {
+      "id": "path-signals",
+      "title": "Path Signals & Constraints",
+      "items": [
+        {
+          "id": "rtt-signal",
+          "name": "Round-Trip Time (RTT)",
+          "deps": []
+        },
+        {
+          "id": "packet-loss-signal",
+          "name": "Packet Loss",
+          "deps": []
+        },
+        {
+          "id": "mss-mtu",
+          "name": "MSS / MTU",
+          "deps": []
+        }
+      ]
+    }
+  ]
+}

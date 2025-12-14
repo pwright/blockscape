@@ -1,0 +1,99 @@
+{
+  "id": "l4-load-balancing",
+  "title": "L4 Load Balancing",
+  "abstract": "Layer 4 load balancing distributes traffic based on transport-layer attributes such as IP addresses and ports. By remaining protocol-agnostic and avoiding application inspection, L4 balancers achieve extremely high throughput and low latency, making them ideal for large-scale traffic distribution.",
+  "categories": [
+    {
+      "id": "user-visible-impact",
+      "title": "User-Visible Impact",
+      "items": [
+        {
+          "id": "minimal-added-latency",
+          "name": "Minimal Added Latency",
+          "deps": [
+            "stateless-forwarding"
+          ]
+        },
+        {
+          "id": "high-throughput-delivery",
+          "name": "High Throughput Delivery",
+          "deps": [
+            "connection-distribution"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "balancing-behavior",
+      "title": "Balancing Behavior",
+      "items": [
+        {
+          "id": "connection-distribution",
+          "name": "Connection Distribution",
+          "deps": [
+            "hashing-algorithms"
+          ]
+        },
+        {
+          "id": "flow-affinity",
+          "name": "Flow Affinity (5-Tuple Hashing)",
+          "deps": [
+            "hashing-algorithms"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "operational-characteristics",
+      "title": "Operational Characteristics",
+      "items": [
+        {
+          "id": "stateless-forwarding",
+          "name": "Stateless Packet Forwarding",
+          "deps": []
+        },
+        {
+          "id": "fast-failover",
+          "name": "Fast Failover",
+          "deps": [
+            "health-signals"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "health-integration",
+      "title": "Health Integration",
+      "items": [
+        {
+          "id": "health-signals",
+          "name": "Health Signals (Up/Down)",
+          "deps": [
+            "backend-reachability"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "foundation",
+      "title": "Foundation",
+      "items": [
+        {
+          "id": "hashing-algorithms",
+          "name": "Hashing Algorithms",
+          "deps": []
+        },
+        {
+          "id": "backend-reachability",
+          "name": "Backend Reachability",
+          "deps": []
+        },
+        {
+          "id": "transport-tuples",
+          "name": "Transport Tuples (IP/Port)",
+          "deps": []
+        }
+      ]
+    }
+  ]
+}

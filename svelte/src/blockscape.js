@@ -8,10 +8,63 @@ import { ensureSeriesId, getSeriesId, makeSeriesId } from "./series";
 
 const ASSET_BASE =
   (typeof import.meta !== "undefined" && import.meta.env?.BASE_URL) || "";
+const DEFAULT_SAMPLE_FILES = [
+  "comms.bs",
+  "planets.bs",
+  "styleguide.bs",
+  "blockscape-features.bs",
+];
+const BUILTIN_BS_FILES = import.meta.glob("../public/**/*.bs", {
+  as: "raw",
+  eager: true,
+});
+const DEFAULT_MODEL_SET_ID = "__default__";
+
+function normalizePublicPath(path) {
+  return (path || "")
+    .replace(/^\.?\/+/, "")
+    .replace(/^public\//, "")
+    .replace(/^\.\.\/public\//, "");
+}
+
+function resolveAssetPath(name) {
+  if (!name) return "";
+  const normalized = normalizePublicPath(name);
+  if (!ASSET_BASE) return normalized;
+  return ASSET_BASE.endsWith("/")
+    ? `${ASSET_BASE}${normalized}`
+    : `${ASSET_BASE}/${normalized}`;
+}
+
+function getBundledFileText(relativePath) {
+  const normalized = normalizePublicPath(relativePath);
+  return BUILTIN_BS_FILES[`../public/${normalized}`] ?? null;
+}
+
+function buildBundledDirectories() {
+  const directories = new Map();
+  Object.keys(BUILTIN_BS_FILES).forEach((key) => {
+    const normalized = normalizePublicPath(key.replace(/^\.\.\//, ""));
+    const parts = normalized.split("/");
+    if (parts.length <= 1) return;
+    const file = parts.pop();
+    const dir = parts.join("/");
+    if (!directories.has(dir)) directories.set(dir, []);
+    directories.get(dir).push({
+      filename: file,
+      relativePath: `${dir}/${file}`,
+    });
+  });
+  directories.forEach((files) =>
+    files.sort((a, b) => a.filename.localeCompare(b.filename))
+  );
+  return directories;
+}
 
 export function initBlockscape() {
   console.log("[Blockscape] init");
 
+  let seedTemplate = "";
   const jsonBox = document.getElementById("jsonBox");
   const jsonPanel = document.querySelector(".blockscape-json-panel");
   const app = document.getElementById("app");
@@ -44,17 +97,24 @@ export function initBlockscape() {
   const newPanelBackdrop = document.getElementById("newPanelBackdrop");
   const searchInput = document.getElementById("search");
   const searchResults = document.getElementById("searchResults");
+  const modelSetsList = document.getElementById("modelSets");
   const EDITOR_TRANSFER_KEY = "blockscape:editorPayload";
   const EDITOR_TRANSFER_MESSAGE_TYPE = "blockscape:editorTransfer";
   const defaultDocumentTitle = document.title;
+  const seedEl = document.getElementById("seed");
+  const bundledDirectories = buildBundledDirectories();
+  seedTemplate = (seedEl?.textContent || seedEl?.innerHTML || "").trim();
 
   // Show the seed in the editor initially.
-  jsonBox.value = document.getElementById("seed").textContent.trim();
+  if (seedTemplate && jsonBox) {
+    jsonBox.value = seedTemplate;
+  }
 
   // ===== State =====
   /** @type {{id:string,title:string,data:any}[]} */
   let models = [];
   let activeIndex = -1;
+  let activeModelSetId = DEFAULT_MODEL_SET_ID;
   const apicurio = createApicurioIntegration({
     models,
     getActiveIndex: () => activeIndex,
@@ -87,6 +147,8 @@ export function initBlockscape() {
   const NOTICE_TIMEOUT_MS = 2000;
   let pendingSeriesNavigation = null;
   let pendingSeriesNavigationTimer = null;
+  let pendingModelNavigation = null;
+  let pendingModelNavigationTimer = null;
   let noticeEl = null;
   let noticeTextEl = null;
   let noticeTimer = null;
@@ -855,6 +917,28 @@ export function initBlockscape() {
     return trimmed || null;
   }
 
+  function modelContainsId(entry, candidateId) {
+    if (!candidateId) return false;
+    const primaryId = (entry?.data?.id || "").toString().trim();
+    if (primaryId === candidateId) return true;
+    const versions = entry?.apicurioVersions || [];
+    return versions.some(
+      (ver) => (ver?.data?.id || "").toString().trim() === candidateId
+    );
+  }
+
+  function resolveModelNavigationTarget(candidateId, { excludeIndex = -1 } = {}) {
+    if (!candidateId) return -1;
+    const normalized = candidateId.toString().trim();
+    if (!normalized) return -1;
+    for (let i = 0; i < models.length; i += 1) {
+      if (i === excludeIndex) continue;
+      const entry = models[i];
+      if (modelContainsId(entry, normalized)) return i;
+    }
+    return -1;
+  }
+
   function persistActiveEdits(entryIndex) {
     if (entryIndex < 0 || entryIndex >= models.length) return true;
     if (!jsonBox) return true;
@@ -1471,9 +1555,14 @@ export function initBlockscape() {
 
   function clearSeriesNavNotice() {
     pendingSeriesNavigation = null;
+    pendingModelNavigation = null;
     if (pendingSeriesNavigationTimer) {
       clearTimeout(pendingSeriesNavigationTimer);
       pendingSeriesNavigationTimer = null;
+    }
+    if (pendingModelNavigationTimer) {
+      clearTimeout(pendingModelNavigationTimer);
+      pendingModelNavigationTimer = null;
     }
     clearNotice();
   }
@@ -1498,6 +1587,24 @@ export function initBlockscape() {
     const label = describeSeriesVersion(entry, targetVersionIndex);
     showNotice(
       `Click again to open ${label} in this series.`,
+      seriesNavDoubleClickWaitMs
+    );
+  }
+
+  function showModelNavNotice(id, targetModelIndex, targetModel) {
+    ensureNoticeElements();
+    pendingModelNavigation = { id, targetModelIndex };
+    if (pendingModelNavigationTimer) {
+      clearTimeout(pendingModelNavigationTimer);
+    }
+    pendingModelNavigationTimer = setTimeout(() => {
+      pendingModelNavigationTimer = null;
+      pendingModelNavigation = null;
+      clearNotice();
+    }, seriesNavDoubleClickWaitMs);
+    const label = getModelDisplayTitle(targetModel) || id;
+    showNotice(
+      `Click again to open "${label}" from the portfolio.`,
       seriesNavDoubleClickWaitMs
     );
   }
@@ -3290,6 +3397,14 @@ export function initBlockscape() {
           externalMeta,
           seriesIdLookup,
         });
+        const targetModelIndex = resolveModelNavigationTarget(it.id, {
+          excludeIndex: activeIndex,
+        });
+        const activeEntry = models[activeIndex];
+        const isPortfolio =
+          activeEntry &&
+          ((activeEntry.data && activeEntry.data.id === "network") ||
+            getModelId(activeEntry) === "network");
         const tile = document.createElement("div");
         tile.className = externalMeta.isExternal ? "tile external" : "tile";
         tile.tabIndex = 0;
@@ -3307,6 +3422,11 @@ export function initBlockscape() {
               ? "Current map in this series"
               : `Open version ${targetIdx + 1} in this series`;
           tile.title = label;
+        }
+        if (isPortfolio && targetModelIndex !== -1) {
+          tile.dataset.modelIndex = String(targetModelIndex);
+          tile.classList.add("tile--model-link");
+          if (!tile.title) tile.title = "Open map from portfolio";
         }
         if (obsidianUrl) {
           tile.dataset.obsidianUrl = obsidianUrl;
@@ -3398,6 +3518,10 @@ export function initBlockscape() {
           t.dataset.seriesVersionIndex != null
             ? parseInt(t.dataset.seriesVersionIndex, 10)
             : null;
+        const targetModelIndex =
+          t.dataset.modelIndex != null
+            ? parseInt(t.dataset.modelIndex, 10)
+            : resolveModelNavigationTarget(id, { excludeIndex: activeIndex });
         const globalIndex =
           t.dataset.globalIndex != null
             ? parseInt(t.dataset.globalIndex, 10)
@@ -3414,8 +3538,20 @@ export function initBlockscape() {
           pendingSeriesNavigation &&
           pendingSeriesNavigation.id === id &&
           pendingSeriesNavigation.targetVersionIndex === targetSeriesIndex;
+        const canNavigateToModel =
+          targetModelIndex !== -1 &&
+          activeEntry &&
+          ((activeEntry.data && activeEntry.data.id === "network") ||
+            getModelId(activeEntry) === "network");
+        const pendingModelMatch =
+          pendingModelNavigation &&
+          pendingModelNavigation.id === id &&
+          pendingModelNavigation.targetModelIndex === targetModelIndex;
 
         if (pendingSeriesNavigation && !pendingMatch) {
+          clearSeriesNavNotice();
+        }
+        if (pendingModelNavigation && !pendingModelMatch) {
           clearSeriesNavNotice();
         }
 
@@ -3430,6 +3566,13 @@ export function initBlockscape() {
           } else {
             showSeriesNavNotice(id, targetSeriesIndex, activeEntry);
           }
+        } else if (canNavigateToModel) {
+          if (pendingModelMatch) {
+            clearSeriesNavNotice();
+            setActive(targetModelIndex);
+            return;
+          }
+          showModelNavNotice(id, targetModelIndex, models[targetModelIndex]);
         } else if (
           Number.isInteger(globalIndex) &&
           globalIndex > 0 &&
@@ -5153,6 +5296,29 @@ export function initBlockscape() {
 
   // ===== Controls =====
 
+  if (modelSetsList) {
+    renderModelSetsList();
+    modelSetsList.addEventListener("click", async (event) => {
+      const button = event.target.closest("button[data-set-id]");
+      if (!button) return;
+      const setId = button.dataset.setId || DEFAULT_MODEL_SET_ID;
+      if (setId === activeModelSetId) return;
+      if (models.length) {
+        const suffix = models.length === 1 ? "" : "s";
+        const proceed = window.confirm(
+          `Switching portfolio will discard the ${models.length} current model${suffix}. Continue?`
+        );
+        if (!proceed) return;
+      }
+      try {
+        await loadDirectorySelection(setId);
+      } catch (err) {
+        console.error("[Blockscape] directory load error:", err);
+        alert("Failed to load that set (see console).");
+      }
+    });
+  }
+
   if (copyJsonButton) {
     copyJsonButton.addEventListener("click", async () => {
       const text = jsonBox.value || "";
@@ -5484,28 +5650,91 @@ export function initBlockscape() {
     }
   }
 
+  function clearModelsState() {
+    models.length = 0;
+    activeIndex = -1;
+    activeModelSetId = DEFAULT_MODEL_SET_ID;
+    model = null;
+    index = new Map();
+    categoryIndex = new Map();
+    selection = null;
+    selectedCategoryId = null;
+    selectionRelations = null;
+    categoryEntryHint = null;
+    lastDeletedItem = null;
+    lastDeletedCategory = null;
+    pendingSeriesNavigation = null;
+    pendingModelNavigation = null;
+    if (pendingSeriesNavigationTimer) {
+      clearTimeout(pendingSeriesNavigationTimer);
+      pendingSeriesNavigationTimer = null;
+    }
+    if (pendingModelNavigationTimer) {
+      clearTimeout(pendingModelNavigationTimer);
+      pendingModelNavigationTimer = null;
+    }
+    versionThumbLabels = [];
+    if (app) app.innerHTML = "";
+    if (overlay) overlay.innerHTML = "";
+    if (jsonBox) jsonBox.value = "";
+    if (searchInput) {
+      searchInput.value = "";
+      handleSearchInput("");
+    }
+    if (searchResults) {
+      searchResults.innerHTML = "";
+      searchResults.hidden = true;
+    }
+    syncSelectionClass();
+    syncDocumentTitle();
+  }
+
+  async function readPublicBsFile(filename) {
+    const bundled = getBundledFileText(filename);
+    if (bundled != null) return bundled;
+    const response = await fetch(resolveAssetPath(filename), {
+      cache: "no-store",
+    });
+    if (!response.ok) {
+      throw new Error(
+        `[Blockscape] ${filename} not fetched (${response.status})`
+      );
+    }
+    return response.text();
+  }
+
   // Load JSON files from same directory (for static hosting)
-  async function loadJsonFiles() {
-    const jsonFiles = ["comms.bs", "planets.bs", "styleguide.bs", "blockscape-features.bs"];
-    const joinPath = (name) => {
-      if (!ASSET_BASE) return name;
-      return ASSET_BASE.endsWith("/")
-        ? `${ASSET_BASE}${name}`
-        : `${ASSET_BASE}/${name}`;
-    };
+  async function loadJsonFiles(
+    fileList = DEFAULT_SAMPLE_FILES,
+    {
+      replaceExisting = false,
+      includeSeed = false,
+      setActiveAfterLoad = false,
+      collectionLabel,
+    } = {}
+  ) {
+    const files = Array.isArray(fileList) ? [...fileList] : [];
+    if (replaceExisting) {
+      clearModelsState();
+    }
 
-    for (const filename of jsonFiles) {
+    let firstIndex = null;
+
+    if (includeSeed && seedTemplate) {
+      const seedEntries = normalizeToModelsFromText(seedTemplate, "Blockscape");
+      seedEntries.forEach((entry) => {
+        const idx = addModelEntry(entry, { versionLabel: "seed" });
+        if (firstIndex == null) firstIndex = idx;
+      });
+    }
+
+    for (const filenameRaw of files) {
+      const filename = normalizePublicPath(filenameRaw);
+      if (!filename) continue;
       try {
-        const response = await fetch(joinPath(filename), { cache: "no-store" });
-        if (!response.ok) {
-          console.warn(
-            `[Blockscape] ${filename} not fetched (${response.status}); skipping`
-          );
-          continue;
-        }
-
-        const text = await response.text();
-        const baseName = filename.replace(/\.[^.]+$/, "") || "Model";
+        const text = await readPublicBsFile(filename);
+        const filePart = filename.split("/").pop() || filename;
+        const baseName = filePart.replace(/\.[^.]+$/, "") || "Model";
         const entries = normalizeToModelsFromText(text, baseName, {
           seriesTitleOverride: `${baseName} series`,
         });
@@ -5530,10 +5759,15 @@ export function initBlockscape() {
               fallbackTitle: "unknown",
             });
           }
-          addModelEntry(payload, { versionLabel: filename });
+          const idxResult = addModelEntry(payload, {
+            versionLabel: collectionLabel || filename,
+          });
+          if (firstIndex == null) firstIndex = idxResult;
         });
         console.log(
-          `[Blockscape] loaded ${entries.length} model(s) from ${filename}`
+          `[Blockscape] loaded ${entries.length} model(s) from ${
+            collectionLabel || filename
+          }`
         );
       } catch (error) {
         console.log(
@@ -5545,7 +5779,93 @@ export function initBlockscape() {
       }
     }
 
-    renderModelList();
+    if (setActiveAfterLoad) {
+      if (firstIndex != null) setActive(firstIndex);
+      else if (models.length) setActive(0);
+      else renderModelList();
+    } else {
+      renderModelList();
+    }
+    apicurio.updateAvailability();
+    return firstIndex;
+  }
+
+  function renderModelSetsList() {
+    if (!modelSetsList) return;
+    modelSetsList.innerHTML = "";
+
+    const entries = [
+      {
+        id: DEFAULT_MODEL_SET_ID,
+        title: "Default maps",
+        count: DEFAULT_SAMPLE_FILES.length,
+      },
+      ...Array.from(bundledDirectories.entries())
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .map(([dir, files]) => ({
+          id: dir,
+          title: dir,
+          count: files.length,
+        })),
+    ];
+
+    entries.forEach((entry) => {
+      const li = document.createElement("li");
+      li.className = "model-nav-item";
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className =
+        "model-nav-button" +
+        (entry.id === activeModelSetId ? " is-active" : "");
+      btn.dataset.setId = entry.id;
+      btn.setAttribute(
+        "aria-current",
+        entry.id === activeModelSetId ? "true" : "false"
+      );
+      const label = document.createElement("span");
+      label.className = "model-nav-label";
+      const titleSpan = document.createElement("span");
+      titleSpan.className = "model-nav-title";
+      titleSpan.textContent = entry.title;
+      label.appendChild(titleSpan);
+      const meta = document.createElement("span");
+      meta.className = "model-nav-meta";
+      meta.textContent = `${entry.count} file${entry.count === 1 ? "" : "s"}`;
+      btn.appendChild(label);
+      btn.appendChild(meta);
+      li.appendChild(btn);
+      modelSetsList.appendChild(li);
+    });
+  }
+
+  async function loadDirectorySelection(dir) {
+    if (dir === DEFAULT_MODEL_SET_ID) {
+      await loadJsonFiles(DEFAULT_SAMPLE_FILES, {
+        replaceExisting: true,
+        includeSeed: true,
+        setActiveAfterLoad: true,
+        collectionLabel: "default",
+      });
+      activeModelSetId = DEFAULT_MODEL_SET_ID;
+      renderModelSetsList();
+      return;
+    }
+    const entries = bundledDirectories.get(dir) || [];
+    if (!entries.length) {
+      alert(`No .bs files found in ${dir}.`);
+      return;
+    }
+    await loadJsonFiles(
+      entries.map((entry) => entry.relativePath),
+      {
+        replaceExisting: true,
+        includeSeed: false,
+        setActiveAfterLoad: true,
+        collectionLabel: dir,
+      }
+    );
+    activeModelSetId = dir;
+    renderModelSetsList();
   }
 
   async function fetchTextWithCacheBypass(url) {
@@ -5750,15 +6070,10 @@ export function initBlockscape() {
 
   // Bootstrap with Blockscape
   (async function bootstrap() {
-    const seedEl = document.getElementById("seed");
-    if (!seedEl) {
-      throw new Error("Seed template not found in document.");
-    }
-    const seedRaw = (seedEl.textContent || seedEl.innerHTML || "").trim();
-    if (!seedRaw) {
+    if (!seedTemplate) {
       throw new Error("Seed template is empty.");
     }
-    const seedEntries = normalizeToModelsFromText(seedRaw, "Blockscape");
+    const seedEntries = normalizeToModelsFromText(seedTemplate, "Blockscape");
     if (!seedEntries.length) {
       throw new Error("Seed template could not be parsed.");
     }
@@ -5770,7 +6085,9 @@ export function initBlockscape() {
     });
 
     // Try to load JSON files from same directory
-    await loadJsonFiles();
+    await loadJsonFiles(DEFAULT_SAMPLE_FILES);
+    activeModelSetId = DEFAULT_MODEL_SET_ID;
+    renderModelSetsList();
 
     // Load explicit model from URL hash/search (?load= or #load=)
     const loadIndex = await consumeLoadParam();

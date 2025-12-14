@@ -1,0 +1,120 @@
+{
+  "id": "reverse-proxying",
+  "title": "Reverse Proxying",
+  "abstract": "Reverse proxies sit between clients and backends, terminating connections and reshaping traffic. By buffering, multiplexing, and pooling connections, they dramatically reduce backend load while enabling routing, security, and observability at the edge.",
+  "categories": [
+    {
+      "id": "user-visible-impact",
+      "title": "User-Visible Impact",
+      "items": [
+        {
+          "id": "reduced-latency",
+          "name": "Reduced Per-Request Latency",
+          "deps": [
+            "connection-reuse",
+            "request-buffering"
+          ]
+        },
+        {
+          "id": "higher-reliability",
+          "name": "Higher Reliability Under Load",
+          "deps": [
+            "backend-isolation",
+            "health-awareness"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "traffic-shaping",
+      "title": "Traffic Shaping",
+      "items": [
+        {
+          "id": "request-buffering",
+          "name": "Request / Response Buffering",
+          "deps": [
+            "proxy-runtime"
+          ]
+        },
+        {
+          "id": "connection-reuse",
+          "name": "Connection Reuse & Pooling",
+          "deps": [
+            "proxy-runtime"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "routing-capabilities",
+      "title": "Routing Capabilities",
+      "items": [
+        {
+          "id": "header-based-routing",
+          "name": "Header / Path Based Routing",
+          "deps": [
+            "http-awareness"
+          ]
+        },
+        {
+          "id": "backend-selection",
+          "name": "Backend Selection Logic",
+          "deps": [
+            "service-discovery"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "operational-controls",
+      "title": "Operational Controls",
+      "items": [
+        {
+          "id": "health-awareness",
+          "name": "Health Awareness",
+          "deps": [
+            "health-checks"
+          ]
+        },
+        {
+          "id": "backend-isolation",
+          "name": "Backend Isolation",
+          "deps": [
+            "timeout-policies"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "foundation",
+      "title": "Foundation",
+      "items": [
+        {
+          "id": "proxy-runtime",
+          "name": "Proxy Runtime (NGINX / HAProxy / Envoy)",
+          "deps": []
+        },
+        {
+          "id": "http-awareness",
+          "name": "HTTP Protocol Awareness",
+          "deps": []
+        },
+        {
+          "id": "health-checks",
+          "name": "Health Checks",
+          "deps": []
+        },
+        {
+          "id": "service-discovery",
+          "name": "Service Discovery",
+          "deps": []
+        },
+        {
+          "id": "timeout-policies",
+          "name": "Timeout & Retry Policies",
+          "deps": []
+        }
+      ]
+    }
+  ]
+}

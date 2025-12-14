@@ -1,0 +1,106 @@
+{
+  "id": "recursive-authoritative-dns",
+  "title": "Recursive vs Authoritative DNS",
+  "abstract": "DNS resolution is split between recursive resolvers that perform lookups on behalf of users and authoritative servers that publish records. Latency, caching behavior, and TTL strategy at this layer directly affect where users connect and how fast connections start.",
+  "categories": [
+    {
+      "id": "user-visible-effects",
+      "title": "User-Visible Effects",
+      "items": [
+        {
+          "id": "dns-startup-latency",
+          "name": "Startup Latency Before First Byte",
+          "deps": [
+            "recursive-resolution",
+            "authoritative-response"
+          ]
+        },
+        {
+          "id": "routing-accuracy",
+          "name": "Initial Routing Accuracy",
+          "deps": [
+            "ttl-strategy",
+            "authoritative-response"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "resolution-flow",
+      "title": "Resolution Flow",
+      "items": [
+        {
+          "id": "recursive-resolution",
+          "name": "Recursive Resolution",
+          "deps": [
+            "cache-hit",
+            "cache-miss"
+          ]
+        },
+        {
+          "id": "authoritative-response",
+          "name": "Authoritative Response",
+          "deps": [
+            "zone-data"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "caching-behavior",
+      "title": "Caching Behavior",
+      "items": [
+        {
+          "id": "cache-hit",
+          "name": "Resolver Cache Hits",
+          "deps": [
+            "ttl-strategy"
+          ]
+        },
+        {
+          "id": "cache-miss",
+          "name": "Resolver Cache Misses",
+          "deps": [
+            "ttl-strategy"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "control-knobs",
+      "title": "Control Knobs",
+      "items": [
+        {
+          "id": "ttl-strategy",
+          "name": "TTL Strategy",
+          "deps": [
+            "zone-data"
+          ]
+        },
+        {
+          "id": "record-types",
+          "name": "Record Types (A/AAAA/CNAME)",
+          "deps": [
+            "zone-data"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "foundation",
+      "title": "Foundation",
+      "items": [
+        {
+          "id": "zone-data",
+          "name": "Authoritative Zone Data",
+          "deps": []
+        },
+        {
+          "id": "recursive-infrastructure",
+          "name": "Recursive Resolver Infrastructure",
+          "deps": []
+        }
+      ]
+    }
+  ]
+}

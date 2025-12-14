@@ -253,6 +253,8 @@
             title="Remove selected model">Remove active</button>
           <button id="clear" class="pf-v5-c-button pf-m-tertiary" type="button">Clear selection</button>
         </div>
+        <div class="sidebar-heading sidebar-heading--sub">Portfolio</div>
+        <ul id="modelSets" class="model-nav-list model-nav-list--sets"></ul>
       </aside>
       <div class="blockscape-main">
         <section class="pf-v5-c-page__main-section blockscape-json-panel" hidden
