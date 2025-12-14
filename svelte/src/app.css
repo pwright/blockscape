@@ -1686,6 +1686,11 @@
       font-weight: var(--font-weight-semibold);
     }
 
+    .tile--model-link .name {
+      color: var(--color-danger);
+      font-weight: var(--font-weight-semibold);
+    }
+
     .tile-id {
       font-size: var(--font-size-xs);
       color: var(--blockscape-muted);

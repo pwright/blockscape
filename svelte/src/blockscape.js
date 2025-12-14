@@ -3397,6 +3397,14 @@ export function initBlockscape() {
           externalMeta,
           seriesIdLookup,
         });
+        const targetModelIndex = resolveModelNavigationTarget(it.id, {
+          excludeIndex: activeIndex,
+        });
+        const activeEntry = models[activeIndex];
+        const isPortfolio =
+          activeEntry &&
+          ((activeEntry.data && activeEntry.data.id === "network") ||
+            getModelId(activeEntry) === "network");
         const tile = document.createElement("div");
         tile.className = externalMeta.isExternal ? "tile external" : "tile";
         tile.tabIndex = 0;
@@ -3414,6 +3422,11 @@ export function initBlockscape() {
               ? "Current map in this series"
               : `Open version ${targetIdx + 1} in this series`;
           tile.title = label;
+        }
+        if (isPortfolio && targetModelIndex !== -1) {
+          tile.dataset.modelIndex = String(targetModelIndex);
+          tile.classList.add("tile--model-link");
+          if (!tile.title) tile.title = "Open map from portfolio";
         }
         if (obsidianUrl) {
           tile.dataset.obsidianUrl = obsidianUrl;
@@ -3501,13 +3514,14 @@ export function initBlockscape() {
         if (typeof event.button === "number" && event.button !== 0) return;
         hidePreview();
         const id = t.dataset.id;
-      const targetSeriesIndex =
-        t.dataset.seriesVersionIndex != null
-          ? parseInt(t.dataset.seriesVersionIndex, 10)
-          : null;
-        const targetModelIndex = models.findIndex(
-          (entry, idx) => idx !== activeIndex && modelContainsId(entry, id)
-        );
+        const targetSeriesIndex =
+          t.dataset.seriesVersionIndex != null
+            ? parseInt(t.dataset.seriesVersionIndex, 10)
+            : null;
+        const targetModelIndex =
+          t.dataset.modelIndex != null
+            ? parseInt(t.dataset.modelIndex, 10)
+            : resolveModelNavigationTarget(id, { excludeIndex: activeIndex });
         const globalIndex =
           t.dataset.globalIndex != null
             ? parseInt(t.dataset.globalIndex, 10)
