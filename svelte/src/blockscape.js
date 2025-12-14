@@ -147,6 +147,8 @@ export function initBlockscape() {
   const NOTICE_TIMEOUT_MS = 2000;
   let pendingSeriesNavigation = null;
   let pendingSeriesNavigationTimer = null;
+  let pendingModelNavigation = null;
+  let pendingModelNavigationTimer = null;
   let noticeEl = null;
   let noticeTextEl = null;
   let noticeTimer = null;
@@ -915,6 +917,16 @@ export function initBlockscape() {
     return trimmed || null;
   }
 
+  function modelContainsId(entry, candidateId) {
+    if (!candidateId) return false;
+    const primaryId = (entry?.data?.id || "").toString().trim();
+    if (primaryId === candidateId) return true;
+    const versions = entry?.apicurioVersions || [];
+    return versions.some(
+      (ver) => (ver?.data?.id || "").toString().trim() === candidateId
+    );
+  }
+
   function persistActiveEdits(entryIndex) {
     if (entryIndex < 0 || entryIndex >= models.length) return true;
     if (!jsonBox) return true;
@@ -1531,9 +1543,14 @@ export function initBlockscape() {
 
   function clearSeriesNavNotice() {
     pendingSeriesNavigation = null;
+    pendingModelNavigation = null;
     if (pendingSeriesNavigationTimer) {
       clearTimeout(pendingSeriesNavigationTimer);
       pendingSeriesNavigationTimer = null;
+    }
+    if (pendingModelNavigationTimer) {
+      clearTimeout(pendingModelNavigationTimer);
+      pendingModelNavigationTimer = null;
     }
     clearNotice();
   }
@@ -1558,6 +1575,24 @@ export function initBlockscape() {
     const label = describeSeriesVersion(entry, targetVersionIndex);
     showNotice(
       `Click again to open ${label} in this series.`,
+      seriesNavDoubleClickWaitMs
+    );
+  }
+
+  function showModelNavNotice(id, targetModelIndex, targetModel) {
+    ensureNoticeElements();
+    pendingModelNavigation = { id, targetModelIndex };
+    if (pendingModelNavigationTimer) {
+      clearTimeout(pendingModelNavigationTimer);
+    }
+    pendingModelNavigationTimer = setTimeout(() => {
+      pendingModelNavigationTimer = null;
+      pendingModelNavigation = null;
+      clearNotice();
+    }, seriesNavDoubleClickWaitMs);
+    const label = getModelDisplayTitle(targetModel) || id;
+    showNotice(
+      `Click again to open "${label}" from the portfolio.`,
       seriesNavDoubleClickWaitMs
     );
   }
@@ -3454,10 +3489,13 @@ export function initBlockscape() {
         if (typeof event.button === "number" && event.button !== 0) return;
         hidePreview();
         const id = t.dataset.id;
-        const targetSeriesIndex =
-          t.dataset.seriesVersionIndex != null
-            ? parseInt(t.dataset.seriesVersionIndex, 10)
-            : null;
+      const targetSeriesIndex =
+        t.dataset.seriesVersionIndex != null
+          ? parseInt(t.dataset.seriesVersionIndex, 10)
+          : null;
+        const targetModelIndex = models.findIndex(
+          (entry, idx) => idx !== activeIndex && modelContainsId(entry, id)
+        );
         const globalIndex =
           t.dataset.globalIndex != null
             ? parseInt(t.dataset.globalIndex, 10)
@@ -3474,8 +3512,20 @@ export function initBlockscape() {
           pendingSeriesNavigation &&
           pendingSeriesNavigation.id === id &&
           pendingSeriesNavigation.targetVersionIndex === targetSeriesIndex;
+        const canNavigateToModel =
+          targetModelIndex !== -1 &&
+          activeEntry &&
+          ((activeEntry.data && activeEntry.data.id === "network") ||
+            getModelId(activeEntry) === "network");
+        const pendingModelMatch =
+          pendingModelNavigation &&
+          pendingModelNavigation.id === id &&
+          pendingModelNavigation.targetModelIndex === targetModelIndex;
 
         if (pendingSeriesNavigation && !pendingMatch) {
+          clearSeriesNavNotice();
+        }
+        if (pendingModelNavigation && !pendingModelMatch) {
           clearSeriesNavNotice();
         }
 
@@ -3490,6 +3540,13 @@ export function initBlockscape() {
           } else {
             showSeriesNavNotice(id, targetSeriesIndex, activeEntry);
           }
+        } else if (canNavigateToModel) {
+          if (pendingModelMatch) {
+            clearSeriesNavNotice();
+            setActive(targetModelIndex);
+            return;
+          }
+          showModelNavNotice(id, targetModelIndex, models[targetModelIndex]);
         } else if (
           Number.isInteger(globalIndex) &&
           globalIndex > 0 &&
@@ -5219,6 +5276,14 @@ export function initBlockscape() {
       const button = event.target.closest("button[data-set-id]");
       if (!button) return;
       const setId = button.dataset.setId || DEFAULT_MODEL_SET_ID;
+      if (setId === activeModelSetId) return;
+      if (models.length) {
+        const suffix = models.length === 1 ? "" : "s";
+        const proceed = window.confirm(
+          `Switching portfolio will discard the ${models.length} current model${suffix}. Continue?`
+        );
+        if (!proceed) return;
+      }
       try {
         await loadDirectorySelection(setId);
       } catch (err) {
@@ -5573,9 +5638,14 @@ export function initBlockscape() {
     lastDeletedItem = null;
     lastDeletedCategory = null;
     pendingSeriesNavigation = null;
+    pendingModelNavigation = null;
     if (pendingSeriesNavigationTimer) {
       clearTimeout(pendingSeriesNavigationTimer);
       pendingSeriesNavigationTimer = null;
+    }
+    if (pendingModelNavigationTimer) {
+      clearTimeout(pendingModelNavigationTimer);
+      pendingModelNavigationTimer = null;
     }
     versionThumbLabels = [];
     if (app) app.innerHTML = "";
@@ -5637,7 +5707,8 @@ export function initBlockscape() {
       if (!filename) continue;
       try {
         const text = await readPublicBsFile(filename);
-        const baseName = filename.replace(/\.[^.]+$/, "") || "Model";
+        const filePart = filename.split("/").pop() || filename;
+        const baseName = filePart.replace(/\.[^.]+$/, "") || "Model";
         const entries = normalizeToModelsFromText(text, baseName, {
           seriesTitleOverride: `${baseName} series`,
         });
