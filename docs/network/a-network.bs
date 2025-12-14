@@ -1,123 +1,185 @@
 {
-"id": "network",
-"title": "Network Portfolio",
-"abstract": "High-level index of the network BS models. Each tile links to one of the network maps to make hopping between them quick.",
-"categories": [
-{
-"id": "edge-delivery",
-"title": "Edge Delivery & HTTP Services",
-"items": [
-{
-"id": "http-caching",
-"name": "HTTP Caching",
-"deps": ["reverse-proxying", "tcp-delivery", "tls-delivery", "recursive-authoritative-dns"]
-},
-{
-"id": "reverse-proxying",
-"name": "Reverse Proxying",
-"deps": ["tcp-delivery", "tls-delivery", "recursive-authoritative-dns", "throughput-latency-congestion"]
-}
-]
-},
-{
-"id": "traffic-steering-load-balancing",
-"title": "Traffic Steering & Load Balancing",
-"items": [
-{
-"id": "anycast-delivery",
-"name": "Anycast Delivery",
-"deps": ["l4-load-balancing", "health-checks", "recursive-authoritative-dns", "throughput-latency-congestion"]
-},
-{
-"id": "l4-load-balancing",
-"name": "L4 Load Balancing",
-"deps": ["tcp-delivery", "udp-delivery", "mtu-pmtud-delivery", "throughput-latency-congestion", "health-checks"]
-},
-{
-"id": "l7-load-balancing",
-"name": "L7 Load Balancing",
-"deps": ["reverse-proxying", "tls-delivery", "throughput-latency-congestion", "health-checks"]
-}
-]
-},
-{
-"id": "dns-naming",
-"title": "DNS & Naming",
-"items": [
-{
-"id": "recursive-authoritative-dns",
-"name": "Recursive vs Authoritative DNS",
-"deps": ["udp-delivery", "tcp-delivery", "throughput-latency-congestion"]
-},
-{
-"id": "geodns-edns",
-"name": "GeoDNS & EDNS Client Subnet",
-"deps": ["recursive-authoritative-dns", "health-checks", "throughput-latency-congestion"]
-}
-]
-},
-{
-"id": "transport-security",
-"title": "Core Transport & Security Mechanics",
-"items": [
-{
-"id": "transport-protocols",
-"name": "Core Transport Protocols",
-"deps": ["throughput-latency-congestion", "mtu-pmtud-delivery"]
-},
-{
-"id": "tcp-delivery",
-"name": "TCP Data Delivery",
-"deps": ["congestion-control-algorithms", "mtu-pmtud-delivery", "throughput-latency-congestion"]
-},
-{
-"id": "udp-delivery",
-"name": "UDP Data Delivery",
-"deps": ["mtu-pmtud-delivery", "throughput-latency-congestion"]
-},
-{
-"id": "tls-delivery",
-"name": "TLS Handshake & Secure Delivery",
-"deps": ["tcp-delivery", "recursive-authoritative-dns", "throughput-latency-congestion"]
-},
-{
-"id": "mtu-pmtud-delivery",
-"name": "IP Fragmentation & Path MTU Discovery",
-"deps": ["throughput-latency-congestion"]
-}
-]
-},
-{
-"id": "performance-dynamics",
-"title": "Performance & Congestion Dynamics",
-"items": [
-{
-"id": "throughput-latency-congestion",
-"name": "Throughput, Latency & Congestion",
-"deps": []
-},
-{
-"id": "congestion-control-algorithms",
-"name": "Congestion Control Algorithms",
-"deps": ["throughput-latency-congestion"]
-}
-]
-},
-{
-"id": "operations-reliability",
-"title": "Operations, Reliability & Debugging",
-"items": [
-{
-"id": "observability-troubleshooting",
-"name": "Observability & Troubleshooting Concepts",
-"deps": ["health-checks", "throughput-latency-congestion", "tcp-delivery", "recursive-authoritative-dns"]
-},
-{
-"id": "health-checks",
-"name": "Health Checks",
-"deps": ["recursive-authoritative-dns", "tcp-delivery", "udp-delivery", "tls-delivery"]
-}
-]
-}
-]
+  "id": "network",
+  "title": "Network Portfolio",
+  "abstract": "High-level index of the network BS models. Each tile links to one of the network maps to make hopping between them quick.",
+  "categories": [
+    {
+      "id": "transport-security",
+      "title": "Core Transport & Security Mechanics",
+      "items": [
+        {
+          "id": "transport-protocols",
+          "name": "Core Transport Protocols",
+          "deps": [
+            "throughput-latency-congestion",
+            "mtu-pmtud-delivery"
+          ]
+        },
+        {
+          "id": "tcp-delivery",
+          "name": "TCP Data Delivery",
+          "deps": [
+            "congestion-control-algorithms",
+            "mtu-pmtud-delivery",
+            "throughput-latency-congestion"
+          ]
+        },
+        {
+          "id": "udp-delivery",
+          "name": "UDP Data Delivery",
+          "deps": [
+            "mtu-pmtud-delivery",
+            "throughput-latency-congestion"
+          ]
+        },
+        {
+          "id": "tls-delivery",
+          "name": "TLS",
+          "deps": [
+            "tcp-delivery",
+            "recursive-authoritative-dns",
+            "throughput-latency-congestion"
+          ]
+        },
+        {
+          "id": "mtu-pmtud-delivery",
+          "name": "IP Frag & MTU Discovery",
+          "deps": [
+            "throughput-latency-congestion"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "operations-reliability",
+      "title": "Operations, Reliability & Debugging",
+      "items": [
+        {
+          "id": "observability-troubleshooting",
+          "name": "Observability",
+          "deps": [
+            "health-checks",
+            "throughput-latency-congestion",
+            "tcp-delivery",
+            "recursive-authoritative-dns"
+          ]
+        },
+        {
+          "id": "health-checks",
+          "name": "Health Checks",
+          "deps": [
+            "recursive-authoritative-dns",
+            "tcp-delivery",
+            "udp-delivery",
+            "tls-delivery"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "traffic-steering-load-balancing",
+      "title": "Traffic Steering & Load Balancing",
+      "items": [
+        {
+          "id": "anycast-delivery",
+          "name": "Anycast Delivery",
+          "deps": [
+            "l4-load-balancing",
+            "health-checks",
+            "recursive-authoritative-dns",
+            "throughput-latency-congestion"
+          ]
+        },
+        {
+          "id": "l4-load-balancing",
+          "name": "L4 Load Balancing",
+          "deps": [
+            "tcp-delivery",
+            "udp-delivery",
+            "mtu-pmtud-delivery",
+            "throughput-latency-congestion",
+            "health-checks"
+          ]
+        },
+        {
+          "id": "l7-load-balancing",
+          "name": "L7 Load Balancing",
+          "deps": [
+            "reverse-proxying",
+            "tls-delivery",
+            "throughput-latency-congestion",
+            "health-checks"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "performance-dynamics",
+      "title": "Performance & Congestion",
+      "items": [
+        {
+          "id": "throughput-latency-congestion",
+          "name": "Throughput, Latency & Congestion",
+          "deps": []
+        },
+        {
+          "id": "congestion-control-algorithms",
+          "name": "Congestion Control Algorithms",
+          "deps": [
+            "throughput-latency-congestion"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "edge-delivery",
+      "title": "Edge Delivery & HTTP Services",
+      "items": [
+        {
+          "id": "http-caching",
+          "name": "HTTP Caching",
+          "deps": [
+            "reverse-proxying",
+            "tcp-delivery",
+            "tls-delivery",
+            "recursive-authoritative-dns"
+          ]
+        },
+        {
+          "id": "reverse-proxying",
+          "name": "Reverse Proxying",
+          "deps": [
+            "tcp-delivery",
+            "tls-delivery",
+            "recursive-authoritative-dns",
+            "throughput-latency-congestion"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "dns-naming",
+      "title": "DNS & Naming",
+      "items": [
+        {
+          "id": "recursive-authoritative-dns",
+          "name": "Authoritative DNS",
+          "deps": [
+            "udp-delivery",
+            "tcp-delivery",
+            "throughput-latency-congestion"
+          ]
+        },
+        {
+          "id": "geodns-edns",
+          "name": "GeoDNS & EDNS",
+          "deps": [
+            "recursive-authoritative-dns",
+            "health-checks",
+            "throughput-latency-congestion"
+          ]
+        }
+      ]
+    }
+  ]
 }
