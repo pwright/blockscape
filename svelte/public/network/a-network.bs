@@ -1,0 +1,29 @@
+{
+  "id": "network",
+  "title": "Network Portfolio",
+  "abstract": "High-level index of the network BS models. Each tile links to one of the network maps to make hopping between them quick.",
+  "categories": [
+    {
+      "id": "network-portfolio",
+      "title": "Network model index",
+      "items": [
+        { "id": "anycast-delivery", "name": "Anycast Delivery", "deps": [] },
+        { "id": "http-caching", "name": "HTTP Caching", "deps": [] },
+        { "id": "congestion-control-algorithms", "name": "Congestion Control Algorithms", "deps": [] },
+        { "id": "transport-protocols", "name": "Core Transport Protocols", "deps": [] },
+        { "id": "geodns-edns", "name": "GeoDNS & EDNS Client Subnet", "deps": [] },
+        { "id": "health-checks", "name": "Health Checks", "deps": [] },
+        { "id": "mtu-pmtud-delivery", "name": "IP Fragmentation & Path MTU Discovery", "deps": [] },
+        { "id": "l4-load-balancing", "name": "L4 Load Balancing", "deps": [] },
+        { "id": "l7-load-balancing", "name": "L7 Load Balancing", "deps": [] },
+        { "id": "observability-troubleshooting", "name": "Observability & Troubleshooting Concepts", "deps": [] },
+        { "id": "recursive-authoritative-dns", "name": "Recursive vs Authoritative DNS", "deps": [] },
+        { "id": "reverse-proxying", "name": "Reverse Proxying", "deps": [] },
+        { "id": "tcp-delivery", "name": "TCP Data Delivery", "deps": [] },
+        { "id": "throughput-latency-congestion", "name": "Throughput, Latency & Congestion", "deps": [] },
+        { "id": "tls-delivery", "name": "TLS Handshake & Secure Delivery", "deps": [] },
+        { "id": "udp-delivery", "name": "UDP Data Delivery", "deps": [] }
+      ]
+    }
+  ]
+}

@@ -927,6 +927,18 @@ export function initBlockscape() {
     );
   }
 
+  function resolveModelNavigationTarget(candidateId, { excludeIndex = -1 } = {}) {
+    if (!candidateId) return -1;
+    const normalized = candidateId.toString().trim();
+    if (!normalized) return -1;
+    for (let i = 0; i < models.length; i += 1) {
+      if (i === excludeIndex) continue;
+      const entry = models[i];
+      if (modelContainsId(entry, normalized)) return i;
+    }
+    return -1;
+  }
+
   function persistActiveEdits(entryIndex) {
     if (entryIndex < 0 || entryIndex >= models.length) return true;
     if (!jsonBox) return true;
