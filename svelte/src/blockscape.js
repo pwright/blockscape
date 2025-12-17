@@ -44,9 +44,19 @@ export function initBlockscape() {
   const newPanelBackdrop = document.getElementById("newPanelBackdrop");
   const searchInput = document.getElementById("search");
   const searchResults = document.getElementById("searchResults");
+  const localBackendPanel = document.getElementById("localBackendPanel");
+  const localBackendStatus = document.getElementById("localBackendStatus");
+  const localFileList = document.getElementById("localFileList");
+  const refreshLocalFilesButton = document.getElementById("refreshLocalFiles");
+  const loadLocalFileButton = document.getElementById("loadLocalFile");
+  const saveLocalFileButton = document.getElementById("saveLocalFile");
+  const localSavePathInput = document.getElementById("localSavePath");
   const EDITOR_TRANSFER_KEY = "blockscape:editorPayload";
   const EDITOR_TRANSFER_MESSAGE_TYPE = "blockscape:editorTransfer";
   const defaultDocumentTitle = document.title;
+
+  // Ensure local backend panel starts hidden; it will only unhide after a successful health check.
+  if (localBackendPanel) localBackendPanel.hidden = true;
 
   // Show the seed in the editor initially.
   jsonBox.value = document.getElementById("seed").textContent.trim();
@@ -99,6 +109,7 @@ export function initBlockscape() {
   let activeSeriesPreviewTarget = null;
   let versionThumbLabels = [];
   let thumbLabelMeasureTimer = null;
+  const localBackend = createLocalBackend();
   const MAX_SEARCH_RESULTS = 30;
   const SERIES_INFO_PREVIEW_DELAY = 1000;
   const TILE_HOVER_SCALE_STORAGE_KEY = "blockscape:hoverScale";
@@ -197,6 +208,297 @@ export function initBlockscape() {
     a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
+  }
+
+  function isLocalBackendOptIn() {
+    if (typeof window === "undefined" || !window.location) return false;
+    const url = new URL(window.location.href);
+    const normalizedPath = url.pathname.replace(/\/+$/, "");
+    const lastSegment =
+      normalizedPath.split("/").filter(Boolean).pop() || "";
+    const searchFlag = url.searchParams.get("server");
+    return (
+      lastSegment.toLowerCase() === "server" ||
+      (searchFlag &&
+        ["1", "true", "yes", "on"].includes(searchFlag.toLowerCase()))
+    );
+  }
+
+  function isGithubPagesHost() {
+    if (typeof window === "undefined" || !window.location) return false;
+    const host = (window.location.hostname || "").toLowerCase();
+    return host.endsWith("github.io");
+  }
+
+  function createLocalBackend() {
+    const debugContext = () => {
+      if (typeof window === "undefined" || !window.location) return {};
+      return {
+        host: window.location.host,
+        path: window.location.pathname,
+        search: window.location.search,
+        hash: window.location.hash,
+      };
+    };
+
+    function debug(message, extra = {}) {
+      console.log("[Blockscape][local-backend]", message, {
+        ...debugContext(),
+        ...extra,
+      });
+    }
+
+    if (isGithubPagesHost()) {
+      debug("Disabled on github.io host");
+      if (localBackendPanel) localBackendPanel.hidden = true;
+      return { detect() {}, refresh() {}, updateActiveSavePlaceholder() {} };
+    }
+
+    const optIn = isLocalBackendOptIn();
+    if (!optIn || !localBackendPanel || !localBackendStatus) {
+      debug("Opt-in flag missing or panel unavailable");
+      if (localBackendPanel) localBackendPanel.hidden = true;
+      return {
+        detect() {},
+        refresh() {},
+        updateActiveSavePlaceholder() {},
+      };
+    }
+
+    if (!localBackendPanel || !localBackendStatus) {
+      return {
+        detect() {},
+        refresh() {},
+        updateActiveSavePlaceholder() {},
+      };
+    }
+
+    let available = false;
+    let lastKnownPath = "";
+    let files = [];
+
+    function setStatus(text, { error = false } = {}) {
+      localBackendStatus.textContent = text;
+      localBackendStatus.style.color = error ? "#b42318" : "";
+      debug("Status", { text, error });
+    }
+
+    function normalizeSavePath(raw) {
+      const cleaned = (raw || "").trim().replace(/\\/g, "/").replace(/^\/+/, "");
+      if (!cleaned || cleaned.includes("..")) return null;
+      return cleaned.toLowerCase().endsWith(".bs") ? cleaned : `${cleaned}.bs`;
+    }
+
+    function defaultSaveName() {
+      if (activeIndex < 0) return "blockscape.bs";
+      const title = getModelTitle(models[activeIndex]) || "blockscape";
+      return `${makeSeriesId(title, "blockscape")}.bs`;
+    }
+
+    function updateActiveSavePlaceholder() {
+      if (!localSavePathInput) return;
+      localSavePathInput.placeholder = defaultSaveName();
+    }
+
+    function renderFiles() {
+      if (!localFileList) return;
+      localFileList.innerHTML = "";
+      if (!files.length) {
+        const option = document.createElement("option");
+        option.disabled = true;
+        option.textContent = "No .bs files found yet";
+        localFileList.appendChild(option);
+        localFileList.disabled = true;
+        return;
+      }
+
+      localFileList.disabled = false;
+      files.forEach((file) => {
+        const option = document.createElement("option");
+        option.value = file.path;
+        const mtime = file.mtimeMs
+          ? new Date(file.mtimeMs).toLocaleString()
+          : "";
+        option.textContent = mtime ? `${file.path} · ${mtime}` : file.path;
+        localFileList.appendChild(option);
+      });
+      if (lastKnownPath) {
+        localFileList.value = lastKnownPath;
+      }
+    }
+
+    function hidePanel(message) {
+      available = false;
+      files = [];
+      renderFiles();
+      localBackendPanel.hidden = true;
+      if (message) setStatus(message, { error: true });
+      debug("Panel hidden", { message });
+    }
+
+    async function checkHealth({ silent = false } = {}) {
+      try {
+        debug("Health check start");
+        const resp = await fetch("/api/health", { cache: "no-store" });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const payload = await resp.json();
+        available = !!payload?.ok;
+        if (!available) throw new Error("Health check failed");
+        localBackendPanel.hidden = false;
+        if (!silent) {
+          setStatus(
+            payload.root
+              ? `Local server ready (root: ${payload.root})`
+              : "Local server ready"
+          );
+        }
+        debug("Health check ok", { payload });
+        return true;
+      } catch (err) {
+        if (!silent) {
+          console.log("[Blockscape] local backend health failed", err);
+        }
+        hidePanel("Local server unavailable");
+        return false;
+      }
+    }
+
+    async function refresh() {
+      if (!available) return;
+      if (!localFileList) return;
+      setStatus("Loading files…");
+      try {
+        const response = await fetch("/api/files", { cache: "no-store" });
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        const payload = await response.json();
+        files = payload.files || [];
+        renderFiles();
+        setStatus(
+          files.length
+            ? `Browsing ${files.length} file(s) in ~/blockscape`
+            : "No .bs files in ~/blockscape yet"
+        );
+      } catch (err) {
+        console.warn("[Blockscape] local backend refresh failed", err);
+        hidePanel("Local server unavailable");
+      }
+    }
+
+    async function detect() {
+      available = false;
+      hidePanel();
+      setStatus("Checking for local server…");
+      try {
+        debug("Detect start");
+        const healthy = await checkHealth();
+        if (!healthy) return;
+        updateActiveSavePlaceholder();
+        await refresh();
+      } catch (err) {
+        available = false;
+        console.log("[Blockscape] local backend not detected", err);
+        debug("Detect failed", { err });
+      }
+    }
+
+    async function loadSelected() {
+      if (!available || !localFileList) return;
+      const relPath = localFileList.value;
+      if (!relPath) {
+        alert("Select a file to load from ~/blockscape.");
+        return;
+      }
+      try {
+        setStatus(`Loading ${relPath}…`);
+        const resp = await fetch(
+          `/api/file?path=${encodeURIComponent(relPath)}`,
+          { cache: "no-store" }
+        );
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const payload = await resp.json();
+        const text = JSON.stringify(payload.data ?? payload, null, 2);
+        const entries = normalizeToModelsFromText(text, relPath, {
+          seriesTitleOverride: `${relPath} series`,
+        });
+        if (!entries.length) throw new Error("No models found in file");
+        let firstIndex = null;
+        entries.forEach((entry, idx) => {
+          const idxResult = addModelEntry(entry, {
+            versionLabel:
+              entries.length > 1 ? `${relPath} #${idx + 1}` : relPath,
+          });
+          if (firstIndex == null) firstIndex = idxResult;
+        });
+        if (firstIndex != null) setActive(firstIndex);
+        setStatus(`Loaded ${relPath}`);
+        lastKnownPath = relPath;
+        renderFiles();
+      } catch (err) {
+        console.error("[Blockscape] failed to load from local server", err);
+        alert(`Local load failed: ${err.message}`);
+        hidePanel("Local server unavailable");
+      }
+    }
+
+    async function saveActiveToFile() {
+      if (!available) return;
+      if (activeIndex < 0) {
+        alert("No active model to save.");
+        return;
+      }
+      const desiredPath =
+        normalizeSavePath(localSavePathInput?.value) || defaultSaveName();
+      if (!desiredPath) {
+        alert("Enter a relative path (no ..) to save under ~/blockscape.");
+        return;
+      }
+      try {
+        const body = JSON.stringify(models[activeIndex].data, null, 2);
+        setStatus(`Saving to ${desiredPath}…`);
+        const resp = await fetch(
+          `/api/file?path=${encodeURIComponent(desiredPath)}`,
+          {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body,
+          }
+        );
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const payload = await resp.json();
+        lastKnownPath = payload.path || desiredPath;
+        setStatus(`Saved to ${payload.path || desiredPath}`);
+        await refresh();
+      } catch (err) {
+        console.error("[Blockscape] local save failed", err);
+        alert(`Local save failed: ${err.message}`);
+        hidePanel("Local server unavailable");
+      }
+    }
+
+    if (refreshLocalFilesButton) {
+      refreshLocalFilesButton.onclick = () => refresh();
+    }
+    if (loadLocalFileButton) {
+      loadLocalFileButton.onclick = () => loadSelected();
+    }
+    if (saveLocalFileButton) {
+      saveLocalFileButton.onclick = () => saveActiveToFile();
+    }
+    if (localFileList && localSavePathInput) {
+      localFileList.addEventListener("change", () => {
+        if (localFileList.value) {
+          localSavePathInput.value = localFileList.value;
+        }
+      });
+    }
+
+    return {
+      detect,
+      refresh,
+      updateActiveSavePlaceholder,
+    };
   }
 
   async function writeTextToClipboard(text) {
@@ -1819,6 +2121,7 @@ export function initBlockscape() {
     if (searchInput) {
       handleSearchInput(searchInput.value || "");
     }
+    localBackend.updateActiveSavePlaceholder();
     apicurio.updateAvailability();
   }
 
@@ -5747,6 +6050,9 @@ export function initBlockscape() {
       return null;
     }
   }
+
+  // Optional local server for ~/blockscape
+  localBackend.detect();
 
   // Bootstrap with Blockscape
   (async function bootstrap() {
