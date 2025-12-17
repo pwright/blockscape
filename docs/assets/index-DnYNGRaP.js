@@ -1,17 +1,2038 @@
-import { createApicurioIntegration } from "./apicurio";
-import {
+var __defProp = Object.defineProperty;
+var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
+var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
+(function polyfill() {
+  const relList = document.createElement("link").relList;
+  if (relList && relList.supports && relList.supports("modulepreload")) {
+    return;
+  }
+  for (const link of document.querySelectorAll('link[rel="modulepreload"]')) {
+    processPreload(link);
+  }
+  new MutationObserver((mutations) => {
+    for (const mutation of mutations) {
+      if (mutation.type !== "childList") {
+        continue;
+      }
+      for (const node of mutation.addedNodes) {
+        if (node.tagName === "LINK" && node.rel === "modulepreload")
+          processPreload(node);
+      }
+    }
+  }).observe(document, { childList: true, subtree: true });
+  function getFetchOpts(link) {
+    const fetchOpts = {};
+    if (link.integrity) fetchOpts.integrity = link.integrity;
+    if (link.referrerPolicy) fetchOpts.referrerPolicy = link.referrerPolicy;
+    if (link.crossOrigin === "use-credentials")
+      fetchOpts.credentials = "include";
+    else if (link.crossOrigin === "anonymous") fetchOpts.credentials = "omit";
+    else fetchOpts.credentials = "same-origin";
+    return fetchOpts;
+  }
+  function processPreload(link) {
+    if (link.ep)
+      return;
+    link.ep = true;
+    const fetchOpts = getFetchOpts(link);
+    fetch(link.href, fetchOpts);
+  }
+})();
+function noop() {
+}
+function run(fn) {
+  return fn();
+}
+function blank_object() {
+  return /* @__PURE__ */ Object.create(null);
+}
+function run_all(fns) {
+  fns.forEach(run);
+}
+function is_function(thing) {
+  return typeof thing === "function";
+}
+function safe_not_equal(a, b) {
+  return a != a ? b == b : a !== b || a && typeof a === "object" || typeof a === "function";
+}
+function is_empty(obj) {
+  return Object.keys(obj).length === 0;
+}
+const globals = typeof window !== "undefined" ? window : typeof globalThis !== "undefined" ? globalThis : (
+  // @ts-ignore Node typings have this
+  global
+);
+function append(target2, node) {
+  target2.appendChild(node);
+}
+function insert(target2, node, anchor) {
+  target2.insertBefore(node, anchor || null);
+}
+function detach(node) {
+  if (node.parentNode) {
+    node.parentNode.removeChild(node);
+  }
+}
+function element(name) {
+  return document.createElement(name);
+}
+function svg_element(name) {
+  return document.createElementNS("http://www.w3.org/2000/svg", name);
+}
+function text(data) {
+  return document.createTextNode(data);
+}
+function space() {
+  return text(" ");
+}
+function listen(node, event, handler, options) {
+  node.addEventListener(event, handler, options);
+  return () => node.removeEventListener(event, handler, options);
+}
+function prevent_default(fn) {
+  return function(event) {
+    event.preventDefault();
+    return fn.call(this, event);
+  };
+}
+function attr(node, attribute, value) {
+  if (value == null) node.removeAttribute(attribute);
+  else if (node.getAttribute(attribute) !== value) node.setAttribute(attribute, value);
+}
+function init_binding_group(group) {
+  let _inputs;
+  return {
+    /* push */
+    p(...inputs) {
+      _inputs = inputs;
+      _inputs.forEach((input) => group.push(input));
+    },
+    /* remove */
+    r() {
+      _inputs.forEach((input) => group.splice(group.indexOf(input), 1));
+    }
+  };
+}
+function children(element2) {
+  return Array.from(element2.childNodes);
+}
+function set_data(text2, data) {
+  data = "" + data;
+  if (text2.data === data) return;
+  text2.data = /** @type {string} */
+  data;
+}
+function set_input_value(input, value) {
+  input.value = value == null ? "" : value;
+}
+class HtmlTag {
+  constructor(is_svg = false) {
+    /**
+     * @private
+     * @default false
+     */
+    __publicField(this, "is_svg", false);
+    /** parent for creating node */
+    __publicField(this, "e");
+    /** html tag nodes */
+    __publicField(this, "n");
+    /** target */
+    __publicField(this, "t");
+    /** anchor */
+    __publicField(this, "a");
+    this.is_svg = is_svg;
+    this.e = this.n = null;
+  }
+  /**
+   * @param {string} html
+   * @returns {void}
+   */
+  c(html) {
+    this.h(html);
+  }
+  /**
+   * @param {string} html
+   * @param {HTMLElement | SVGElement} target
+   * @param {HTMLElement | SVGElement} anchor
+   * @returns {void}
+   */
+  m(html, target2, anchor = null) {
+    if (!this.e) {
+      if (this.is_svg)
+        this.e = svg_element(
+          /** @type {keyof SVGElementTagNameMap} */
+          target2.nodeName
+        );
+      else
+        this.e = element(
+          /** @type {keyof HTMLElementTagNameMap} */
+          target2.nodeType === 11 ? "TEMPLATE" : target2.nodeName
+        );
+      this.t = target2.tagName !== "TEMPLATE" ? target2 : (
+        /** @type {HTMLTemplateElement} */
+        target2.content
+      );
+      this.c(html);
+    }
+    this.i(anchor);
+  }
+  /**
+   * @param {string} html
+   * @returns {void}
+   */
+  h(html) {
+    this.e.innerHTML = html;
+    this.n = Array.from(
+      this.e.nodeName === "TEMPLATE" ? this.e.content.childNodes : this.e.childNodes
+    );
+  }
+  /**
+   * @returns {void} */
+  i(anchor) {
+    for (let i = 0; i < this.n.length; i += 1) {
+      insert(this.t, this.n[i], anchor);
+    }
+  }
+  /**
+   * @param {string} html
+   * @returns {void}
+   */
+  p(html) {
+    this.d();
+    this.h(html);
+    this.i(this.a);
+  }
+  /**
+   * @returns {void} */
+  d() {
+    this.n.forEach(detach);
+  }
+}
+let current_component;
+function set_current_component(component) {
+  current_component = component;
+}
+function get_current_component() {
+  if (!current_component) throw new Error("Function called outside component initialization");
+  return current_component;
+}
+function onMount(fn) {
+  get_current_component().$$.on_mount.push(fn);
+}
+const dirty_components = [];
+const binding_callbacks = [];
+let render_callbacks = [];
+const flush_callbacks = [];
+const resolved_promise = /* @__PURE__ */ Promise.resolve();
+let update_scheduled = false;
+function schedule_update() {
+  if (!update_scheduled) {
+    update_scheduled = true;
+    resolved_promise.then(flush);
+  }
+}
+function add_render_callback(fn) {
+  render_callbacks.push(fn);
+}
+const seen_callbacks = /* @__PURE__ */ new Set();
+let flushidx = 0;
+function flush() {
+  if (flushidx !== 0) {
+    return;
+  }
+  const saved_component = current_component;
+  do {
+    try {
+      while (flushidx < dirty_components.length) {
+        const component = dirty_components[flushidx];
+        flushidx++;
+        set_current_component(component);
+        update(component.$$);
+      }
+    } catch (e) {
+      dirty_components.length = 0;
+      flushidx = 0;
+      throw e;
+    }
+    set_current_component(null);
+    dirty_components.length = 0;
+    flushidx = 0;
+    while (binding_callbacks.length) binding_callbacks.pop()();
+    for (let i = 0; i < render_callbacks.length; i += 1) {
+      const callback = render_callbacks[i];
+      if (!seen_callbacks.has(callback)) {
+        seen_callbacks.add(callback);
+        callback();
+      }
+    }
+    render_callbacks.length = 0;
+  } while (dirty_components.length);
+  while (flush_callbacks.length) {
+    flush_callbacks.pop()();
+  }
+  update_scheduled = false;
+  seen_callbacks.clear();
+  set_current_component(saved_component);
+}
+function update($$) {
+  if ($$.fragment !== null) {
+    $$.update();
+    run_all($$.before_update);
+    const dirty = $$.dirty;
+    $$.dirty = [-1];
+    $$.fragment && $$.fragment.p($$.ctx, dirty);
+    $$.after_update.forEach(add_render_callback);
+  }
+}
+function flush_render_callbacks(fns) {
+  const filtered = [];
+  const targets = [];
+  render_callbacks.forEach((c) => fns.indexOf(c) === -1 ? filtered.push(c) : targets.push(c));
+  targets.forEach((c) => c());
+  render_callbacks = filtered;
+}
+const outroing = /* @__PURE__ */ new Set();
+let outros;
+function transition_in(block, local) {
+  if (block && block.i) {
+    outroing.delete(block);
+    block.i(local);
+  }
+}
+function transition_out(block, local, detach2, callback) {
+  if (block && block.o) {
+    if (outroing.has(block)) return;
+    outroing.add(block);
+    outros.c.push(() => {
+      outroing.delete(block);
+    });
+    block.o(local);
+  }
+}
+function create_component(block) {
+  block && block.c();
+}
+function mount_component(component, target2, anchor) {
+  const { fragment, after_update } = component.$$;
+  fragment && fragment.m(target2, anchor);
+  add_render_callback(() => {
+    const new_on_destroy = component.$$.on_mount.map(run).filter(is_function);
+    if (component.$$.on_destroy) {
+      component.$$.on_destroy.push(...new_on_destroy);
+    } else {
+      run_all(new_on_destroy);
+    }
+    component.$$.on_mount = [];
+  });
+  after_update.forEach(add_render_callback);
+}
+function destroy_component(component, detaching) {
+  const $$ = component.$$;
+  if ($$.fragment !== null) {
+    flush_render_callbacks($$.after_update);
+    run_all($$.on_destroy);
+    $$.fragment && $$.fragment.d(detaching);
+    $$.on_destroy = $$.fragment = null;
+    $$.ctx = [];
+  }
+}
+function make_dirty(component, i) {
+  if (component.$$.dirty[0] === -1) {
+    dirty_components.push(component);
+    schedule_update();
+    component.$$.dirty.fill(0);
+  }
+  component.$$.dirty[i / 31 | 0] |= 1 << i % 31;
+}
+function init(component, options, instance2, create_fragment2, not_equal, props, append_styles = null, dirty = [-1]) {
+  const parent_component = current_component;
+  set_current_component(component);
+  const $$ = component.$$ = {
+    fragment: null,
+    ctx: [],
+    // state
+    props,
+    update: noop,
+    not_equal,
+    bound: blank_object(),
+    // lifecycle
+    on_mount: [],
+    on_destroy: [],
+    on_disconnect: [],
+    before_update: [],
+    after_update: [],
+    context: new Map(options.context || (parent_component ? parent_component.$$.context : [])),
+    // everything else
+    callbacks: blank_object(),
+    dirty,
+    skip_bound: false,
+    root: options.target || parent_component.$$.root
+  };
+  append_styles && append_styles($$.root);
+  let ready = false;
+  $$.ctx = instance2 ? instance2(component, options.props || {}, (i, ret, ...rest) => {
+    const value = rest.length ? rest[0] : ret;
+    if ($$.ctx && not_equal($$.ctx[i], $$.ctx[i] = value)) {
+      if (!$$.skip_bound && $$.bound[i]) $$.bound[i](value);
+      if (ready) make_dirty(component, i);
+    }
+    return ret;
+  }) : [];
+  $$.update();
+  ready = true;
+  run_all($$.before_update);
+  $$.fragment = create_fragment2 ? create_fragment2($$.ctx) : false;
+  if (options.target) {
+    if (options.hydrate) {
+      const nodes = children(options.target);
+      $$.fragment && $$.fragment.l(nodes);
+      nodes.forEach(detach);
+    } else {
+      $$.fragment && $$.fragment.c();
+    }
+    if (options.intro) transition_in(component.$$.fragment);
+    mount_component(component, options.target, options.anchor);
+    flush();
+  }
+  set_current_component(parent_component);
+}
+class SvelteComponent {
+  constructor() {
+    /**
+     * ### PRIVATE API
+     *
+     * Do not use, may change at any time
+     *
+     * @type {any}
+     */
+    __publicField(this, "$$");
+    /**
+     * ### PRIVATE API
+     *
+     * Do not use, may change at any time
+     *
+     * @type {any}
+     */
+    __publicField(this, "$$set");
+  }
+  /** @returns {void} */
+  $destroy() {
+    destroy_component(this, 1);
+    this.$destroy = noop;
+  }
+  /**
+   * @template {Extract<keyof Events, string>} K
+   * @param {K} type
+   * @param {((e: Events[K]) => void) | null | undefined} callback
+   * @returns {() => void}
+   */
+  $on(type, callback) {
+    if (!is_function(callback)) {
+      return noop;
+    }
+    const callbacks = this.$$.callbacks[type] || (this.$$.callbacks[type] = []);
+    callbacks.push(callback);
+    return () => {
+      const index = callbacks.indexOf(callback);
+      if (index !== -1) callbacks.splice(index, 1);
+    };
+  }
+  /**
+   * @param {Partial<Props>} props
+   * @returns {void}
+   */
+  $set(props) {
+    if (this.$$set && !is_empty(props)) {
+      this.$$.skip_bound = true;
+      this.$$set(props);
+      this.$$.skip_bound = false;
+    }
+  }
+}
+const PUBLIC_VERSION = "4";
+if (typeof window !== "undefined")
+  (window.__svelte || (window.__svelte = { v: /* @__PURE__ */ new Set() })).v.add(PUBLIC_VERSION);
+const APICURIO_STORAGE_KEY = "blockscape:apicurioConfig";
+const DEFAULT_APICURIO_BASE = "http://localhost:8080/apis/registry/v3";
+const DEFAULT_APICURIO_GROUP = "bs";
+const SERIES_GROUP_SUFFIX = "-series";
+const DEFAULT_APICURIO_ENABLED = false;
+const DEFAULT_APICURIO_SEMVER_ENABLED = false;
+function createApicurioIntegration({
+  models,
+  getActiveIndex,
+  setActive,
+  ensureModelMetadata,
+  ensureSeriesId: ensureSeriesId2,
+  getModelId,
+  getSeriesId: getSeriesId2,
+  getModelTitle,
+  computeJsonFingerprint,
+  uid
+}) {
+  let pushApicurioButton = null;
+  let apicurioListButton = null;
+  let apicurioUrlInput = null;
+  let apicurioGroupInput = null;
+  let apicurioTokenInput = null;
+  let apicurioToggleInput = null;
+  let apicurioSemverInput = null;
+  let apicurioStatusNode = null;
+  let pushApicurioSeriesButton = null;
+  let apicurioArtifactsContainer = null;
+  const apicurioEnabledListeners = /* @__PURE__ */ new Set();
+  const apicurioConfig = {
+    baseUrl: DEFAULT_APICURIO_BASE,
+    groupId: DEFAULT_APICURIO_GROUP,
+    authToken: "",
+    enabled: DEFAULT_APICURIO_ENABLED,
+    useSemver: DEFAULT_APICURIO_SEMVER_ENABLED
+  };
+  const apicurioArtifactsById = /* @__PURE__ */ new Map();
+  const apicurioArtifactVersions = /* @__PURE__ */ new Map();
+  function sanitizeApicurioBaseUrl(value) {
+    const trimmed = (value || "").toString().trim();
+    return trimmed.replace(/\/+$/, "");
+  }
+  function deriveSeriesGroupId(groupId) {
+    const base = (groupId || "").toString().trim() || DEFAULT_APICURIO_GROUP;
+    return `${base}${SERIES_GROUP_SUFFIX}`;
+  }
+  function hasApicurioDetails() {
+    return Boolean(apicurioConfig.baseUrl && apicurioConfig.groupId);
+  }
+  function isApicurioEnabled() {
+    return apicurioConfig.enabled !== false;
+  }
+  function notifyApicurioEnabledChange() {
+    apicurioEnabledListeners.forEach((listener) => {
+      try {
+        listener(isApicurioEnabled());
+      } catch (err) {
+        console.warn("[Blockscape] failed to run Apicurio enabled listener", err);
+      }
+    });
+  }
+  function onApicurioEnabledChange(listener) {
+    if (typeof listener === "function") {
+      apicurioEnabledListeners.add(listener);
+    }
+    return () => apicurioEnabledListeners.delete(listener);
+  }
+  function syncApicurioInputsFromConfig() {
+    if (apicurioUrlInput) apicurioUrlInput.value = apicurioConfig.baseUrl || "";
+    if (apicurioGroupInput) apicurioGroupInput.value = apicurioConfig.groupId || "";
+    if (apicurioTokenInput) apicurioTokenInput.value = apicurioConfig.authToken || "";
+    if (apicurioToggleInput) apicurioToggleInput.checked = isApicurioEnabled();
+    if (apicurioSemverInput) apicurioSemverInput.checked = Boolean(apicurioConfig.useSemver);
+  }
+  function setApicurioStatus(message = "", tone = "muted") {
+    if (!apicurioStatusNode) return;
+    apicurioStatusNode.textContent = message || "";
+    apicurioStatusNode.classList.remove("is-error", "is-success");
+    if (tone === "error") {
+      apicurioStatusNode.classList.add("is-error");
+    } else if (tone === "success") {
+      apicurioStatusNode.classList.add("is-success");
+    }
+  }
+  function setApicurioArtifactsMessage(message) {
+    if (!apicurioArtifactsContainer) return;
+    apicurioArtifactsContainer.innerHTML = "";
+    if (!message) return;
+    const p = document.createElement("p");
+    p.className = "apicurio-hint";
+    p.textContent = message;
+    apicurioArtifactsContainer.appendChild(p);
+  }
+  function resetApicurioArtifactsPanel(message) {
+    apicurioArtifactsById.clear();
+    apicurioArtifactVersions.clear();
+    setApicurioArtifactsMessage(message);
+  }
+  function updateApicurioAvailability() {
+    const activeIndex = getActiveIndex();
+    const enabled = isApicurioEnabled();
+    const haveDetails = hasApicurioDetails();
+    const activeModel = activeIndex >= 0 ? models[activeIndex] : null;
+    const hasSeries = !!((activeModel == null ? void 0 : activeModel.apicurioVersions) && activeModel.apicurioVersions.length > 1);
+    if (pushApicurioButton) {
+      const isBusy = pushApicurioButton.dataset.loading === "true";
+      const ready = enabled && haveDetails && activeIndex >= 0 && !!resolveArtifactId(models[activeIndex]);
+      pushApicurioButton.disabled = !enabled || isBusy || !ready;
+      if (!enabled) {
+        pushApicurioButton.textContent = "Enable Apicurio to push";
+      } else if (!isBusy) {
+        pushApicurioButton.textContent = "Push to Apicurio";
+      }
+    }
+    if (pushApicurioSeriesButton) {
+      const isBusy = pushApicurioSeriesButton.dataset.loading === "true";
+      const ready = enabled && haveDetails && hasSeries && !!resolveArtifactId(activeModel);
+      pushApicurioSeriesButton.disabled = !ready || isBusy;
+      pushApicurioSeriesButton.hidden = !hasSeries;
+      if (!enabled) {
+        pushApicurioSeriesButton.textContent = "Enable Apicurio to push series";
+      } else if (!isBusy) {
+        pushApicurioSeriesButton.textContent = "Push series";
+      }
+    }
+    if (apicurioListButton) {
+      const listBusy = apicurioListButton.dataset.loading === "true";
+      const listReady = enabled && haveDetails;
+      apicurioListButton.disabled = !listReady || listBusy;
+      if (!listBusy) {
+        if (!enabled) {
+          apicurioListButton.textContent = "Enable Apicurio to list";
+        } else if (!haveDetails) {
+          apicurioListButton.textContent = "Enter details to list";
+        } else {
+          apicurioListButton.textContent = "List artifacts";
+        }
+      }
+    }
+  }
+  function refreshApicurioUiState() {
+    syncApicurioInputsFromConfig();
+    if (!isApicurioEnabled()) {
+      setApicurioStatus("Apicurio integration is off. Enable it to allow pushes.", "muted");
+      resetApicurioArtifactsPanel("Apicurio integration is disabled.");
+    } else if (!hasApicurioDetails()) {
+      setApicurioStatus("Enter Apicurio connection details to enable push.", "muted");
+      resetApicurioArtifactsPanel("Enter registry details to browse artifacts.");
+    } else {
+      setApicurioStatus("Apicurio push is ready when a model is selected.", "muted");
+      if (!apicurioArtifactsById.size) {
+        setApicurioArtifactsMessage("Click “List artifacts” to browse the current group.");
+      }
+    }
+    updateApicurioAvailability();
+  }
+  function persistApicurioConfig() {
+    if (!(window == null ? void 0 : window.localStorage)) return;
+    try {
+      localStorage.setItem(APICURIO_STORAGE_KEY, JSON.stringify(apicurioConfig));
+    } catch (err) {
+      console.warn("[Blockscape] unable to persist Apicurio settings", err);
+    }
+  }
+  function hydrateApicurioConfig() {
+    let restored = {};
+    if (window == null ? void 0 : window.localStorage) {
+      try {
+        const raw = localStorage.getItem(APICURIO_STORAGE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && typeof parsed === "object") {
+            restored = parsed;
+          }
+        }
+      } catch (err) {
+        console.warn("[Blockscape] failed to restore Apicurio settings", err);
+      }
+    }
+    const restoredBase = sanitizeApicurioBaseUrl(restored.baseUrl ?? DEFAULT_APICURIO_BASE);
+    const restoredGroup = (restored.groupId ?? DEFAULT_APICURIO_GROUP).toString().trim();
+    let restoredEnabled = DEFAULT_APICURIO_ENABLED;
+    let restoredSemver = DEFAULT_APICURIO_SEMVER_ENABLED;
+    if (typeof restored.enabled === "boolean") {
+      restoredEnabled = restored.enabled;
+    } else if (typeof restored.enabled === "string") {
+      restoredEnabled = restored.enabled === "true";
+    }
+    if (typeof restored.useSemver === "boolean") {
+      restoredSemver = restored.useSemver;
+    } else if (typeof restored.useSemver === "string") {
+      restoredSemver = restored.useSemver === "true";
+    }
+    apicurioConfig.baseUrl = restoredBase || DEFAULT_APICURIO_BASE;
+    apicurioConfig.groupId = restoredGroup || DEFAULT_APICURIO_GROUP;
+    apicurioConfig.authToken = (restored.authToken ?? "").toString().trim();
+    apicurioConfig.enabled = restoredEnabled;
+    apicurioConfig.useSemver = restoredSemver;
+    refreshApicurioUiState();
+    notifyApicurioEnabledChange();
+  }
+  function buildApicurioHeaders() {
+    const headers = { Accept: "application/json" };
+    const token = (apicurioConfig.authToken || "").trim();
+    if (token) {
+      headers["Authorization"] = /\s/.test(token) ? token : `Bearer ${token}`;
+    }
+    return headers;
+  }
+  function buildApicurioCreateBody(artifactId, contentText, { title, description, version } = {}) {
+    const payload = {
+      artifactId,
+      artifactType: "JSON",
+      firstVersion: {
+        content: {
+          contentType: "application/json",
+          content: contentText
+        },
+        metadata: {
+          properties: {}
+        }
+      }
+    };
+    if (version) payload.firstVersion.version = version;
+    if (title) payload.name = title;
+    if (description) payload.description = description;
+    try {
+      const parsed = JSON.parse(contentText);
+      const seriesId = parsed == null ? void 0 : parsed.seriesId;
+      if (seriesId && typeof seriesId === "string") {
+        payload.firstVersion.metadata.properties.seriesId = seriesId;
+      }
+    } catch {
+    }
+    return payload;
+  }
+  function buildApicurioUpdateBody(contentText, { version } = {}) {
+    const body = {
+      content: {
+        contentType: "application/json",
+        content: contentText
+      },
+      metadata: {
+        properties: {}
+      }
+    };
+    try {
+      const parsed = JSON.parse(contentText);
+      const seriesId = parsed == null ? void 0 : parsed.seriesId;
+      if (seriesId && typeof seriesId === "string") {
+        body.metadata.properties.seriesId = seriesId;
+      }
+    } catch {
+    }
+    if (version) body.version = version;
+    return body;
+  }
+  function parseApicurioSemver(value) {
+    if (value == null) return null;
+    const text2 = String(value).trim();
+    if (!text2) return null;
+    const fullMatch = /^v?(\d+)\.(\d+)\.(\d+)(?:-.+)?$/.exec(text2);
+    if (fullMatch) {
+      return {
+        major: Number(fullMatch[1]),
+        minor: Number(fullMatch[2]),
+        patch: Number(fullMatch[3])
+      };
+    }
+    const majorOnly = /^v?(\d+)$/.exec(text2);
+    if (majorOnly) {
+      return {
+        major: Number(majorOnly[1]),
+        minor: 0,
+        patch: 0
+      };
+    }
+    return null;
+  }
+  function formatSemverParts(parts) {
+    return `${parts.major}.${parts.minor}.${parts.patch}`;
+  }
+  function compareSemverParts(a, b) {
+    if (!a && !b) return 0;
+    if (!a) return -1;
+    if (!b) return 1;
+    if (a.major !== b.major) return a.major - b.major;
+    if (a.minor !== b.minor) return a.minor - b.minor;
+    return a.patch - b.patch;
+  }
+  function computeNextSemverVersion(versions = []) {
+    let latest = null;
+    versions.forEach((entry) => {
+      const parsed = parseApicurioSemver((entry == null ? void 0 : entry.version) ?? entry);
+      if (!parsed) return;
+      if (!latest || compareSemverParts(parsed, latest) > 0) {
+        latest = parsed;
+      }
+    });
+    if (!latest) return "1.0.0";
+    const bumped = { ...latest, patch: latest.patch + 1 };
+    return formatSemverParts(bumped);
+  }
+  function resolveArtifactId(entry, { seriesName, fallbackTitle } = {}) {
+    var _a;
+    if (!entry) return null;
+    const resolvedName = seriesName || entry.title || entry.apicurioArtifactName || getModelTitle(entry);
+    const resolvedFallback = fallbackTitle || resolvedName;
+    if (typeof ensureSeriesId2 === "function" && (entry.isSeries || ((_a = entry.apicurioVersions) == null ? void 0 : _a.length) > 1)) {
+      ensureSeriesId2(entry, { seriesName: resolvedName, fallbackTitle: resolvedFallback });
+    }
+    if (typeof getSeriesId2 === "function") {
+      const seriesId = getSeriesId2(entry, { seriesName: resolvedName, fallbackTitle: resolvedFallback });
+      if (seriesId) return seriesId;
+    }
+    return getModelId(entry);
+  }
+  function normalizeApicurioArtifactsPayload(payload) {
+    if (Array.isArray(payload)) return payload;
+    if (Array.isArray(payload == null ? void 0 : payload.artifacts)) return payload.artifacts;
+    if (Array.isArray(payload == null ? void 0 : payload.items)) return payload.items;
+    if (Array.isArray(payload == null ? void 0 : payload.results)) return payload.results;
+    return [];
+  }
+  function normalizeApicurioVersionsPayload(payload) {
+    if (Array.isArray(payload)) return payload;
+    if (Array.isArray(payload == null ? void 0 : payload.versions)) return payload.versions;
+    if (Array.isArray(payload == null ? void 0 : payload.items)) return payload.items;
+    return [];
+  }
+  function pickLatestVersionEntry(versions = []) {
+    if (!Array.isArray(versions) || !versions.length) return null;
+    const copy = [...versions].filter(Boolean);
+    copy.sort((a, b) => {
+      const aDate = (a == null ? void 0 : a.createdOn) ? new Date(a.createdOn).getTime() : 0;
+      const bDate = (b == null ? void 0 : b.createdOn) ? new Date(b.createdOn).getTime() : 0;
+      if (aDate !== bDate) return bDate - aDate;
+      const aVersionNum = Number(a == null ? void 0 : a.version);
+      const bVersionNum = Number(b == null ? void 0 : b.version);
+      const aNumValid = Number.isFinite(aVersionNum);
+      const bNumValid = Number.isFinite(bVersionNum);
+      if (aNumValid && bNumValid && aVersionNum !== bVersionNum) {
+        return bVersionNum - aVersionNum;
+      }
+      const aVer = String((a == null ? void 0 : a.version) ?? "");
+      const bVer = String((b == null ? void 0 : b.version) ?? "");
+      return bVer.localeCompare(aVer, void 0, { numeric: true });
+    });
+    return copy[0] || null;
+  }
+  function normalizeArtifactContentPayload(payload) {
+    if (!payload) return payload;
+    let data = payload;
+    const topHasCategories = Array.isArray(payload == null ? void 0 : payload.categories);
+    if (!topHasCategories) {
+      const embedded = payload == null ? void 0 : payload.content;
+      if (typeof embedded === "string") {
+        try {
+          data = JSON.parse(embedded);
+        } catch (err) {
+          console.warn("[Blockscape] artifact payload contained string content that could not be parsed", err);
+        }
+      } else if (embedded && typeof embedded === "object") {
+        data = embedded;
+      }
+    }
+    return data;
+  }
+  async function fetchApicurioArtifactMetadata(baseUrl, groupId, artifactId) {
+    const encodedGroup = encodeURIComponent(groupId);
+    const encodedId = encodeURIComponent(artifactId);
+    const target2 = `${baseUrl}/groups/${encodedGroup}/artifacts/${encodedId}`;
+    const headers = buildApicurioHeaders();
+    headers["Accept"] = "application/json";
+    const resp = await fetch(target2, { method: "GET", headers });
+    if (!resp.ok) {
+      let detail = resp.statusText || "Unknown error";
+      try {
+        const text2 = await resp.text();
+        if (text2) detail = text2.slice(0, 400);
+      } catch {
+      }
+      throw new Error(`Failed to fetch artifact metadata (${resp.status}): ${detail}`);
+    }
+    return resp.json();
+  }
+  async function fetchApicurioArtifactVersions(baseUrl, groupId, artifactId) {
+    const encodedGroup = encodeURIComponent(groupId);
+    const encodedId = encodeURIComponent(artifactId);
+    const target2 = `${baseUrl}/groups/${encodedGroup}/artifacts/${encodedId}/versions?limit=50&order=desc`;
+    const headers = buildApicurioHeaders();
+    headers["Accept"] = "application/json";
+    const resp = await fetch(target2, { method: "GET", headers });
+    if (!resp.ok) {
+      let detail = resp.statusText || "Unknown error";
+      try {
+        const text2 = await resp.text();
+        if (text2) detail = text2.slice(0, 400);
+      } catch {
+      }
+      throw new Error(`Failed to fetch artifact versions (${resp.status}): ${detail}`);
+    }
+    const payload = await resp.json();
+    return normalizeApicurioVersionsPayload(payload).filter((v) => v && v.version != null);
+  }
+  async function fetchApicurioArtifactContent(baseUrl, groupId, artifactId, versionSegment = "latest") {
+    const encodedGroup = encodeURIComponent(groupId);
+    const encodedId = encodeURIComponent(artifactId);
+    const encodedVersion = encodeURIComponent(versionSegment || "latest");
+    const contentEndpoint = `${baseUrl}/groups/${encodedGroup}/artifacts/${encodedId}/versions/${encodedVersion}/content`;
+    const headers = buildApicurioHeaders();
+    headers["Accept"] = "application/json, application/*+json, */*;q=0.8";
+    const resp = await fetch(contentEndpoint, { method: "GET", headers });
+    if (!resp.ok) {
+      let detail = resp.statusText || "Unknown error";
+      try {
+        const text3 = await resp.text();
+        if (text3) detail = text3.slice(0, 400);
+      } catch {
+      }
+      throw new Error(`Failed to load artifact content (${resp.status}): ${detail}`);
+    }
+    const text2 = await resp.text();
+    let data = null;
+    try {
+      data = JSON.parse(text2);
+    } catch {
+      throw new Error("Artifact content is not valid JSON.");
+    }
+    return normalizeArtifactContentPayload(data);
+  }
+  async function fetchApicurioArtifactFingerprint(baseUrl, groupId, artifactId, versionSegment = "latest") {
+    const data = await fetchApicurioArtifactContent(baseUrl, groupId, artifactId, versionSegment);
+    return {
+      data,
+      fingerprint: computeJsonFingerprint(data)
+    };
+  }
+  async function resolveApicurioCompareVersion(baseUrl, groupId, artifactId) {
+    try {
+      const versions = await fetchApicurioArtifactVersions(baseUrl, groupId, artifactId);
+      if (versions == null ? void 0 : versions.length) {
+        apicurioArtifactVersions.set(artifactId, versions);
+        const newestEntry = pickLatestVersionEntry(versions);
+        if ((newestEntry == null ? void 0 : newestEntry.version) != null) return newestEntry.version;
+      }
+    } catch (err) {
+      console.warn("[Blockscape] compare-version: unable to fetch versions list", err);
+    }
+    try {
+      const meta = await fetchApicurioArtifactMetadata(baseUrl, groupId, artifactId);
+      if ((meta == null ? void 0 : meta.version) != null) return meta.version;
+    } catch (err) {
+      console.warn("[Blockscape] compare-version: unable to fetch metadata", err);
+    }
+    const cached = apicurioArtifactVersions.get(artifactId);
+    if (cached && cached.length) {
+      const newestCached = pickLatestVersionEntry(cached);
+      if ((newestCached == null ? void 0 : newestCached.version) != null) return newestCached.version;
+    }
+    return "latest";
+  }
+  async function resolveApicurioSemverTarget(baseUrl, groupId, artifactId, exists) {
+    if (!apicurioConfig.useSemver) return null;
+    if (!exists) return "1.0.0";
+    try {
+      const versions = await fetchApicurioArtifactVersions(baseUrl, groupId, artifactId);
+      return computeNextSemverVersion(versions);
+    } catch (err) {
+      throw new Error(`Unable to compute next semantic version: ${err.message}`);
+    }
+  }
+  function bindApicurioElements(scope = document) {
+    pushApicurioButton = scope.querySelector("#pushApicurio") || document.getElementById("pushApicurio");
+    pushApicurioSeriesButton = scope.querySelector("#pushApicurioSeries") || document.getElementById("pushApicurioSeries");
+    apicurioListButton = scope.querySelector("#listApicurioArtifacts") || document.getElementById("listApicurioArtifacts");
+    apicurioUrlInput = scope.querySelector("#apicurioUrl") || document.getElementById("apicurioUrl");
+    apicurioGroupInput = scope.querySelector("#apicurioGroup") || document.getElementById("apicurioGroup");
+    apicurioTokenInput = scope.querySelector("#apicurioToken") || document.getElementById("apicurioToken");
+    apicurioToggleInput = scope.querySelector("#apicurioToggle") || document.getElementById("apicurioToggle");
+    apicurioSemverInput = scope.querySelector("#apicurioSemver") || document.getElementById("apicurioSemver");
+    apicurioStatusNode = scope.querySelector("#apicurioStatus") || document.getElementById("apicurioStatus");
+    apicurioArtifactsContainer = scope.querySelector("#apicurioArtifacts") || document.getElementById("apicurioArtifacts");
+  }
+  function handleApicurioInputChange() {
+    apicurioConfig.baseUrl = sanitizeApicurioBaseUrl((apicurioUrlInput == null ? void 0 : apicurioUrlInput.value) ?? apicurioConfig.baseUrl);
+    apicurioConfig.groupId = ((apicurioGroupInput == null ? void 0 : apicurioGroupInput.value) ?? "").trim();
+    apicurioConfig.authToken = ((apicurioTokenInput == null ? void 0 : apicurioTokenInput.value) ?? "").trim();
+    persistApicurioConfig();
+    refreshApicurioUiState();
+  }
+  function setApicurioEnabled(nextValue) {
+    apicurioConfig.enabled = nextValue !== false;
+    persistApicurioConfig();
+    refreshApicurioUiState();
+    notifyApicurioEnabledChange();
+  }
+  function handleApicurioToggleChange() {
+    setApicurioEnabled(apicurioToggleInput ? apicurioToggleInput.checked : DEFAULT_APICURIO_ENABLED);
+  }
+  function handleApicurioSemverToggleChange() {
+    apicurioConfig.useSemver = apicurioSemverInput ? apicurioSemverInput.checked : DEFAULT_APICURIO_SEMVER_ENABLED;
+    persistApicurioConfig();
+    refreshApicurioUiState();
+  }
+  function attachApicurioEventHandlers() {
+    [apicurioUrlInput, apicurioGroupInput, apicurioTokenInput].forEach((input) => {
+      if (!input) return;
+      input.addEventListener("input", handleApicurioInputChange);
+    });
+    if (pushApicurioButton) {
+      pushApicurioButton.addEventListener("click", () => {
+        pushActiveModelToApicurio();
+      });
+    }
+    if (pushApicurioSeriesButton) {
+      pushApicurioSeriesButton.addEventListener("click", () => {
+        pushActiveSeriesToApicurio();
+      });
+    }
+    if (apicurioToggleInput) {
+      apicurioToggleInput.addEventListener("change", handleApicurioToggleChange);
+    }
+    if (apicurioSemverInput) {
+      apicurioSemverInput.addEventListener("change", handleApicurioSemverToggleChange);
+    }
+    if (apicurioListButton) {
+      apicurioListButton.addEventListener("click", listApicurioArtifacts);
+    }
+    if (apicurioArtifactsContainer) {
+      apicurioArtifactsContainer.addEventListener("click", (event) => {
+        const versionButton = event.target.closest("[data-artifact-version]");
+        if (versionButton) {
+          event.stopPropagation();
+          const artifactId = versionButton.dataset.artifactId;
+          const version = versionButton.dataset.artifactVersion;
+          if (artifactId && version) {
+            loadApicurioArtifact(artifactId, version);
+          }
+          return;
+        }
+        const loadAllButton = event.target.closest("[data-artifact-load-all]");
+        if (loadAllButton) {
+          event.stopPropagation();
+          const artifactId = loadAllButton.dataset.artifactId;
+          if (artifactId) {
+            loadAllApicurioArtifactVersions();
+          }
+          return;
+        }
+        const artifactTrigger = event.target.closest("[data-artifact-trigger]");
+        if (artifactTrigger) {
+          const artifactId = artifactTrigger.dataset.artifactId;
+          if (!artifactId) return;
+          toggleArtifactVersions(artifactId);
+        }
+      });
+    }
+  }
+  function createApicurioPanelContent() {
+    const wrapper = document.createElement("div");
+    wrapper.className = "blockscape-registry-panel";
+    wrapper.innerHTML = `
+      <div class="blockscape-registry-header">
+        <h2>Apicurio registry</h2>
+        <p>Configure the registry connection and push the active model.</p>
+      </div>
+      <div class="apicurio-controls">
+        <label class="apicurio-toggle">
+          <input id="apicurioToggle" type="checkbox" />
+          <span>Enable Apicurio push</span>
+        </label>
+        <label class="apicurio-toggle">
+          <input id="apicurioSemver" type="checkbox" />
+          <span>Use semantic versioning</span>
+        </label>
+        <p class="apicurio-hint">When disabled, Blockscape never contacts your registry.</p>
+        <p class="apicurio-hint apicurio-subnote">When on, Blockscape reads the latest version and auto-bumps the next semver on each push.</p>
+        <button id="pushApicurio" class="pf-v5-c-button pf-m-secondary" type="button" disabled
+          title="Enter Apicurio connection details to enable pushes">Push to Apicurio</button>
+        <button id="pushApicurioSeries" class="pf-v5-c-button pf-m-secondary" type="button" disabled hidden
+          title="Push all versions in this series as a JSON array">Push series</button>
+        <button id="listApicurioArtifacts" class="pf-v5-c-button pf-m-secondary" type="button" disabled
+          title="List artifacts in the configured group">List artifacts</button>
+        <details id="apicurioSettings" class="apicurio-settings">
+          <summary>Connection settings (optional)</summary>
+          <div class="apicurio-fields">
+            <label>
+              Registry base URL
+              <input id="apicurioUrl" type="url" placeholder="https://registry.example/apis/registry/v3" autocomplete="url" />
+            </label>
+            <label>
+              Group ID
+              <input id="apicurioGroup" type="text" placeholder="default" autocomplete="organization" />
+            </label>
+            <label>
+              Auth token (optional)
+              <input id="apicurioToken" type="password" placeholder="Bearer token" autocomplete="off" />
+            </label>
+          </div>
+          <p class="apicurio-hint">Details stay in this browser only.</p>
+        </details>
+        <div id="apicurioStatus" class="apicurio-status" role="status" aria-live="polite"></div>
+        <div id="apicurioArtifacts" class="apicurio-artifacts" aria-live="polite"></div>
+      </div>
+    `;
+    return wrapper;
+  }
+  function mount(panelNode) {
+    if (!panelNode) return;
+    panelNode.innerHTML = "";
+    const content = createApicurioPanelContent();
+    panelNode.appendChild(content);
+    bindApicurioElements(panelNode);
+    attachApicurioEventHandlers();
+    refreshApicurioUiState();
+  }
+  function renderApicurioArtifactsList(entries) {
+    if (!apicurioArtifactsContainer) return;
+    apicurioArtifactsContainer.innerHTML = "";
+    if (!entries.length) {
+      setApicurioArtifactsMessage("No artifacts found in this group.");
+      return;
+    }
+    const makeSection = (label) => {
+      const section = document.createElement("section");
+      section.className = "apicurio-artifact-section";
+      const heading = document.createElement("h3");
+      heading.textContent = label;
+      section.appendChild(heading);
+      const list = document.createElement("ul");
+      list.className = "apicurio-artifact-list";
+      section.appendChild(list);
+      return { section, list };
+    };
+    const seriesSection = makeSection("Series artifacts");
+    const baseSection = makeSection("Artifacts");
+    entries.forEach((entry) => {
+      if (!(entry == null ? void 0 : entry.artifactId)) return;
+      const isSeriesGroup = entry._groupId && entry._groupId.endsWith(SERIES_GROUP_SUFFIX);
+      const targetList = isSeriesGroup ? seriesSection.list : baseSection.list;
+      const li = document.createElement("li");
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "apicurio-artifact";
+      button.dataset.artifactId = entry.artifactId;
+      button.dataset.artifactTrigger = "toggle";
+      const title = document.createElement("span");
+      title.className = "apicurio-artifact-title";
+      title.textContent = entry.artifactId;
+      button.appendChild(title);
+      const metaParts = [];
+      if (entry.name) metaParts.push(entry.name);
+      if (entry.version != null) metaParts.push(`v${entry.version}`);
+      if (entry.type) metaParts.push(entry.type);
+      if (entry._groupId) metaParts.push(entry._groupId);
+      if (metaParts.length) {
+        const meta = document.createElement("span");
+        meta.className = "apicurio-artifact-meta";
+        meta.textContent = metaParts.join(" • ");
+        button.appendChild(meta);
+      }
+      if (entry.description) {
+        const desc = document.createElement("span");
+        desc.className = "apicurio-artifact-meta";
+        desc.textContent = entry.description;
+        button.appendChild(desc);
+      }
+      li.appendChild(button);
+      const versionPanel = document.createElement("div");
+      versionPanel.className = "apicurio-version-list";
+      versionPanel.dataset.versionPanel = entry.artifactId;
+      versionPanel.hidden = true;
+      const hint = document.createElement("p");
+      hint.className = "apicurio-hint";
+      hint.textContent = "Click to load the latest or open versions.";
+      versionPanel.appendChild(hint);
+      li.appendChild(versionPanel);
+      targetList.appendChild(li);
+    });
+    if (seriesSection.list.children.length) apicurioArtifactsContainer.appendChild(seriesSection.section);
+    if (baseSection.list.children.length) apicurioArtifactsContainer.appendChild(baseSection.section);
+  }
+  function getApicurioVersionPanel(artifactId) {
+    if (!apicurioArtifactsContainer) return null;
+    return apicurioArtifactsContainer.querySelector(`[data-version-panel="${artifactId}"]`);
+  }
+  function setVersionPanelMessage(panel, message) {
+    if (!panel) return;
+    panel.innerHTML = "";
+    if (!message) return;
+    const p = document.createElement("p");
+    p.className = "apicurio-hint";
+    p.textContent = message;
+    panel.appendChild(p);
+  }
+  function renderApicurioVersionButtons(artifactId, versions) {
+    const panel = getApicurioVersionPanel(artifactId);
+    if (!panel) return;
+    panel.innerHTML = "";
+    if (!versions.length) {
+      setVersionPanelMessage(panel, "No versions found for this artifact.");
+      return;
+    }
+    versions.forEach((ver) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "apicurio-version-button";
+      btn.dataset.artifactId = artifactId;
+      btn.dataset.artifactVersion = ver.version;
+      const labelParts = [`Version ${ver.version}`];
+      if (ver.createdOn) {
+        const dt = new Date(ver.createdOn);
+        if (!isNaN(dt)) {
+          labelParts.push(dt.toISOString().slice(0, 10));
+        }
+      }
+      btn.textContent = labelParts.join(" — ");
+      panel.appendChild(btn);
+    });
+  }
+  async function toggleArtifactVersions(artifactId) {
+    const panel = getApicurioVersionPanel(artifactId);
+    if (!panel) return;
+    const isOpen = panel.dataset.open === "true";
+    if (isOpen) {
+      panel.hidden = true;
+      panel.dataset.open = "false";
+      return;
+    }
+    panel.hidden = false;
+    panel.dataset.open = "true";
+    if (panel.dataset.loaded === "true") return;
+    if (!hasApicurioDetails()) {
+      setVersionPanelMessage(panel, "Enter registry details first.");
+      return;
+    }
+    setVersionPanelMessage(panel, "Loading versions…");
+    try {
+      const baseUrl = sanitizeApicurioBaseUrl(apicurioConfig.baseUrl);
+      const metaEntry = apicurioArtifactsById.get(artifactId);
+      const baseGroupId = apicurioConfig.groupId.trim();
+      const groupId = (metaEntry == null ? void 0 : metaEntry._groupId) || baseGroupId;
+      const versions = await fetchApicurioArtifactVersions(baseUrl, groupId, artifactId);
+      apicurioArtifactVersions.set(artifactId, versions);
+      panel.dataset.loaded = "true";
+      renderApicurioVersionButtons(artifactId, versions);
+    } catch (err) {
+      console.error("[Blockscape] failed to load versions", err);
+      setVersionPanelMessage(panel, `Unable to fetch versions: ${err.message}`);
+    }
+  }
+  function upsertModelEntryForArtifact(artifactId, entry) {
+    var _a;
+    const existingIndex = models.findIndex((m) => m.apicurioArtifactId === artifactId);
+    if (existingIndex !== -1) {
+      const preservedId = models[existingIndex].id;
+      models[existingIndex] = { ...entry, id: preservedId || entry.id };
+      if (((_a = models[existingIndex].apicurioVersions) == null ? void 0 : _a.length) > 1) {
+        models[existingIndex].isSeries = true;
+      }
+      setActive(existingIndex);
+    } else {
+      models.push(entry);
+      setActive(models.length - 1);
+    }
+  }
+  async function apicurioArtifactExists(baseUrl, groupId, artifactId, headers) {
+    const encodedGroup = encodeURIComponent(groupId);
+    const encodedId = encodeURIComponent(artifactId);
+    const target2 = `${baseUrl}/groups/${encodedGroup}/artifacts/${encodedId}`;
+    try {
+      const resp = await fetch(target2, { method: "GET", headers });
+      if (resp.status === 404) return false;
+      if (resp.ok) return true;
+      if (resp.status === 401 || resp.status === 403) {
+        throw new Error("Authentication failed while checking the registry.");
+      }
+      throw new Error(`Registry responded with status ${resp.status} while checking the artifact.`);
+    } catch (err) {
+      if (err instanceof TypeError) {
+        throw new Error("Network error while contacting Apicurio registry.");
+      }
+      throw err;
+    }
+  }
+  async function pushActiveModelToApicurio() {
+    var _a;
+    if (!pushApicurioButton || pushApicurioButton.dataset.loading === "true") return;
+    if (!isApicurioEnabled()) {
+      setApicurioStatus("Apicurio integration is off. Enable it first.", "error");
+      return;
+    }
+    if (!hasApicurioDetails()) {
+      setApicurioStatus("Enter the registry base URL and group ID before pushing.", "error");
+      return;
+    }
+    const activeIndex = getActiveIndex();
+    if (activeIndex < 0 || !models[activeIndex]) {
+      setApicurioStatus("No active model to push.", "error");
+      return;
+    }
+    const artifactId = resolveArtifactId(models[activeIndex], { fallbackTitle: getModelTitle(models[activeIndex]) });
+    if (!artifactId) {
+      setApicurioStatus("Active model needs an id before pushing.", "error");
+      return;
+    }
+    const baseUrl = sanitizeApicurioBaseUrl(apicurioConfig.baseUrl);
+    const groupId = apicurioConfig.groupId.trim();
+    const payload = JSON.stringify(models[activeIndex].data, null, 2);
+    const headers = buildApicurioHeaders();
+    pushApicurioButton.dataset.loading = "true";
+    pushApicurioButton.textContent = "Pushing…";
+    pushApicurioButton.disabled = true;
+    setApicurioStatus("Pushing to Apicurio…", "muted");
+    try {
+      const exists = await apicurioArtifactExists(baseUrl, groupId, artifactId, headers);
+      const localFingerprint = computeJsonFingerprint(models[activeIndex].data);
+      if (exists) {
+        try {
+          const compareVersion = await resolveApicurioCompareVersion(baseUrl, groupId, artifactId);
+          const { data: registryData, fingerprint: registryFingerprint } = await fetchApicurioArtifactFingerprint(baseUrl, groupId, artifactId, compareVersion);
+          console.group("[Blockscape] Apicurio push compare");
+          console.log("compare version", compareVersion);
+          console.log("local fingerprint", localFingerprint);
+          console.log("registry fingerprint", registryFingerprint);
+          console.log("local payload", models[activeIndex].data);
+          console.log("registry payload", registryData);
+          console.groupEnd();
+          if (localFingerprint && registryFingerprint && localFingerprint === registryFingerprint) {
+            const proceed = window.confirm("The current registry version is identical to this model. Push anyway?");
+            if (!proceed) {
+              setApicurioStatus("Push cancelled (content matches the latest registry version).", "muted");
+              return;
+            }
+            setApicurioStatus("Pushing identical content by user choice.", "muted");
+          } else if (!registryFingerprint) {
+            setApicurioStatus("Unable to compare with registry content (skipping confirmation).", "muted");
+          } else {
+            console.log("[Blockscape] Apicurio compare mismatch (proceeding with push)");
+          }
+        } catch (compareError) {
+          console.warn("[Blockscape] unable to compare registry content before push", compareError);
+          setApicurioStatus("Skipped comparison with registry (content fetch failed). Proceeding with push.", "muted");
+        }
+      }
+      const targetVersion = apicurioConfig.useSemver ? await resolveApicurioSemverTarget(baseUrl, groupId, artifactId, exists) : null;
+      if (apicurioConfig.useSemver && !targetVersion) {
+        throw new Error("Semantic versioning is enabled but no version could be computed.");
+      }
+      const encodedGroup = encodeURIComponent(groupId);
+      const encodedId = encodeURIComponent(artifactId);
+      const endpoint = exists ? `${baseUrl}/groups/${encodedGroup}/artifacts/${encodedId}/versions` : `${baseUrl}/groups/${encodedGroup}/artifacts`;
+      const requestHeaders = {
+        ...headers,
+        "Content-Type": "application/json"
+      };
+      if (targetVersion) {
+        requestHeaders["X-Registry-Version"] = targetVersion;
+        setApicurioStatus(`Pushing to Apicurio as version ${targetVersion}…`, "muted");
+      }
+      const bodyObject = exists ? buildApicurioUpdateBody(payload, { version: targetVersion }) : buildApicurioCreateBody(artifactId, payload, {
+        title: getModelTitle(models[activeIndex]),
+        description: (_a = models[activeIndex].data) == null ? void 0 : _a.abstract,
+        version: targetVersion
+      });
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: requestHeaders,
+        body: JSON.stringify(bodyObject)
+      });
+      if (!response.ok) {
+        let detail = response.statusText || "Unknown error";
+        try {
+          const text2 = await response.text();
+          if (text2) detail = text2.slice(0, 400);
+        } catch {
+        }
+        throw new Error(`Registry rejected the push (${response.status}): ${detail}`);
+      }
+      let info = null;
+      try {
+        info = await response.json();
+      } catch {
+        info = null;
+      }
+      const label = (info == null ? void 0 : info.version) || (info == null ? void 0 : info.globalId) || "";
+      const prefix = exists ? "Updated" : "Created";
+      const suffix = label ? ` (version ${label})` : "";
+      setApicurioStatus(`${prefix} ${artifactId}${suffix}`, "success");
+    } catch (error) {
+      console.error("[Blockscape] Apicurio push failed", error);
+      setApicurioStatus(`Apicurio push failed: ${error.message}`, "error");
+    } finally {
+      pushApicurioButton.dataset.loading = "false";
+      updateApicurioAvailability();
+    }
+  }
+  async function pushActiveSeriesToApicurio() {
+    var _a, _b;
+    if (!pushApicurioSeriesButton || pushApicurioSeriesButton.dataset.loading === "true") return;
+    if (!isApicurioEnabled()) {
+      setApicurioStatus("Apicurio integration is off. Enable it first.", "error");
+      return;
+    }
+    if (!hasApicurioDetails()) {
+      setApicurioStatus("Enter the registry base URL and group ID before pushing.", "error");
+      return;
+    }
+    const activeIndex = getActiveIndex();
+    const activeEntry = activeIndex >= 0 ? models[activeIndex] : null;
+    if (!activeEntry || !activeEntry.apicurioVersions || activeEntry.apicurioVersions.length < 2) {
+      setApicurioStatus("Series push requires a model with multiple versions.", "error");
+      return;
+    }
+    const artifactId = resolveArtifactId(activeEntry, { seriesName: activeEntry.title || activeEntry.apicurioArtifactName || getModelTitle(activeEntry) });
+    if (!artifactId) {
+      setApicurioStatus("Active series needs an id before pushing.", "error");
+      return;
+    }
+    if (typeof ensureSeriesId2 === "function") {
+      ensureSeriesId2(activeEntry, { seriesName: activeEntry.title || activeEntry.apicurioArtifactName || getModelTitle(activeEntry) });
+    }
+    const baseUrl = sanitizeApicurioBaseUrl(apicurioConfig.baseUrl);
+    const baseGroupId = apicurioConfig.groupId.trim();
+    const payloadArray = activeEntry.apicurioVersions.map((v) => v.data);
+    const payload = JSON.stringify(payloadArray, null, 2);
+    const headers = buildApicurioHeaders();
+    const seriesGroupId = deriveSeriesGroupId(baseGroupId);
+    pushApicurioSeriesButton.dataset.loading = "true";
+    pushApicurioSeriesButton.textContent = "Pushing…";
+    pushApicurioSeriesButton.disabled = true;
+    setApicurioStatus("Pushing series to Apicurio…", "muted");
+    try {
+      const exists = await apicurioArtifactExists(baseUrl, seriesGroupId, artifactId, headers);
+      const localFingerprint = computeJsonFingerprint(payloadArray);
+      if (exists) {
+        try {
+          const compareVersion = await resolveApicurioCompareVersion(baseUrl, seriesGroupId, artifactId);
+          const { data: registryData, fingerprint: registryFingerprint } = await fetchApicurioArtifactFingerprint(baseUrl, seriesGroupId, artifactId, compareVersion);
+          console.group("[Blockscape] Apicurio series push compare");
+          console.log("compare version", compareVersion);
+          console.log("local fingerprint", localFingerprint);
+          console.log("registry fingerprint", registryFingerprint);
+          console.log("local payload (series)", payloadArray);
+          console.log("registry payload", registryData);
+          console.groupEnd();
+          if (localFingerprint && registryFingerprint && localFingerprint === registryFingerprint) {
+            const proceed = window.confirm("The current registry version matches this series. Push anyway?");
+            if (!proceed) {
+              setApicurioStatus("Series push cancelled (content matches latest).", "muted");
+              return;
+            }
+            setApicurioStatus("Pushing identical series by user choice.", "muted");
+          } else if (!registryFingerprint) {
+            setApicurioStatus("Unable to compare with registry content (skipping confirmation).", "muted");
+          } else {
+            console.log("[Blockscape] Apicurio compare mismatch (proceeding with series push)");
+          }
+        } catch (compareError) {
+          console.warn("[Blockscape] unable to compare registry content before series push", compareError);
+          setApicurioStatus("Skipped comparison with registry (content fetch failed). Proceeding with series push.", "muted");
+        }
+      }
+      const targetVersion = apicurioConfig.useSemver ? await resolveApicurioSemverTarget(baseUrl, seriesGroupId, artifactId, exists) : null;
+      if (apicurioConfig.useSemver && !targetVersion) {
+        throw new Error("Semantic versioning is enabled but no version could be computed.");
+      }
+      const encodedGroup = encodeURIComponent(seriesGroupId);
+      const encodedId = encodeURIComponent(artifactId);
+      const endpoint = exists ? `${baseUrl}/groups/${encodedGroup}/artifacts/${encodedId}/versions` : `${baseUrl}/groups/${encodedGroup}/artifacts`;
+      const requestHeaders = {
+        ...headers,
+        "Content-Type": "application/json"
+      };
+      if (targetVersion) {
+        requestHeaders["X-Registry-Version"] = targetVersion;
+        setApicurioStatus(`Pushing series to Apicurio as version ${targetVersion}…`, "muted");
+      }
+      const bodyObject = exists ? buildApicurioUpdateBody(payload, { version: targetVersion }) : buildApicurioCreateBody(artifactId, payload, {
+        title: activeEntry.apicurioArtifactName || ((_a = activeEntry.data) == null ? void 0 : _a.title) || artifactId,
+        description: (_b = activeEntry.data) == null ? void 0 : _b.abstract,
+        version: targetVersion
+      });
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: requestHeaders,
+        body: JSON.stringify(bodyObject)
+      });
+      if (!response.ok) {
+        let detail = response.statusText || "Unknown error";
+        try {
+          const text2 = await response.text();
+          if (text2) detail = text2.slice(0, 400);
+        } catch {
+        }
+        throw new Error(`Registry rejected the series push (${response.status}): ${detail}`);
+      }
+      let info = null;
+      try {
+        info = await response.json();
+      } catch {
+        info = null;
+      }
+      const label = (info == null ? void 0 : info.version) || (info == null ? void 0 : info.globalId) || "";
+      const prefix = exists ? "Updated" : "Created";
+      const suffix = label ? ` (version ${label})` : "";
+      setApicurioStatus(`${prefix} ${artifactId} series${suffix}`, "success");
+    } catch (error) {
+      console.error("[Blockscape] Apicurio series push failed", error);
+      setApicurioStatus(`Apicurio series push failed: ${error.message}`, "error");
+    } finally {
+      pushApicurioSeriesButton.dataset.loading = "false";
+      updateApicurioAvailability();
+    }
+  }
+  async function listApicurioArtifacts() {
+    if (!apicurioListButton || apicurioListButton.dataset.loading === "true") return;
+    if (!isApicurioEnabled()) {
+      setApicurioStatus("Enable Apicurio integration to list artifacts.", "error");
+      return;
+    }
+    if (!hasApicurioDetails()) {
+      setApicurioStatus("Enter registry base URL and group ID before listing.", "error");
+      return;
+    }
+    const baseUrl = sanitizeApicurioBaseUrl(apicurioConfig.baseUrl);
+    const baseGroupId = apicurioConfig.groupId.trim();
+    const seriesGroupId = deriveSeriesGroupId(baseGroupId);
+    const targets = [
+      { groupId: baseGroupId, label: "base" },
+      { groupId: seriesGroupId, label: "series" }
+    ];
+    apicurioListButton.dataset.loading = "true";
+    apicurioListButton.textContent = "Listing…";
+    apicurioListButton.disabled = true;
+    setApicurioStatus("Listing artifacts…", "muted");
+    setApicurioArtifactsMessage("Contacting registry…");
+    try {
+      const headers = buildApicurioHeaders();
+      headers["Accept"] = "application/json";
+      const allEntries = [];
+      for (const target2 of targets) {
+        const encodedGroup = encodeURIComponent(target2.groupId);
+        const endpoint = `${baseUrl}/groups/${encodedGroup}/artifacts?limit=50&offset=0`;
+        const resp = await fetch(endpoint, { method: "GET", headers });
+        if (!resp.ok) {
+          let detail = resp.statusText || "Unknown error";
+          try {
+            const text2 = await resp.text();
+            if (text2) detail = text2.slice(0, 400);
+          } catch {
+          }
+          console.warn(`[Blockscape] failed to list artifacts for group ${target2.groupId} (${resp.status}): ${detail}`);
+          continue;
+        }
+        const payload = await resp.json();
+        const entries = normalizeApicurioArtifactsPayload(payload).filter((item) => item && item.artifactId);
+        entries.forEach((item) => {
+          if (item) item._groupId = target2.groupId;
+        });
+        allEntries.push(...entries);
+      }
+      apicurioArtifactsById.clear();
+      apicurioArtifactVersions.clear();
+      allEntries.forEach((item) => {
+        if (item == null ? void 0 : item.artifactId) {
+          apicurioArtifactsById.set(item.artifactId, item);
+        }
+      });
+      renderApicurioArtifactsList(allEntries);
+      const count = allEntries.length;
+      setApicurioStatus(count ? `Found ${count} artifact${count === 1 ? "" : "s"} across base and series groups.` : "No artifacts found in base/series groups.", count ? "success" : "muted");
+    } catch (err) {
+      console.error("[Blockscape] failed to list artifacts", err);
+      resetApicurioArtifactsPanel("Unable to list artifacts.");
+      setApicurioStatus(`Listing failed: ${err.message}`, "error");
+    } finally {
+      apicurioListButton.dataset.loading = "false";
+      updateApicurioAvailability();
+    }
+  }
+  async function loadApicurioArtifact(artifactId, explicitVersion = null) {
+    var _a, _b, _c, _d, _e, _f;
+    if (!artifactId) return;
+    if (!isApicurioEnabled()) {
+      setApicurioStatus("Enable Apicurio integration to load artifacts.", "error");
+      return;
+    }
+    if (!hasApicurioDetails()) {
+      setApicurioStatus("Enter registry connection details before loading artifacts.", "error");
+      return;
+    }
+    const baseUrl = sanitizeApicurioBaseUrl(apicurioConfig.baseUrl);
+    const baseGroupId = apicurioConfig.groupId.trim();
+    const groupId = artifactId && ((_a = apicurioArtifactsById.get(artifactId)) == null ? void 0 : _a._groupId) || baseGroupId;
+    let meta = apicurioArtifactsById.get(artifactId);
+    const ensureMetadata = async () => {
+      try {
+        const fresh = await fetchApicurioArtifactMetadata(baseUrl, groupId, artifactId);
+        if (fresh == null ? void 0 : fresh.artifactId) {
+          apicurioArtifactsById.set(artifactId, fresh);
+        }
+        return fresh;
+      } catch (err) {
+        console.error("[Blockscape] failed to fetch artifact metadata before loading", err);
+        throw err;
+      }
+    };
+    if (!meta) {
+      try {
+        meta = await ensureMetadata();
+      } catch (err) {
+        setApicurioStatus(`Failed to fetch artifact metadata: ${err.message}`, "error");
+        return;
+      }
+    }
+    const knownVersions = apicurioArtifactVersions.get(artifactId) || [];
+    let versionSegment = "latest";
+    let versionLabel = "latest";
+    if (explicitVersion) {
+      versionSegment = explicitVersion;
+      versionLabel = explicitVersion;
+    } else {
+      if (!meta || meta.version == null) {
+        try {
+          meta = await ensureMetadata();
+        } catch (err) {
+          setApicurioStatus(`Failed to fetch artifact metadata: ${err.message}`, "error");
+          return;
+        }
+      }
+      versionSegment = (meta == null ? void 0 : meta.version) || "latest";
+      versionLabel = (meta == null ? void 0 : meta.version) || "latest";
+    }
+    const matchedVersion = knownVersions.find((v) => String(v.version) === String(versionSegment));
+    if ((matchedVersion == null ? void 0 : matchedVersion.version) != null) {
+      versionLabel = matchedVersion.version;
+    }
+    setApicurioStatus(`Loading artifact ${artifactId}…`, "muted");
+    try {
+      const data = await fetchApicurioArtifactContent(baseUrl, groupId, artifactId, versionSegment);
+      const resolvedMeta = apicurioArtifactsById.get(artifactId) || meta || {};
+      const isSeriesPayload = Array.isArray(data);
+      let entry = null;
+      if (isSeriesPayload) {
+        const seriesVersions = data.map((item, idx) => {
+          ensureModelMetadata(item, { titleHint: resolvedMeta.name || artifactId, idHint: artifactId });
+          return {
+            version: String(idx + 1),
+            data: item,
+            createdOn: (matchedVersion == null ? void 0 : matchedVersion.createdOn) || resolvedMeta.createdOn
+          };
+        });
+        entry = {
+          id: uid(),
+          title: ((_c = (_b = seriesVersions[0]) == null ? void 0 : _b.data) == null ? void 0 : _c.title) || resolvedMeta.name || artifactId,
+          data: (_d = seriesVersions[0]) == null ? void 0 : _d.data,
+          apicurioArtifactId: artifactId,
+          apicurioArtifactName: resolvedMeta.name || "",
+          apicurioVersions: seriesVersions,
+          apicurioActiveVersionIndex: 0,
+          isSeries: true
+        };
+        const seriesId = ((_e = resolvedMeta == null ? void 0 : resolvedMeta.properties) == null ? void 0 : _e.seriesId) || artifactId;
+        if (typeof ensureSeriesId2 === "function") {
+          ensureSeriesId2(entry, { seriesName: seriesId, fallbackTitle: seriesId });
+        }
+        setApicurioStatus(`Loaded series artifact ${artifactId}.`, "success");
+      } else {
+        ensureModelMetadata(data, { titleHint: resolvedMeta.name || artifactId, idHint: artifactId });
+        const versionEntry = {
+          version: versionLabel,
+          data,
+          createdOn: (matchedVersion == null ? void 0 : matchedVersion.createdOn) || resolvedMeta.createdOn
+        };
+        entry = {
+          id: uid(),
+          title: data.title || resolvedMeta.name || artifactId,
+          data,
+          apicurioArtifactId: artifactId,
+          apicurioArtifactName: resolvedMeta.name || "",
+          apicurioVersions: [versionEntry],
+          apicurioActiveVersionIndex: 0
+        };
+        const seriesId = (_f = resolvedMeta == null ? void 0 : resolvedMeta.properties) == null ? void 0 : _f.seriesId;
+        if (seriesId && typeof ensureSeriesId2 === "function") {
+          ensureSeriesId2(entry, { seriesName: seriesId, fallbackTitle: seriesId });
+        }
+        const suffix = versionLabel ? ` (version ${versionLabel})` : "";
+        setApicurioStatus(`Loaded artifact ${artifactId}${suffix}.`, "success");
+      }
+      upsertModelEntryForArtifact(artifactId, entry);
+    } catch (err) {
+      console.error("[Blockscape] failed to load artifact", err);
+      setApicurioStatus(`Failed to load artifact: ${err.message}`, "error");
+    }
+  }
+  async function loadAllApicurioArtifactVersions(artifactId) {
+  }
+  return {
+    hydrateConfig: hydrateApicurioConfig,
+    mount,
+    updateAvailability: updateApicurioAvailability,
+    isEnabled: isApicurioEnabled,
+    setEnabled: setApicurioEnabled,
+    onEnabledChange: onApicurioEnabledChange
+  };
+}
+function assertFn(fn, name) {
+  if (typeof fn !== "function") {
+    throw new Error(`[itemEditor] expected ${name} to be a function`);
+  }
+}
+function normalizeDepsInput(value, { excludeId } = {}) {
+  if (!value) return [];
+  const parts = value.split(/[\s,]+/).map((v) => v.trim()).filter(Boolean);
+  const unique = [];
+  parts.forEach((dep) => {
+    if (excludeId && dep === excludeId) return;
+    if (!unique.includes(dep)) unique.push(dep);
+  });
+  return unique;
+}
+function updateItemReferences(modelData, oldId, newId) {
+  if (!oldId || !newId || oldId === newId) return;
+  const categories = (modelData == null ? void 0 : modelData.categories) || [];
+  categories.forEach((cat) => {
+    (cat.items || []).forEach((it) => {
+      if (Array.isArray(it.deps)) {
+        it.deps = it.deps.map((dep) => dep === oldId ? newId : dep);
+      }
+    });
+  });
+  if (Array.isArray(modelData == null ? void 0 : modelData.links)) {
+    modelData.links.forEach((link) => {
+      if (link.from === oldId) link.from = newId;
+      if (link.to === oldId) link.to = newId;
+    });
+  }
+}
+function createItemEditor({
+  findItemAndCategoryById,
   collectAllItemIds,
-  createItemEditor,
-  updateItemReferences,
-} from "./itemEditor";
-import { ensureSeriesId, getSeriesId, makeSeriesId } from "./series";
-
-const ASSET_BASE =
-  (typeof import.meta !== "undefined" && import.meta.env?.BASE_URL) || "";
-
-export function initBlockscape() {
+  updateItemReferences: updateItemReferences2,
+  loadActiveIntoEditor,
+  rebuildFromActive,
+  select,
+  onSelectionRenamed
+} = {}) {
+  assertFn(findItemAndCategoryById, "findItemAndCategoryById");
+  assertFn(collectAllItemIds, "collectAllItemIds");
+  assertFn(updateItemReferences2, "updateItemReferences");
+  assertFn(loadActiveIntoEditor, "loadActiveIntoEditor");
+  assertFn(rebuildFromActive, "rebuildFromActive");
+  assertFn(select, "select");
+  const state = {
+    wrapper: null,
+    fields: {},
+    categoryId: null,
+    itemId: null,
+    modelData: null
+  };
+  function setError(message) {
+    if (!state.fields.errorEl) return;
+    if (!message) {
+      state.fields.errorEl.hidden = true;
+      state.fields.errorEl.textContent = "";
+      return;
+    }
+    state.fields.errorEl.hidden = false;
+    state.fields.errorEl.textContent = message;
+  }
+  function hide() {
+    if (!state.wrapper) return;
+    state.wrapper.hidden = true;
+    state.wrapper.setAttribute("aria-hidden", "true");
+    setError("");
+    state.categoryId = null;
+    state.itemId = null;
+    state.modelData = null;
+    document.body.classList.remove("item-editor-open");
+  }
+  function show() {
+    if (!state.wrapper) return;
+    state.wrapper.hidden = false;
+    state.wrapper.setAttribute("aria-hidden", "false");
+    document.body.classList.add("item-editor-open");
+    requestAnimationFrame(() => {
+      var _a, _b;
+      (_a = state.fields.nameInput) == null ? void 0 : _a.focus();
+      (_b = state.fields.nameInput) == null ? void 0 : _b.select();
+    });
+  }
+  function applyItemEdits(payload) {
+    var _a;
+    if (!state.modelData || !state.categoryId || !state.itemId) {
+      throw new Error("No item loaded.");
+    }
+    const categories = ((_a = state.modelData) == null ? void 0 : _a.categories) || [];
+    const category = categories.find((cat) => cat.id === state.categoryId);
+    if (!category) throw new Error("Category not found.");
+    category.items = category.items || [];
+    const item = category.items.find((it) => it.id === state.itemId);
+    if (!item) throw new Error("Item not found.");
+    const normalizedId = (payload.id || "").trim();
+    if (!normalizedId) throw new Error("ID is required.");
+    const allIds = collectAllItemIds(state.modelData);
+    if (normalizedId !== item.id && allIds.has(normalizedId)) {
+      throw new Error("Another item already uses that ID.");
+    }
+    item.id = normalizedId;
+    const trimmedName = (payload.name || "").trim();
+    item.name = trimmedName || item.id;
+    const logo = (payload.logo || "").trim();
+    if (logo) item.logo = logo;
+    else delete item.logo;
+    if (payload.externalFlag && !payload.external) {
+      item.external = true;
+    } else {
+      const external = (payload.external ?? "").toString().trim();
+      if (external) item.external = external;
+      else delete item.external;
+    }
+    const color = (payload.color || "").trim();
+    if (color) item.color = color;
+    else delete item.color;
+    item.deps = Array.isArray(payload.deps) ? payload.deps : [];
+    if (item.id !== payload.originalId && typeof onSelectionRenamed === "function") {
+      onSelectionRenamed(payload.originalId, item.id);
+    }
+    updateItemReferences2(state.modelData, payload.originalId, item.id);
+    loadActiveIntoEditor();
+    rebuildFromActive();
+    select(item.id);
+    return item.id;
+  }
+  function saveItemEdits() {
+    if (!state.fields || !state.fields.idInput) return false;
+    const idVal = (state.fields.idInput.value || "").trim();
+    const payload = {
+      originalId: state.itemId,
+      id: idVal,
+      name: state.fields.nameInput.value || "",
+      logo: state.fields.logoInput.value || "",
+      external: state.fields.externalInput.value || "",
+      externalFlag: state.fields.externalFlagInput.checked,
+      color: state.fields.colorInput.value || "",
+      deps: normalizeDepsInput(state.fields.depsInput.value, { excludeId: idVal })
+    };
+    try {
+      applyItemEdits(payload);
+      hide();
+      return true;
+    } catch (error) {
+      console.warn("[itemEditor] item edit failed", error);
+      setError((error == null ? void 0 : error.message) || "Unable to save item.");
+      return false;
+    }
+  }
+  function ensureItemEditorModal() {
+    if (state.wrapper) return state.wrapper;
+    const wrapper = document.createElement("div");
+    wrapper.className = "item-editor-modal";
+    wrapper.hidden = true;
+    wrapper.setAttribute("role", "dialog");
+    wrapper.setAttribute("aria-modal", "true");
+    const backdrop = document.createElement("div");
+    backdrop.className = "item-editor-modal__backdrop";
+    wrapper.appendChild(backdrop);
+    const dialog = document.createElement("div");
+    dialog.className = "item-editor";
+    wrapper.appendChild(dialog);
+    const header = document.createElement("div");
+    header.className = "item-editor__header";
+    const title = document.createElement("h2");
+    title.className = "item-editor__title";
+    title.textContent = "Edit item";
+    const closeBtn = document.createElement("button");
+    closeBtn.type = "button";
+    closeBtn.className = "item-editor__close";
+    closeBtn.setAttribute("aria-label", "Close item editor");
+    closeBtn.textContent = "×";
+    header.appendChild(title);
+    header.appendChild(closeBtn);
+    dialog.appendChild(header);
+    const form = document.createElement("form");
+    form.className = "item-editor__form";
+    dialog.appendChild(form);
+    const meta = document.createElement("div");
+    meta.className = "item-editor__meta";
+    meta.innerHTML = '<div class="item-editor__meta-label">Category</div><div class="item-editor__meta-value"></div>';
+    form.appendChild(meta);
+    const errorEl = document.createElement("div");
+    errorEl.className = "item-editor__error";
+    errorEl.hidden = true;
+    form.appendChild(errorEl);
+    const makeField = (labelText, inputEl, hintText) => {
+      const field = document.createElement("label");
+      field.className = "item-editor__field";
+      const label = document.createElement("span");
+      label.className = "item-editor__label";
+      label.textContent = labelText;
+      field.appendChild(label);
+      inputEl.classList.add("item-editor__control");
+      field.appendChild(inputEl);
+      if (hintText) {
+        const hint = document.createElement("div");
+        hint.className = "item-editor__hint";
+        hint.textContent = hintText;
+        field.appendChild(hint);
+      }
+      return field;
+    };
+    const idInput = document.createElement("input");
+    idInput.type = "text";
+    idInput.required = true;
+    form.appendChild(makeField("ID", idInput, "Unique identifier used for links and dependencies."));
+    const nameInput = document.createElement("input");
+    nameInput.type = "text";
+    form.appendChild(makeField("Name", nameInput, "Visible label shown on the tile."));
+    const logoInput = document.createElement("input");
+    logoInput.type = "url";
+    logoInput.inputMode = "url";
+    logoInput.placeholder = "https://…";
+    form.appendChild(makeField("Logo URL", logoInput, "Optional image URL."));
+    const externalInput = document.createElement("input");
+    externalInput.type = "url";
+    externalInput.inputMode = "url";
+    externalInput.placeholder = "https://…";
+    form.appendChild(makeField("External link", externalInput, "Shown with ↗ icon and in preview."));
+    const externalToggle = document.createElement("div");
+    externalToggle.className = "item-editor__checkbox";
+    const externalToggleRow = document.createElement("label");
+    externalToggleRow.className = "item-editor__checkbox-row";
+    const externalFlagInput = document.createElement("input");
+    externalFlagInput.type = "checkbox";
+    const externalFlagLabel = document.createElement("span");
+    externalFlagLabel.textContent = "Mark as external without link";
+    const externalFlagHint = document.createElement("div");
+    externalFlagHint.className = "item-editor__hint";
+    externalFlagHint.textContent = "Keeps dashed border even without a URL.";
+    externalToggleRow.appendChild(externalFlagInput);
+    externalToggleRow.appendChild(externalFlagLabel);
+    externalToggle.appendChild(externalToggleRow);
+    externalToggle.appendChild(externalFlagHint);
+    form.appendChild(externalToggle);
+    const colorInput = document.createElement("input");
+    colorInput.type = "text";
+    colorInput.placeholder = "#2563eb";
+    form.appendChild(makeField("Color", colorInput, "Optional badge color (hex or CSS color)."));
+    const depsInput = document.createElement("textarea");
+    depsInput.rows = 2;
+    depsInput.placeholder = "Comma or space separated ids";
+    form.appendChild(makeField("Dependencies", depsInput, "Use item IDs, separated by commas or spaces."));
+    const actions = document.createElement("div");
+    actions.className = "item-editor__actions";
+    const cancelBtn = document.createElement("button");
+    cancelBtn.type = "button";
+    cancelBtn.className = "pf-v5-c-button pf-m-tertiary";
+    cancelBtn.textContent = "Cancel";
+    const saveBtn = document.createElement("button");
+    saveBtn.type = "submit";
+    saveBtn.className = "pf-v5-c-button pf-m-primary";
+    saveBtn.textContent = "Save";
+    actions.appendChild(cancelBtn);
+    actions.appendChild(saveBtn);
+    form.appendChild(actions);
+    state.wrapper = wrapper;
+    state.fields = {
+      idInput,
+      nameInput,
+      logoInput,
+      externalInput,
+      externalFlagInput,
+      colorInput,
+      depsInput,
+      categoryValue: meta.querySelector(".item-editor__meta-value"),
+      errorEl
+    };
+    cancelBtn.addEventListener("click", hide);
+    closeBtn.addEventListener("click", hide);
+    backdrop.addEventListener("click", hide);
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      saveItemEdits();
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && !wrapper.hidden) {
+        event.preventDefault();
+        event.stopPropagation();
+        hide();
+      }
+    });
+    document.body.appendChild(wrapper);
+    return wrapper;
+  }
+  function open(itemId) {
+    const hit = findItemAndCategoryById(itemId);
+    if (!hit) return false;
+    ensureItemEditorModal();
+    state.categoryId = hit.category.id;
+    state.itemId = hit.item.id;
+    state.modelData = hit.modelData;
+    state.fields.categoryValue.textContent = hit.category.title || hit.category.id;
+    state.fields.idInput.value = hit.item.id || "";
+    state.fields.nameInput.value = hit.item.name || "";
+    state.fields.logoInput.value = hit.item.logo || "";
+    state.fields.externalInput.value = typeof hit.item.external === "string" ? hit.item.external : "";
+    state.fields.externalFlagInput.checked = hit.item.external === true;
+    state.fields.colorInput.value = hit.item.color || "";
+    state.fields.depsInput.value = Array.isArray(hit.item.deps) ? hit.item.deps.join(", ") : "";
+    setError("");
+    select(hit.item.id);
+    show();
+    return true;
+  }
+  return {
+    open,
+    hide,
+    isOpen: () => !!state.wrapper && !state.wrapper.hidden
+  };
+}
+function slugify(base, fallback = "series") {
+  return (base || fallback).trim().toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "") || fallback;
+}
+function makeSeriesId(seriesName, fallback = "series") {
+  const rawSlug = slugify(seriesName, fallback).replace(/\./g, "-");
+  const withoutSuffix = rawSlug.replace(/-series$/i, "").replace(/-+$/, "");
+  const cleaned = withoutSuffix || rawSlug;
+  return cleaned || slugify(fallback, "series");
+}
+function deriveSeriesId(entry, { seriesName, fallbackTitle = "unknown" } = {}) {
+  var _a, _b;
+  const candidates = [
+    entry == null ? void 0 : entry.seriesId,
+    (_a = entry == null ? void 0 : entry.data) == null ? void 0 : _a.seriesId,
+    entry == null ? void 0 : entry.apicurioArtifactId,
+    seriesName,
+    entry == null ? void 0 : entry.title,
+    entry == null ? void 0 : entry.apicurioArtifactName,
+    (_b = entry == null ? void 0 : entry.data) == null ? void 0 : _b.title,
+    fallbackTitle
+  ];
+  const trimmed = candidates.map((c) => (c ?? "").toString().trim());
+  const foundIndex = trimmed.findIndex(Boolean);
+  const base = foundIndex !== -1 ? trimmed[foundIndex] : "";
+  if (!base) {
+    console.log("[Series] deriveSeriesId: no base found; fallback", { fallbackTitle });
+    return null;
+  }
+  console.log("[Series] deriveSeriesId: picked base", {
+    base,
+    sourceIndex: foundIndex,
+    candidates: trimmed
+  });
+  return makeSeriesId(base, fallbackTitle);
+}
+function ensureSeriesId(entry, { seriesName, fallbackTitle = "unknown" } = {}) {
+  if (!entry || typeof entry !== "object") return null;
+  const seriesId = deriveSeriesId(entry, { seriesName, fallbackTitle });
+  if (!seriesId) return null;
+  entry.seriesId = seriesId;
+  if (!entry.apicurioArtifactId) entry.apicurioArtifactId = seriesId;
+  return seriesId;
+}
+function getSeriesId(entry, options = {}) {
+  var _a, _b;
+  if (!entry) return null;
+  const hasSeriesSignal = entry.isSeries || ((_a = entry.apicurioVersions) == null ? void 0 : _a.length) > 1 || entry.seriesId || ((_b = entry.data) == null ? void 0 : _b.seriesId) || entry.apicurioArtifactId;
+  if (!hasSeriesSignal && !options.force) return null;
+  const seriesId = deriveSeriesId(entry, options);
+  if (seriesId) return seriesId;
+  if (hasSeriesSignal) {
+    return makeSeriesId(options.fallbackTitle || "unknown");
+  }
+  return null;
+}
+const ASSET_BASE = typeof import.meta !== "undefined" && "./" || "";
+function initBlockscape() {
   console.log("[Blockscape] init");
-
   const jsonBox = document.getElementById("jsonBox");
   const jsonPanel = document.querySelector(".blockscape-json-panel");
   const app = document.getElementById("app");
@@ -55,15 +2076,8 @@ export function initBlockscape() {
   const EDITOR_TRANSFER_KEY = "blockscape:editorPayload";
   const EDITOR_TRANSFER_MESSAGE_TYPE = "blockscape:editorTransfer";
   const defaultDocumentTitle = document.title;
-
-  // Ensure local backend panel starts hidden; it will only unhide after a successful health check.
   if (localBackendPanel) localBackendPanel.hidden = true;
-
-  // Show the seed in the editor initially.
   jsonBox.value = document.getElementById("seed").textContent.trim();
-
-  // ===== State =====
-  /** @type {{id:string,title:string,data:any}[]} */
   let models = [];
   let activeIndex = -1;
   const apicurio = createApicurioIntegration({
@@ -76,12 +2090,11 @@ export function initBlockscape() {
     ensureSeriesId,
     getModelTitle,
     computeJsonFingerprint,
-    uid,
+    uid
   });
-
-  let model = null; // parsed result of active model: { m, fwd, rev, reusedLocal, seen }
-  let index = new Map(); // id -> {el, catId, rect}
-  let categoryIndex = new Map(); // catId -> { el, headEl }
+  let model = null;
+  let index = /* @__PURE__ */ new Map();
+  let categoryIndex = /* @__PURE__ */ new Map();
   let selection = null;
   let selectedCategoryId = null;
   let selectionRelations = null;
@@ -95,7 +2108,7 @@ export function initBlockscape() {
   let lastDeletedCategory = null;
   let shortcutHelpListBuilt = false;
   let lastShortcutTrigger = null;
-  const NOTICE_TIMEOUT_MS = 2000;
+  const NOTICE_TIMEOUT_MS = 2e3;
   let pendingSeriesNavigation = null;
   let pendingSeriesNavigationTimer = null;
   let pendingModelNavigation = null;
@@ -113,15 +2126,14 @@ export function initBlockscape() {
   let versionThumbLabels = [];
   let thumbLabelMeasureTimer = null;
   const MAX_SEARCH_RESULTS = 30;
-  const SERIES_INFO_PREVIEW_DELAY = 1000;
+  const SERIES_INFO_PREVIEW_DELAY = 1e3;
   const TILE_HOVER_SCALE_STORAGE_KEY = "blockscape:hoverScale";
   const DEFAULT_TILE_HOVER_SCALE = 1.5;
   const MIN_TILE_HOVER_SCALE = 1;
   const MAX_TILE_HOVER_SCALE = 2.5;
   const TITLE_WRAP_STORAGE_KEY = "blockscape:titleWrap";
   const TITLE_HOVER_WIDTH_STORAGE_KEY = "blockscape:titleHoverWidth";
-  const TITLE_HOVER_TEXT_PORTION_STORAGE_KEY =
-    "blockscape:titleHoverTextPortion";
+  const TITLE_HOVER_TEXT_PORTION_STORAGE_KEY = "blockscape:titleHoverTextPortion";
   const DEFAULT_TITLE_WRAP_MODE = "wrap";
   const DEFAULT_TITLE_HOVER_WIDTH_MULTIPLIER = 1.3;
   const MIN_TITLE_HOVER_WIDTH_MULTIPLIER = 1;
@@ -141,9 +2153,9 @@ export function initBlockscape() {
   const DEFAULT_OBSIDIAN_LINK_MODE = OBSIDIAN_LINK_MODE_TITLE;
   const AUTO_RELOAD_ENABLED_STORAGE_KEY = "blockscape:autoReloadEnabled";
   const AUTO_RELOAD_INTERVAL_STORAGE_KEY = "blockscape:autoReloadIntervalMs";
-  const DEFAULT_AUTO_RELOAD_INTERVAL_MS = 1000;
+  const DEFAULT_AUTO_RELOAD_INTERVAL_MS = 1e3;
   const MIN_AUTO_RELOAD_INTERVAL_MS = 500;
-  const MAX_AUTO_RELOAD_INTERVAL_MS = 10000;
+  const MAX_AUTO_RELOAD_INTERVAL_MS = 1e4;
   let tileHoverScale = DEFAULT_TILE_HOVER_SCALE;
   let tileCompactness = DEFAULT_TILE_COMPACTNESS;
   let titleWrapMode = DEFAULT_TITLE_WRAP_MODE;
@@ -152,11 +2164,10 @@ export function initBlockscape() {
   let obsidianLinksEnabled = false;
   let obsidianLinkMode = DEFAULT_OBSIDIAN_LINK_MODE;
   let obsidianVaultName = "";
-  const SERIES_NAV_DOUBLE_CLICK_STORAGE_KEY =
-    "blockscape:seriesNavDoubleClickMs";
+  const SERIES_NAV_DOUBLE_CLICK_STORAGE_KEY = "blockscape:seriesNavDoubleClickMs";
   const DEFAULT_SERIES_NAV_DOUBLE_CLICK_MS = 900;
   const MIN_SERIES_NAV_DOUBLE_CLICK_MS = 300;
-  const MAX_SERIES_NAV_DOUBLE_CLICK_MS = 4000;
+  const MAX_SERIES_NAV_DOUBLE_CLICK_MS = 4e3;
   let seriesNavDoubleClickWaitMs = DEFAULT_SERIES_NAV_DOUBLE_CLICK_MS;
   const localBackend = createLocalBackend();
   const initialBackendCheck = localBackend.detect();
@@ -171,21 +2182,17 @@ export function initBlockscape() {
   initializeObsidianLinkMode();
   initializeObsidianVaultName();
   syncSelectionClass();
-
-  // ===== Utilities =====
   function uid() {
     return Math.random().toString(36).slice(2, 10);
   }
-
-  function base64Encode(text) {
-    const bytes = new TextEncoder().encode(text);
+  function base64Encode(text2) {
+    const bytes = new TextEncoder().encode(text2);
     let binary = "";
     bytes.forEach((b) => {
       binary += String.fromCharCode(b);
     });
     return btoa(binary);
   }
-
   function base64Decode(base64) {
     const binary = atob(base64);
     const bytes = new Uint8Array(binary.length);
@@ -194,23 +2201,17 @@ export function initBlockscape() {
     }
     return new TextDecoder().decode(bytes);
   }
-
-  function base64UrlEncode(text) {
-    return base64Encode(text)
-      .replace(/\+/g, "-")
-      .replace(/\//g, "_")
-      .replace(/=+$/g, "");
+  function base64UrlEncode(text2) {
+    return base64Encode(text2).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
   }
-
   function base64UrlDecode(token) {
     let base64 = token.replace(/-/g, "+").replace(/_/g, "/");
     const pad = base64.length % 4;
     if (pad) base64 += "=".repeat(4 - pad);
     return base64Decode(base64);
   }
-
-  function download(filename, text) {
-    const blob = new Blob([text], { type: "application/json" });
+  function download(filename, text2) {
+    const blob = new Blob([text2], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -218,27 +2219,19 @@ export function initBlockscape() {
     a.click();
     URL.revokeObjectURL(url);
   }
-
   function isLocalBackendOptIn() {
     if (typeof window === "undefined" || !window.location) return false;
     const url = new URL(window.location.href);
     const normalizedPath = url.pathname.replace(/\/+$/, "");
-    const lastSegment =
-      normalizedPath.split("/").filter(Boolean).pop() || "";
+    const lastSegment = normalizedPath.split("/").filter(Boolean).pop() || "";
     const searchFlag = url.searchParams.get("server");
-    return (
-      lastSegment.toLowerCase() === "server" ||
-      (searchFlag &&
-        ["1", "true", "yes", "on"].includes(searchFlag.toLowerCase()))
-    );
+    return lastSegment.toLowerCase() === "server" || searchFlag && ["1", "true", "yes", "on"].includes(searchFlag.toLowerCase());
   }
-
   function isGithubPagesHost() {
     if (typeof window === "undefined" || !window.location) return false;
     const host = (window.location.hostname || "").toLowerCase();
     return host.endsWith("github.io");
   }
-
   function createLocalBackend() {
     const debugContext = () => {
       if (typeof window === "undefined" || !window.location) return {};
@@ -246,60 +2239,60 @@ export function initBlockscape() {
         host: window.location.host,
         path: window.location.pathname,
         search: window.location.search,
-        hash: window.location.hash,
+        hash: window.location.hash
       };
     };
-
     function debug(message, extra = {}) {
       console.log("[Blockscape][local-backend]", message, {
         ...debugContext(),
-        ...extra,
+        ...extra
       });
     }
-
     if (isGithubPagesHost()) {
       debug("Disabled on github.io host");
       if (localBackendPanel) localBackendPanel.hidden = true;
       return {
         detect: async () => false,
-        refresh: async () => {},
-        updateActiveSavePlaceholder() {},
-        isAvailable: () => false,
+        refresh: async () => {
+        },
+        updateActiveSavePlaceholder() {
+        },
+        isAvailable: () => false
       };
     }
-
     const optIn = isLocalBackendOptIn();
     if (!optIn || !localBackendPanel || !localBackendStatus) {
       debug("Opt-in flag missing or panel unavailable");
       if (localBackendPanel) localBackendPanel.hidden = true;
       return {
         detect: async () => false,
-        refresh: async () => {},
-        updateActiveSavePlaceholder() {},
-        isAvailable: () => false,
+        refresh: async () => {
+        },
+        updateActiveSavePlaceholder() {
+        },
+        isAvailable: () => false
       };
     }
-
     if (!localBackendPanel || !localBackendStatus) {
       return {
         detect: async () => false,
-        refresh: async () => {},
-        updateActiveSavePlaceholder() {},
-        isAvailable: () => false,
+        refresh: async () => {
+        },
+        updateActiveSavePlaceholder() {
+        },
+        isAvailable: () => false
       };
     }
-
     let available = false;
     let lastKnownPath = "";
     let files = [];
     let dirs = [];
     let currentDir = "";
-    let knownMtimes = new Map();
+    let knownMtimes = /* @__PURE__ */ new Map();
     let autoReloadEnabled = readAutoReloadEnabled();
     let autoReloadIntervalMs = readAutoReloadInterval();
     let autoReloadTimer = null;
     let autoReloadInFlight = false;
-
     function readAutoReloadEnabled() {
       if (typeof window === "undefined" || !window.localStorage) return true;
       try {
@@ -312,7 +2305,6 @@ export function initBlockscape() {
         return true;
       }
     }
-
     function persistAutoReloadEnabled(value) {
       if (typeof window === "undefined" || !window.localStorage) return;
       try {
@@ -324,7 +2316,6 @@ export function initBlockscape() {
         console.warn("[Blockscape] auto-reload: failed to persist", err);
       }
     }
-
     function readAutoReloadInterval() {
       if (typeof window === "undefined" || !window.localStorage)
         return DEFAULT_AUTO_RELOAD_INTERVAL_MS;
@@ -339,7 +2330,6 @@ export function initBlockscape() {
         return DEFAULT_AUTO_RELOAD_INTERVAL_MS;
       }
     }
-
     function persistAutoReloadInterval(value) {
       if (typeof window === "undefined" || !window.localStorage) return;
       try {
@@ -351,7 +2341,6 @@ export function initBlockscape() {
         console.warn("[Blockscape] auto-reload: failed to persist interval", err);
       }
     }
-
     function clampAutoReloadInterval(value) {
       if (!Number.isFinite(value)) return DEFAULT_AUTO_RELOAD_INTERVAL_MS;
       return Math.min(
@@ -359,43 +2348,39 @@ export function initBlockscape() {
         Math.max(MIN_AUTO_RELOAD_INTERVAL_MS, value)
       );
     }
-
     function dirOfPath(p) {
       if (!p) return "";
       const parts = p.split("/").filter(Boolean);
       parts.pop();
       return parts.join("/");
     }
-
-    function setStatus(text, { error = false } = {}) {
-      localBackendStatus.textContent = text;
+    function setStatus(text2, { error = false } = {}) {
+      localBackendStatus.textContent = text2;
       localBackendStatus.style.color = error ? "#b42318" : "";
-      debug("Status", { text, error });
+      debug("Status", { text: text2, error });
     }
-
     function normalizeSavePath(raw) {
       const cleaned = (raw || "").trim().replace(/\\/g, "/").replace(/^\/+/, "");
       if (!cleaned || cleaned.includes("..")) return null;
       return cleaned.toLowerCase().endsWith(".bs") ? cleaned : `${cleaned}.bs`;
     }
-
     function defaultSaveName() {
-      if (activeIndex >= 0 && models[activeIndex]?.sourcePath) {
+      var _a;
+      if (activeIndex >= 0 && ((_a = models[activeIndex]) == null ? void 0 : _a.sourcePath)) {
         return models[activeIndex].sourcePath;
       }
       if (activeIndex < 0) return "blockscape.bs";
       const title = getModelTitle(models[activeIndex]) || "blockscape";
       return `${makeSeriesId(title, "blockscape")}.bs`;
     }
-
     function updateActiveSavePlaceholder() {
+      var _a;
       if (!localSavePathInput) return;
       localSavePathInput.placeholder = defaultSaveName();
-      if (models[activeIndex]?.sourcePath) {
+      if ((_a = models[activeIndex]) == null ? void 0 : _a.sourcePath) {
         localSavePathInput.value = models[activeIndex].sourcePath;
       }
     }
-
     function renderDirFilter() {
       if (!localDirSelect) return;
       localDirSelect.innerHTML = "";
@@ -413,13 +2398,10 @@ export function initBlockscape() {
       localDirSelect.value = desired;
       currentDir = desired;
     }
-
     function renderFiles() {
       if (!localFileList) return;
       localFileList.innerHTML = "";
-      const filtered = currentDir
-        ? files.filter((f) => f.path.startsWith(`${currentDir}/`))
-        : files;
+      const filtered = currentDir ? files.filter((f) => f.path.startsWith(`${currentDir}/`)) : files;
       if (!filtered.length) {
         const option = document.createElement("option");
         option.disabled = true;
@@ -428,14 +2410,11 @@ export function initBlockscape() {
         localFileList.disabled = true;
         return;
       }
-
       localFileList.disabled = false;
       filtered.forEach((file) => {
         const option = document.createElement("option");
         option.value = file.path;
-        const mtime = file.mtimeMs
-          ? new Date(file.mtimeMs).toLocaleString()
-          : "";
+        const mtime = file.mtimeMs ? new Date(file.mtimeMs).toLocaleString() : "";
         option.textContent = mtime ? `${file.path} · ${mtime}` : file.path;
         localFileList.appendChild(option);
       });
@@ -448,7 +2427,6 @@ export function initBlockscape() {
         localFileList.options[0].selected = true;
       }
     }
-
     function highlightSourcePath(path) {
       if (!available || !localFileList || !path) return;
       const match = files.find((f) => f.path === path);
@@ -465,21 +2443,19 @@ export function initBlockscape() {
       const selected = Array.from(localFileList.options).find(
         (opt) => opt.value === path
       );
-      if (selected?.scrollIntoView) {
+      if (selected == null ? void 0 : selected.scrollIntoView) {
         selected.scrollIntoView({ block: "nearest" });
       }
       if (localSavePathInput) {
         localSavePathInput.value = path;
       }
     }
-
     function stopAutoReloadTimer() {
       if (autoReloadTimer) {
         clearInterval(autoReloadTimer);
         autoReloadTimer = null;
       }
     }
-
     async function reloadModelFromSource(path) {
       const idx = models.findIndex((m) => m.sourcePath === path);
       if (idx === -1) return;
@@ -490,25 +2466,24 @@ export function initBlockscape() {
         );
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const payload = await resp.json();
-        const text = JSON.stringify(payload.data ?? payload, null, 2);
-        const entries = normalizeToModelsFromText(text, path, {
-          seriesTitleOverride: `${path} series`,
+        const text2 = JSON.stringify(payload.data ?? payload, null, 2);
+        const entries = normalizeToModelsFromText(text2, path, {
+          seriesTitleOverride: `${path} series`
         });
         if (!entries.length) return;
         const next = entries[0];
         next.sourcePath = path;
         ensureModelMetadata(next, {
           titleHint: getModelTitle(models[idx]),
-          idHint: getModelId(models[idx]),
+          idHint: getModelId(models[idx])
         });
         if (next.isSeries) {
-          const seriesTitle =
-            next.title || getModelTitle(next) || getModelTitle(models[idx]);
+          const seriesTitle = next.title || getModelTitle(next) || getModelTitle(models[idx]);
           const forcedSlug = makeSeriesId(seriesTitle || "unknown");
           applySeriesSlug(next, forcedSlug);
           ensureSeriesId(next, {
             seriesName: seriesTitle || "unknown",
-            fallbackTitle: "unknown",
+            fallbackTitle: "unknown"
           });
         }
         models[idx] = {
@@ -516,7 +2491,7 @@ export function initBlockscape() {
           ...next,
           title: next.title || getModelTitle(next),
           data: next.data,
-          sourcePath: path,
+          sourcePath: path
         };
         if (idx === activeIndex) {
           loadActiveIntoEditor();
@@ -529,7 +2504,6 @@ export function initBlockscape() {
         console.warn("[Blockscape] auto-reload failed for", path, err);
       }
     }
-
     async function checkFileChanges() {
       if (!available || !autoReloadEnabled || autoReloadInFlight) return;
       autoReloadInFlight = true;
@@ -538,16 +2512,14 @@ export function initBlockscape() {
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const payload = await response.json();
         const list = (payload.files || []).slice().sort((a, b) => {
-          const aTime = a?.mtimeMs || 0;
-          const bTime = b?.mtimeMs || 0;
+          const aTime = (a == null ? void 0 : a.mtimeMs) || 0;
+          const bTime = (b == null ? void 0 : b.mtimeMs) || 0;
           if (aTime === bTime) return (a.path || "").localeCompare(b.path || "");
           return bTime - aTime;
         });
-        const newMap = new Map();
+        const newMap = /* @__PURE__ */ new Map();
         list.forEach((f) => newMap.set(f.path, f.mtimeMs || 0));
-        const pathsToCheck = models
-          .map((m, idx) => ({ path: m.sourcePath, idx }))
-          .filter((m) => m.path);
+        const pathsToCheck = models.map((m, idx) => ({ path: m.sourcePath, idx })).filter((m) => m.path);
         for (const entry of pathsToCheck) {
           const prev = knownMtimes.get(entry.path) || 0;
           const next = newMap.get(entry.path) || 0;
@@ -556,7 +2528,7 @@ export function initBlockscape() {
           }
         }
         files = list;
-        const dirSet = new Set();
+        const dirSet = /* @__PURE__ */ new Set();
         files.forEach((f) => dirSet.add(dirOfPath(f.path)));
         dirs = Array.from(dirSet).filter((d) => d !== "").sort();
         knownMtimes = newMap;
@@ -568,20 +2540,17 @@ export function initBlockscape() {
         autoReloadInFlight = false;
       }
     }
-
     function startAutoReloadTimer() {
       stopAutoReloadTimer();
       if (!available || !autoReloadEnabled) return;
       autoReloadTimer = setInterval(checkFileChanges, autoReloadIntervalMs);
     }
-
     function setAutoReloadEnabled(enabled) {
       autoReloadEnabled = !!enabled;
       persistAutoReloadEnabled(autoReloadEnabled);
       if (autoReloadEnabled) startAutoReloadTimer();
       else stopAutoReloadTimer();
     }
-
     function setAutoReloadInterval(ms) {
       autoReloadIntervalMs = clampAutoReloadInterval(ms);
       persistAutoReloadInterval(autoReloadIntervalMs);
@@ -590,32 +2559,28 @@ export function initBlockscape() {
       }
       return autoReloadIntervalMs;
     }
-
     function hidePanel(message) {
       available = false;
       files = [];
-      knownMtimes = new Map();
+      knownMtimes = /* @__PURE__ */ new Map();
       stopAutoReloadTimer();
       renderFiles();
       localBackendPanel.hidden = true;
       if (message) setStatus(message, { error: true });
       debug("Panel hidden", { message });
     }
-
     async function checkHealth({ silent = false } = {}) {
       try {
         debug("Health check start");
         const resp = await fetch("/api/health", { cache: "no-store" });
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const payload = await resp.json();
-        available = !!payload?.ok;
+        available = !!(payload == null ? void 0 : payload.ok);
         if (!available) throw new Error("Health check failed");
         localBackendPanel.hidden = false;
         if (!silent) {
           setStatus(
-            payload.root
-              ? `Local server ready (root: ${payload.root})`
-              : "Local server ready"
+            payload.root ? `Local server ready (root: ${payload.root})` : "Local server ready"
           );
         }
         debug("Health check ok", { payload });
@@ -628,7 +2593,6 @@ export function initBlockscape() {
         return false;
       }
     }
-
     async function refresh() {
       if (!available) return;
       if (!localFileList) return;
@@ -640,12 +2604,12 @@ export function initBlockscape() {
         }
         const payload = await response.json();
         files = (payload.files || []).slice().sort((a, b) => {
-          const aTime = a?.mtimeMs || 0;
-          const bTime = b?.mtimeMs || 0;
+          const aTime = (a == null ? void 0 : a.mtimeMs) || 0;
+          const bTime = (b == null ? void 0 : b.mtimeMs) || 0;
           if (aTime === bTime) return (a.path || "").localeCompare(b.path || "");
-          return bTime - aTime; // newest first
+          return bTime - aTime;
         });
-        const dirSet = new Set();
+        const dirSet = /* @__PURE__ */ new Set();
         files.forEach((f) => {
           dirSet.add(dirOfPath(f.path));
         });
@@ -660,16 +2624,13 @@ export function initBlockscape() {
         renderDirFilter();
         renderFiles();
         setStatus(
-          files.length
-            ? `Browsing ${files.length} file(s) in ~/blockscape`
-            : "No .bs files in ~/blockscape yet"
+          files.length ? `Browsing ${files.length} file(s) in ~/blockscape` : "No .bs files in ~/blockscape yet"
         );
       } catch (err) {
         console.warn("[Blockscape] local backend refresh failed", err);
         hidePanel("Local server unavailable");
       }
     }
-
     async function detect() {
       available = false;
       hidePanel();
@@ -691,13 +2652,9 @@ export function initBlockscape() {
         return false;
       }
     }
-
     async function loadSelected() {
       if (!available || !localFileList) return;
-      const selectedPaths = Array.from(localFileList.selectedOptions || [])
-        .map((opt) => opt.value)
-        .filter(Boolean)
-        .sort((a, b) => a.localeCompare(b));
+      const selectedPaths = Array.from(localFileList.selectedOptions || []).map((opt) => opt.value).filter(Boolean).sort((a, b) => a.localeCompare(b));
       if (!selectedPaths.length) {
         alert("Select one or more files to load from ~/blockscape.");
         return;
@@ -712,9 +2669,9 @@ export function initBlockscape() {
           );
           if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
           const payload = await resp.json();
-          const text = JSON.stringify(payload.data ?? payload, null, 2);
-          const entries = normalizeToModelsFromText(text, relPath, {
-            seriesTitleOverride: `${relPath} series`,
+          const text2 = JSON.stringify(payload.data ?? payload, null, 2);
+          const entries = normalizeToModelsFromText(text2, relPath, {
+            seriesTitleOverride: `${relPath} series`
           });
           if (!entries.length) throw new Error("No models found in file");
           entries.forEach((entry, idx) => {
@@ -725,8 +2682,7 @@ export function initBlockscape() {
               entry.title = stem;
             }
             const idxResult = addModelEntry(entry, {
-              versionLabel:
-                entries.length > 1 ? `${relPath} #${idx + 1}` : relPath,
+              versionLabel: entries.length > 1 ? `${relPath} #${idx + 1}` : relPath
             });
             if (firstIndex == null) firstIndex = idxResult;
           });
@@ -740,17 +2696,14 @@ export function initBlockscape() {
       setStatus(`Loaded ${selectedPaths.length} file(s)`);
       renderFiles();
     }
-
     async function saveActiveToFile() {
+      var _a;
       if (!available) return;
       if (activeIndex < 0) {
         alert("No active model to save.");
         return;
       }
-      const desiredPath =
-        normalizeSavePath(localSavePathInput?.value) ||
-        normalizeSavePath(models[activeIndex]?.sourcePath) ||
-        defaultSaveName();
+      const desiredPath = normalizeSavePath(localSavePathInput == null ? void 0 : localSavePathInput.value) || normalizeSavePath((_a = models[activeIndex]) == null ? void 0 : _a.sourcePath) || defaultSaveName();
       if (!desiredPath) {
         alert("Enter a relative path (no ..) to save under ~/blockscape.");
         return;
@@ -763,7 +2716,7 @@ export function initBlockscape() {
           {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
-            body,
+            body
           }
         );
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
@@ -778,7 +2731,6 @@ export function initBlockscape() {
         hidePanel("Local server unavailable");
       }
     }
-
     if (refreshLocalFilesButton) {
       refreshLocalFilesButton.onclick = () => refresh();
     }
@@ -791,7 +2743,7 @@ export function initBlockscape() {
     if (localFileList && localSavePathInput) {
       localFileList.addEventListener("change", () => {
         const first = Array.from(localFileList.selectedOptions || [])[0];
-        if (first?.value) {
+        if (first == null ? void 0 : first.value) {
           localSavePathInput.value = first.value;
         }
       });
@@ -805,7 +2757,6 @@ export function initBlockscape() {
         renderFiles();
       });
     }
-
     return {
       detect,
       refresh,
@@ -815,42 +2766,33 @@ export function initBlockscape() {
       getAutoReloadConfig: () => ({
         enabled: autoReloadEnabled,
         intervalMs: autoReloadIntervalMs,
-        available,
+        available
       }),
       setAutoReloadEnabled,
-      setAutoReloadInterval,
+      setAutoReloadInterval
     };
   }
-
-  async function writeTextToClipboard(text) {
-    if (!navigator.clipboard?.writeText) return false;
+  async function writeTextToClipboard(text2) {
+    var _a;
+    if (!((_a = navigator.clipboard) == null ? void 0 : _a.writeText)) return false;
     try {
-      await navigator.clipboard.writeText(text);
+      await navigator.clipboard.writeText(text2);
       return true;
     } catch (err) {
       console.warn("[Blockscape] clipboard write failed", err);
       return false;
     }
   }
-
   async function readTextFromClipboard() {
-    if (!navigator.clipboard?.readText) {
+    var _a;
+    if (!((_a = navigator.clipboard) == null ? void 0 : _a.readText)) {
       throw new Error("Clipboard read not supported");
     }
     return navigator.clipboard.readText();
   }
-
   function makeDownloadName(base) {
-    return (
-      (base || "blockscape")
-        .trim()
-        .toLowerCase()
-        .replace(/[^a-z0-9._-]+/g, "-")
-        .replace(/-+/g, "-")
-        .replace(/^-|-$/g, "") || "blockscape"
-    );
+    return (base || "blockscape").trim().toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "") || "blockscape";
   }
-
   function clampHoverScale(value) {
     if (!Number.isFinite(value)) return DEFAULT_TILE_HOVER_SCALE;
     return Math.min(
@@ -858,13 +2800,11 @@ export function initBlockscape() {
       Math.max(MIN_TILE_HOVER_SCALE, value)
     );
   }
-
   function syncSelectionClass() {
     if (!app) return;
     const hasSelection = !!selection || !!selectedCategoryId;
     app.classList.toggle("blockscape-has-selection", hasSelection);
   }
-
   function applyTileHoverScale(scale) {
     tileHoverScale = clampHoverScale(scale);
     document.documentElement.style.setProperty(
@@ -873,7 +2813,6 @@ export function initBlockscape() {
     );
     return tileHoverScale;
   }
-
   function clampTileCompactness(value) {
     if (!Number.isFinite(value)) return DEFAULT_TILE_COMPACTNESS;
     return Math.min(
@@ -881,7 +2820,6 @@ export function initBlockscape() {
       Math.max(MIN_TILE_COMPACTNESS, value)
     );
   }
-
   function applyTileCompactness(value) {
     tileCompactness = clampTileCompactness(value);
     document.documentElement.style.setProperty(
@@ -890,7 +2828,6 @@ export function initBlockscape() {
     );
     return tileCompactness;
   }
-
   function clampTitleHoverWidthMultiplier(value) {
     if (!Number.isFinite(value))
       return DEFAULT_TITLE_HOVER_WIDTH_MULTIPLIER;
@@ -899,7 +2836,6 @@ export function initBlockscape() {
       Math.max(MIN_TITLE_HOVER_WIDTH_MULTIPLIER, value)
     );
   }
-
   function applyTitleHoverWidthMultiplier(value) {
     titleHoverWidthMultiplier = clampTitleHoverWidthMultiplier(value);
     document.documentElement.style.setProperty(
@@ -908,7 +2844,6 @@ export function initBlockscape() {
     );
     return titleHoverWidthMultiplier;
   }
-
   function clampTitleHoverTextPortion(value) {
     if (!Number.isFinite(value)) return DEFAULT_TITLE_HOVER_TEXT_PORTION;
     return Math.min(
@@ -916,7 +2851,6 @@ export function initBlockscape() {
       Math.max(MIN_TITLE_HOVER_TEXT_PORTION, value)
     );
   }
-
   function applyTitleHoverTextPortion(value) {
     titleHoverTextPortion = clampTitleHoverTextPortion(value);
     document.documentElement.style.setProperty(
@@ -925,7 +2859,6 @@ export function initBlockscape() {
     );
     return titleHoverTextPortion;
   }
-
   function applyTitleWrapMode(mode) {
     const normalized = mode === "nowrap" ? "nowrap" : "wrap";
     titleWrapMode = normalized;
@@ -941,7 +2874,6 @@ export function initBlockscape() {
     );
     return normalized;
   }
-
   function persistTileHoverScale(scale) {
     if (typeof window === "undefined" || !window.localStorage) return;
     try {
@@ -950,7 +2882,6 @@ export function initBlockscape() {
       console.warn("[Blockscape] failed to persist hover scale", error);
     }
   }
-
   function initializeTileHoverScale() {
     if (typeof window === "undefined" || !window.localStorage) {
       return applyTileHoverScale(DEFAULT_TILE_HOVER_SCALE);
@@ -965,7 +2896,6 @@ export function initBlockscape() {
       return applyTileHoverScale(DEFAULT_TILE_HOVER_SCALE);
     }
   }
-
   function persistTileCompactness(value) {
     if (typeof window === "undefined" || !window.localStorage) return;
     try {
@@ -977,7 +2907,6 @@ export function initBlockscape() {
       console.warn("[Blockscape] failed to persist tile compactness", error);
     }
   }
-
   function initializeTileCompactness() {
     if (typeof window === "undefined" || !window.localStorage) {
       return applyTileCompactness(DEFAULT_TILE_COMPACTNESS);
@@ -992,7 +2921,6 @@ export function initBlockscape() {
       return applyTileCompactness(DEFAULT_TILE_COMPACTNESS);
     }
   }
-
   function persistTitleHoverWidthMultiplier(value) {
     if (typeof window === "undefined" || !window.localStorage) return;
     try {
@@ -1004,7 +2932,6 @@ export function initBlockscape() {
       console.warn("[Blockscape] failed to persist title hover width", error);
     }
   }
-
   function initializeTitleHoverWidthMultiplier() {
     if (typeof window === "undefined" || !window.localStorage) {
       return applyTitleHoverWidthMultiplier(
@@ -1027,7 +2954,6 @@ export function initBlockscape() {
       );
     }
   }
-
   function persistTitleHoverTextPortion(value) {
     if (typeof window === "undefined" || !window.localStorage) return;
     try {
@@ -1039,7 +2965,6 @@ export function initBlockscape() {
       console.warn("[Blockscape] failed to persist title text zoom", error);
     }
   }
-
   function initializeTitleHoverTextPortion() {
     if (typeof window === "undefined" || !window.localStorage) {
       return applyTitleHoverTextPortion(DEFAULT_TITLE_HOVER_TEXT_PORTION);
@@ -1057,7 +2982,6 @@ export function initBlockscape() {
       return applyTitleHoverTextPortion(DEFAULT_TITLE_HOVER_TEXT_PORTION);
     }
   }
-
   function persistTitleWrapMode(mode) {
     if (typeof window === "undefined" || !window.localStorage) return;
     try {
@@ -1066,7 +2990,6 @@ export function initBlockscape() {
       console.warn("[Blockscape] failed to persist title wrap mode", error);
     }
   }
-
   function initializeTitleWrapMode() {
     if (typeof window === "undefined" || !window.localStorage) {
       return applyTitleWrapMode(DEFAULT_TITLE_WRAP_MODE);
@@ -1080,7 +3003,6 @@ export function initBlockscape() {
       return applyTitleWrapMode(DEFAULT_TITLE_WRAP_MODE);
     }
   }
-
   function clampSeriesNavDoubleClickWait(value) {
     if (!Number.isFinite(value)) return DEFAULT_SERIES_NAV_DOUBLE_CLICK_MS;
     return Math.min(
@@ -1088,12 +3010,10 @@ export function initBlockscape() {
       Math.max(MIN_SERIES_NAV_DOUBLE_CLICK_MS, value)
     );
   }
-
   function applySeriesNavDoubleClickWait(value) {
     seriesNavDoubleClickWaitMs = clampSeriesNavDoubleClickWait(value);
     return seriesNavDoubleClickWaitMs;
   }
-
   function persistSeriesNavDoubleClickWait(value) {
     if (typeof window === "undefined" || !window.localStorage) return;
     try {
@@ -1108,7 +3028,6 @@ export function initBlockscape() {
       );
     }
   }
-
   function initializeSeriesNavDoubleClickWait() {
     if (typeof window === "undefined" || !window.localStorage) {
       return applySeriesNavDoubleClickWait(DEFAULT_SERIES_NAV_DOUBLE_CLICK_MS);
@@ -1131,18 +3050,13 @@ export function initBlockscape() {
       return applySeriesNavDoubleClickWait(DEFAULT_SERIES_NAV_DOUBLE_CLICK_MS);
     }
   }
-
   function normalizeObsidianLinkMode(mode) {
-    return mode === OBSIDIAN_LINK_MODE_ID
-      ? OBSIDIAN_LINK_MODE_ID
-      : OBSIDIAN_LINK_MODE_TITLE;
+    return mode === OBSIDIAN_LINK_MODE_ID ? OBSIDIAN_LINK_MODE_ID : OBSIDIAN_LINK_MODE_TITLE;
   }
-
   function applyObsidianLinkMode(mode) {
     obsidianLinkMode = normalizeObsidianLinkMode(mode);
     return obsidianLinkMode;
   }
-
   function persistObsidianLinkMode(mode) {
     if (typeof window === "undefined" || !window.localStorage) return;
     try {
@@ -1151,7 +3065,6 @@ export function initBlockscape() {
       console.warn("[Blockscape] failed to persist Obsidian link mode", error);
     }
   }
-
   function initializeObsidianLinkMode() {
     if (typeof window === "undefined" || !window.localStorage) {
       return applyObsidianLinkMode(DEFAULT_OBSIDIAN_LINK_MODE);
@@ -1165,12 +3078,10 @@ export function initBlockscape() {
       return applyObsidianLinkMode(DEFAULT_OBSIDIAN_LINK_MODE);
     }
   }
-
   function applyObsidianLinksEnabled(enabled) {
     obsidianLinksEnabled = !!enabled;
     return obsidianLinksEnabled;
   }
-
   function persistObsidianLinksEnabled(enabled) {
     if (typeof window === "undefined" || !window.localStorage) return;
     try {
@@ -1182,7 +3093,6 @@ export function initBlockscape() {
       console.warn("[Blockscape] failed to persist Obsidian toggle", error);
     }
   }
-
   function initializeObsidianLinksEnabled() {
     if (typeof window === "undefined" || !window.localStorage) {
       return applyObsidianLinksEnabled(false);
@@ -1198,13 +3108,11 @@ export function initBlockscape() {
       return applyObsidianLinksEnabled(false);
     }
   }
-
   function applyObsidianVaultName(value) {
     const trimmed = (value ?? "").toString().trim();
     obsidianVaultName = trimmed;
     return obsidianVaultName;
   }
-
   function persistObsidianVaultName(value) {
     if (typeof window === "undefined" || !window.localStorage) return;
     try {
@@ -1213,7 +3121,6 @@ export function initBlockscape() {
       console.warn("[Blockscape] failed to persist Obsidian vault", error);
     }
   }
-
   function initializeObsidianVaultName() {
     if (typeof window === "undefined" || !window.localStorage) {
       return applyObsidianVaultName("");
@@ -1227,7 +3134,6 @@ export function initBlockscape() {
       return applyObsidianVaultName("");
     }
   }
-
   function promptForSeriesTitle(defaultTitle) {
     if (typeof window === "undefined" || typeof window.prompt !== "function")
       return null;
@@ -1235,16 +3141,13 @@ export function initBlockscape() {
     const trimmed = (response || "").trim();
     return trimmed || null;
   }
-
   function deriveSeriesTitleFromArray(list, titleBase = "Pasted") {
     const array = Array.isArray(list) ? list : [];
     if (!array.length) return `${titleBase} series`;
-    const firstObj =
-      array.find((obj) => obj && typeof obj === "object") || array[0];
-    const candidate = (firstObj?.title ?? "").toString().trim();
+    const firstObj = array.find((obj) => obj && typeof obj === "object") || array[0];
+    const candidate = ((firstObj == null ? void 0 : firstObj.title) ?? "").toString().trim();
     return candidate || `${titleBase} series`;
   }
-
   function applySeriesSlug(entry, slug) {
     if (!slug || !entry || typeof entry !== "object") return;
     entry.seriesId = slug;
@@ -1255,30 +3158,21 @@ export function initBlockscape() {
     }
     if (Array.isArray(entry.apicurioVersions)) {
       entry.apicurioVersions.forEach((ver) => {
-        if (ver?.data && typeof ver.data === "object") {
+        if ((ver == null ? void 0 : ver.data) && typeof ver.data === "object") {
           ver.data.seriesId = slug;
         }
       });
     }
   }
-
   function renameSeries(entry) {
-    if (
-      !entry ||
-      typeof window === "undefined" ||
-      typeof window.prompt !== "function"
-    )
+    if (!entry || typeof window === "undefined" || typeof window.prompt !== "function")
       return false;
-    const currentName =
-      (entry.title ?? entry.apicurioArtifactName ?? "").toString().trim() ||
-      getModelDisplayTitle(entry, "Series");
+    const currentName = (entry.title ?? entry.apicurioArtifactName ?? "").toString().trim() || getModelDisplayTitle(entry, "Series");
     const nameResponse = window.prompt("Series name", currentName);
     if (nameResponse == null) return false;
     const nextName = nameResponse.trim();
     if (!nextName) return false;
-    const existingId =
-      getSeriesId(entry, { seriesName: nextName, fallbackTitle: nextName }) ||
-      makeSeriesId(nextName, nextName);
+    const existingId = getSeriesId(entry, { seriesName: nextName, fallbackTitle: nextName }) || makeSeriesId(nextName, nextName);
     const idResponse = window.prompt(
       "Series ID (used for linking and downloads)",
       existingId
@@ -1293,7 +3187,6 @@ export function initBlockscape() {
     applySeriesSlug(entry, nextId);
     return true;
   }
-
   function stableStringify(value) {
     if (value === null || typeof value !== "object")
       return JSON.stringify(value);
@@ -1305,7 +3198,6 @@ export function initBlockscape() {
     );
     return `{${parts.join(",")}}`;
   }
-
   function canonicalizeJson(value) {
     try {
       return stableStringify(value);
@@ -1313,7 +3205,6 @@ export function initBlockscape() {
       return "";
     }
   }
-
   function computeJsonFingerprint(input) {
     try {
       const value = typeof input === "string" ? JSON.parse(input) : input;
@@ -1335,99 +3226,82 @@ export function initBlockscape() {
       return "";
     }
   }
-
   const SHORTCUT_CONFIG = [
-
     // --- NAVIGATION ---
     {
       keys: [["Arrow Left"], ["Arrow Right"]],
-      description:
-        "Move selection to the previous or next item in the current category.",
+      description: "Move selection to the previous or next item in the current category."
     },
     {
       keys: [["Arrow Up"], ["Arrow Down"]],
-      description:
-        "Move up/down through items, pausing on category headers before entering the next category at the same relative position.",
+      description: "Move up/down through items, pausing on category headers before entering the next category at the same relative position."
     },
     {
       keys: [
         ["Cmd/Ctrl", "Arrow Up"],
-        ["Cmd/Ctrl", "Arrow Down"],
+        ["Cmd/Ctrl", "Arrow Down"]
       ],
-      description:
-        "Reorder the selected category (or the category that holds the selected item).",
+      description: "Reorder the selected category (or the category that holds the selected item)."
     },
-
     // --- STRUCTURAL MANIPULATION (Moving Items) ---
     {
       keys: [
         ["Shift", "Arrow Left"],
-        ["Shift", "Arrow Right"],
+        ["Shift", "Arrow Right"]
       ],
-      description: "Reorder the selected item inside its category.",
+      description: "Reorder the selected item inside its category."
     },
     {
       keys: [
         ["Shift", "Arrow Up"],
-        ["Shift", "Arrow Down"],
+        ["Shift", "Arrow Down"]
       ],
-      description: "Move the selected item to the previous or next category.",
+      description: "Move the selected item to the previous or next category."
     },
-
     // --- VIEW & UI CONTROL ---
     {
       keys: [
         ["Cmd/Ctrl", "Arrow Left"],
-        ["Cmd/Ctrl", "Arrow Right"],
+        ["Cmd/Ctrl", "Arrow Right"]
       ],
-      description: "Switch to the previous or next map when viewing a series.",
+      description: "Switch to the previous or next map when viewing a series."
     },
-
     // --- ESSENTIALS & GLOBAL ---
     {
       keys: [["Cmd/Ctrl", "Z"]],
-      description: "Undo the last deleted tile or category.",
+      description: "Undo the last deleted tile or category."
     },
     {
       keys: [["Cmd/Ctrl", "S"]],
-      description:
-        "Download the active model JSON (series if multiple versions are open).",
+      description: "Download the active model JSON (series if multiple versions are open)."
     },
     {
       keys: [["Cmd/Ctrl", "V"]],
-      description:
-        "Append JSON models from the clipboard when focus is outside inputs.",
+      description: "Append JSON models from the clipboard when focus is outside inputs."
     },
-
     // --- BASIC INTERACTION ---
     {
       keys: [["Enter"], ["Space"]],
-      description: "Activate a focused tile, same as clicking it.",
+      description: "Activate a focused tile, same as clicking it."
     },
     {
       keys: [["F2"]],
-      description:
-        "Edit the selected item; when a category (not an item) is selected, open the category editor.",
+      description: "Edit the selected item; when a category (not an item) is selected, open the category editor."
     },
     {
       keys: [["Delete"]],
-      description: "Delete the selected item or category (use Cmd/Ctrl+Z to undo).",
+      description: "Delete the selected item or category (use Cmd/Ctrl+Z to undo)."
     },
     {
       keys: [["Insert"]],
-      description: "Add a new category at the bottom of the map.",
+      description: "Add a new category at the bottom of the map."
     },
-
-    { keys: [["Escape"]], description: "Unselect item or close the open preview popover." },
+    { keys: [["Escape"]], description: "Unselect item or close the open preview popover." }
   ];
-  function ensureModelMetadata(
-    data,
-    { titleHint = "Untitled Model", idHint } = {}
-  ) {
+  function ensureModelMetadata(data, { titleHint = "Untitled Model", idHint } = {}) {
     if (!data || typeof data !== "object") return data;
     const trimmedTitle = (data.title ?? "").toString().trim();
     data.title = trimmedTitle || titleHint || "Untitled Model";
-
     const trimmedId = (data.id ?? "").toString().trim();
     if (!trimmedId) {
       const base = idHint || data.title || titleHint || "model";
@@ -1436,31 +3310,25 @@ export function initBlockscape() {
     } else {
       data.id = trimmedId;
     }
-
     if (typeof data.abstract !== "string") {
       data.abstract = data.abstract == null ? "" : String(data.abstract);
     }
     return data;
   }
-
   function cloneModelData(data) {
     return JSON.parse(JSON.stringify(data));
   }
-
   function getModelTitle(entry, fallback = "Untitled Model") {
+    var _a;
     if (!entry) return fallback;
-    const candidate = (entry.data?.title ?? entry.title ?? "")
-      .toString()
-      .trim();
+    const candidate = (((_a = entry.data) == null ? void 0 : _a.title) ?? entry.title ?? "").toString().trim();
     return candidate || fallback;
   }
-
   function getModelDisplayTitle(entry, fallback = "Untitled Model") {
-    const isSeries = entry?.apicurioVersions?.length > 1 || entry?.isSeries;
+    var _a;
+    const isSeries = ((_a = entry == null ? void 0 : entry.apicurioVersions) == null ? void 0 : _a.length) > 1 || (entry == null ? void 0 : entry.isSeries);
     if (isSeries) {
-      const seriesTitle =
-        (entry?.title ?? "").toString().trim() ||
-        (entry?.apicurioArtifactName ?? "").toString().trim();
+      const seriesTitle = ((entry == null ? void 0 : entry.title) ?? "").toString().trim() || ((entry == null ? void 0 : entry.apicurioArtifactName) ?? "").toString().trim();
       if (seriesTitle) return seriesTitle;
       const modelId = getModelId(entry);
       if (modelId) return `${modelId} series`;
@@ -1468,18 +3336,17 @@ export function initBlockscape() {
     }
     return getModelTitle(entry, fallback);
   }
-
   function getModelId(entry) {
+    var _a;
     const seriesId = getSeriesId(entry);
     if (seriesId) return seriesId;
-    const candidate = entry?.data?.id;
+    const candidate = (_a = entry == null ? void 0 : entry.data) == null ? void 0 : _a.id;
     if (!candidate) return null;
     const trimmed = candidate.toString().trim();
     return trimmed || null;
   }
-
   function getModelSourceLabel(entry) {
-    if (!entry?.sourcePath) return null;
+    if (!(entry == null ? void 0 : entry.sourcePath)) return null;
     try {
       const parts = entry.sourcePath.split("/").filter(Boolean);
       const leaf = parts.length ? parts[parts.length - 1] : entry.sourcePath;
@@ -1488,12 +3355,10 @@ export function initBlockscape() {
       return entry.sourcePath.replace(/\.bs$/i, "");
     }
   }
-
   function formatIdForDisplay(id) {
     if (!id) return null;
     return id.toString().replace(/-series$/i, "");
   }
-
   function findModelIndexByIdOrSource(id) {
     if (!id) return -1;
     const normalized = id.toString().trim().toLowerCase();
@@ -1507,49 +3372,47 @@ export function initBlockscape() {
     }
     return -1;
   }
-
   function persistActiveEdits(entryIndex) {
+    var _a;
     if (entryIndex < 0 || entryIndex >= models.length) return true;
     if (!jsonBox) return true;
     const entry = models[entryIndex];
-    const text = (jsonBox.value || "").trim();
-    if (!text) return true;
+    const text2 = (jsonBox.value || "").trim();
+    if (!text2) return true;
     let parsed;
     try {
-      parsed = JSON.parse(text);
+      parsed = JSON.parse(text2);
     } catch (err) {
       alert("Current JSON is invalid. Fix it before switching versions.");
       return false;
     }
     ensureModelMetadata(parsed, {
       titleHint: getModelTitle(entry),
-      idHint: getModelId(entry),
+      idHint: getModelId(entry)
     });
     const currentFp = computeJsonFingerprint(entry.data);
     const editedFp = computeJsonFingerprint(parsed);
     if (currentFp === editedFp) return true;
     entry.data = parsed;
     const activeVerIdx = getActiveApicurioVersionIndex(entry);
-    if (activeVerIdx >= 0 && entry.apicurioVersions?.[activeVerIdx]) {
+    if (activeVerIdx >= 0 && ((_a = entry.apicurioVersions) == null ? void 0 : _a[activeVerIdx])) {
       entry.apicurioVersions[activeVerIdx].data = parsed;
     }
     return true;
   }
-
-  function collectAllItemIds(modelData) {
-    const ids = new Set();
-    (modelData?.categories || []).forEach((cat) =>
-      (cat.items || []).forEach((it) => {
-        if (it?.id) ids.add(it.id);
+  function collectAllItemIds2(modelData) {
+    const ids = /* @__PURE__ */ new Set();
+    ((modelData == null ? void 0 : modelData.categories) || []).forEach(
+      (cat) => (cat.items || []).forEach((it) => {
+        if (it == null ? void 0 : it.id) ids.add(it.id);
       })
     );
     return ids;
   }
-
   function findItemAndCategoryById(itemId) {
     if (activeIndex < 0 || !itemId) return null;
     const mobj = models[activeIndex].data;
-    const categories = mobj?.categories || [];
+    const categories = (mobj == null ? void 0 : mobj.categories) || [];
     for (const cat of categories) {
       const items = cat.items || [];
       const found = items.find((it) => it.id === itemId);
@@ -1559,10 +3422,9 @@ export function initBlockscape() {
     }
     return null;
   }
-
   function makeUniqueItemId(base, modelData) {
-    const ids = collectAllItemIds(modelData);
-    let candidate = makeDownloadName(base || "item") || `item-${uid()}`;
+    const ids = collectAllItemIds2(modelData);
+    let candidate = makeDownloadName(base || "item");
     if (!ids.has(candidate)) return candidate;
     const suffix = () => uid().slice(0, 4);
     while (ids.has(candidate)) {
@@ -1570,9 +3432,8 @@ export function initBlockscape() {
     }
     return candidate;
   }
-
   function makeUniqueCategoryId(base = "category", modelData) {
-    const categories = modelData?.categories || [];
+    const categories = (modelData == null ? void 0 : modelData.categories) || [];
     const slug = makeDownloadName(base || "category");
     const exists = (id) => categories.some((cat) => cat.id === id);
     let candidate = slug || `category-${uid()}`;
@@ -1583,37 +3444,35 @@ export function initBlockscape() {
     }
     return `${slug}-${counter}`;
   }
-
   const itemEditor = createItemEditor({
     findItemAndCategoryById,
-    collectAllItemIds,
+    collectAllItemIds: collectAllItemIds2,
     updateItemReferences,
     loadActiveIntoEditor,
     rebuildFromActive,
     select: (id) => select(id),
     onSelectionRenamed: (oldId, newId) => {
+      var _a;
       if (selection === oldId) {
         selection = newId;
         syncSelectionClass();
       }
-      if (lastDeletedItem?.item?.id === oldId) lastDeletedItem.item.id = newId;
-    },
+      if (((_a = lastDeletedItem == null ? void 0 : lastDeletedItem.item) == null ? void 0 : _a.id) === oldId) lastDeletedItem.item.id = newId;
+    }
   });
-
   function createCategoryEditor({
     getActiveModelData,
-    loadActiveIntoEditor,
-    rebuildFromActive,
-    selectCategory,
-    onCategoryRenamed,
+    loadActiveIntoEditor: loadActiveIntoEditor2,
+    rebuildFromActive: rebuildFromActive2,
+    selectCategory: selectCategory2,
+    onCategoryRenamed
   }) {
     const state = {
       wrapper: null,
       fields: {},
       categoryId: null,
-      modelData: null,
+      modelData: null
     };
-
     const setError = (message) => {
       if (!state.fields.errorEl) return;
       if (!message) {
@@ -1624,7 +3483,6 @@ export function initBlockscape() {
       state.fields.errorEl.hidden = false;
       state.fields.errorEl.textContent = message;
     };
-
     const hide = () => {
       if (!state.wrapper) return;
       state.wrapper.hidden = true;
@@ -1634,18 +3492,17 @@ export function initBlockscape() {
       state.modelData = null;
       document.body.classList.remove("category-editor-open");
     };
-
     const show = () => {
       if (!state.wrapper) return;
       state.wrapper.hidden = false;
       state.wrapper.setAttribute("aria-hidden", "false");
       document.body.classList.add("category-editor-open");
       requestAnimationFrame(() => {
-        state.fields.titleInput?.focus();
-        state.fields.titleInput?.select();
+        var _a, _b;
+        (_a = state.fields.titleInput) == null ? void 0 : _a.focus();
+        (_b = state.fields.titleInput) == null ? void 0 : _b.select();
       });
     };
-
     const applyEdits = () => {
       if (!state.modelData || !state.categoryId) {
         throw new Error("No category loaded.");
@@ -1666,12 +3523,11 @@ export function initBlockscape() {
       if (oldId !== nextId && typeof onCategoryRenamed === "function") {
         onCategoryRenamed(oldId, nextId);
       }
-      loadActiveIntoEditor();
-      rebuildFromActive();
-      selectCategory(nextId, { scrollIntoView: true });
+      loadActiveIntoEditor2();
+      rebuildFromActive2();
+      selectCategory2(nextId, { scrollIntoView: true });
       return true;
     };
-
     const save = () => {
       try {
         applyEdits();
@@ -1679,11 +3535,10 @@ export function initBlockscape() {
         return true;
       } catch (error) {
         console.warn("[CategoryEditor] save failed", error);
-        setError(error?.message || "Unable to save category.");
+        setError((error == null ? void 0 : error.message) || "Unable to save category.");
         return false;
       }
     };
-
     const ensureModal = () => {
       if (state.wrapper) return state.wrapper;
       const wrapper = document.createElement("div");
@@ -1691,15 +3546,12 @@ export function initBlockscape() {
       wrapper.hidden = true;
       wrapper.setAttribute("role", "dialog");
       wrapper.setAttribute("aria-modal", "true");
-
       const backdrop = document.createElement("div");
       backdrop.className = "item-editor-modal__backdrop";
       wrapper.appendChild(backdrop);
-
       const dialog = document.createElement("div");
       dialog.className = "item-editor";
       wrapper.appendChild(dialog);
-
       const header = document.createElement("div");
       header.className = "item-editor__header";
       const title = document.createElement("h2");
@@ -1713,22 +3565,17 @@ export function initBlockscape() {
       header.appendChild(title);
       header.appendChild(closeBtn);
       dialog.appendChild(header);
-
       const form = document.createElement("form");
       form.className = "item-editor__form";
       dialog.appendChild(form);
-
       const meta = document.createElement("div");
       meta.className = "item-editor__meta";
-      meta.innerHTML =
-        '<div class="item-editor__meta-label">Category</div><div class="item-editor__meta-value"></div>';
+      meta.innerHTML = '<div class="item-editor__meta-label">Category</div><div class="item-editor__meta-value"></div>';
       form.appendChild(meta);
-
       const errorEl = document.createElement("div");
       errorEl.className = "item-editor__error";
       errorEl.hidden = true;
       form.appendChild(errorEl);
-
       const makeField = (labelText, inputEl, hintText) => {
         const field = document.createElement("label");
         field.className = "item-editor__field";
@@ -1746,13 +3593,11 @@ export function initBlockscape() {
         }
         return field;
       };
-
       const titleInput = document.createElement("input");
       titleInput.type = "text";
       form.appendChild(
         makeField("Title", titleInput, "Display label shown in the map.")
       );
-
       const idInput = document.createElement("input");
       idInput.type = "text";
       idInput.required = true;
@@ -1763,24 +3608,19 @@ export function initBlockscape() {
           "Unique identifier for this category (used in URLs and references)."
         )
       );
-
       const actions = document.createElement("div");
       actions.className = "item-editor__actions";
-
       const saveBtn = document.createElement("button");
       saveBtn.type = "submit";
       saveBtn.className = "item-editor__action item-editor__action--primary";
       saveBtn.textContent = "Save";
-
       const cancelBtn = document.createElement("button");
       cancelBtn.type = "button";
       cancelBtn.className = "item-editor__action";
       cancelBtn.textContent = "Cancel";
-
       actions.appendChild(saveBtn);
       actions.appendChild(cancelBtn);
       form.appendChild(actions);
-
       form.addEventListener("submit", (event) => {
         event.preventDefault();
         save();
@@ -1794,47 +3634,44 @@ export function initBlockscape() {
           hide();
         }
       });
-
       document.body.appendChild(wrapper);
-
       state.wrapper = wrapper;
       state.fields = {
         titleInput,
         idInput,
         errorEl,
-        metaLabel: meta.querySelector(".item-editor__meta-value"),
+        metaLabel: meta.querySelector(".item-editor__meta-value")
       };
       return wrapper;
     };
-
     const open = (catId) => {
       if (!catId) return false;
       const modal = ensureModal();
       if (!modal) return false;
       const modelData = getActiveModelData();
-      const categories = modelData?.categories || [];
+      const categories = (modelData == null ? void 0 : modelData.categories) || [];
       const category = categories.find((cat) => cat.id === catId);
       if (!category) return false;
       state.categoryId = category.id;
       state.modelData = modelData;
-      state.fields.metaLabel.textContent =
-        category.title || category.id || "Category";
+      state.fields.metaLabel.textContent = category.title || category.id || "Category";
       state.fields.titleInput.value = category.title || category.id || "";
       state.fields.idInput.value = category.id || "";
       setError("");
       show();
       return true;
     };
-
     return {
       open,
       hide,
-      isOpen: () => !!state.wrapper && state.wrapper.hidden === false,
+      isOpen: () => !!state.wrapper && state.wrapper.hidden === false
     };
   }
-
   const categoryEditor = createCategoryEditor({
-    getActiveModelData: () => models[activeIndex]?.data,
+    getActiveModelData: () => {
+      var _a;
+      return (_a = models[activeIndex]) == null ? void 0 : _a.data;
+    },
     loadActiveIntoEditor,
     rebuildFromActive,
     selectCategory: (catId, opts = {}) => selectCategory(catId, opts),
@@ -1843,34 +3680,23 @@ export function initBlockscape() {
         selectedCategoryId = newId;
         syncSelectionClass();
       }
-    },
+    }
   });
-
-  function ensureVersionContainer(
-    entry,
-    { versionLabel = "1", createdOn } = {}
-  ) {
+  function ensureVersionContainer(entry, { versionLabel = "1", createdOn } = {}) {
     if (!entry) return entry;
-    if (
-      Array.isArray(entry.apicurioVersions) &&
-      entry.apicurioVersions.length
-    ) {
+    if (Array.isArray(entry.apicurioVersions) && entry.apicurioVersions.length) {
       if (entry.apicurioActiveVersionIndex == null) {
         entry.apicurioActiveVersionIndex = 0;
       }
-      if (
-        !entry.data &&
-        entry.apicurioVersions[entry.apicurioActiveVersionIndex]
-      ) {
-        entry.data =
-          entry.apicurioVersions[entry.apicurioActiveVersionIndex].data;
+      if (!entry.data && entry.apicurioVersions[entry.apicurioActiveVersionIndex]) {
+        entry.data = entry.apicurioVersions[entry.apicurioActiveVersionIndex].data;
       }
       return entry;
     }
     const initialVersion = {
       version: versionLabel,
       data: entry.data,
-      createdOn: createdOn || new Date().toISOString(),
+      createdOn: createdOn || (/* @__PURE__ */ new Date()).toISOString()
     };
     entry.apicurioVersions = [initialVersion];
     entry.apicurioActiveVersionIndex = 0;
@@ -1879,9 +3705,9 @@ export function initBlockscape() {
     entry.isSeries = true;
     return entry;
   }
-
   function addModelEntry(entry, { versionLabel, createdOn } = {}) {
-    if (entry?.isSeries || entry?.apicurioVersions?.length > 1) {
+    var _a, _b, _c;
+    if ((entry == null ? void 0 : entry.isSeries) || ((_a = entry == null ? void 0 : entry.apicurioVersions) == null ? void 0 : _a.length) > 1) {
       const name = entry.title || getModelTitle(entry);
       ensureSeriesId(entry, { seriesName: name, fallbackTitle: name });
     }
@@ -1889,7 +3715,7 @@ export function initBlockscape() {
     if (!modelId) {
       ensureVersionContainer(entry, {
         versionLabel: versionLabel || "1",
-        createdOn,
+        createdOn
       });
       models.push(entry);
       return models.length - 1;
@@ -1898,54 +3724,51 @@ export function initBlockscape() {
     if (existingIndex === -1) {
       ensureVersionContainer(entry, {
         versionLabel: versionLabel || "1",
-        createdOn,
+        createdOn
       });
       models.push(entry);
       return models.length - 1;
     }
-    const target = models[existingIndex];
-    if (
-      !Array.isArray(target.apicurioVersions) ||
-      !target.apicurioVersions.length
-    ) {
-      target.apicurioVersions = [
+    const target2 = models[existingIndex];
+    if (!Array.isArray(target2.apicurioVersions) || !target2.apicurioVersions.length) {
+      target2.apicurioVersions = [
         {
           version: "1",
-          data: target.data,
-          createdOn: target.apicurioVersions?.[0]?.createdOn,
-        },
+          data: target2.data,
+          createdOn: (_c = (_b = target2.apicurioVersions) == null ? void 0 : _b[0]) == null ? void 0 : _c.createdOn
+        }
       ];
-      target.apicurioActiveVersionIndex = 0;
-      const mergedName = target.title || getModelTitle(target);
-      ensureSeriesId(target, {
+      target2.apicurioActiveVersionIndex = 0;
+      const mergedName = target2.title || getModelTitle(target2);
+      ensureSeriesId(target2, {
         seriesName: mergedName,
-        fallbackTitle: mergedName,
+        fallbackTitle: mergedName
       });
     }
-    const label = String(target.apicurioVersions.length + 1);
-    target.apicurioVersions.push({
+    const label = String(target2.apicurioVersions.length + 1);
+    target2.apicurioVersions.push({
       version: label,
       data: entry.data,
-      createdOn: createdOn || new Date().toISOString(),
+      createdOn: createdOn || (/* @__PURE__ */ new Date()).toISOString()
     });
-    target.apicurioActiveVersionIndex = target.apicurioVersions.length - 1;
-    target.data = entry.data;
-    target.title = getModelTitle(entry) || target.title;
-    target.isSeries = true;
-    const seriesName = target.title || getModelTitle(target);
-    ensureSeriesId(target, { seriesName, fallbackTitle: seriesName });
+    target2.apicurioActiveVersionIndex = target2.apicurioVersions.length - 1;
+    target2.data = entry.data;
+    target2.title = getModelTitle(entry) || target2.title;
+    target2.isSeries = true;
+    const seriesName = target2.title || getModelTitle(target2);
+    ensureSeriesId(target2, { seriesName, fallbackTitle: seriesName });
     return existingIndex;
   }
-
   function createNewVersionFromActive({ versionLabel } = {}) {
+    var _a;
     if (activeIndex < 0 || !models[activeIndex]) {
       throw new Error("Load or select a model before creating a version.");
     }
-    const target = models[activeIndex];
-    ensureVersionContainer(target, { versionLabel: "1" });
+    const target2 = models[activeIndex];
+    ensureVersionContainer(target2, { versionLabel: "1" });
     let copy;
     try {
-      copy = cloneModelData(target.data);
+      copy = cloneModelData(target2.data);
     } catch (error) {
       console.warn(
         "[Blockscape] failed to clone active model for versioning",
@@ -1954,45 +3777,39 @@ export function initBlockscape() {
       throw new Error("Could not copy the current model.");
     }
     ensureModelMetadata(copy, {
-      titleHint: getModelTitle(target),
-      idHint: getModelId(target) || getSeriesId(target),
+      titleHint: getModelTitle(target2),
+      idHint: getModelId(target2) || getSeriesId(target2)
     });
-    const label =
-      versionLabel || String((target.apicurioVersions?.length || 0) + 1);
+    const label = versionLabel || String((((_a = target2.apicurioVersions) == null ? void 0 : _a.length) || 0) + 1);
     const newVersion = {
       version: label,
       data: copy,
-      createdOn: new Date().toISOString(),
+      createdOn: (/* @__PURE__ */ new Date()).toISOString()
     };
-    target.apicurioVersions.push(newVersion);
-    target.apicurioActiveVersionIndex = target.apicurioVersions.length - 1;
-    target.data = copy;
-    target.isSeries = true;
-    const seriesName = target.title || getModelTitle(target);
-    ensureSeriesId(target, { seriesName, fallbackTitle: seriesName });
+    target2.apicurioVersions.push(newVersion);
+    target2.apicurioActiveVersionIndex = target2.apicurioVersions.length - 1;
+    target2.data = copy;
+    target2.isSeries = true;
+    const seriesName = target2.title || getModelTitle(target2);
+    ensureSeriesId(target2, { seriesName, fallbackTitle: seriesName });
     return activeIndex;
   }
-
   function syncDocumentTitle() {
-    const activeModel =
-      activeIndex >= 0 && models[activeIndex] ? models[activeIndex] : null;
+    const activeModel = activeIndex >= 0 && models[activeIndex] ? models[activeIndex] : null;
     const modelId = getModelId(activeModel);
     document.title = modelId ? `${modelId}-blockscape` : defaultDocumentTitle;
   }
-
   function buildSeriesPayload(entry) {
     if (!entry) return null;
     const versions = entry.apicurioVersions;
     if (!Array.isArray(versions) || versions.length <= 1) return null;
-    const seriesName =
-      entry.title || entry.apicurioArtifactName || getModelTitle(entry);
+    const seriesName = entry.title || entry.apicurioArtifactName || getModelTitle(entry);
     ensureSeriesId(entry, { seriesName, fallbackTitle: seriesName });
     return versions.map((ver) => {
       if (ver && typeof ver === "object" && "data" in ver) return ver.data;
       return ver;
     });
   }
-
   function getActiveSeriesJson() {
     const active = models[activeIndex];
     const payload = buildSeriesPayload(active);
@@ -2004,21 +3821,16 @@ export function initBlockscape() {
       return null;
     }
   }
-
   function downloadCurrentJson(source = "shortcut", preferSeries = false) {
-    const text = jsonBox.value || "";
-    if (!text.trim()) {
+    const text2 = jsonBox.value || "";
+    if (!text2.trim()) {
       console.warn("[Blockscape] download ignored: JSON box is empty.");
       return false;
     }
     const active = models[activeIndex];
     const seriesPayload = preferSeries ? buildSeriesPayload(active) : null;
     const isSeries = Boolean(seriesPayload);
-
-    const payloadText = isSeries
-      ? JSON.stringify(seriesPayload, null, 2)
-      : text;
-
+    const payloadText = isSeries ? JSON.stringify(seriesPayload, null, 2) : text2;
     const seriesId = getSeriesId(active);
     const modelId = getModelId(active);
     const title = seriesId || modelId || getModelTitle(active, "blockscape");
@@ -2028,9 +3840,6 @@ export function initBlockscape() {
     console.log(`[Blockscape] saved JSON (${source}):`, filename);
     return true;
   }
-
-  // --- NEW: letter → color mapping and helpers ---
-  // Letter → color mapping (tailwind-ish palette). G => green.
   const LETTER_COLOR_MAP = {
     A: "#0284c7",
     B: "#3b82f6",
@@ -2057,39 +3866,22 @@ export function initBlockscape() {
     W: "#818cf8",
     X: "#a78bfa",
     Y: "#f472b6",
-    Z: "#fb7185",
+    Z: "#fb7185"
   };
-
-  // Prefer explicit item.color (if present), else map by first letter.
-  function getBadgeColor(text, explicit) {
+  function getBadgeColor(text2, explicit) {
     if (explicit && /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(explicit))
       return explicit;
-    const ch = (text || "?").charAt(0).toUpperCase();
-    return LETTER_COLOR_MAP[ch] || "#9ca3af"; // fallback gray
+    const ch = (text2 || "?").charAt(0).toUpperCase();
+    return LETTER_COLOR_MAP[ch] || "#9ca3af";
   }
-
-  // Compute readable letter color (black/white) against bg
   function idealTextColor(bgHex) {
     const hex = bgHex.replace("#", "");
-    const expanded =
-      hex.length === 3
-        ? hex
-            .split("")
-            .map((c) => c + c)
-            .join("")
-        : hex;
+    const expanded = hex.length === 3 ? hex.split("").map((c) => c + c).join("") : hex;
     const bigint = parseInt(expanded, 16);
-    const r = (bigint >> 16) & 255,
-      g = (bigint >> 8) & 255,
-      b = bigint & 255;
-    // luminance (sRGB)
-    const L =
-      0.2126 * Math.pow(r / 255, 2.2) +
-      0.7152 * Math.pow(g / 255, 2.2) +
-      0.0722 * Math.pow(b / 255, 2.2);
+    const r = bigint >> 16 & 255, g = bigint >> 8 & 255, b = bigint & 255;
+    const L = 0.2126 * Math.pow(r / 255, 2.2) + 0.7152 * Math.pow(g / 255, 2.2) + 0.0722 * Math.pow(b / 255, 2.2);
     return L > 0.35 ? "#111111" : "#ffffff";
   }
-
   function scrollPageToTop() {
     if (typeof window === "undefined" || typeof window.scrollTo !== "function")
       return;
@@ -2099,7 +3891,6 @@ export function initBlockscape() {
       window.scrollTo(0, 0);
     }
   }
-
   function ensureNoticeElements() {
     if (noticeEl) return;
     noticeEl = document.createElement("div");
@@ -2112,7 +3903,6 @@ export function initBlockscape() {
     noticeEl.appendChild(noticeTextEl);
     document.body.appendChild(noticeEl);
   }
-
   function clearNotice() {
     if (noticeTimer) {
       clearTimeout(noticeTimer);
@@ -2121,7 +3911,6 @@ export function initBlockscape() {
     if (noticeEl) noticeEl.classList.remove("is-visible");
     if (noticeTextEl) noticeTextEl.textContent = "";
   }
-
   function clearSeriesNavNotice() {
     pendingSeriesNavigation = null;
     if (pendingSeriesNavigationTimer) {
@@ -2130,7 +3919,6 @@ export function initBlockscape() {
     }
     clearNotice();
   }
-
   function clearModelNavNotice() {
     pendingModelNavigation = null;
     if (pendingModelNavigationTimer) {
@@ -2139,14 +3927,13 @@ export function initBlockscape() {
     }
     clearNotice();
   }
-
   function describeSeriesVersion(entry, versionIndex) {
-    if (!entry?.apicurioVersions?.[versionIndex])
+    var _a;
+    if (!((_a = entry == null ? void 0 : entry.apicurioVersions) == null ? void 0 : _a[versionIndex]))
       return `version ${versionIndex + 1}`;
     const label = entry.apicurioVersions[versionIndex].version;
     return label ? `version "${label}"` : `version ${versionIndex + 1}`;
   }
-
   function showSeriesNavNotice(id, targetVersionIndex, entry) {
     ensureNoticeElements();
     pendingSeriesNavigation = { id, targetVersionIndex };
@@ -2163,7 +3950,6 @@ export function initBlockscape() {
       seriesNavDoubleClickWaitMs
     );
   }
-
   function showModelNavNotice(id, targetIndex) {
     ensureNoticeElements();
     pendingModelNavigation = { id, targetIndex };
@@ -2180,7 +3966,6 @@ export function initBlockscape() {
       seriesNavDoubleClickWaitMs
     );
   }
-
   function showNotice(message, timeout = NOTICE_TIMEOUT_MS, linkHref = null) {
     ensureNoticeElements();
     noticeTextEl.textContent = "";
@@ -2199,14 +3984,12 @@ export function initBlockscape() {
     if (noticeTimer) clearTimeout(noticeTimer);
     noticeTimer = setTimeout(() => clearNotice(), timeout);
   }
-
   function renderShortcutHelpList() {
     if (!shortcutHelpList) return;
     shortcutHelpList.innerHTML = "";
     SHORTCUT_CONFIG.forEach((entry) => {
       const row = document.createElement("div");
       row.className = "shortcut-help__row";
-
       const keys = document.createElement("div");
       keys.className = "shortcut-help__keys";
       entry.keys.forEach((combo, comboIdx) => {
@@ -2232,22 +4015,18 @@ export function initBlockscape() {
         });
         keys.appendChild(comboEl);
       });
-
       const desc = document.createElement("div");
       desc.className = "shortcut-help__desc";
       desc.textContent = entry.description;
-
       row.appendChild(keys);
       row.appendChild(desc);
       shortcutHelpList.appendChild(row);
     });
     shortcutHelpListBuilt = true;
   }
-
   function isShortcutHelpOpen() {
     return !!shortcutHelp && shortcutHelp.hidden === false;
   }
-
   function openShortcutHelp() {
     if (!shortcutHelp) return;
     if (!shortcutHelpListBuilt) renderShortcutHelpList();
@@ -2256,41 +4035,37 @@ export function initBlockscape() {
     shortcutHelp.setAttribute("aria-hidden", "false");
     document.body.classList.add("shortcut-help-open");
     const panel = shortcutHelp.querySelector(".shortcut-help__panel");
-    panel?.focus({ preventScroll: true });
+    panel == null ? void 0 : panel.focus({ preventScroll: true });
   }
-
   function closeShortcutHelp() {
     if (!shortcutHelp || shortcutHelp.hidden) return;
     shortcutHelp.hidden = true;
     shortcutHelp.setAttribute("aria-hidden", "true");
     document.body.classList.remove("shortcut-help-open");
-    const target = lastShortcutTrigger;
-    if (target?.focus) {
-      target.focus({ preventScroll: true });
-    } else if (helpButton?.focus) {
+    const target2 = lastShortcutTrigger;
+    if (target2 == null ? void 0 : target2.focus) {
+      target2.focus({ preventScroll: true });
+    } else if (helpButton == null ? void 0 : helpButton.focus) {
       helpButton.focus({ preventScroll: true });
     }
   }
-
   function openNewPanel() {
     if (!newPanel) return;
     newPanel.hidden = false;
     newPanel.setAttribute("aria-hidden", "false");
     document.body.classList.add("shortcut-help-open");
     const panel = newPanel.querySelector(".shortcut-help__panel");
-    panel?.focus({ preventScroll: true });
+    panel == null ? void 0 : panel.focus({ preventScroll: true });
   }
-
   function closeNewPanel() {
     if (!newPanel || newPanel.hidden) return;
     newPanel.hidden = true;
     newPanel.setAttribute("aria-hidden", "true");
     document.body.classList.remove("shortcut-help-open");
-    if (newPanelButton?.focus) {
+    if (newPanelButton == null ? void 0 : newPanelButton.focus) {
       newPanelButton.focus({ preventScroll: true });
     }
   }
-
   let overlaySyncPending = false;
   function scheduleOverlaySync() {
     if (overlaySyncPending) return;
@@ -2301,18 +4076,10 @@ export function initBlockscape() {
       drawLinks();
     });
   }
-
   let globalEventsBound = false;
-
   function getSearchTerms(query) {
-    return (query || "")
-      .toString()
-      .toLowerCase()
-      .split(/\s+/)
-      .map((t) => t.trim())
-      .filter(Boolean);
+    return (query || "").toString().toLowerCase().split(/\s+/).map((t) => t.trim()).filter(Boolean);
   }
-
   function applyActiveSearchFilter(query) {
     const terms = getSearchTerms(query);
     if (!terms.length) {
@@ -2322,7 +4089,8 @@ export function initBlockscape() {
       return;
     }
     app.querySelectorAll(".tile").forEach((t) => {
-      const name = (t.querySelector(".name")?.textContent || "").toLowerCase();
+      var _a;
+      const name = (((_a = t.querySelector(".name")) == null ? void 0 : _a.textContent) || "").toLowerCase();
       const id = (t.dataset.id || "").toLowerCase();
       const matches = terms.every(
         (term) => name.includes(term) || id.includes(term)
@@ -2330,12 +4098,12 @@ export function initBlockscape() {
       t.style.opacity = matches ? "1" : "0.2";
     });
   }
-
   function collectSearchMatches(query) {
     const terms = getSearchTerms(query);
     if (!terms.length) return [];
     const results = [];
     models.forEach((entry, modelIndex) => {
+      var _a;
       const modelTitle = getModelDisplayTitle(entry);
       const modelId = getModelId(entry) || "";
       const modelHaystack = `${modelTitle} ${modelId}`.toLowerCase();
@@ -2344,12 +4112,10 @@ export function initBlockscape() {
           type: "model",
           modelIndex,
           modelTitle,
-          modelId,
+          modelId
         });
       }
-      const categories = Array.isArray(entry.data?.categories)
-        ? entry.data.categories
-        : [];
+      const categories = Array.isArray((_a = entry.data) == null ? void 0 : _a.categories) ? entry.data.categories : [];
       categories.forEach((cat) => {
         const catTitle = (cat.title || cat.id || "").toString();
         (cat.items || []).forEach((it) => {
@@ -2363,7 +4129,7 @@ export function initBlockscape() {
               modelId,
               itemId: it.id,
               itemName: name,
-              categoryTitle: catTitle,
+              categoryTitle: catTitle
             });
           }
         });
@@ -2371,7 +4137,6 @@ export function initBlockscape() {
     });
     return results.slice(0, MAX_SEARCH_RESULTS);
   }
-
   function renderSearchResults(query) {
     if (!searchResults) return;
     searchResults.innerHTML = "";
@@ -2404,33 +4169,22 @@ export function initBlockscape() {
       btn.dataset.modelIndex = String(match.modelIndex);
       if (match.itemId) btn.dataset.itemId = match.itemId;
       if (match.type) btn.dataset.type = match.type;
-      if (
-        match.modelIndex === activeIndex &&
-        (!match.itemId || selection === match.itemId)
-      ) {
+      if (match.modelIndex === activeIndex && (!match.itemId || selection === match.itemId)) {
         btn.classList.add("is-active");
       }
-
       const primary = document.createElement("div");
       primary.className = "search-result__primary";
       const title = document.createElement("span");
-      title.textContent =
-        match.type === "model"
-          ? match.modelTitle
-          : match.itemName || match.itemId || "Item";
+      title.textContent = match.type === "model" ? match.modelTitle : match.itemName || match.itemId || "Item";
       primary.appendChild(title);
       const badge = document.createElement("span");
       badge.className = "search-result__badge";
-      badge.textContent =
-        match.type === "item" ? match.categoryTitle || "Item" : "Model";
+      badge.textContent = match.type === "item" ? match.categoryTitle || "Item" : "Model";
       primary.appendChild(badge);
-
       const meta = document.createElement("div");
       meta.className = "search-result__meta";
       const modelMeta = document.createElement("span");
-      modelMeta.textContent = match.modelId
-        ? `${match.modelTitle} · ${match.modelId}`
-        : match.modelTitle;
+      modelMeta.textContent = match.modelId ? `${match.modelTitle} · ${match.modelId}` : match.modelTitle;
       meta.appendChild(modelMeta);
       if (match.type === "item" && match.itemId) {
         const itemMeta = document.createElement("span");
@@ -2441,38 +4195,36 @@ export function initBlockscape() {
         scopeMeta.textContent = "Matches model title";
         meta.appendChild(scopeMeta);
       }
-
       btn.appendChild(primary);
       btn.appendChild(meta);
       searchResults.appendChild(btn);
     });
     searchResults.hidden = false;
   }
-
   function handleSearchInput(value) {
     applyActiveSearchFilter(value || "");
     renderSearchResults(value || "");
   }
-
   function activateSearchResult(match) {
     if (!match || !Number.isInteger(match.modelIndex)) return;
     setActive(match.modelIndex);
     if (!match.itemId) return;
     requestAnimationFrame(() => {
+      var _a;
       if (activeIndex !== match.modelIndex) return;
-      const tile = index.get(match.itemId)?.el;
+      const tile = (_a = index.get(match.itemId)) == null ? void 0 : _a.el;
       if (!tile) return;
       select(match.itemId);
       tile.scrollIntoView({
         behavior: "smooth",
         block: "center",
-        inline: "center",
+        inline: "center"
       });
       tile.focus({ preventScroll: true });
     });
   }
-
   function setActive(i) {
+    var _a;
     hidePreview();
     clearSeriesNavNotice();
     lastDeletedItem = null;
@@ -2491,8 +4243,8 @@ export function initBlockscape() {
       "(index",
       i + " )"
     );
-    if (typeof localBackend?.highlightSource === "function") {
-      const targetPath = models[i]?.sourcePath || null;
+    if (typeof (localBackend == null ? void 0 : localBackend.highlightSource) === "function") {
+      const targetPath = ((_a = models[i]) == null ? void 0 : _a.sourcePath) || null;
       localBackend.highlightSource(targetPath);
     }
     syncDocumentTitle();
@@ -2505,7 +4257,6 @@ export function initBlockscape() {
     localBackend.updateActiveSavePlaceholder();
     apicurio.updateAvailability();
   }
-
   function renderModelList() {
     modelList.innerHTML = "";
     if (!models.length) {
@@ -2515,26 +4266,21 @@ export function initBlockscape() {
       modelList.appendChild(empty);
       return;
     }
-
     models.forEach((m, i) => {
+      var _a;
       const li = document.createElement("li");
       li.className = "model-nav-item";
-
       const btn = document.createElement("button");
       btn.type = "button";
-      btn.className =
-        "model-nav-button" + (i === activeIndex ? " is-active" : "");
+      btn.className = "model-nav-button" + (i === activeIndex ? " is-active" : "");
       btn.dataset.index = String(i);
       btn.setAttribute("aria-current", i === activeIndex ? "true" : "false");
-
       const label = document.createElement("span");
       label.className = "model-nav-label";
-
       const titleSpan = document.createElement("span");
       titleSpan.className = "model-nav-title";
       titleSpan.textContent = getModelDisplayTitle(m);
       label.appendChild(titleSpan);
-
       const dataId = formatIdForDisplay(
         getModelSourceLabel(m) || getModelId(m)
       );
@@ -2544,32 +4290,22 @@ export function initBlockscape() {
         idBadge.textContent = dataId;
         label.appendChild(idBadge);
       }
-
-      const categories = Array.isArray(m.data?.categories)
-        ? m.data.categories
-        : [];
+      const categories = Array.isArray((_a = m.data) == null ? void 0 : _a.categories) ? m.data.categories : [];
       const itemsCount = categories.reduce(
         (sum, cat) => sum + (cat.items || []).length,
         0
       );
-
       const meta = document.createElement("span");
       meta.className = "model-nav-meta";
-      const versionsInfo =
-        m.apicurioVersions && m.apicurioVersions.length > 1
-          ? ` · ${m.apicurioVersions.length} maps`
-          : "";
+      const versionsInfo = m.apicurioVersions && m.apicurioVersions.length > 1 ? ` · ${m.apicurioVersions.length} maps` : "";
       meta.textContent = `${categories.length} cat · ${itemsCount} items${versionsInfo}`;
-
       btn.appendChild(label);
       btn.appendChild(meta);
       li.appendChild(btn);
       modelList.appendChild(li);
     });
-
     apicurio.updateAvailability();
   }
-
   function loadActiveIntoEditor() {
     if (activeIndex < 0) {
       jsonBox.value = "";
@@ -2582,7 +4318,6 @@ export function initBlockscape() {
       copySeriesButton.disabled = !buildSeriesPayload(active);
     }
   }
-
   function tryParseJson(txt) {
     try {
       return JSON.parse(txt);
@@ -2590,25 +4325,18 @@ export function initBlockscape() {
       return null;
     }
   }
-
   function buildSeriesEntry(list, titleBase = "Pasted", options = {}) {
     const array = Array.isArray(list) ? list : [];
     if (!array.length) return [];
-
-    const normalized = array
-      .map((obj, idx) => {
-        if (!obj || typeof obj !== "object") return null;
-        ensureModelMetadata(obj, { titleHint: `${titleBase} #${idx + 1}` });
-        return { obj, idx };
-      })
-      .filter(Boolean);
-
+    const normalized = array.map((obj, idx) => {
+      if (!obj || typeof obj !== "object") return null;
+      ensureModelMetadata(obj, { titleHint: `${titleBase} #${idx + 1}` });
+      return { obj, idx };
+    }).filter(Boolean);
     if (!normalized.length) return [];
-
     const first = normalized[0].obj;
     const { seriesTitleOverride } = options;
-    let seriesTitle =
-      seriesTitleOverride || first.title || `${titleBase} series`;
+    let seriesTitle = seriesTitleOverride || first.title || `${titleBase} series`;
     if (seriesTitleOverride && !first.title) {
       first.title = seriesTitleOverride;
     }
@@ -2618,24 +4346,19 @@ export function initBlockscape() {
       data: first,
       apicurioVersions: normalized.map(({ obj, idx }) => ({
         version: String(idx + 1),
-        data: obj,
+        data: obj
       })),
       apicurioActiveVersionIndex: 0,
-      isSeries: true,
+      isSeries: true
     };
     const seriesId = ensureSeriesId(entry, {
       seriesName: seriesTitle,
-      fallbackTitle: seriesTitle,
+      fallbackTitle: seriesTitle
     });
     if (seriesId) entry.id = seriesId;
     return [entry];
   }
-
-  function normalizeToModelsFromValue(
-    value,
-    titleBase = "Pasted",
-    options = {}
-  ) {
+  function normalizeToModelsFromValue(value, titleBase = "Pasted", options = {}) {
     if (Array.isArray(value)) {
       return buildSeriesEntry(value, titleBase, options);
     }
@@ -2645,12 +4368,10 @@ export function initBlockscape() {
       {
         id: uid(),
         title: value.title || `${titleBase} #1`,
-        data: value,
-      },
+        data: value
+      }
     ];
   }
-
-  // Accept 1) object, 2) array-of-objects, 3) '---' or '%%%' separated objects
   function normalizeToModelsFromText(txt, titleBase = "Pasted", options = {}) {
     const trimmed = (txt || "").trim();
     if (!trimmed) return [];
@@ -2663,7 +4384,7 @@ export function initBlockscape() {
         normalizeOptions = {
           ...options,
           promptForSeriesName: false,
-          seriesTitleOverride: userTitle || defaultTitle,
+          seriesTitleOverride: userTitle || defaultTitle
         };
       }
       const normalized = normalizeToModelsFromValue(
@@ -2673,45 +4394,34 @@ export function initBlockscape() {
       );
       if (normalized.length) return normalized;
     }
-    const parts = trimmed
-      .split(/^\s*(?:---|%%%)\s*$/m)
-      .map((s) => s.trim())
-      .filter(Boolean);
+    const parts = trimmed.split(/^\s*(?:---|%%%)\s*$/m).map((s) => s.trim()).filter(Boolean);
     return parts.map((p, i) => {
       const obj = JSON.parse(p);
       ensureModelMetadata(obj, { titleHint: `${titleBase} #${i + 1}` });
       return {
         id: uid(),
         title: obj.title || `${titleBase} #${i + 1}`,
-        data: obj,
+        data: obj
       };
     });
   }
-
   function isEditableElement(el) {
     if (!el) return false;
     if (el.isContentEditable) return true;
     const tag = (el.tagName || "").toLowerCase();
     return tag === "input" || tag === "textarea" || tag === "select";
   }
-
   function shouldHandleGlobalPaste() {
     const active = document.activeElement;
-    if (
-      !active ||
-      active === document.body ||
-      active === document.documentElement
-    )
+    if (!active || active === document.body || active === document.documentElement)
       return true;
     return !isEditableElement(active);
   }
-
-  function looksLikeModelJson(text) {
-    if (!text) return false;
-    const start = text.trimStart();
+  function looksLikeModelJson(text2) {
+    if (!text2) return false;
+    const start = text2.trimStart();
     return /^\s*(\{|\[|---|%%%)/.test(start);
   }
-
   function consumeEditorPayload() {
     if (typeof window === "undefined" || !window.localStorage) return null;
     let raw;
@@ -2729,10 +4439,11 @@ export function initBlockscape() {
       console.warn("[Blockscape] invalid payload JSON", err);
       try {
         localStorage.removeItem(EDITOR_TRANSFER_KEY);
-      } catch (_) {}
+      } catch (_) {
+      }
       return null;
     }
-    if (payload?.source !== "editor") return null;
+    if ((payload == null ? void 0 : payload.source) !== "editor") return null;
     try {
       localStorage.removeItem(EDITOR_TRANSFER_KEY);
     } catch (err) {
@@ -2761,7 +4472,6 @@ export function initBlockscape() {
     console.log(`[Blockscape] imported ${entries.length} model(s) from editor`);
     return { index: firstIndex, count: entries.length };
   }
-
   function importEditorPayload(trigger = "storage") {
     const result = consumeEditorPayload();
     if (!result || typeof result.index !== "number") return false;
@@ -2771,71 +4481,32 @@ export function initBlockscape() {
     );
     return true;
   }
-
-  function updateShareHashForModel(model, fallbackTitle = "Shared Model") {
-    if (!model || !model.data) {
-      throw new Error("Select or load a model before sharing.");
-    }
-    let encoded;
-    const payload = {
-      title: getModelTitle(model, fallbackTitle),
-      data: model.data,
-    };
-    try {
-      encoded = base64UrlEncode(JSON.stringify(payload));
-    } catch (err) {
-      console.error("[Blockscape] share encode failed", err);
-      throw new Error("Unable to encode this model for sharing.");
-    }
-
-    const shareUrl = new URL(window.location.href);
-    shareUrl.searchParams.delete("share");
-    shareUrl.hash = `share=${encoded}`;
-
-    try {
-      window.history.replaceState({}, document.title, shareUrl.toString());
-    } catch (err) {
-      console.warn("[Blockscape] failed to update URL for share", err);
-      window.location.hash = shareUrl.hash;
-    }
-    return shareUrl;
-  }
-
   function consumeShareLink() {
     const hash = window.location.hash || "";
     let token = null;
-    let source = null;
-
     const hashMatch = hash.match(/share=([^&]+)/);
     if (hashMatch) {
       token = hashMatch[1];
-      source = "hash";
     }
-
     if (!token) {
       const params = new URLSearchParams(window.location.search);
       if (params.has("share")) {
         token = params.get("share");
-        source = "search";
       }
     }
-
     if (!token) return null;
-
     let payload;
     try {
-      const text = base64UrlDecode(token);
-      payload = JSON.parse(text);
+      const text2 = base64UrlDecode(token);
+      payload = JSON.parse(text2);
     } catch (err) {
       console.warn("[Blockscape] failed to decode share token", err);
       return null;
     }
-
     if (!payload || typeof payload !== "object" || payload.data == null) {
       console.warn("[Blockscape] share payload missing data");
       return null;
     }
-
     const entries = normalizeToModelsFromValue(
       payload.data,
       payload.title || "Shared Model"
@@ -2844,65 +4515,56 @@ export function initBlockscape() {
       console.warn("[Blockscape] share payload did not contain usable models");
       return null;
     }
-
     let firstIndex = null;
     entries.forEach((entry) => {
       const seriesName = entry.isSeries ? payload.title || entry.title : null;
       const idx = addModelEntry(
         {
           ...entry,
-          apicurioArtifactName: seriesName || entry.apicurioArtifactName,
+          apicurioArtifactName: seriesName || entry.apicurioArtifactName
         },
         { versionLabel: "shared" }
       );
       if (firstIndex == null) firstIndex = idx;
     });
-
     return firstIndex;
   }
-
   async function consumeLoadParam() {
     const hash = window.location.hash || "";
-    let target = null;
-
+    let target2 = null;
     const hashMatch = hash.match(/load=([^&]+)/);
     if (hashMatch) {
       try {
-        target = decodeURIComponent(hashMatch[1]);
+        target2 = decodeURIComponent(hashMatch[1]);
       } catch {
-        target = hashMatch[1];
+        target2 = hashMatch[1];
       }
     }
-
-    if (!target) {
+    if (!target2) {
       const params = new URLSearchParams(window.location.search);
       if (params.has("load")) {
-        target = params.get("load");
+        target2 = params.get("load");
       }
     }
-
-    if (!target) return null;
-
+    if (!target2) return null;
     try {
-      const idx = await loadFromUrl(target);
+      const idx = await loadFromUrl(target2);
       return typeof idx === "number" ? idx : null;
     } catch (err) {
       console.warn("[Blockscape] load param failed", err);
       return null;
     }
   }
-
   function parse(mObj) {
     console.log(
       "[Blockscape] parsing model; categories=",
-      (mObj?.categories || []).length
+      ((mObj == null ? void 0 : mObj.categories) || []).length
     );
-    const fwd = new Map();
-    const rev = new Map();
-    const seen = new Set();
-
-    (mObj.categories || []).forEach((c) =>
-      (c.items || []).forEach((it) => {
+    const fwd = /* @__PURE__ */ new Map();
+    const rev = /* @__PURE__ */ new Map();
+    const seen = /* @__PURE__ */ new Set();
+    (mObj.categories || []).forEach(
+      (c) => (c.items || []).forEach((it) => {
         seen.add(it.id);
         const deps = new Set(it.deps || []);
         (mObj.links || []).forEach((l) => {
@@ -2910,88 +4572,73 @@ export function initBlockscape() {
         });
         fwd.set(it.id, deps);
         deps.forEach((d) => {
-          if (!rev.has(d)) rev.set(d, new Set());
+          if (!rev.has(d)) rev.set(d, /* @__PURE__ */ new Set());
           rev.get(d).add(it.id);
         });
       })
     );
-
-    const reusedLocal = new Set();
+    const reusedLocal = /* @__PURE__ */ new Set();
     rev.forEach((dependents, node) => {
-      if ((dependents?.size || 0) >= 2) reusedLocal.add(node);
+      if (((dependents == null ? void 0 : dependents.size) || 0) >= 2) reusedLocal.add(node);
     });
     return { m: mObj, fwd, rev, reusedLocal, seen };
   }
-
-  // --- MODIFIED: color-aware letter image ---
-  function generateLetterImage(text, explicitColor) {
-    console.log("[Blockscape] generateLetterImage for:", text);
+  function generateLetterImage(text2, explicitColor) {
+    console.log("[Blockscape] generateLetterImage for:", text2);
     const canvas = document.createElement("canvas");
     const size = 44;
     canvas.width = size;
     canvas.height = size;
     const ctx = canvas.getContext("2d");
-
-    const letter = (text || "?").charAt(0).toUpperCase();
-    const bg = getBadgeColor(text, explicitColor);
+    const letter = (text2 || "?").charAt(0).toUpperCase();
+    const bg = getBadgeColor(text2, explicitColor);
     const fg = idealTextColor(bg);
-
-    // Circle
     ctx.fillStyle = bg;
     ctx.beginPath();
     ctx.arc(size / 2, size / 2, size / 2 - 2, 0, 2 * Math.PI);
     ctx.fill();
-
-    // Subtle ring
     ctx.strokeStyle = "rgba(0,0,0,0.15)";
     ctx.lineWidth = 1;
     ctx.stroke();
-
-    // Letter
     ctx.fillStyle = fg;
     ctx.font = `bold ${size * 0.5}px system-ui, -apple-system, sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(letter, size / 2, size / 2);
-
     return canvas.toDataURL("image/png");
   }
-
   function getActiveApicurioVersionIndex(entry) {
-    if (!entry?.apicurioVersions?.length) return -1;
-    const idx = Number.isInteger(entry.apicurioActiveVersionIndex)
-      ? entry.apicurioActiveVersionIndex
-      : 0;
+    var _a;
+    if (!((_a = entry == null ? void 0 : entry.apicurioVersions) == null ? void 0 : _a.length)) return -1;
+    const idx = Number.isInteger(entry.apicurioActiveVersionIndex) ? entry.apicurioActiveVersionIndex : 0;
     return Math.min(Math.max(idx, 0), entry.apicurioVersions.length - 1);
   }
-
   function getActiveApicurioVersionLabel(entry) {
     const idx = getActiveApicurioVersionIndex(entry);
     if (idx === -1) return null;
     const versionEntry = entry.apicurioVersions[idx];
-    return versionEntry?.version ?? null;
+    return (versionEntry == null ? void 0 : versionEntry.version) ?? null;
   }
-
   function buildModelIdToVersionIndex(entry) {
-    const map = new Map();
-    (entry?.apicurioVersions || []).forEach((ver, idx) => {
-      const id = (ver?.data?.id ?? "").toString().trim();
+    const map = /* @__PURE__ */ new Map();
+    ((entry == null ? void 0 : entry.apicurioVersions) || []).forEach((ver, idx) => {
+      var _a, _b;
+      const id = (((_a = ver == null ? void 0 : ver.data) == null ? void 0 : _a.id) ?? "").toString().trim();
       if (id) map.set(id, idx);
-      const seriesId = (ver?.data?.seriesId ?? "").toString().trim();
+      const seriesId = (((_b = ver == null ? void 0 : ver.data) == null ? void 0 : _b.seriesId) ?? "").toString().trim();
       if (seriesId && !map.has(seriesId)) map.set(seriesId, idx);
     });
     return map;
   }
-
-  const thumbnailCache = new WeakMap();
+  const thumbnailCache = /* @__PURE__ */ new WeakMap();
   function getSeriesThumbnail(entry, versionIdx) {
-    if (!entry?.apicurioVersions?.[versionIdx]) return null;
+    var _a;
+    if (!((_a = entry == null ? void 0 : entry.apicurioVersions) == null ? void 0 : _a[versionIdx])) return null;
     const version = entry.apicurioVersions[versionIdx];
     const payload = version.data;
     const fp = computeJsonFingerprint(payload);
     const cached = thumbnailCache.get(version);
     if (cached && cached.fingerprint === fp) return cached.dataUrl;
-
     const width = 160;
     const height = 90;
     const canvas = document.createElement("canvas");
@@ -3002,21 +4649,18 @@ export function initBlockscape() {
     ctx.fillRect(0, 0, width, height);
     ctx.strokeStyle = "#e5e7eb";
     ctx.strokeRect(0.5, 0.5, width - 1, height - 1);
-
-    const cats = Array.isArray(payload?.categories) ? payload.categories : [];
+    const cats = Array.isArray(payload == null ? void 0 : payload.categories) ? payload.categories : [];
     const catCount = Math.max(cats.length, 1);
     const colWidth = width / catCount;
     const topPad = 8;
     const bottomPad = 8;
     const dotRadius = 4;
-
     cats.forEach((cat, cIdx) => {
       const xCenter = cIdx * colWidth + colWidth / 2;
       const items = Array.isArray(cat.items) ? cat.items : [];
       const itemCount = Math.max(items.length, 1);
       items.forEach((it, iIdx) => {
-        const y =
-          topPad + (iIdx + 0.5) * ((height - topPad - bottomPad) / itemCount);
+        const y = topPad + (iIdx + 0.5) * ((height - topPad - bottomPad) / itemCount);
         ctx.beginPath();
         ctx.arc(xCenter, y, dotRadius, 0, Math.PI * 2);
         const fill = getBadgeColor(it.name || it.id || "", it.color);
@@ -3026,25 +4670,24 @@ export function initBlockscape() {
         ctx.stroke();
       });
     });
-
     const dataUrl = canvas.toDataURL("image/png");
     thumbnailCache.set(version, { fingerprint: fp, dataUrl });
     return dataUrl;
   }
-
   function setActiveApicurioVersion(entryIndex, versionIndex) {
+    var _a;
     clearSeriesNavNotice();
     if (entryIndex < 0 || entryIndex >= models.length) return false;
     const entry = models[entryIndex];
-    if (!entry?.apicurioVersions?.length) return false;
+    if (!((_a = entry == null ? void 0 : entry.apicurioVersions) == null ? void 0 : _a.length)) return false;
     const persisted = persistActiveEdits(entryIndex);
     if (!persisted) return false;
     const count = entry.apicurioVersions.length;
-    const normalized = ((versionIndex % count) + count) % count;
-    const target = entry.apicurioVersions[normalized];
-    if (!target?.data) return false;
+    const normalized = (versionIndex % count + count) % count;
+    const target2 = entry.apicurioVersions[normalized];
+    if (!(target2 == null ? void 0 : target2.data)) return false;
     entry.apicurioActiveVersionIndex = normalized;
-    entry.data = target.data;
+    entry.data = target2.data;
     pendingInfoPreview = true;
     selection = null;
     selectionRelations = null;
@@ -3053,24 +4696,20 @@ export function initBlockscape() {
     rebuildFromActive();
     return true;
   }
-
   function stepApicurioVersion(step) {
+    var _a;
     if (!step || activeIndex < 0) return false;
     const entry = models[activeIndex];
-    if (!entry?.apicurioVersions?.length) return false;
+    if (!((_a = entry == null ? void 0 : entry.apicurioVersions) == null ? void 0 : _a.length)) return false;
     const current = getActiveApicurioVersionIndex(entry);
     if (current === -1) return false;
     return setActiveApicurioVersion(activeIndex, current + step);
   }
-
   function removeApicurioVersion(entryIndex, versionIndex) {
     clearSeriesNavNotice();
     if (entryIndex < 0 || entryIndex >= models.length) return false;
     const entry = models[entryIndex];
-    if (
-      !Array.isArray(entry?.apicurioVersions) ||
-      entry.apicurioVersions.length <= 1
-    ) {
+    if (!Array.isArray(entry == null ? void 0 : entry.apicurioVersions) || entry.apicurioVersions.length <= 1) {
       alert(
         "A series needs at least one map. Add another before removing this one."
       );
@@ -3084,7 +4723,6 @@ export function initBlockscape() {
     const activeBefore = getActiveApicurioVersionIndex(entry);
     const [removed] = entry.apicurioVersions.splice(normalized, 1);
     if (!removed) return false;
-
     let nextActive = activeBefore;
     if (normalized === activeBefore) {
       nextActive = Math.min(normalized, entry.apicurioVersions.length - 1);
@@ -3092,49 +4730,39 @@ export function initBlockscape() {
       nextActive = Math.max(0, activeBefore - 1);
     }
     entry.apicurioActiveVersionIndex = Math.max(0, nextActive);
-    const activeEntry =
-      entry.apicurioVersions[entry.apicurioActiveVersionIndex];
-    entry.data = activeEntry?.data || entry.data;
+    const activeEntry = entry.apicurioVersions[entry.apicurioActiveVersionIndex];
+    entry.data = (activeEntry == null ? void 0 : activeEntry.data) || entry.data;
     entry.isSeries = entry.apicurioVersions.length > 1;
     setActive(entryIndex);
     return true;
   }
-
   function renderVersionNavigator(entry) {
-    if (!entry?.apicurioVersions || !entry.apicurioVersions.length) return null;
+    if (!(entry == null ? void 0 : entry.apicurioVersions) || !entry.apicurioVersions.length) return null;
     const nav = document.createElement("div");
     nav.className = "version-nav";
-
     const title = document.createElement("div");
     title.className = "version-nav__title";
-    title.textContent =
-      entry.apicurioArtifactName ||
-      entry.apicurioArtifactId ||
-      getModelId(entry) ||
-      "Artifact";
+    title.textContent = entry.apicurioArtifactName || entry.apicurioArtifactId || getModelId(entry) || "Artifact";
     title.title = "Double-click to rename this series";
     title.setAttribute("role", "button");
     title.tabIndex = 0;
     title.addEventListener("dblclick", () => {
-      const target = models[activeIndex];
-      if (!target?.apicurioVersions?.length) return;
-      const renamed = renameSeries(target);
+      var _a;
+      const target2 = models[activeIndex];
+      if (!((_a = target2 == null ? void 0 : target2.apicurioVersions) == null ? void 0 : _a.length)) return;
+      const renamed = renameSeries(target2);
       if (!renamed) return;
       renderModelList();
       loadActiveIntoEditor();
       rebuildFromActive();
     });
     nav.appendChild(title);
-
     const status = document.createElement("div");
     status.className = "version-nav__status";
     const activeIdx = getActiveApicurioVersionIndex(entry);
     const activeVersionLabel = getActiveApicurioVersionLabel(entry) || "latest";
-    status.textContent = `No. in series ${activeVersionLabel} (${
-      activeIdx + 1
-    } of ${entry.apicurioVersions.length})`;
+    status.textContent = `No. in series ${activeVersionLabel} (${activeIdx + 1} of ${entry.apicurioVersions.length})`;
     nav.appendChild(status);
-
     const controls = document.createElement("div");
     controls.className = "version-nav__controls";
     const prevBtn = document.createElement("button");
@@ -3142,20 +4770,18 @@ export function initBlockscape() {
     prevBtn.className = "version-nav__button";
     prevBtn.textContent = "Previous";
     prevBtn.addEventListener("click", () => stepApicurioVersion(-1));
-
     const nextBtn = document.createElement("button");
     nextBtn.type = "button";
     nextBtn.className = "version-nav__button";
     nextBtn.textContent = "Next";
     nextBtn.addEventListener("click", () => stepApicurioVersion(1));
-
     controls.appendChild(prevBtn);
     controls.appendChild(nextBtn);
     nav.appendChild(controls);
-
     const thumbs = document.createElement("div");
     thumbs.className = "version-nav__thumbs";
     entry.apicurioVersions.forEach((ver, idx) => {
+      var _a;
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "version-nav__thumb";
@@ -3171,9 +4797,8 @@ export function initBlockscape() {
       lbl.className = "version-nav__thumb-label";
       const lblText = document.createElement("span");
       lblText.className = "version-nav__thumb-label-text";
-      const fullId = (ver?.data?.id ?? ver?.id ?? "").toString().trim();
-      const labelValue =
-        fullId || (ver?.version ? `v${ver.version}` : `${idx + 1}`);
+      const fullId = (((_a = ver == null ? void 0 : ver.data) == null ? void 0 : _a.id) ?? (ver == null ? void 0 : ver.id) ?? "").toString().trim();
+      const labelValue = fullId || ((ver == null ? void 0 : ver.version) ? `v${ver.version}` : `${idx + 1}`);
       lblText.textContent = labelValue;
       lbl.title = fullId || labelValue;
       lbl.appendChild(lblText);
@@ -3201,13 +4826,13 @@ export function initBlockscape() {
         });
         btn.appendChild(removeBtn);
       }
-      btn.addEventListener("click", () =>
-        setActiveApicurioVersion(activeIndex, idx)
+      btn.addEventListener(
+        "click",
+        () => setActiveApicurioVersion(activeIndex, idx)
       );
       attachSeriesPreviewHover(btn, ver);
       thumbs.appendChild(btn);
     });
-
     const addThumb = document.createElement("button");
     addThumb.type = "button";
     addThumb.className = "version-nav__thumb version-nav__thumb--add";
@@ -3217,7 +4842,7 @@ export function initBlockscape() {
         const idx = createNewVersionFromActive({ versionLabel: "manual" });
         setActive(idx);
       } catch (err) {
-        alert(err?.message || "Unable to create a new version right now.");
+        alert((err == null ? void 0 : err.message) || "Unable to create a new version right now.");
       }
     });
     const addIcon = document.createElement("span");
@@ -3225,14 +4850,11 @@ export function initBlockscape() {
     addIcon.textContent = "+";
     addThumb.appendChild(addIcon);
     thumbs.appendChild(addThumb);
-
     nav.appendChild(thumbs);
-
     return nav;
   }
-
-  // ===== Render =====
   function render() {
+    var _a, _b, _c;
     if (!model) return;
     hideTabTooltip();
     if (!Array.isArray(model.m.categories)) {
@@ -3252,48 +4874,31 @@ export function initBlockscape() {
     index.clear();
     categoryIndex.clear();
     versionThumbLabels = [];
-
     ensureVersionContainer(models[activeIndex], { versionLabel: "1" });
     const versionNav = renderVersionNavigator(models[activeIndex]);
     if (versionNav) {
       app.appendChild(versionNav);
     }
-
     overlay.setAttribute("width", window.innerWidth);
     overlay.setAttribute("height", window.innerHeight);
-
     const meta = document.createElement("div");
     meta.className = "blockscape-model-meta";
-
     const titleEl = document.createElement("div");
     titleEl.className = "blockscape-model-title";
-    titleEl.textContent =
-      (model.m.title && model.m.title.trim()) ||
-      getModelTitle(models[activeIndex]);
+    titleEl.textContent = model.m.title && model.m.title.trim() || getModelTitle(models[activeIndex]);
     meta.appendChild(titleEl);
-
-    // Ensure series ID is present for display if this entry is a series.
-    if (
-      models[activeIndex]?.isSeries ||
-      models[activeIndex]?.apicurioVersions?.length
-    ) {
+    if (((_a = models[activeIndex]) == null ? void 0 : _a.isSeries) || ((_c = (_b = models[activeIndex]) == null ? void 0 : _b.apicurioVersions) == null ? void 0 : _c.length)) {
       ensureSeriesId(models[activeIndex], {
-        seriesName:
-          models[activeIndex].title ||
-          model.m.title ||
-          getModelTitle(models[activeIndex]),
+        seriesName: models[activeIndex].title || model.m.title || getModelTitle(models[activeIndex])
       });
     }
-
     const activeVersionLabel = getActiveApicurioVersionLabel(
       models[activeIndex]
     );
     const seriesId = getSeriesId(models[activeIndex]);
     const modelId = (model.m.id ?? "").toString().trim();
-
     const detailsRow = document.createElement("div");
     detailsRow.className = "blockscape-model-meta__details";
-
     const addMetaDetail = (label, value) => {
       if (!value) return;
       const wrapper = document.createElement("div");
@@ -3307,28 +4912,22 @@ export function initBlockscape() {
       wrapper.append(labelSpan, valueSpan);
       detailsRow.appendChild(wrapper);
     };
-
     addMetaDetail("Series ID", seriesId);
     addMetaDetail("Model ID", modelId);
     addMetaDetail("No. in series", activeVersionLabel);
-
     if (detailsRow.childElementCount) {
       meta.appendChild(detailsRow);
     }
-
     app.appendChild(meta);
     const tabsWrapper = document.createElement("div");
     tabsWrapper.className = "blockscape-tabs";
-
     const tabList = document.createElement("div");
     tabList.className = "blockscape-tablist";
     tabList.setAttribute("role", "tablist");
     tabsWrapper.appendChild(tabList);
-
     const panelsWrapper = document.createElement("div");
     panelsWrapper.className = "blockscape-tabpanels";
     tabsWrapper.appendChild(panelsWrapper);
-
     const mapPanel = document.createElement("div");
     const abstractPanel = document.createElement("div");
     const sourcePanel = document.createElement("div");
@@ -3340,21 +4939,18 @@ export function initBlockscape() {
     );
     infoTabButton = null;
     activeInfoTooltipHtml = "";
-
-    const appendTitleLine = (el, text) => {
-      if (!el || !text) return;
-      el.title = el.title ? `${el.title}\n${text}` : text;
+    const appendTitleLine = (el, text2) => {
+      if (!el || !text2) return;
+      el.title = el.title ? `${el.title}
+${text2}` : text2;
     };
-
     const tabDefs = [
       { id: "map", label: "Map", panel: mapPanel },
       { id: "abstract", label: "Info", panel: abstractPanel },
       { id: "source", label: "Settings", panel: sourcePanel },
-      { id: "apicurio", label: "Apicurio", panel: apicurioPanel },
+      { id: "apicurio", label: "Apicurio", panel: apicurioPanel }
     ];
-    const apicurioInitiallyEnabled =
-      typeof apicurio.isEnabled === "function" ? apicurio.isEnabled() : false;
-
+    const apicurioInitiallyEnabled = typeof apicurio.isEnabled === "function" ? apicurio.isEnabled() : false;
     const handleTabVisibility = (tabId) => {
       if (!overlay) return;
       const showOverlay = tabId === "map";
@@ -3366,7 +4962,6 @@ export function initBlockscape() {
         overlay.innerHTML = "";
       }
     };
-
     tabDefs.forEach((tab, idx) => {
       const button = document.createElement("button");
       button.type = "button";
@@ -3384,7 +4979,6 @@ export function initBlockscape() {
       }
       tab.button = button;
       tabList.appendChild(button);
-
       tab.panel.id = `panel-${tab.id}`;
       tab.panel.classList.add("blockscape-tabpanel");
       tab.panel.setAttribute("role", "tabpanel");
@@ -3393,7 +4987,6 @@ export function initBlockscape() {
       if (idx === 0) tab.panel.classList.add("is-active");
       panelsWrapper.appendChild(tab.panel);
     });
-
     const activateTab = (targetId) => {
       lastActiveTabId = targetId;
       tabDefs.forEach((t) => {
@@ -3405,7 +4998,6 @@ export function initBlockscape() {
       });
       handleTabVisibility(targetId);
     };
-
     const apicurioTab = tabDefs.find((t) => t.id === "apicurio");
     const syncApicurioTabVisibility = (enabled) => {
       if (!apicurioTab || !apicurioTab.button || !apicurioTab.panel) return;
@@ -3438,7 +5030,6 @@ export function initBlockscape() {
         apicurioSettingsToggle.checked = show;
       }
     };
-
     tabDefs.forEach((t) => {
       t.button.addEventListener("click", () => {
         hideTabTooltip();
@@ -3446,40 +5037,37 @@ export function initBlockscape() {
       });
       if (t.id === "abstract") {
         infoTabButton = t.button;
-        t.button.addEventListener("mouseenter", () =>
-          showTabTooltip(t.button, infoTooltipHtml, { offset: 12 })
+        t.button.addEventListener(
+          "mouseenter",
+          () => showTabTooltip(t.button, infoTooltipHtml, { offset: 12 })
         );
         t.button.addEventListener("mouseleave", hideTabTooltip);
-        t.button.addEventListener("focus", () =>
-          showTabTooltip(t.button, infoTooltipHtml, { offset: 12 })
+        t.button.addEventListener(
+          "focus",
+          () => showTabTooltip(t.button, infoTooltipHtml, { offset: 12 })
         );
         t.button.addEventListener("blur", hideTabTooltip);
       }
     });
-
-    const resolveInitialTabId = (apicurioEnabled) => {
+    const resolveInitialTabId = (apicurioEnabled2) => {
       const preferred = tabDefs.find((t) => t.id === lastActiveTabId);
-      if (preferred && (preferred.id !== "apicurio" || apicurioEnabled))
+      if (preferred && (preferred.id !== "apicurio" || apicurioEnabled2))
         return preferred.id;
       const firstVisible = tabDefs.find(
-        (t) => t.id !== "apicurio" || apicurioEnabled
+        (t) => t.id !== "apicurio" || apicurioEnabled2
       );
-      return firstVisible?.id || tabDefs[0].id;
+      return (firstVisible == null ? void 0 : firstVisible.id) || tabDefs[0].id;
     };
-
     const initialTabId = resolveInitialTabId(apicurioInitiallyEnabled);
     activateTab(initialTabId);
     syncApicurioTabVisibility(apicurioInitiallyEnabled);
     if (typeof apicurio.onEnabledChange === "function") {
       apicurio.onEnabledChange(syncApicurioTabVisibility);
     }
-
     app.appendChild(tabsWrapper);
-
     const renderHost = document.createElement("div");
     renderHost.className = "blockscape-render";
     mapPanel.appendChild(renderHost);
-
     const abstractWrapper = document.createElement("div");
     abstractWrapper.className = "blockscape-abstract-panel";
     if (model.m.abstract) {
@@ -3500,7 +5088,6 @@ export function initBlockscape() {
     }
     activeInfoTooltipHtml = infoTooltipHtml;
     abstractPanel.appendChild(abstractWrapper);
-
     const sourceWrapper = document.createElement("div");
     sourceWrapper.className = "blockscape-source-panel";
     const settingsPanel = document.createElement("div");
@@ -3515,7 +5102,7 @@ export function initBlockscape() {
       hint,
       checked,
       className = "",
-      onChange,
+      onChange
     }) => {
       const row = document.createElement("label");
       row.className = ["settings-toggle", className].filter(Boolean).join(" ");
@@ -3523,58 +5110,54 @@ export function initBlockscape() {
       input.type = "checkbox";
       input.id = id;
       input.checked = checked;
-      const text = document.createElement("span");
-      text.className = "settings-toggle__text";
+      const text2 = document.createElement("span");
+      text2.className = "settings-toggle__text";
       const labelSpan = document.createElement("span");
       labelSpan.className = "settings-toggle__label";
       labelSpan.textContent = label;
-      text.appendChild(labelSpan);
+      text2.appendChild(labelSpan);
       if (hint) {
         const hintSpan = document.createElement("span");
         hintSpan.className = "settings-toggle__hint";
         hintSpan.textContent = hint;
-        text.appendChild(hintSpan);
+        text2.appendChild(hintSpan);
       }
       row.appendChild(input);
-      row.appendChild(text);
+      row.appendChild(text2);
       if (typeof onChange === "function") {
         input.addEventListener("change", () => onChange(input.checked));
       }
       return { row, input };
     };
-
     const refreshObsidianLinks = () => {
       app.querySelectorAll(".tile").forEach((tile) => {
         const id = tile.dataset.id;
         const match = findItemAndCategoryById(id);
-        if (!match?.item) return;
+        if (!(match == null ? void 0 : match.item)) return;
         const itemExternalMeta = resolveExternalMeta(match.item.external);
         const obsidianUrl = getObsidianLink(match.item, {
           externalMeta: itemExternalMeta,
-          seriesIdLookup,
+          seriesIdLookup
         });
         applyObsidianLinkToTile(tile, obsidianUrl);
       });
     };
-
-    const { row: secondaryToggleRow, input: secondaryToggleInput } =
-      createSettingsToggle({
-        id: "toggleSecondaryLinks",
-        label: "Show indirect links",
-        checked: showSecondaryLinks,
-        className: "map-controls__toggle",
-        onChange: (checked) => {
-          showSecondaryLinks = checked;
-          if (selection) {
-            select(selection);
-          } else {
-            clearStyles();
-            drawLinks();
-          }
-        },
-      });
+    const { row: secondaryToggleRow } = createSettingsToggle({
+      id: "toggleSecondaryLinks",
+      label: "Show indirect links",
+      checked: showSecondaryLinks,
+      className: "map-controls__toggle",
+      onChange: (checked) => {
+        showSecondaryLinks = checked;
+        if (selection) {
+          select(selection);
+        } else {
+          clearStyles();
+          drawLinks();
+        }
+      }
+    });
     settingsPanel.appendChild(secondaryToggleRow);
-
     const { row: reusedToggleRow } = createSettingsToggle({
       id: "toggleReusedInMap",
       label: "Display reused in map view",
@@ -3584,10 +5167,9 @@ export function initBlockscape() {
       onChange: (checked) => {
         showReusedInMap = checked;
         applyReusedHighlights();
-      },
+      }
     });
     settingsPanel.appendChild(reusedToggleRow);
-
     const obsidianModeInputs = [];
     const { row: obsidianToggleRow } = createSettingsToggle({
       id: "toggleObsidianLinks",
@@ -3602,34 +5184,26 @@ export function initBlockscape() {
           input.disabled = !applied;
         });
         refreshObsidianLinks();
-      },
+      }
     });
     settingsPanel.appendChild(obsidianToggleRow);
-
-    const hasLocalBackend =
-      typeof localBackend?.isAvailable === "function" &&
-      localBackend.isAvailable() &&
-      typeof localBackend?.getAutoReloadConfig === "function";
+    const hasLocalBackend = typeof (localBackend == null ? void 0 : localBackend.isAvailable) === "function" && localBackend.isAvailable() && typeof (localBackend == null ? void 0 : localBackend.getAutoReloadConfig) === "function";
     if (hasLocalBackend) {
-      const { enabled: autoEnabled, intervalMs: autoInterval } =
-        localBackend.getAutoReloadConfig();
+      const { enabled: autoEnabled, intervalMs: autoInterval } = localBackend.getAutoReloadConfig();
       let autoReloadSlider = null;
-      const { row: autoReloadToggle, input: autoReloadInput } =
-        createSettingsToggle({
-          id: "toggleAutoReload",
-          label: "Auto-reload local files",
-          hint: "Poll the local backend for file changes and refresh matching models.",
-          checked: autoEnabled,
-          className: "map-controls__toggle",
-          onChange: (checked) => {
-            localBackend.setAutoReloadEnabled(checked);
-            if (autoReloadSlider) autoReloadSlider.disabled = !checked;
-          },
-        });
+      const { row: autoReloadToggle } = createSettingsToggle({
+        id: "toggleAutoReload",
+        label: "Auto-reload local files",
+        hint: "Poll the local backend for file changes and refresh matching models.",
+        checked: autoEnabled,
+        className: "map-controls__toggle",
+        onChange: (checked) => {
+          localBackend.setAutoReloadEnabled(checked);
+          if (autoReloadSlider) autoReloadSlider.disabled = !checked;
+        }
+      });
       settingsPanel.appendChild(autoReloadToggle);
-
-      const formatAutoReloadInterval = (ms) =>
-        `${(ms / 1000).toFixed(2)}s`;
+      const formatAutoReloadInterval = (ms) => `${(ms / 1e3).toFixed(2)}s`;
       const autoReloadRow = document.createElement("label");
       autoReloadRow.className = "settings-slider";
       autoReloadRow.setAttribute("for", "autoReloadInterval");
@@ -3667,7 +5241,6 @@ export function initBlockscape() {
       autoReloadRow.append(autoReloadText, autoReloadValue, autoReloadSlider);
       settingsPanel.appendChild(autoReloadRow);
     }
-
     const obsidianModeRow = document.createElement("div");
     obsidianModeRow.className = "settings-radio";
     const obsidianModeLabel = document.createElement("div");
@@ -3675,12 +5248,10 @@ export function initBlockscape() {
     obsidianModeLabel.textContent = "Obsidian link format";
     const obsidianModeHint = document.createElement("div");
     obsidianModeHint.className = "settings-radio__hint";
-    obsidianModeHint.textContent =
-      "Use the tile title or id when building Obsidian links.";
+    obsidianModeHint.textContent = "Use the tile title or id when building Obsidian links.";
     const obsidianModeOptions = document.createElement("div");
     obsidianModeOptions.className = "settings-radio__options";
-
-    const registerObsidianModeOption = (value, text) => {
+    const registerObsidianModeOption = (value, text2) => {
       const option = document.createElement("label");
       option.className = "settings-radio__option";
       const radio = document.createElement("input");
@@ -3696,12 +5267,11 @@ export function initBlockscape() {
         refreshObsidianLinks();
       });
       const textNode = document.createElement("span");
-      textNode.textContent = text;
+      textNode.textContent = text2;
       option.append(radio, textNode);
       obsidianModeInputs.push(radio);
       obsidianModeOptions.appendChild(option);
     };
-
     registerObsidianModeOption(OBSIDIAN_LINK_MODE_TITLE, "Use title");
     registerObsidianModeOption(OBSIDIAN_LINK_MODE_ID, "Use id");
     obsidianModeRow.append(
@@ -3710,7 +5280,6 @@ export function initBlockscape() {
       obsidianModeHint
     );
     settingsPanel.appendChild(obsidianModeRow);
-
     const obsidianVaultRow = document.createElement("label");
     obsidianVaultRow.className = "settings-text";
     obsidianVaultRow.setAttribute("for", "obsidianVaultInput");
@@ -3721,8 +5290,7 @@ export function initBlockscape() {
     obsidianVaultLabel.textContent = "Obsidian vault";
     const obsidianVaultHint = document.createElement("span");
     obsidianVaultHint.className = "settings-text__hint";
-    obsidianVaultHint.textContent =
-      "Optional. Set the vault name to avoid duplicates.";
+    obsidianVaultHint.textContent = "Optional. Set the vault name to avoid duplicates.";
     obsidianVaultText.append(obsidianVaultLabel, obsidianVaultHint);
     const obsidianVaultInput = document.createElement("input");
     obsidianVaultInput.type = "text";
@@ -3737,18 +5305,14 @@ export function initBlockscape() {
     });
     obsidianVaultRow.append(obsidianVaultText, obsidianVaultInput);
     settingsPanel.appendChild(obsidianVaultRow);
-
     const obsidianPluginNote = document.createElement("p");
     obsidianPluginNote.className = "settings-note";
-    obsidianPluginNote.innerHTML =
-      'Requires the Obsidian <a href="https://vinzent03.github.io/obsidian-advanced-uri/" target="_blank" rel="noreferrer noopener">Advanced URI</a> plugin for create/open behavior.';
+    obsidianPluginNote.innerHTML = 'Requires the Obsidian <a href="https://vinzent03.github.io/obsidian-advanced-uri/" target="_blank" rel="noreferrer noopener">Advanced URI</a> plugin for create/open behavior.';
     settingsPanel.appendChild(obsidianPluginNote);
-
-    const formatSeriesNavWait = (value) => `${(value / 1000).toFixed(1)}s`;
+    const formatSeriesNavWait = (value) => `${(value / 1e3).toFixed(1)}s`;
     const seriesNavWaitRow = document.createElement("label");
     seriesNavWaitRow.className = "settings-slider";
     seriesNavWaitRow.setAttribute("for", "seriesNavDoubleClickWait");
-
     const seriesNavWaitText = document.createElement("div");
     seriesNavWaitText.className = "settings-slider__text";
     const seriesNavWaitLabel = document.createElement("span");
@@ -3756,16 +5320,13 @@ export function initBlockscape() {
     seriesNavWaitLabel.textContent = "Series double-click wait";
     const seriesNavWaitHint = document.createElement("span");
     seriesNavWaitHint.className = "settings-slider__hint";
-    seriesNavWaitHint.textContent =
-      "Time window to double-click into another map version.";
+    seriesNavWaitHint.textContent = "Time window to double-click into another map version.";
     seriesNavWaitText.append(seriesNavWaitLabel, seriesNavWaitHint);
-
     const seriesNavWaitValue = document.createElement("span");
     seriesNavWaitValue.className = "settings-slider__value";
     seriesNavWaitValue.textContent = formatSeriesNavWait(
       seriesNavDoubleClickWaitMs
     );
-
     const seriesNavWaitInput = document.createElement("input");
     seriesNavWaitInput.type = "range";
     seriesNavWaitInput.id = "seriesNavDoubleClickWait";
@@ -3785,19 +5346,16 @@ export function initBlockscape() {
       seriesNavWaitValue.textContent = formatSeriesNavWait(applied);
       persistSeriesNavDoubleClickWait(applied);
     });
-
     seriesNavWaitRow.append(
       seriesNavWaitText,
       seriesNavWaitValue,
       seriesNavWaitInput
     );
     settingsPanel.appendChild(seriesNavWaitRow);
-
     const formatHoverScale = (value) => `${Math.round((value - 1) * 100)}%`;
     const hoverScaleRow = document.createElement("label");
     hoverScaleRow.className = "settings-slider";
     hoverScaleRow.setAttribute("for", "hoverScaleSlider");
-
     const hoverScaleText = document.createElement("div");
     hoverScaleText.className = "settings-slider__text";
     const hoverScaleLabel = document.createElement("span");
@@ -3807,11 +5365,9 @@ export function initBlockscape() {
     hoverScaleHint.className = "settings-slider__hint";
     hoverScaleHint.textContent = "Expand tiles on hover to see more detail.";
     hoverScaleText.append(hoverScaleLabel, hoverScaleHint);
-
     const hoverScaleValue = document.createElement("span");
     hoverScaleValue.className = "settings-slider__value";
     hoverScaleValue.textContent = formatHoverScale(tileHoverScale);
-
     const hoverScaleInput = document.createElement("input");
     hoverScaleInput.type = "range";
     hoverScaleInput.id = "hoverScaleSlider";
@@ -3827,16 +5383,12 @@ export function initBlockscape() {
       persistTileHoverScale(applied);
       if (selection) scheduleOverlaySync();
     });
-
     hoverScaleRow.append(hoverScaleText, hoverScaleValue, hoverScaleInput);
     settingsPanel.appendChild(hoverScaleRow);
-
-    const formatCompactness = (value) =>
-      value === 1 ? "Default" : `${Math.round(value * 100)}%`;
+    const formatCompactness = (value) => value === 1 ? "Default" : `${Math.round(value * 100)}%`;
     const compactRow = document.createElement("label");
     compactRow.className = "settings-slider";
     compactRow.setAttribute("for", "tileCompactnessSlider");
-
     const compactText = document.createElement("div");
     compactText.className = "settings-slider__text";
     const compactLabel = document.createElement("span");
@@ -3844,14 +5396,11 @@ export function initBlockscape() {
     compactLabel.textContent = "Tile compactness";
     const compactHint = document.createElement("span");
     compactHint.className = "settings-slider__hint";
-    compactHint.textContent =
-      "Adjust padding, gap, and logo size for tiles.";
+    compactHint.textContent = "Adjust padding, gap, and logo size for tiles.";
     compactText.append(compactLabel, compactHint);
-
     const compactValue = document.createElement("span");
     compactValue.className = "settings-slider__value";
     compactValue.textContent = formatCompactness(tileCompactness);
-
     const compactInput = document.createElement("input");
     compactInput.type = "range";
     compactInput.id = "tileCompactnessSlider";
@@ -3867,11 +5416,9 @@ export function initBlockscape() {
       persistTileCompactness(applied);
       if (selection) scheduleOverlaySync();
     });
-
     compactRow.append(compactText, compactValue, compactInput);
     settingsPanel.appendChild(compactRow);
-
-    const { row: titleWrapRow, input: titleWrapInput } = createSettingsToggle({
+    const { row: titleWrapRow } = createSettingsToggle({
       id: "titleWrapToggle",
       label: "Wrap titles",
       hint: "Allow long titles to wrap instead of truncating.",
@@ -3881,16 +5428,13 @@ export function initBlockscape() {
         const mode = checked ? "wrap" : "nowrap";
         applyTitleWrapMode(mode);
         persistTitleWrapMode(mode);
-      },
+      }
     });
     settingsPanel.appendChild(titleWrapRow);
-
-    const formatTitleWidth = (value) =>
-      `${Math.round((value - 1) * 100)}% extra`;
+    const formatTitleWidth = (value) => `${Math.round((value - 1) * 100)}% extra`;
     const titleWidthRow = document.createElement("label");
     titleWidthRow.className = "settings-slider";
     titleWidthRow.setAttribute("for", "titleHoverWidthSlider");
-
     const titleWidthText = document.createElement("div");
     titleWidthText.className = "settings-slider__text";
     const titleWidthLabel = document.createElement("span");
@@ -3900,11 +5444,9 @@ export function initBlockscape() {
     titleWidthHint.className = "settings-slider__hint";
     titleWidthHint.textContent = "Give titles more room horizontally when zoomed.";
     titleWidthText.append(titleWidthLabel, titleWidthHint);
-
     const titleWidthValue = document.createElement("span");
     titleWidthValue.className = "settings-slider__value";
     titleWidthValue.textContent = formatTitleWidth(titleHoverWidthMultiplier);
-
     const titleWidthInput = document.createElement("input");
     titleWidthInput.type = "range";
     titleWidthInput.id = "titleHoverWidthSlider";
@@ -3924,16 +5466,12 @@ export function initBlockscape() {
       titleWidthValue.textContent = formatTitleWidth(applied);
       persistTitleHoverWidthMultiplier(applied);
     });
-
     titleWidthRow.append(titleWidthText, titleWidthValue, titleWidthInput);
     settingsPanel.appendChild(titleWidthRow);
-
-    const formatTitleZoomPortion = (value) =>
-      `${Math.round(value * 100)}% of hover zoom`;
+    const formatTitleZoomPortion = (value) => `${Math.round(value * 100)}% of hover zoom`;
     const titleZoomRow = document.createElement("label");
     titleZoomRow.className = "settings-slider";
     titleZoomRow.setAttribute("for", "titleZoomPortionSlider");
-
     const titleZoomText = document.createElement("div");
     titleZoomText.className = "settings-slider__text";
     const titleZoomLabel = document.createElement("span");
@@ -3941,14 +5479,11 @@ export function initBlockscape() {
     titleZoomLabel.textContent = "Title zoom influence";
     const titleZoomHint = document.createElement("span");
     titleZoomHint.className = "settings-slider__hint";
-    titleZoomHint.textContent =
-      "How much the title scales relative to tile hover zoom.";
+    titleZoomHint.textContent = "How much the title scales relative to tile hover zoom.";
     titleZoomText.append(titleZoomLabel, titleZoomHint);
-
     const titleZoomValue = document.createElement("span");
     titleZoomValue.className = "settings-slider__value";
     titleZoomValue.textContent = formatTitleZoomPortion(titleHoverTextPortion);
-
     const titleZoomInput = document.createElement("input");
     titleZoomInput.type = "range";
     titleZoomInput.id = "titleZoomPortionSlider";
@@ -3968,25 +5503,21 @@ export function initBlockscape() {
       titleZoomValue.textContent = formatTitleZoomPortion(applied);
       persistTitleHoverTextPortion(applied);
     });
-
     titleZoomRow.append(titleZoomText, titleZoomValue, titleZoomInput);
     settingsPanel.appendChild(titleZoomRow);
-
-    const apicurioEnabled =
-      typeof apicurio.isEnabled === "function" ? apicurio.isEnabled() : false;
-    const { row: apicurioToggleRow, input: apicurioToggleInput } =
-      createSettingsToggle({
-        id: "apicurioFeatureToggle",
-        label: "Apicurio",
-        hint: "Show the Apicurio registry tab when enabled.",
-        checked: apicurioEnabled,
-        className: "apicurio-toggle",
-        onChange: (checked) => {
-          if (typeof apicurio.setEnabled === "function") {
-            apicurio.setEnabled(checked);
-          }
-        },
-      });
+    const apicurioEnabled = typeof apicurio.isEnabled === "function" ? apicurio.isEnabled() : false;
+    const { row: apicurioToggleRow, input: apicurioToggleInput } = createSettingsToggle({
+      id: "apicurioFeatureToggle",
+      label: "Apicurio",
+      hint: "Show the Apicurio registry tab when enabled.",
+      checked: apicurioEnabled,
+      className: "apicurio-toggle",
+      onChange: (checked) => {
+        if (typeof apicurio.setEnabled === "function") {
+          apicurio.setEnabled(checked);
+        }
+      }
+    });
     apicurioSettingsToggle = apicurioToggleInput;
     settingsPanel.appendChild(apicurioToggleRow);
     sourceWrapper.appendChild(settingsPanel);
@@ -4002,13 +5533,11 @@ export function initBlockscape() {
     }
     sourcePanel.appendChild(sourceWrapper);
     apicurio.mount(apicurioPanel);
-
     let tileCounter = 0;
     model.m.categories.forEach((cat) => {
       const section = document.createElement("section");
       section.className = "category";
       section.dataset.cat = cat.id;
-
       const head = document.createElement("div");
       head.className = "cat-head";
       head.dataset.cat = cat.id;
@@ -4017,9 +5546,7 @@ export function initBlockscape() {
       head.innerHTML = `<div class="cat-title">${escapeHtml(
         cat.title || cat.id
       )}</div>
-                          <div class="muted cat-count">${
-                            (cat.items || []).length
-                          } items</div>`;
+                          <div class="muted cat-count">${(cat.items || []).length} items</div>`;
       head.addEventListener("click", () => selectCategory(cat.id));
       head.addEventListener("keydown", (event) => {
         if (event.key === "Enter" || event.key === " ") {
@@ -4027,21 +5554,20 @@ export function initBlockscape() {
           selectCategory(cat.id);
         }
       });
-      head.addEventListener("focus", () =>
-        selectCategory(cat.id, { scrollIntoView: false })
+      head.addEventListener(
+        "focus",
+        () => selectCategory(cat.id, { scrollIntoView: false })
       );
       section.appendChild(head);
-
       const grid = document.createElement("div");
       grid.className = "grid";
       section.appendChild(grid);
-
       (cat.items || []).forEach((it) => {
         tileCounter += 1;
         const externalMeta = resolveExternalMeta(it.external);
         const obsidianUrl = getObsidianLink(it, {
           externalMeta,
-          seriesIdLookup,
+          seriesIdLookup
         });
         const tile = document.createElement("div");
         tile.className = externalMeta.isExternal ? "tile external" : "tile";
@@ -4055,22 +5581,17 @@ export function initBlockscape() {
           const targetIdx = seriesIdLookup.get(it.id);
           tile.dataset.seriesVersionIndex = String(targetIdx);
           tile.classList.add("tile--series-link");
-          const label =
-            targetIdx === activeSeriesIndex
-              ? "Current map in this series"
-              : `Open version ${targetIdx + 1} in this series`;
+          const label = targetIdx === activeSeriesIndex ? "Current map in this series" : `Open version ${targetIdx + 1} in this series`;
           appendTitleLine(tile, label);
         }
         if (obsidianUrl) {
           tile.dataset.obsidianUrl = obsidianUrl;
         }
-
         const navTargetIndex = findModelIndexByIdOrSource(it.id);
         if (navTargetIndex !== -1 && navTargetIndex !== activeIndex) {
           tile.classList.add("tile--series-link");
           tile.dataset.navTargetIndex = String(navTargetIndex);
         }
-
         const img = document.createElement("img");
         img.className = "logo";
         if (it.logo) {
@@ -4078,22 +5599,18 @@ export function initBlockscape() {
           img.alt = it.name || it.id;
         } else {
           img.alt = "";
-          img.style.opacity = 1; // colored letter icon is the intended visual
-          img.src = generateLetterImage(it.name || it.id, it.color); // supports optional per-item color
+          img.style.opacity = 1;
+          img.src = generateLetterImage(it.name || it.id, it.color);
         }
-
         const nm = document.createElement("div");
         nm.className = "name";
         nm.textContent = it.name || it.id;
-
         const idLine = document.createElement("div");
         idLine.className = "tile-id";
         idLine.textContent = it.id || "";
-
         const badge = document.createElement("div");
         badge.className = "badge";
         badge.textContent = "reused";
-
         const deleteBtn = document.createElement("button");
         deleteBtn.type = "button";
         deleteBtn.className = "tile-delete";
@@ -4103,7 +5620,6 @@ export function initBlockscape() {
           event.stopPropagation();
           deleteItemById(it.id);
         });
-
         if (externalMeta.url) {
           tile.appendChild(createExternalLinkButton(externalMeta.url));
         }
@@ -4114,86 +5630,52 @@ export function initBlockscape() {
         tile.appendChild(idLine);
         tile.appendChild(badge);
         grid.appendChild(tile);
-
         index.set(it.id, { el: tile, catId: cat.id, rect: null });
       });
-
       renderHost.appendChild(section);
       categoryIndex.set(cat.id, { el: section, headEl: head });
-
       const addTile = document.createElement("button");
       addTile.type = "button";
       addTile.className = "tile-add";
-      addTile.innerHTML =
-        '<span class="tile-add__icon" aria-hidden="true">+</span><span class="tile-add__label"></span>';
+      addTile.innerHTML = '<span class="tile-add__icon" aria-hidden="true">+</span><span class="tile-add__label"></span>';
       addTile.addEventListener("click", () => addItemToCategory(cat.id));
       grid.appendChild(addTile);
     });
-
     const addCategoryButton = document.createElement("button");
     addCategoryButton.type = "button";
     addCategoryButton.className = "category-add";
-    addCategoryButton.innerHTML =
-      '<span class="category-add__icon" aria-hidden="true">+</span><span class="category-add__label">Add category</span><span class="category-add__hint">(Insert)</span>';
+    addCategoryButton.innerHTML = '<span class="category-add__icon" aria-hidden="true">+</span><span class="category-add__label">Add category</span><span class="category-add__hint">(Insert)</span>';
     addCategoryButton.addEventListener("click", () => addCategoryAtEnd());
     renderHost.appendChild(addCategoryButton);
-
     applyReusedHighlights();
-
     wireEvents();
     reflowRects();
     drawLinks();
     renderCategorySelection();
     maybeShowInfoTabPreview();
   }
-
   function wireEvents() {
     app.querySelectorAll(".tile").forEach((t) => {
       t.addEventListener("click", (event) => {
+        var _a;
         if (typeof event.button === "number" && event.button !== 0) return;
         hidePreview();
         const id = t.dataset.id;
-        const targetSeriesIndex =
-          t.dataset.seriesVersionIndex != null
-            ? parseInt(t.dataset.seriesVersionIndex, 10)
-            : null;
-        const globalIndex =
-          t.dataset.globalIndex != null
-            ? parseInt(t.dataset.globalIndex, 10)
-            : null;
-        const targetModelIndex =
-          t.dataset.navTargetIndex != null
-            ? parseInt(t.dataset.navTargetIndex, 10)
-            : null;
+        const targetSeriesIndex = t.dataset.seriesVersionIndex != null ? parseInt(t.dataset.seriesVersionIndex, 10) : null;
+        const globalIndex = t.dataset.globalIndex != null ? parseInt(t.dataset.globalIndex, 10) : null;
+        const targetModelIndex = t.dataset.navTargetIndex != null ? parseInt(t.dataset.navTargetIndex, 10) : null;
         const activeEntry = models[activeIndex];
-        const currentSeriesIndex = activeEntry
-          ? getActiveApicurioVersionIndex(activeEntry)
-          : -1;
-        const canNavigateToSeries =
-          activeEntry?.apicurioVersions?.length > 1 &&
-          Number.isInteger(targetSeriesIndex) &&
-          targetSeriesIndex !== currentSeriesIndex;
-        const canNavigateToModel =
-          Number.isInteger(targetModelIndex) &&
-          targetModelIndex !== activeIndex &&
-          targetModelIndex >= 0 &&
-          targetModelIndex < models.length;
-        const pendingMatch =
-          pendingSeriesNavigation &&
-          pendingSeriesNavigation.id === id &&
-          pendingSeriesNavigation.targetVersionIndex === targetSeriesIndex;
-        const pendingModelMatch =
-          pendingModelNavigation &&
-          pendingModelNavigation.id === id &&
-          pendingModelNavigation.targetIndex === targetModelIndex;
-
+        const currentSeriesIndex = activeEntry ? getActiveApicurioVersionIndex(activeEntry) : -1;
+        const canNavigateToSeries = ((_a = activeEntry == null ? void 0 : activeEntry.apicurioVersions) == null ? void 0 : _a.length) > 1 && Number.isInteger(targetSeriesIndex) && targetSeriesIndex !== currentSeriesIndex;
+        const canNavigateToModel = Number.isInteger(targetModelIndex) && targetModelIndex !== activeIndex && targetModelIndex >= 0 && targetModelIndex < models.length;
+        const pendingMatch = pendingSeriesNavigation && pendingSeriesNavigation.id === id && pendingSeriesNavigation.targetVersionIndex === targetSeriesIndex;
+        const pendingModelMatch = pendingModelNavigation && pendingModelNavigation.id === id && pendingModelNavigation.targetIndex === targetModelIndex;
         if (pendingSeriesNavigation && !pendingMatch) {
           clearSeriesNavNotice();
         }
         if (pendingModelNavigation && !pendingModelMatch) {
           clearModelNavNotice();
         }
-
         if (canNavigateToSeries) {
           if (pendingMatch) {
             clearSeriesNavNotice();
@@ -4212,21 +5694,13 @@ export function initBlockscape() {
             return;
           }
           showModelNavNotice(id, targetModelIndex);
-        } else if (
-          Number.isInteger(globalIndex) &&
-          globalIndex > 0 &&
-          globalIndex % 5 === 0
-        ) {
+        } else if (Number.isInteger(globalIndex) && globalIndex > 0 && globalIndex % 5 === 0) {
           showNotice(
             "Use arrow keys to move between blocks. Shift arrow to move block."
           );
         }
         console.log("[Blockscape] click", id);
-        if (
-          selection === id &&
-          !(canNavigateToSeries && pendingMatch) &&
-          !(canNavigateToModel && pendingModelMatch)
-        ) {
+        if (selection === id && !(canNavigateToSeries && pendingMatch) && !(canNavigateToModel && pendingModelMatch)) {
           clearSelection();
           return;
         }
@@ -4235,10 +5709,7 @@ export function initBlockscape() {
       t.addEventListener("dblclick", (event) => {
         event.preventDefault();
         const id = t.dataset.id;
-        const targetIndex =
-          t.dataset.navTargetIndex != null
-            ? parseInt(t.dataset.navTargetIndex, 10)
-            : findModelIndexByIdOrSource(id);
+        const targetIndex = t.dataset.navTargetIndex != null ? parseInt(t.dataset.navTargetIndex, 10) : findModelIndexByIdOrSource(id);
         if (targetIndex !== -1 && targetIndex !== activeIndex) {
           setActive(targetIndex);
         }
@@ -4260,14 +5731,12 @@ export function initBlockscape() {
       t.addEventListener("dragstart", handleDragStart);
       t.addEventListener("dragend", handleDragEnd);
     });
-
     app.querySelectorAll(".grid").forEach((grid) => {
       grid.addEventListener("dragover", handleDragOver);
       grid.addEventListener("drop", handleDrop);
       grid.addEventListener("dragenter", handleDragEnter);
       grid.addEventListener("dragleave", handleDragLeave);
     });
-
     if (!globalEventsBound) {
       globalEventsBound = true;
       window.addEventListener("resize", scheduleOverlaySync);
@@ -4276,33 +5745,27 @@ export function initBlockscape() {
     }
     document.getElementById("clear").onclick = () => clearSelection();
   }
-
   function reflowRects() {
     index.forEach((v) => {
       v.rect = v.el.getBoundingClientRect();
     });
   }
-
-  function getSelectionRelations(
-    id,
-    { includeSecondary = showSecondaryLinks } = {}
-  ) {
+  function getSelectionRelations(id, { includeSecondary = showSecondaryLinks } = {}) {
     if (!id || !model) {
       return {
-        deps: new Set(),
-        revs: new Set(),
-        secondaryDeps: new Set(),
-        secondaryRevs: new Set(),
-        edges: [],
+        deps: /* @__PURE__ */ new Set(),
+        revs: /* @__PURE__ */ new Set(),
+        secondaryDeps: /* @__PURE__ */ new Set(),
+        secondaryRevs: /* @__PURE__ */ new Set(),
+        edges: []
       };
     }
-
     const deps = new Set(model.fwd.get(id) || []);
     const revs = new Set(model.rev.get(id) || []);
-    const secondaryDeps = new Set();
-    const secondaryRevs = new Set();
+    const secondaryDeps = /* @__PURE__ */ new Set();
+    const secondaryRevs = /* @__PURE__ */ new Set();
     const edges = [];
-    const edgeKeys = new Set();
+    const edgeKeys = /* @__PURE__ */ new Set();
     const addEdge = (from, to, type, depth) => {
       if (!from || !to) return;
       const key = `${from}->${to}:${type}:${depth}`;
@@ -4310,21 +5773,18 @@ export function initBlockscape() {
       edgeKeys.add(key);
       edges.push({ from, to, type, depth });
     };
-
     deps.forEach((dep) => addEdge(id, dep, "dep", 1));
     revs.forEach((dependent) => addEdge(id, dependent, "revdep", 1));
-
     if (includeSecondary) {
-      const firstLevel = new Set([...deps, ...revs]);
+      const firstLevel = /* @__PURE__ */ new Set([...deps, ...revs]);
       firstLevel.forEach((node) => {
-        const nodeDeps = model.fwd.get(node) || new Set();
+        const nodeDeps = model.fwd.get(node) || /* @__PURE__ */ new Set();
         nodeDeps.forEach((dep) => {
           const isLoopToSelection = dep === id;
           if (!isLoopToSelection) secondaryDeps.add(dep);
           if (!isLoopToSelection) addEdge(node, dep, "dep", 2);
         });
-
-        const nodeDependents = model.rev.get(node) || new Set();
+        const nodeDependents = model.rev.get(node) || /* @__PURE__ */ new Set();
         nodeDependents.forEach((dependent) => {
           const isLoopToSelection = dependent === id;
           if (!isLoopToSelection) secondaryRevs.add(dependent);
@@ -4332,16 +5792,14 @@ export function initBlockscape() {
         });
       });
     }
-
     return { deps, revs, secondaryDeps, secondaryRevs, edges };
   }
-
   function markTile(id, className) {
     const hit = index.get(id);
     if (hit) hit.el.classList.add(className);
   }
-
   function select(id) {
+    var _a, _b, _c;
     if (!id) return;
     selectedCategoryId = null;
     selection = id;
@@ -4371,34 +5829,30 @@ export function initBlockscape() {
         markTile(r, "revdep-indirect");
     });
     drawLinks();
-    const externalUrl = index.get(id)?.el?.dataset?.externalUrl;
+    const externalUrl = (_c = (_b = (_a = index.get(id)) == null ? void 0 : _a.el) == null ? void 0 : _b.dataset) == null ? void 0 : _c.externalUrl;
     if (externalUrl) {
       showNotice("This item has link to", NOTICE_TIMEOUT_MS, externalUrl);
     }
   }
-
-  function selectCategory(
-    catId,
-    { scrollIntoView = true, preserveEntryHint = false } = {}
-  ) {
-    if (!model?.m?.categories || !catId) return false;
+  function selectCategory(catId, { scrollIntoView = true, preserveEntryHint = false } = {}) {
+    var _a, _b;
+    if (!((_a = model == null ? void 0 : model.m) == null ? void 0 : _a.categories) || !catId) return false;
     const categories = model.m.categories || [];
-    const target = categories.find((cat) => cat.id === catId);
-    if (!target) return false;
+    const target2 = categories.find((cat) => cat.id === catId);
+    if (!target2) return false;
     hidePreview();
     clearItemSelection();
     if (!preserveEntryHint) categoryEntryHint = null;
-    selectedCategoryId = target.id;
+    selectedCategoryId = target2.id;
     syncSelectionClass();
     renderCategorySelection();
-    const entry = categoryIndex.get(target.id);
-    if (scrollIntoView && entry?.el) {
+    const entry = categoryIndex.get(target2.id);
+    if (scrollIntoView && (entry == null ? void 0 : entry.el)) {
       entry.el.scrollIntoView({ behavior: "smooth", block: "center" });
-      entry.headEl?.focus({ preventScroll: true });
+      (_b = entry.headEl) == null ? void 0 : _b.focus({ preventScroll: true });
     }
     return true;
   }
-
   function renderCategorySelection() {
     categoryIndex.forEach(({ el, headEl }) => {
       el.classList.remove("category--selected");
@@ -4406,7 +5860,7 @@ export function initBlockscape() {
     });
     if (!selectedCategoryId) return;
     const hit = categoryIndex.get(selectedCategoryId);
-    if (!hit?.el) {
+    if (!(hit == null ? void 0 : hit.el)) {
       selectedCategoryId = null;
       categoryEntryHint = null;
       syncSelectionClass();
@@ -4415,23 +5869,20 @@ export function initBlockscape() {
     hit.el.classList.add("category--selected");
     if (hit.headEl) hit.headEl.setAttribute("aria-current", "true");
   }
-
   function getCurrentCategoryId() {
     if (selectedCategoryId) return selectedCategoryId;
     const selectedMeta = selection ? index.get(selection) : null;
-    if (selectedMeta?.catId) return selectedMeta.catId;
+    if (selectedMeta == null ? void 0 : selectedMeta.catId) return selectedMeta.catId;
     return null;
   }
-
   function selectCategoryByStep(step) {
-    if (!model?.m?.categories?.length || !step) return false;
+    var _a, _b, _c, _d;
+    if (!((_b = (_a = model == null ? void 0 : model.m) == null ? void 0 : _a.categories) == null ? void 0 : _b.length) || !step) return false;
     const categories = model.m.categories;
     const currentCatId = getCurrentCategoryId();
     let currentIndex = categories.findIndex((cat) => cat.id === currentCatId);
     if (currentIndex === -1) {
-      const fallback =
-        categories.find((cat) => (cat.items || []).length)?.id ||
-        categories[0]?.id;
+      const fallback = ((_c = categories.find((cat) => (cat.items || []).length)) == null ? void 0 : _c.id) || ((_d = categories[0]) == null ? void 0 : _d.id);
       if (!fallback) return false;
       return selectCategory(fallback);
     }
@@ -4439,43 +5890,36 @@ export function initBlockscape() {
     if (targetIndex < 0 || targetIndex >= categories.length) return false;
     return selectCategory(categories[targetIndex].id);
   }
-
   function clearItemSelection() {
     selection = null;
     selectionRelations = null;
     clearStyles();
     drawLinks();
   }
-
   function clearCategorySelection() {
     selectedCategoryId = null;
     categoryEntryHint = null;
     renderCategorySelection();
   }
-
   function clearSelection() {
     clearItemSelection();
     clearCategorySelection();
     categoryEntryHint = null;
     syncSelectionClass();
   }
-
   function clearStyles() {
-    app
-      .querySelectorAll(".tile")
-      .forEach((t) =>
-        t.classList.remove(
-          "dep",
-          "revdep",
-          "dep-indirect",
-          "revdep-indirect",
-          "selected"
-        )
-      );
+    app.querySelectorAll(".tile").forEach(
+      (t) => t.classList.remove(
+        "dep",
+        "revdep",
+        "dep-indirect",
+        "revdep-indirect",
+        "selected"
+      )
+    );
   }
-
   function applyReusedHighlights() {
-    if (!model?.reusedLocal) return;
+    if (!(model == null ? void 0 : model.reusedLocal)) return;
     model.reusedLocal.forEach((id) => {
       const hit = index.get(id);
       if (!hit) return;
@@ -4485,16 +5929,15 @@ export function initBlockscape() {
         badge.style.display = showReusedInMap ? "inline-block" : "none";
     });
   }
-
   function drawLinks() {
     while (overlay.firstChild) overlay.removeChild(overlay.firstChild);
     if (!selection || overlay.hidden) return;
     selectionRelations = getSelectionRelations(selection);
     const relations = selectionRelations;
-
     relations.edges.forEach((edge) => {
-      const fromRect = index.get(edge.from)?.rect;
-      const toRect = index.get(edge.to)?.rect;
+      var _a, _b;
+      const fromRect = (_a = index.get(edge.from)) == null ? void 0 : _a.rect;
+      const toRect = (_b = index.get(edge.to)) == null ? void 0 : _b.rect;
       if (!fromRect || !toRect) return;
       const a = center(fromRect);
       const b = center(toRect);
@@ -4502,10 +5945,8 @@ export function initBlockscape() {
         "http://www.w3.org/2000/svg",
         "path"
       );
-      const c1x = (a.x + b.x) / 2,
-        c1y = a.y;
-      const c2x = (a.x + b.x) / 2,
-        c2y = b.y;
+      const c1x = (a.x + b.x) / 2, c1y = a.y;
+      const c2x = (a.x + b.x) / 2, c2y = b.y;
       path.setAttribute(
         "d",
         `M ${a.x},${a.y} C ${c1x},${c1y} ${c2x},${c2y} ${b.x},${b.y}`
@@ -4513,9 +5954,7 @@ export function initBlockscape() {
       path.setAttribute("fill", "none");
       path.setAttribute(
         "stroke",
-        edge.type === "dep"
-          ? "var(--blockscape-dep)"
-          : "var(--blockscape-revdep)"
+        edge.type === "dep" ? "var(--blockscape-dep)" : "var(--blockscape-revdep)"
       );
       path.setAttribute("stroke-opacity", edge.depth === 1 ? "0.45" : "0.22");
       path.setAttribute("stroke-width", edge.depth === 1 ? "2" : "1.5");
@@ -4524,24 +5963,21 @@ export function initBlockscape() {
       overlay.appendChild(path);
     });
   }
-
   function center(r) {
     return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
   }
   function escapeHtml(s) {
     return s.replace(
       /[&<>"']/g,
-      (m) =>
-        ({
-          "&": "&amp;",
-          "<": "&lt;",
-          ">": "&gt;",
-          '"': "&quot;",
-      "'": "&#39;",
-        }[m])
+      (m) => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;"
+      })[m]
     );
   }
-
   function buildObsidianUrl(targetText) {
     const trimmed = (targetText ?? "").toString().trim();
     if (!trimmed) return "";
@@ -4555,7 +5991,6 @@ export function initBlockscape() {
     }
     return `obsidian://advanced-uri?${params.toString()}`;
   }
-
   function getObsidianTargetText(item) {
     if (!item) return "";
     if (obsidianLinkMode === OBSIDIAN_LINK_MODE_ID) {
@@ -4563,15 +5998,14 @@ export function initBlockscape() {
     }
     return item.name ?? item.id ?? "";
   }
-
   function getObsidianLink(item, { externalMeta, seriesIdLookup } = {}) {
+    var _a;
     if (!obsidianLinksEnabled) return "";
     if (!item) return "";
-    if (seriesIdLookup?.has?.(item.id)) return "";
+    if ((_a = seriesIdLookup == null ? void 0 : seriesIdLookup.has) == null ? void 0 : _a.call(seriesIdLookup, item.id)) return "";
     const targetText = getObsidianTargetText(item);
     return buildObsidianUrl(targetText);
   }
-
   function resolveExternalMeta(value) {
     if (typeof value === "string") {
       const trimmed = value.trim();
@@ -4591,7 +6025,6 @@ export function initBlockscape() {
     }
     return { isExternal: false, url: "" };
   }
-
   function createObsidianLinkButton(url) {
     const button = document.createElement("button");
     button.type = "button";
@@ -4606,7 +6039,6 @@ export function initBlockscape() {
     button.addEventListener("keydown", (event) => event.stopPropagation());
     return button;
   }
-
   function createExternalLinkButton(url) {
     const button = document.createElement("button");
     button.type = "button";
@@ -4621,7 +6053,6 @@ export function initBlockscape() {
     button.addEventListener("keydown", (event) => event.stopPropagation());
     return button;
   }
-
   function applyObsidianLinkToTile(tile, url) {
     if (!tile) return;
     const existing = tile.querySelector(".obsidian-link");
@@ -4637,13 +6068,12 @@ export function initBlockscape() {
     }
     tile.appendChild(createObsidianLinkButton(url));
   }
-
   function scheduleThumbLabelMeasure() {
     if (thumbLabelMeasureTimer) return;
     thumbLabelMeasureTimer = requestAnimationFrame(() => {
       thumbLabelMeasureTimer = null;
       versionThumbLabels = versionThumbLabels.filter(
-        ({ labelEl, textEl }) => labelEl?.isConnected && textEl?.isConnected
+        ({ labelEl, textEl }) => (labelEl == null ? void 0 : labelEl.isConnected) && (textEl == null ? void 0 : textEl.isConnected)
       );
       versionThumbLabels.forEach(({ labelEl, textEl }) => {
         const overflow = Math.max(textEl.scrollWidth - labelEl.clientWidth, 0);
@@ -4660,24 +6090,17 @@ export function initBlockscape() {
       });
     });
   }
-
   function registerThumbLabel(labelEl, textEl) {
     if (!labelEl || !textEl) return;
     versionThumbLabels.push({ labelEl, textEl });
     scheduleThumbLabelMeasure();
   }
-
   function buildSeriesInfoTooltipHtml(versionEntry, titleText) {
+    var _a, _b;
     const parts = [
-      `<div class="version-nav__tooltip-title">${escapeHtml(titleText)}</div>`,
+      `<div class="version-nav__tooltip-title">${escapeHtml(titleText)}</div>`
     ];
-    const versionLabel = (
-      versionEntry?.version ??
-      versionEntry?.data?.version ??
-      ""
-    )
-      .toString()
-      .trim();
+    const versionLabel = ((versionEntry == null ? void 0 : versionEntry.version) ?? ((_a = versionEntry == null ? void 0 : versionEntry.data) == null ? void 0 : _a.version) ?? "").toString().trim();
     if (versionLabel) {
       parts.push(
         `<div class="version-nav__tooltip-meta">Version ${escapeHtml(
@@ -4685,7 +6108,7 @@ export function initBlockscape() {
         )}</div>`
       );
     }
-    const abstractHtml = (versionEntry?.data?.abstract ?? "").toString().trim();
+    const abstractHtml = (((_b = versionEntry == null ? void 0 : versionEntry.data) == null ? void 0 : _b.abstract) ?? "").toString().trim();
     if (abstractHtml) {
       parts.push(
         `<div class="version-nav__tooltip-body">${abstractHtml}</div>`
@@ -4697,14 +6120,13 @@ export function initBlockscape() {
     }
     return parts.join("");
   }
-
-  function showTabTooltip(target, html, { offset = 8 } = {}) {
-    if (!tabTooltip || !target || !html) return;
+  function showTabTooltip(target2, html, { offset = 8 } = {}) {
+    if (!tabTooltip || !target2 || !html) return;
     tabTooltip.innerHTML = html;
     tabTooltip.hidden = false;
     tabTooltip.setAttribute("aria-hidden", "false");
     requestAnimationFrame(() => {
-      const rect = target.getBoundingClientRect();
+      const rect = target2.getBoundingClientRect();
       const tooltipRect = tabTooltip.getBoundingClientRect();
       const scrollX = window.scrollX || document.documentElement.scrollLeft;
       const scrollY = window.scrollY || document.documentElement.scrollTop;
@@ -4719,7 +6141,6 @@ export function initBlockscape() {
       tabTooltip.classList.add("is-visible");
     });
   }
-
   function hideTabTooltip() {
     if (infoTooltipAutoHideTimer) {
       clearTimeout(infoTooltipAutoHideTimer);
@@ -4730,25 +6151,22 @@ export function initBlockscape() {
     tabTooltip.setAttribute("aria-hidden", "true");
     tabTooltip.hidden = true;
   }
-
   function attachSeriesPreviewHover(thumbEl, versionEntry) {
     if (!thumbEl) return;
     const titleText = getModelTitle(
-      versionEntry?.data || versionEntry,
+      (versionEntry == null ? void 0 : versionEntry.data) || versionEntry,
       "Series version"
     );
     thumbEl.title = titleText;
     thumbEl.setAttribute("aria-label", titleText);
     const infoHtml = buildSeriesInfoTooltipHtml(versionEntry, titleText);
     let hoverTimer = null;
-
     const clearHoverTimer = () => {
       if (hoverTimer) {
         clearTimeout(hoverTimer);
         hoverTimer = null;
       }
     };
-
     const showTitleTooltip = () => {
       activeSeriesPreviewTarget = thumbEl;
       showTabTooltip(
@@ -4759,7 +6177,6 @@ export function initBlockscape() {
         { offset: 10 }
       );
     };
-
     const scheduleInfoTooltip = () => {
       clearHoverTimer();
       hoverTimer = setTimeout(() => {
@@ -4767,19 +6184,16 @@ export function initBlockscape() {
         showTabTooltip(thumbEl, infoHtml, { offset: 10 });
       }, SERIES_INFO_PREVIEW_DELAY);
     };
-
     const handleEnter = () => {
       showTitleTooltip();
       scheduleInfoTooltip();
     };
-
     const handleMove = () => {
       if (activeSeriesPreviewTarget !== thumbEl) {
         showTitleTooltip();
       }
       scheduleInfoTooltip();
     };
-
     const handleLeave = () => {
       clearHoverTimer();
       if (activeSeriesPreviewTarget === thumbEl) {
@@ -4787,7 +6201,6 @@ export function initBlockscape() {
         hideTabTooltip();
       }
     };
-
     thumbEl.addEventListener("mouseenter", handleEnter);
     thumbEl.addEventListener("focus", handleEnter);
     thumbEl.addEventListener("pointermove", handleMove);
@@ -4795,7 +6208,6 @@ export function initBlockscape() {
     thumbEl.addEventListener("blur", handleLeave);
     thumbEl.addEventListener("click", handleLeave);
   }
-
   function maybeShowInfoTabPreview() {
     if (!pendingInfoPreview) return;
     pendingInfoPreview = false;
@@ -4805,9 +6217,8 @@ export function initBlockscape() {
     infoTooltipAutoHideTimer = setTimeout(() => {
       hideTabTooltip();
       startInfoTabTwinkle();
-    }, 1000);
+    }, 1e3);
   }
-
   function startInfoTabTwinkle() {
     if (!infoTabButton) return;
     if (infoTabTwinkleTimer) {
@@ -4820,10 +6231,8 @@ export function initBlockscape() {
       infoTabTwinkleTimer = null;
     }, 1400);
   }
-
   window.addEventListener("scroll", hideTabTooltip, true);
   window.addEventListener("resize", hideTabTooltip);
-
   function hidePreview() {
     if (!preview) return;
     preview.classList.remove(
@@ -4835,7 +6244,6 @@ export function initBlockscape() {
     preview.hidden = true;
     setPreviewActions([]);
   }
-
   function showPreviewAt(x, y) {
     if (!preview) return;
     previewAnchor = { x, y };
@@ -4844,7 +6252,6 @@ export function initBlockscape() {
     preview.classList.add("is-visible");
     positionPreview(x, y);
   }
-
   function positionPreview(x, y) {
     if (!preview) return;
     const margin = 12;
@@ -4862,7 +6269,6 @@ export function initBlockscape() {
     preview.style.left = `${left}px`;
     preview.style.top = `${top}px`;
   }
-
   function setPreviewActions(actions = []) {
     if (!previewActions) return;
     previewActions.innerHTML = "";
@@ -4882,14 +6288,13 @@ export function initBlockscape() {
     });
     previewActions.hidden = actions.length === 0;
   }
-
   async function handleTileContextMenu(event, tile) {
+    var _a;
     if (!preview) return;
     event.stopPropagation();
     event.preventDefault();
     const id = tile.dataset.id;
-    const displayName =
-      tile.querySelector(".name")?.textContent || id || "Preview";
+    const displayName = ((_a = tile.querySelector(".name")) == null ? void 0 : _a.textContent) || id || "Preview";
     const filename = id ? `${id}.html` : "";
     const filepath = filename ? `items/${filename}` : "";
     const requestId = ++previewRequestId;
@@ -4902,39 +6307,35 @@ export function initBlockscape() {
         onClick: () => {
           hidePreview();
           itemEditor.open(id);
-        },
-      },
+        }
+      }
     ];
     if (externalUrl) {
       actionList.push({
         label: "Open link ↗",
         title: externalUrl,
-        onClick: () => window.open(externalUrl, "_blank", "noopener"),
+        onClick: () => window.open(externalUrl, "_blank", "noopener")
       });
     }
     if (obsidianUrl) {
       actionList.push({
         label: "Open in Obsidian",
         title: obsidianUrl,
-        onClick: () => window.open(obsidianUrl, "_blank", "noopener"),
+        onClick: () => window.open(obsidianUrl, "_blank", "noopener")
       });
     }
     setPreviewActions(actionList);
     if (id) select(id);
-
     previewTitle.textContent = displayName;
     previewBody.innerHTML = '<div class="item-preview__status">Loading…</div>';
     preview.classList.remove("item-preview--has-frame");
     preview.classList.add("item-preview--expanded");
     showPreviewAt(event.clientX, event.clientY);
-
     if (!filepath) {
-      previewBody.innerHTML =
-        '<div class="item-preview__status">Preview unavailable for this item.</div>';
+      previewBody.innerHTML = '<div class="item-preview__status">Preview unavailable for this item.</div>';
       positionPreview(previewAnchor.x, previewAnchor.y);
       return;
     }
-
     try {
       const response = await fetch(filepath, { cache: "no-cache" });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -4965,39 +6366,31 @@ export function initBlockscape() {
       positionPreview(previewAnchor.x, previewAnchor.y);
     }
   }
-
   if (previewClose) {
     previewClose.addEventListener("click", hidePreview);
   }
-
   if (helpButton) {
     helpButton.addEventListener("click", () => {
       openShortcutHelp();
     });
   }
-
   if (newPanelButton) {
     newPanelButton.addEventListener("click", () => {
       openNewPanel();
     });
   }
-
   if (shortcutHelpClose) {
     shortcutHelpClose.addEventListener("click", closeShortcutHelp);
   }
-
   if (shortcutHelpBackdrop) {
     shortcutHelpBackdrop.addEventListener("click", closeShortcutHelp);
   }
-
   if (newPanelClose) {
     newPanelClose.addEventListener("click", closeNewPanel);
   }
-
   if (newPanelBackdrop) {
     newPanelBackdrop.addEventListener("click", closeNewPanel);
   }
-
   if (app) {
     app.addEventListener("contextmenu", (event) => {
       const tile = event.target.closest(".tile");
@@ -5005,20 +6398,17 @@ export function initBlockscape() {
       handleTileContextMenu(event, tile);
     });
   }
-
   document.addEventListener("click", (event) => {
     if (typeof event.button === "number" && event.button !== 0) return;
     if (!preview || preview.hidden) return;
     if (preview.contains(event.target)) return;
     hidePreview();
   });
-
   if (downloadButton) {
     downloadButton.addEventListener("click", () => {
       downloadCurrentJson("button");
     });
   }
-
   if (createVersionButton) {
     createVersionButton.addEventListener("click", () => {
       if (activeIndex < 0) {
@@ -5030,20 +6420,20 @@ export function initBlockscape() {
         setActive(idx);
         console.log("[Blockscape] created new version from map view");
       } catch (error) {
-        alert(error?.message || "Unable to create a new version right now.");
+        alert((error == null ? void 0 : error.message) || "Unable to create a new version right now.");
       }
     });
   }
-
   if (shareButton) {
     shareButton.addEventListener("click", async () => {
+      var _a;
       if (activeIndex < 0 || !models[activeIndex]) {
         alert("Select or load a model before sharing.");
         return;
       }
       const payload = {
         title: getModelTitle(models[activeIndex], "Shared Model"),
-        data: models[activeIndex].data,
+        data: models[activeIndex].data
       };
       let encoded;
       try {
@@ -5057,17 +6447,14 @@ export function initBlockscape() {
       shareUrl.searchParams.delete("share");
       shareUrl.hash = `share=${encoded}`;
       const fullUrl = shareUrl.toString();
-
-      // Update the address bar so the current page URL matches the share URL
       try {
         window.history.replaceState({}, document.title, fullUrl);
       } catch (err) {
         console.warn("[Blockscape] failed to update URL for share", err);
         window.location.hash = shareUrl.hash;
       }
-
       let copied = false;
-      if (navigator.clipboard?.writeText) {
+      if ((_a = navigator.clipboard) == null ? void 0 : _a.writeText) {
         try {
           await navigator.clipboard.writeText(fullUrl);
           copied = true;
@@ -5082,16 +6469,15 @@ export function initBlockscape() {
       }
     });
   }
-
   if (editButton) {
     editButton.addEventListener("click", () => {
-      const text = (jsonBox.value || "").trim();
-      if (!text) {
+      const text2 = (jsonBox.value || "").trim();
+      if (!text2) {
         alert("Load or paste a model before opening the editor.");
         return;
       }
       try {
-        JSON.parse(text);
+        JSON.parse(text2);
       } catch (err) {
         alert("Current JSON is invalid. Fix it before opening the editor.");
         return;
@@ -5099,8 +6485,8 @@ export function initBlockscape() {
       try {
         const payload = {
           ts: Date.now(),
-          text,
-          source: "viewer",
+          text: text2,
+          source: "viewer"
         };
         if (selection) {
           payload.selectedItemId = selection;
@@ -5122,7 +6508,6 @@ export function initBlockscape() {
       window.open(editorUrl, "_blank");
     });
   }
-
   if (typeof window !== "undefined") {
     window.addEventListener("storage", (event) => {
       if (!event) return;
@@ -5140,7 +6525,6 @@ export function initBlockscape() {
       if (!payload || payload.source !== "editor") return;
       importEditorPayload("storage-event");
     });
-
     window.addEventListener("message", (event) => {
       if (!event || !event.data) return;
       const currentOrigin = window.location.origin;
@@ -5155,8 +6539,8 @@ export function initBlockscape() {
       importEditorPayload("message");
     });
   }
-
   document.addEventListener("keydown", (event) => {
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j;
     if (isShortcutHelpOpen()) {
       if (event.key === "Escape") {
         event.preventDefault();
@@ -5164,33 +6548,23 @@ export function initBlockscape() {
       }
       return;
     }
-
-    if (!newPanel?.hidden && event.key === "Escape") {
+    if (!(newPanel == null ? void 0 : newPanel.hidden) && event.key === "Escape") {
       event.preventDefault();
       closeNewPanel();
       return;
     }
-
-    const isEditingItem = itemEditor?.isOpen?.();
+    const isEditingItem = (_a = itemEditor == null ? void 0 : itemEditor.isOpen) == null ? void 0 : _a.call(itemEditor);
     if (isEditingItem) {
       return;
     }
-
     if ((event.ctrlKey || event.metaKey) && event.code === "KeyS") {
       event.preventDefault();
       const active = models[activeIndex];
-      const preferSeries = !!(active?.apicurioVersions?.length > 1);
+      const preferSeries = !!(((_b = active == null ? void 0 : active.apicurioVersions) == null ? void 0 : _b.length) > 1);
       downloadCurrentJson("shortcut", preferSeries);
       return;
     }
-
-    if (
-      (event.ctrlKey || event.metaKey) &&
-      !event.altKey &&
-      !event.shiftKey &&
-      event.key &&
-      event.key.toLowerCase() === "z"
-    ) {
+    if ((event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey && event.key && event.key.toLowerCase() === "z") {
       if (!shouldHandleGlobalPaste()) return;
       const undone = undoLastDeletion();
       if (undone) {
@@ -5198,7 +6572,6 @@ export function initBlockscape() {
         return;
       }
     }
-
     if (event.key === "Escape") {
       let handled = false;
       if (preview && !preview.hidden) {
@@ -5213,7 +6586,6 @@ export function initBlockscape() {
         event.preventDefault();
       }
     }
-
     if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
       if (!shouldHandleGlobalPaste()) return;
       const step = event.key === "ArrowLeft" ? -1 : 1;
@@ -5242,7 +6614,6 @@ export function initBlockscape() {
         }
       }
     }
-
     if (event.key === "ArrowUp" || event.key === "ArrowDown") {
       if (!shouldHandleGlobalPaste()) return;
       const step = event.key === "ArrowUp" ? -1 : 1;
@@ -5278,27 +6649,19 @@ export function initBlockscape() {
         }
       }
     }
-
     if (event.key === "Delete") {
       if (!shouldHandleGlobalPaste()) return;
       if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey)
         return;
-      const removedCategory = selectedCategoryId
-        ? deleteSelectedCategory()
-        : false;
+      const removedCategory = selectedCategoryId ? deleteSelectedCategory() : false;
       const removedItem = removedCategory ? true : deleteSelectedItem();
       if (removedCategory || removedItem) {
         event.preventDefault();
       }
     }
-
     if (event.key === "F2") {
       if (!shouldHandleGlobalPaste()) return;
-      const targetCategoryId =
-        (selectedCategoryId && !selection && selectedCategoryId) ||
-        (!selection &&
-          event.target?.closest?.(".category")?.dataset?.cat) ||
-        null;
+      const targetCategoryId = selectedCategoryId && !selection && selectedCategoryId || !selection && ((_f = (_e = (_d = (_c = event.target) == null ? void 0 : _c.closest) == null ? void 0 : _d.call(_c, ".category")) == null ? void 0 : _e.dataset) == null ? void 0 : _f.cat) || null;
       if (targetCategoryId && !selection) {
         const edited = openCategoryEditor(targetCategoryId);
         if (edited) {
@@ -5306,14 +6669,12 @@ export function initBlockscape() {
           return;
         }
       }
-      const targetId =
-        selection || event.target?.closest?.(".tile")?.dataset?.id;
+      const targetId = selection || ((_j = (_i = (_h = (_g = event.target) == null ? void 0 : _g.closest) == null ? void 0 : _h.call(_g, ".tile")) == null ? void 0 : _i.dataset) == null ? void 0 : _j.id);
       if (targetId) {
         const opened = itemEditor.open(targetId);
         if (opened) event.preventDefault();
       }
     }
-
     if (event.key === "Insert") {
       if (!shouldHandleGlobalPaste()) return;
       if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey)
@@ -5324,12 +6685,10 @@ export function initBlockscape() {
       }
     }
   });
-
   window.addEventListener("resize", () => {
     if (!preview || preview.hidden) return;
     positionPreview(previewAnchor.x, previewAnchor.y);
   });
-
   window.addEventListener(
     "scroll",
     () => {
@@ -5338,30 +6697,24 @@ export function initBlockscape() {
     },
     true
   );
-
-  // ===== Drag and drop reorder (per model) =====
   let draggedItemId = null;
   let draggedCategoryId = null;
-
   function handleDragStart(e) {
     hidePreview();
     draggedItemId = e.target.dataset.id;
     draggedCategoryId = e.target.closest(".category").dataset.cat;
-
     e.target.classList.add("dragging");
     e.dataTransfer.effectAllowed = "move";
     e.dataTransfer.setData(
       "text/plain",
       JSON.stringify({
         itemId: draggedItemId,
-        categoryId: draggedCategoryId,
+        categoryId: draggedCategoryId
       })
     );
-
     const category = e.target.closest(".category");
     const grid = category.querySelector(".grid");
     grid.classList.add("drag-active");
-
     console.log(
       "[Blockscape] drag start",
       draggedItemId,
@@ -5369,19 +6722,13 @@ export function initBlockscape() {
       draggedCategoryId
     );
   }
-
   function handleDragEnd(e) {
     e.target.classList.remove("dragging");
-    app
-      .querySelectorAll(".grid")
-      .forEach((grid) => grid.classList.remove("drag-active"));
-    app
-      .querySelectorAll(".tile")
-      .forEach((tile) => tile.classList.remove("drag-over"));
+    app.querySelectorAll(".grid").forEach((grid) => grid.classList.remove("drag-active"));
+    app.querySelectorAll(".tile").forEach((tile) => tile.classList.remove("drag-over"));
     draggedItemId = null;
     draggedCategoryId = null;
   }
-
   function handleDragOver(e) {
     e.preventDefault();
     e.dataTransfer.dropEffect = "move";
@@ -5396,7 +6743,6 @@ export function initBlockscape() {
     if (grid && !grid.contains(e.relatedTarget))
       grid.classList.remove("drag-active");
   }
-
   function handleDrop(e) {
     e.preventDefault();
     const targetGrid = e.target.closest(".grid");
@@ -5404,9 +6750,7 @@ export function initBlockscape() {
     const targetCategory = targetGrid.closest(".category");
     if (!targetCategory) return;
     const targetCategoryId = targetCategory.dataset.cat;
-
     if (!draggedItemId || !targetCategoryId) return;
-
     const tiles = Array.from(targetGrid.querySelectorAll(".tile")).filter(
       (tile) => tile.dataset.id !== draggedItemId
     );
@@ -5414,7 +6758,6 @@ export function initBlockscape() {
       const rect = tile.getBoundingClientRect();
       return e.clientY < rect.top + rect.height / 2;
     });
-
     reorderItem(
       draggedItemId,
       targetTile ? targetTile.dataset.id : null,
@@ -5430,27 +6773,23 @@ export function initBlockscape() {
       targetCategoryId
     );
   }
-
   function reorderItem(itemId, targetItemId, targetCategoryId) {
     if (activeIndex < 0) return;
     const mobj = models[activeIndex].data;
     const categories = mobj.categories || [];
-    const sourceCategory = categories.find((cat) =>
-      (cat.items || []).some((item) => item.id === itemId)
+    const sourceCategory = categories.find(
+      (cat) => (cat.items || []).some((item) => item.id === itemId)
     );
     const targetCategory = categories.find(
       (cat) => cat.id === targetCategoryId
     );
     if (!sourceCategory || !targetCategory) return;
-
     sourceCategory.items = sourceCategory.items || [];
     targetCategory.items = targetCategory.items || [];
-
     const itemIndex = sourceCategory.items.findIndex(
       (item) => item.id === itemId
     );
     if (itemIndex === -1) return;
-
     const [movedItem] = sourceCategory.items.splice(itemIndex, 1);
     let insertIndex = targetCategory.items.length;
     if (targetItemId) {
@@ -5460,19 +6799,15 @@ export function initBlockscape() {
       if (targetIndex !== -1) insertIndex = targetIndex;
     }
     targetCategory.items.splice(insertIndex, 0, movedItem);
-
-    // keep editor in sync
     loadActiveIntoEditor();
     rebuildFromActive();
   }
-
   function addItemToCategory(categoryId) {
     if (activeIndex < 0 || !categoryId) return;
     const mobj = models[activeIndex].data;
     const categories = mobj.categories || [];
     const category = categories.find((cat) => cat.id === categoryId);
     if (!category) return;
-
     category.items = category.items || [];
     const defaultName = `New item ${category.items.length + 1}`;
     const newId = makeUniqueItemId(
@@ -5482,25 +6817,23 @@ export function initBlockscape() {
     const newItem = {
       id: newId,
       name: defaultName,
-      deps: [],
+      deps: []
     };
     category.items.push(newItem);
-
     loadActiveIntoEditor();
     rebuildFromActive();
     hidePreview();
     select(newItem.id);
     const created = index.get(newItem.id);
-    if (created?.el) {
+    if (created == null ? void 0 : created.el) {
       created.el.scrollIntoView({
         behavior: "smooth",
         block: "center",
-        inline: "center",
+        inline: "center"
       });
     }
     console.log("[Blockscape] added item", newItem.id, "to", categoryId);
   }
-
   function addCategoryAtEnd() {
     if (activeIndex < 0) return false;
     const mobj = models[activeIndex].data;
@@ -5519,7 +6852,6 @@ export function initBlockscape() {
     console.log("[Blockscape] added category", newId);
     return true;
   }
-
   function openCategoryEditor(catId = getCurrentCategoryId()) {
     if (activeIndex < 0 || !catId) return false;
     const opened = categoryEditor.open(catId);
@@ -5530,68 +6862,59 @@ export function initBlockscape() {
     }
     return opened;
   }
-
   function moveSelectionWithinCategory(step) {
     if (!selection || activeIndex < 0 || !step) return false;
     const mobj = models[activeIndex].data;
     const categories = mobj.categories || [];
     const selectedMeta = index.get(selection);
     let category = null;
-    if (selectedMeta?.catId) {
+    if (selectedMeta == null ? void 0 : selectedMeta.catId) {
       category = categories.find((cat) => cat.id === selectedMeta.catId);
     }
     if (!category) {
-      category = categories.find((cat) =>
-        (cat.items || []).some((item) => item.id === selection)
+      category = categories.find(
+        (cat) => (cat.items || []).some((item) => item.id === selection)
       );
     }
     if (!category) return false;
-
     category.items = category.items || [];
     const currentIndex = category.items.findIndex(
       (item) => item.id === selection
     );
     if (currentIndex === -1) return false;
-
     const targetIndex = currentIndex + step;
     if (targetIndex < 0 || targetIndex >= category.items.length) return false;
-
     const [movedItem] = category.items.splice(currentIndex, 1);
     category.items.splice(targetIndex, 0, movedItem);
-
     loadActiveIntoEditor();
     rebuildFromActive();
     render();
     select(selection);
     return true;
   }
-
   function selectAdjacentItem(step) {
     if (!model || !model.m || !step) return false;
     const categories = model.m.categories || [];
     if (!categories.length) return false;
-
     const findFirstItem = () => {
       const firstCategory = categories.find((cat) => (cat.items || []).length);
       if (!firstCategory) return null;
       return { category: firstCategory, item: firstCategory.items[0] };
     };
-
     if (!selection) {
       const starter = findFirstItem();
       if (!starter) return false;
       select(starter.item.id);
       return true;
     }
-
     const selectedMeta = index.get(selection);
     let category = null;
-    if (selectedMeta?.catId) {
+    if (selectedMeta == null ? void 0 : selectedMeta.catId) {
       category = categories.find((cat) => cat.id === selectedMeta.catId);
     }
     if (!category) {
-      category = categories.find((cat) =>
-        (cat.items || []).some((item) => item.id === selection)
+      category = categories.find(
+        (cat) => (cat.items || []).some((item) => item.id === selection)
       );
     }
     if (!category) {
@@ -5600,19 +6923,15 @@ export function initBlockscape() {
       select(starter.item.id);
       return true;
     }
-
     const items = category.items || [];
     if (!items.length) return false;
     const currentIndex = items.findIndex((item) => item.id === selection);
     if (currentIndex === -1) return false;
-
     const targetIndex = currentIndex + step;
     if (targetIndex < 0 || targetIndex >= items.length) return false;
-
     select(items[targetIndex].id);
     return true;
   }
-
   function selectAdjacentCategory(step) {
     if (!model || !model.m || !step) return false;
     const categories = model.m.categories || [];
@@ -5632,24 +6951,23 @@ export function initBlockscape() {
       );
       categoryEntryHint = {
         catId: targetCat.id,
-        position: currentItemPosition === -1 ? 0 : currentItemPosition,
+        position: currentItemPosition === -1 ? 0 : currentItemPosition
       };
     } else {
       categoryEntryHint = null;
     }
     return selectCategory(targetCat.id, { preserveEntryHint: true });
   }
-
   function enterSelectedCategoryItems(step) {
-    if (!selectedCategoryId || !model?.m?.categories || !step) return false;
+    var _a;
+    if (!selectedCategoryId || !((_a = model == null ? void 0 : model.m) == null ? void 0 : _a.categories) || !step) return false;
     const categories = model.m.categories || [];
     const targetCat = categories.find((cat) => cat.id === selectedCategoryId);
     if (!targetCat) return false;
     const items = targetCat.items || [];
     if (!items.length) return false;
-    let targetIndex =
-      step > 0 ? 0 : Math.max(0, items.length - 1);
-    if (categoryEntryHint?.catId === targetCat.id) {
+    let targetIndex = step > 0 ? 0 : Math.max(0, items.length - 1);
+    if ((categoryEntryHint == null ? void 0 : categoryEntryHint.catId) === targetCat.id) {
       const hinted = Math.min(
         items.length - 1,
         Math.max(0, categoryEntryHint.position || 0)
@@ -5660,57 +6978,45 @@ export function initBlockscape() {
     select(items[targetIndex].id);
     return true;
   }
-
   function moveSelectionAcrossCategories(step) {
     if (!selection || activeIndex < 0 || !step) return false;
     const mobj = models[activeIndex].data;
     const categories = mobj.categories || [];
     if (!categories.length) return false;
-
     const selectedMeta = index.get(selection);
     let sourceIndex = -1;
-    if (selectedMeta?.catId) {
+    if (selectedMeta == null ? void 0 : selectedMeta.catId) {
       sourceIndex = categories.findIndex(
         (cat) => cat.id === selectedMeta.catId
       );
     }
     if (sourceIndex === -1) {
-      sourceIndex = categories.findIndex((cat) =>
-        (cat.items || []).some((item) => item.id === selection)
+      sourceIndex = categories.findIndex(
+        (cat) => (cat.items || []).some((item) => item.id === selection)
       );
     }
     if (sourceIndex === -1) return false;
-
     const targetIndex = sourceIndex + step;
     if (targetIndex < 0 || targetIndex >= categories.length) return false;
-
     const sourceCategory = categories[sourceIndex];
     const targetCategory = categories[targetIndex];
     if (!targetCategory) return false;
-
     sourceCategory.items = sourceCategory.items || [];
     targetCategory.items = targetCategory.items || [];
-
     const currentIndex = sourceCategory.items.findIndex(
       (item) => item.id === selection
     );
     if (currentIndex === -1) return false;
-
     const insertPos = Math.min(
       targetCategory.items.length,
       Math.max(0, currentIndex)
     );
-    const targetItemId =
-      insertPos < targetCategory.items.length
-        ? targetCategory.items[insertPos].id
-        : null;
-
+    const targetItemId = insertPos < targetCategory.items.length ? targetCategory.items[insertPos].id : null;
     reorderItem(selection, targetItemId, targetCategory.id);
     render();
     select(selection);
     return true;
   }
-
   function moveCategoryByStep(step) {
     if (activeIndex < 0 || !step) return false;
     const mobj = models[activeIndex].data;
@@ -5741,12 +7047,10 @@ export function initBlockscape() {
     );
     return true;
   }
-
   function undoLastDeletion() {
     if (activeIndex < 0) return false;
     const activeModel = models[activeIndex];
-    const activeModelId =
-      getModelId(activeModel) || (activeModel ? activeModel.id : null);
+    const activeModelId = getModelId(activeModel) || (activeModel ? activeModel.id : null);
     const candidates = [];
     if (lastDeletedItem && activeModelId === lastDeletedItem.modelId) {
       candidates.push({ ...lastDeletedItem, type: "item" });
@@ -5769,24 +7073,20 @@ export function initBlockscape() {
     }
     return false;
   }
-
   function restoreItemDeletion(deleted) {
     const activeModel = models[activeIndex];
-    const activeModelId =
-      getModelId(activeModel) || (activeModel ? activeModel.id : null);
+    const activeModelId = getModelId(activeModel) || (activeModel ? activeModel.id : null);
     if (!activeModel || activeModelId !== deleted.modelId) return false;
     const mobj = activeModel.data;
     const categories = mobj.categories || [];
     const category = categories.find((cat) => cat.id === deleted.categoryId);
     if (!category) return false;
-
     category.items = category.items || [];
     const insertIndex = Math.min(
       Math.max(deleted.index, 0),
       category.items.length
     );
     category.items.splice(insertIndex, 0, deleted.item);
-
     lastDeletedItem = null;
     hidePreview();
     selection = null;
@@ -5799,11 +7099,9 @@ export function initBlockscape() {
     console.log("[Blockscape] undo delete restored", deleted.item.id);
     return true;
   }
-
   function restoreCategoryDeletion(deleted) {
     const activeModel = models[activeIndex];
-    const activeModelId =
-      getModelId(activeModel) || (activeModel ? activeModel.id : null);
+    const activeModelId = getModelId(activeModel) || (activeModel ? activeModel.id : null);
     if (!activeModel || activeModelId !== deleted.modelId) return false;
     const mobj = activeModel.data;
     mobj.categories = mobj.categories || [];
@@ -5825,47 +7123,41 @@ export function initBlockscape() {
     console.log("[Blockscape] undo delete restored category", deleted.category.id);
     return true;
   }
-
   function deleteSelectedItem() {
     if (!selection || activeIndex < 0) return false;
     const mobj = models[activeIndex].data;
     const categories = mobj.categories || [];
     if (!categories.length) return false;
-
     const selectedMeta = index.get(selection);
     let category = null;
-    if (selectedMeta?.catId) {
+    if (selectedMeta == null ? void 0 : selectedMeta.catId) {
       category = categories.find((cat) => cat.id === selectedMeta.catId);
     }
     if (!category) {
-      category = categories.find((cat) =>
-        (cat.items || []).some((item) => item.id === selection)
+      category = categories.find(
+        (cat) => (cat.items || []).some((item) => item.id === selection)
       );
     }
     if (!category || !Array.isArray(category.items)) return false;
-
     const currentIndex = category.items.findIndex(
       (item) => item.id === selection
     );
     if (currentIndex === -1) return false;
-
     const removed = category.items.splice(currentIndex, 1)[0];
     if (!removed) return false;
-
     const activeModel = models[activeIndex];
     lastDeletedItem = {
       item: removed,
       categoryId: category.id,
       index: currentIndex,
-      modelId:
-        getModelId(activeModel) || (activeModel ? activeModel.id : null),
-      ts: Date.now(),
+      modelId: getModelId(activeModel) || (activeModel ? activeModel.id : null),
+      ts: Date.now()
     };
-
     const findNextSelection = () => {
+      var _a;
       if (category.items.length) {
         const neighborIndex = Math.min(currentIndex, category.items.length - 1);
-        return category.items[neighborIndex]?.id || null;
+        return ((_a = category.items[neighborIndex]) == null ? void 0 : _a.id) || null;
       }
       const catIndex = categories.findIndex((cat) => cat.id === category.id);
       if (catIndex === -1) return null;
@@ -5879,7 +7171,6 @@ export function initBlockscape() {
       }
       return null;
     };
-
     const nextSelectionId = findNextSelection();
     hidePreview();
     selection = null;
@@ -5897,8 +7188,8 @@ export function initBlockscape() {
     console.log("[Blockscape] removed item", removed.id);
     return true;
   }
-
   function deleteSelectedCategory() {
+    var _a, _b;
     const catId = getCurrentCategoryId();
     if (!catId || activeIndex < 0) return false;
     const mobj = models[activeIndex].data;
@@ -5912,9 +7203,8 @@ export function initBlockscape() {
     lastDeletedCategory = {
       category: removed,
       index: currentIndex,
-      modelId:
-        getModelId(activeModel) || (activeModel ? activeModel.id : null),
-      ts: Date.now(),
+      modelId: getModelId(activeModel) || (activeModel ? activeModel.id : null),
+      ts: Date.now()
     };
     selectedCategoryId = null;
     selection = null;
@@ -5923,10 +7213,7 @@ export function initBlockscape() {
     syncSelectionClass();
     loadActiveIntoEditor();
     rebuildFromActive();
-    const nextId =
-      categories[currentIndex]?.id ||
-      categories[currentIndex - 1]?.id ||
-      null;
+    const nextId = ((_a = categories[currentIndex]) == null ? void 0 : _a.id) || ((_b = categories[currentIndex - 1]) == null ? void 0 : _b.id) || null;
     if (nextId) {
       selectCategory(nextId);
     } else {
@@ -5935,7 +7222,6 @@ export function initBlockscape() {
     console.log("[Blockscape] removed category", removed.id);
     return true;
   }
-
   function deleteItemById(id) {
     if (!id) return false;
     const previousSelection = selection;
@@ -5947,25 +7233,21 @@ export function initBlockscape() {
     }
     return deleted;
   }
-
-  // ===== Controls =====
-
   if (copyJsonButton) {
     copyJsonButton.addEventListener("click", async () => {
-      const text = jsonBox.value || "";
-      if (!text.trim()) {
+      const text2 = jsonBox.value || "";
+      if (!text2.trim()) {
         alert("JSON editor is empty.");
         return;
       }
-      const copied = await writeTextToClipboard(text);
+      const copied = await writeTextToClipboard(text2);
       if (copied) {
         alert("JSON copied to clipboard.");
       } else {
-        window.prompt("Copy this JSON manually:", text);
+        window.prompt("Copy this JSON manually:", text2);
       }
     });
   }
-
   if (copySeriesButton) {
     copySeriesButton.addEventListener("click", async () => {
       const seriesJson = getActiveSeriesJson();
@@ -5981,16 +7263,15 @@ export function initBlockscape() {
       }
     });
   }
-
   if (pasteJsonButton) {
     pasteJsonButton.addEventListener("click", async () => {
       try {
-        const text = await readTextFromClipboard();
-        if (!text) {
+        const text2 = await readTextFromClipboard();
+        if (!text2) {
           alert("Clipboard is empty.");
           return;
         }
-        jsonBox.value = text;
+        jsonBox.value = text2;
         jsonBox.focus();
       } catch (err) {
         console.warn("[Blockscape] clipboard read failed", err);
@@ -6000,12 +7281,10 @@ export function initBlockscape() {
       }
     });
   }
-
-  // Append models from textarea
   document.getElementById("appendFromBox").onclick = () => {
     try {
       const appended = normalizeToModelsFromText(jsonBox.value, "Pasted", {
-        promptForSeriesName: true,
+        promptForSeriesName: true
       });
       if (!appended.length) {
         alert("No valid JSON found to append.");
@@ -6015,7 +7294,7 @@ export function initBlockscape() {
       let firstIndex = null;
       appended.forEach((entry, idx) => {
         const idxResult = addModelEntry(entry, {
-          versionLabel: appended.length > 1 ? `paste #${idx + 1}` : "paste",
+          versionLabel: appended.length > 1 ? `paste #${idx + 1}` : "paste"
         });
         if (firstIndex == null) firstIndex = idxResult;
       });
@@ -6028,9 +7307,8 @@ export function initBlockscape() {
       alert("Append error (see console).");
     }
   };
-
-  // Replace active model data with JSON from textarea
   document.getElementById("replaceActive").onclick = () => {
+    var _a;
     if (activeIndex < 0) {
       alert("No active model selected.");
       return;
@@ -6039,20 +7317,15 @@ export function initBlockscape() {
       const obj = JSON.parse(jsonBox.value);
       ensureModelMetadata(obj, {
         titleHint: getModelTitle(models[activeIndex]),
-        idHint:
-          getModelId(models[activeIndex]) || getModelTitle(models[activeIndex]),
+        idHint: getModelId(models[activeIndex]) || getModelTitle(models[activeIndex])
       });
       models[activeIndex].data = obj;
       models[activeIndex].title = obj.title || models[activeIndex].title;
-      if (
-        models[activeIndex].isSeries ||
-        models[activeIndex].apicurioVersions?.length > 1
-      ) {
-        const seriesName =
-          models[activeIndex].title || getModelTitle(models[activeIndex]);
+      if (models[activeIndex].isSeries || ((_a = models[activeIndex].apicurioVersions) == null ? void 0 : _a.length) > 1) {
+        const seriesName = models[activeIndex].title || getModelTitle(models[activeIndex]);
         ensureSeriesId(models[activeIndex], {
           seriesName,
-          fallbackTitle: seriesName,
+          fallbackTitle: seriesName
         });
       }
       syncDocumentTitle();
@@ -6067,8 +7340,6 @@ export function initBlockscape() {
       alert("JSON parse error (see console).");
     }
   };
-
-  // Load files: each text may be single object, array, or ---/%%% separated
   document.getElementById("file").onchange = async (e) => {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
@@ -6079,42 +7350,36 @@ export function initBlockscape() {
         const txt = await f.text();
         const baseName = f.name.replace(/\.[^.]+$/, "") || "File";
         const entries = normalizeToModelsFromText(txt, baseName, {
-          seriesTitleOverride: `${baseName} series`,
+          seriesTitleOverride: `${baseName} series`
         });
         if (!entries.length) {
           console.warn("[Blockscape] no models in file:", f.name);
           continue;
         }
-        // Ensure file-derived entries prefer embedded title/id but fall back to filename
         entries.forEach((en, i) => {
-          const dataTitle = (en.data?.title ?? "").toString().trim();
-          const fallbackTitle =
-            entries.length > 1 ? `${f.name} #${i + 1}` : f.name;
+          var _a;
+          const dataTitle = (((_a = en.data) == null ? void 0 : _a.title) ?? "").toString().trim();
+          const fallbackTitle = entries.length > 1 ? `${f.name} #${i + 1}` : f.name;
           const fileSeriesName = `${baseName} series`;
           const seriesName = en.isSeries ? fileSeriesName : null;
           let payload = { ...en };
           if (en.isSeries) {
-            const seriesTitle =
-              seriesName || dataTitle || en.title || fallbackTitle || "unknown";
+            const seriesTitle = seriesName || dataTitle || en.title || fallbackTitle || "unknown";
             payload.title = seriesTitle;
             const forcedSlug = makeSeriesId(seriesTitle || "unknown");
             applySeriesSlug(payload, forcedSlug);
             ensureSeriesId(payload, {
               seriesName: seriesTitle,
-              fallbackTitle: "unknown",
+              fallbackTitle: "unknown"
             });
-            payload.apicurioArtifactName =
-              payload.apicurioArtifactName || seriesTitle;
+            payload.apicurioArtifactName = payload.apicurioArtifactName || seriesTitle;
           } else {
             payload.title = dataTitle || fallbackTitle;
           }
           const idxResult = addModelEntry(
             {
               ...payload,
-              apicurioArtifactName:
-                payload.apicurioArtifactName ||
-                seriesName ||
-                payload.apicurioArtifactName,
+              apicurioArtifactName: payload.apicurioArtifactName || seriesName || payload.apicurioArtifactName
             },
             { versionLabel: f.name }
           );
@@ -6127,24 +7392,19 @@ export function initBlockscape() {
       console.error("[Blockscape] file load error:", err);
       alert("File load error (see console).");
     } finally {
-      e.target.value = ""; // allow re-selecting the same files
+      e.target.value = "";
     }
   };
-
-  // Paste JSON anywhere to append new models
   document.addEventListener("paste", handleClipboardPaste);
-
   function handleClipboardPaste(event) {
+    var _a;
     if (!shouldHandleGlobalPaste()) return;
-    const text =
-      event.clipboardData?.getData("text/plain") ||
-      (window.clipboardData && window.clipboardData.getData("Text")) ||
-      "";
-    if (!looksLikeModelJson(text)) return;
+    const text2 = ((_a = event.clipboardData) == null ? void 0 : _a.getData("text/plain")) || window.clipboardData && window.clipboardData.getData("Text") || "";
+    if (!looksLikeModelJson(text2)) return;
     let entries = [];
     try {
-      entries = normalizeToModelsFromText(text, "Clipboard", {
-        promptForSeriesName: true,
+      entries = normalizeToModelsFromText(text2, "Clipboard", {
+        promptForSeriesName: true
       });
     } catch (err) {
       console.warn("[Blockscape] clipboard paste ignored (invalid JSON)", err);
@@ -6155,7 +7415,7 @@ export function initBlockscape() {
     let firstIndex = null;
     entries.forEach((entry, idx) => {
       const idxResult = addModelEntry(entry, {
-        versionLabel: entries.length > 1 ? `paste #${idx + 1}` : "paste",
+        versionLabel: entries.length > 1 ? `paste #${idx + 1}` : "paste"
       });
       if (firstIndex == null) firstIndex = idxResult;
     });
@@ -6164,8 +7424,6 @@ export function initBlockscape() {
     );
     if (firstIndex != null) setActive(firstIndex);
   }
-
-  // Switch active model from sidebar
   modelList.addEventListener("click", (e) => {
     const button = e.target.closest("button[data-index]");
     if (!button) return;
@@ -6174,8 +7432,6 @@ export function initBlockscape() {
     scrollPageToTop();
     setActive(i);
   });
-
-  // Remove selected model
   document.getElementById("removeModel").onclick = () => {
     if (activeIndex < 0) return;
     const title = getModelTitle(models[activeIndex]);
@@ -6199,7 +7455,6 @@ export function initBlockscape() {
     const next = Math.min(activeIndex, models.length - 1);
     setActive(next);
   };
-
   if (searchInput) {
     searchInput.addEventListener("input", (e) => {
       handleSearchInput(e.target.value || "");
@@ -6210,7 +7465,6 @@ export function initBlockscape() {
       }
     });
   }
-
   if (searchResults) {
     searchResults.addEventListener("click", (event) => {
       const button = event.target.closest(".search-result");
@@ -6220,17 +7474,14 @@ export function initBlockscape() {
       activateSearchResult({ modelIndex, itemId });
     });
   }
-
   document.addEventListener("click", (event) => {
     if (!searchResults || searchResults.hidden) return;
-    const target = event.target;
-    if (searchResults.contains(target)) return;
-    if (searchInput && (target === searchInput || searchInput.contains(target)))
+    const target2 = event.target;
+    if (searchResults.contains(target2)) return;
+    if (searchInput && (target2 === searchInput || searchInput.contains(target2)))
       return;
     searchResults.hidden = true;
   });
-
-  // Load from URL
   if (urlForm && urlInput && loadUrlButton) {
     urlForm.addEventListener("submit", async (e) => {
       e.preventDefault();
@@ -6249,8 +7500,6 @@ export function initBlockscape() {
       }
     });
   }
-
-  // Show last 12 characters after user pauses typing
   (function attachUrlHint() {
     const hint = document.getElementById("urlHint");
     if (!urlInput || !hint) return;
@@ -6264,8 +7513,6 @@ export function initBlockscape() {
       }, 300);
     });
   })();
-
-  // Helpers
   function rebuildFromActive() {
     if (activeIndex < 0) return;
     try {
@@ -6280,17 +7527,12 @@ export function initBlockscape() {
       alert("Active model parse/render error (see console).");
     }
   }
-
-  // Load JSON files from same directory (for static hosting)
   async function loadJsonFiles() {
     const jsonFiles = ["comms.bs", "planets.bs", "styleguide.bs", "blockscape-features.bs"];
     const joinPath = (name) => {
       if (!ASSET_BASE) return name;
-      return ASSET_BASE.endsWith("/")
-        ? `${ASSET_BASE}${name}`
-        : `${ASSET_BASE}/${name}`;
+      return ASSET_BASE.endsWith("/") ? `${ASSET_BASE}${name}` : `${ASSET_BASE}/${name}`;
     };
-
     for (const filename of jsonFiles) {
       try {
         const response = await fetch(joinPath(filename), { cache: "no-store" });
@@ -6300,17 +7542,15 @@ export function initBlockscape() {
           );
           continue;
         }
-
-        const text = await response.text();
+        const text2 = await response.text();
         const baseName = filename.replace(/\.[^.]+$/, "") || "Model";
-        const entries = normalizeToModelsFromText(text, baseName, {
-          seriesTitleOverride: `${baseName} series`,
+        const entries = normalizeToModelsFromText(text2, baseName, {
+          seriesTitleOverride: `${baseName} series`
         });
         if (!entries.length) {
           console.warn("[Blockscape] no models found in", filename);
           continue;
         }
-
         entries.forEach((entry) => {
           let payload = { ...entry };
           if (entry.isSeries) {
@@ -6318,13 +7558,13 @@ export function initBlockscape() {
             payload = {
               ...entry,
               title: seriesTitle,
-              apicurioArtifactName: seriesTitle,
+              apicurioArtifactName: seriesTitle
             };
             const forcedSlug = makeSeriesId(seriesTitle || "unknown");
             applySeriesSlug(payload, forcedSlug);
             ensureSeriesId(payload, {
               seriesName: seriesTitle,
-              fallbackTitle: "unknown",
+              fallbackTitle: "unknown"
             });
           }
           addModelEntry(payload, { versionLabel: filename });
@@ -6341,10 +7581,8 @@ export function initBlockscape() {
         );
       }
     }
-
     renderModelList();
   }
-
   async function fetchTextWithCacheBypass(url) {
     const attempts = [{ cache: "no-store" }, { cache: "reload" }, {}];
     let lastError = null;
@@ -6370,18 +7608,14 @@ export function initBlockscape() {
     }
     throw lastError || new Error("Unable to fetch URL");
   }
-
   function enhanceAbstractWithGistLinks(container) {
     if (!container) return;
-
     const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
     const textNodes = [];
     while (walker.nextNode()) {
       textNodes.push(walker.currentNode);
     }
-
     textNodes.forEach((node) => convertTextNodeLinks(node));
-
     container.querySelectorAll("a[href]").forEach((anchor) => {
       const href = anchor.getAttribute("href");
       if (isGistUrl(href)) {
@@ -6389,38 +7623,36 @@ export function initBlockscape() {
       }
     });
   }
-
   function convertTextNodeLinks(node) {
+    var _a, _b;
     if (!node || !node.nodeValue || !node.nodeValue.includes("http")) return;
-    if (node.parentNode?.closest?.("a")) {
-      return; // Skip text already wrapped in a link to avoid nesting anchors
+    if ((_b = (_a = node.parentNode) == null ? void 0 : _a.closest) == null ? void 0 : _b.call(_a, "a")) {
+      return;
     }
-    const text = node.nodeValue;
+    const text2 = node.nodeValue;
     const regex = /(https?:\/\/[^\s<]+)/gi;
     const matches = [];
     let match;
-    while ((match = regex.exec(text)) !== null) {
+    while ((match = regex.exec(text2)) !== null) {
       matches.push({ url: match[0], index: match.index });
     }
     if (!matches.length) return;
-
     const fragment = document.createDocumentFragment();
     let cursor = 0;
-    matches.forEach(({ url, index }) => {
-      if (index > cursor) {
+    matches.forEach(({ url, index: index2 }) => {
+      if (index2 > cursor) {
         fragment.appendChild(
-          document.createTextNode(text.slice(cursor, index))
+          document.createTextNode(text2.slice(cursor, index2))
         );
       }
       fragment.appendChild(createAutoLinkAnchor(url));
-      cursor = index + url.length;
+      cursor = index2 + url.length;
     });
-    if (cursor < text.length) {
-      fragment.appendChild(document.createTextNode(text.slice(cursor)));
+    if (cursor < text2.length) {
+      fragment.appendChild(document.createTextNode(text2.slice(cursor)));
     }
     node.parentNode.replaceChild(fragment, node);
   }
-
   function createAutoLinkAnchor(url) {
     const anchor = document.createElement("a");
     anchor.href = url;
@@ -6432,17 +7664,16 @@ export function initBlockscape() {
     }
     return anchor;
   }
-
   function attachGistLinkBehavior(anchor, url) {
     if (!anchor || anchor.dataset.gistLinkBound === "true") return;
     anchor.dataset.gistLinkBound = "true";
     anchor.classList.add("blockscape-gist-link");
     anchor.title = "Load this Gist into Blockscape";
-    anchor.addEventListener("click", (event) =>
-      handleGistLinkClick(event, url, anchor)
+    anchor.addEventListener(
+      "click",
+      (event) => handleGistLinkClick(event, url, anchor)
     );
   }
-
   async function handleGistLinkClick(event, url, anchor) {
     event.preventDefault();
     event.stopPropagation();
@@ -6456,31 +7687,25 @@ export function initBlockscape() {
       anchor.classList.remove("is-loading");
     }
   }
-
   function isGistUrl(candidate) {
     if (typeof candidate !== "string") return false;
     try {
       const parsed = new URL(candidate, window.location.href);
       const host = parsed.hostname.toLowerCase();
-      return (
-        host === "gist.githubusercontent.com" ||
-        (host.startsWith("gist.") && host.endsWith("githubusercontent.com"))
-      );
+      return host === "gist.githubusercontent.com" || host.startsWith("gist.") && host.endsWith("githubusercontent.com");
     } catch {
       return false;
     }
   }
-
-  // Load JSON from custom URL
   async function loadFromUrl(url) {
     try {
       console.log("[Blockscape] loading from URL:", url);
-      const text = await fetchTextWithCacheBypass(url);
+      const text2 = await fetchTextWithCacheBypass(url);
       const rawName = url.split("/").pop() || "";
       const baseName = rawName.replace(/\.[^.]+$/, "") || "URL Model";
       let entries;
       try {
-        entries = normalizeToModelsFromText(text, baseName);
+        entries = normalizeToModelsFromText(text2, baseName);
       } catch (parseError) {
         throw new Error(`Invalid JSON payload: ${parseError.message}`);
       }
@@ -6489,40 +7714,36 @@ export function initBlockscape() {
       }
       let firstIndex = null;
       entries.forEach((entry, idx) => {
-        const dataTitle = (entry.data?.title ?? "").toString().trim();
-        const fallbackTitle =
-          entries.length > 1 ? `${baseName} #${idx + 1}` : baseName;
+        var _a;
+        const dataTitle = (((_a = entry.data) == null ? void 0 : _a.title) ?? "").toString().trim();
+        const fallbackTitle = entries.length > 1 ? `${baseName} #${idx + 1}` : baseName;
         const seriesName = entry.isSeries ? `${baseName} series` : null;
         let payload = { ...entry };
         if (entry.isSeries) {
-          const seriesTitle =
-            seriesName || dataTitle || payload.title || fallbackTitle;
+          const seriesTitle = seriesName || dataTitle || payload.title || fallbackTitle;
           payload = {
             ...entry,
             title: seriesTitle,
-            apicurioArtifactName: seriesTitle || entry.apicurioArtifactName,
+            apicurioArtifactName: seriesTitle || entry.apicurioArtifactName
           };
           const forcedSlug = makeSeriesId(seriesTitle || "unknown");
           applySeriesSlug(payload, forcedSlug);
           ensureSeriesId(payload, {
             seriesName: seriesTitle || seriesName || "unknown",
-            fallbackTitle: "unknown",
+            fallbackTitle: "unknown"
           });
           console.log("[Blockscape] loadFromUrl: series slug applied", {
             seriesSlug: forcedSlug,
             url,
             baseName,
-            seriesTitle,
+            seriesTitle
           });
         }
         const idxResult = addModelEntry(
           {
             ...payload,
             title: dataTitle || payload.title || fallbackTitle,
-            apicurioArtifactName:
-              payload.apicurioArtifactName ||
-              seriesName ||
-              entry.apicurioArtifactName,
+            apicurioArtifactName: payload.apicurioArtifactName || seriesName || entry.apicurioArtifactName
           },
           { versionLabel: baseName }
         );
@@ -6544,8 +7765,6 @@ export function initBlockscape() {
       return null;
     }
   }
-
-  // Bootstrap with Blockscape
   (async function bootstrap() {
     const seedEl = document.getElementById("seed");
     if (!seedEl) {
@@ -6559,33 +7778,1208 @@ export function initBlockscape() {
     if (!seedEntries.length) {
       throw new Error("Seed template could not be parsed.");
     }
-
     let firstSeedIndex = null;
     seedEntries.forEach((entry) => {
       const idx = addModelEntry(entry, { versionLabel: "seed" });
       if (firstSeedIndex == null) firstSeedIndex = idx;
     });
-
     const hasLocalBackend = await initialBackendCheck;
-
-    // Try to load JSON files from same directory only when no local backend
     if (!hasLocalBackend) {
       await loadJsonFiles();
     }
-
-    // Load explicit model from URL hash/search (?load= or #load=)
     const loadIndex = await consumeLoadParam();
     const editorResult = consumeEditorPayload();
-    const editorIndex = editorResult?.index;
+    const editorIndex = editorResult == null ? void 0 : editorResult.index;
     const shareIndex = consumeShareLink();
-    const initialIndex =
-      typeof loadIndex === "number"
-        ? loadIndex
-        : typeof shareIndex === "number"
-        ? shareIndex
-        : typeof editorIndex === "number"
-        ? editorIndex
-        : firstSeedIndex ?? 0;
+    const initialIndex = typeof loadIndex === "number" ? loadIndex : typeof shareIndex === "number" ? shareIndex : typeof editorIndex === "number" ? editorIndex : firstSeedIndex ?? 0;
     setActive(initialIndex);
   })();
 }
+function create_fragment$2(ctx) {
+  let div5;
+  return {
+    c() {
+      div5 = element("div");
+      div5.innerHTML = `<div id="shortcutHelpBackdrop" class="shortcut-help__backdrop"></div> <div class="shortcut-help__panel" tabindex="-1"><div class="shortcut-help__header"><div class="shortcut-help__title"><h2 id="shortcutHelpTitle">Help</h2></div> <button id="shortcutHelpClose" class="shortcut-help__close" type="button" aria-label="Close keyboard shortcuts">×</button></div> <section class="shortcut-help__section"><ul class="shortcut-help__tips"><li>Play around with the example maps.</li> <li>Read about <a href="https://www.wardleymaps.com" target="_blank" rel="noreferrer noopener">Wardley Maps</a>.</li> <li>Copy this URL and use &quot;Load URL&quot;: <a href="https://gist.githubusercontent.com/pwright/86dbb074b35d6d17671bf17ecbf1a824/raw/git.bs" target="_blank" rel="noreferrer noopener">https://gist.githubusercontent.com/pwright/86dbb074b35d6d17671bf17ecbf1a824/raw/git.bs</a></li> <li>Edit maps by moving items with Shift + Arrow keys.</li></ul></section> <section class="shortcut-help__section"><h3 class="shortcut-help__section-title">Keyboard shortcuts</h3> <div id="shortcutHelpList" class="shortcut-help__list" aria-live="polite"></div></section></div>`;
+      attr(div5, "id", "shortcutHelp");
+      attr(div5, "class", "shortcut-help");
+      div5.hidden = true;
+      attr(div5, "aria-hidden", "true");
+      attr(div5, "role", "dialog");
+      attr(div5, "aria-modal", "true");
+      attr(div5, "aria-labelledby", "shortcutHelpTitle");
+    },
+    m(target2, anchor) {
+      insert(target2, div5, anchor);
+    },
+    p: noop,
+    i: noop,
+    o: noop,
+    d(detaching) {
+      if (detaching) {
+        detach(div5);
+      }
+    }
+  };
+}
+class ShortcutHelp extends SvelteComponent {
+  constructor(options) {
+    super();
+    init(this, options, null, create_fragment$2, safe_not_equal, {});
+  }
+}
+const plainPromptTemplate = 'Generate a blockscape [map|series] for the domain of [DOMAIN]\n\n### Requirements\n\n* Output **valid JSON only** with the structure below (no commentary):\n\n  * Model level:\n    * `id`: required string, short/sluggy (lowercase, hyphen/underscore ok)\n    * `title`: required string, human‑friendly model title\n    * `abstract`: required string (plain text or simple HTML) that explains the landscape\n    * `categories`: array of category objects\n    * optional `links`: array of `{ "from": "id", "to": "id" }` for cross‑category edges\n\n  * Each category has:\n    * `id` (short, lowercase, unique)\n    * `title` (human‑friendly)\n    * `items`: array of component objects\n\n      * each item has:\n        * `id` (short, lowercase, unique across all categories)\n        * `name` (human‑friendly)\n        * optional `logo` (e.g., `"logos/[slug].svg"`)\n        * optional `external` (string URL) pointing to external documentation or reference material for that item\n        * optional `color` (hex string) for tile tint\n        * `deps`: array of item `id`s this item **depends on** (must reference defined items only)\n* Use **3–6/7 categories** and **2–6/7 items per category**. Prefer clarity over exhaustiveness.\n* Order categories roughly from **abstract to concrete**.\n* Model **visible user value** via **vertical position** (things closer to the user are higher). Ensure `deps` reflect a flow from higher‑value items to their underlying enablers.\n* (Optional) You may imply **horizontal evolution/maturity** via category naming or item grouping, but do not add extra fields for it.\n* Keep all identifiers **ASCII**, hyphen‑separated where needed.\n\n### Domain Guidance\n\nIn **[one paragraph]**, summarize the domain’s user‑visible goals and the key enabling components. Use that understanding to choose categories and dependencies.\n\n### Output\n\nIf the user asks for a \'series\', create an array of json using the following criteria.\n\nReturn **only the JSON** matching this schema:\n\n```\n{\n  "id": "[model-id]",\n  "title": "[Model Title]",\n  "abstract": "[Short description or HTML snippet]",\n  "categories": [\n    {\n      "id": "[category-id]",\n      "title": "[Category Title]",\n      "items": [\n        { "id": "[item-id]", "name": "[Item Name]", "deps": ["[id]"] }\n      ]\n    }\n  ]\n}\n```\n\n### Validation Checklist (the model should self‑check before returning):\n\n* Top-level `id`, `title`, and `abstract` are present and non-empty.\n* All `deps` reference **existing** item IDs.\n* No duplicate `id`s across all items.\n* 3–6/7 categories; each has 2–6/7 items.\n* No extra fields beyond those listed above.\n* JSON parses.\n\n---\n\n## One‑shot Example (Machine Learning Model Deployment)\n\n**Prompt to paste**\n\nGenerate a **Blockscape value‑chain JSON** for the domain of **machine learning model deployment**.\n\n### Requirements\n\n* Output **valid JSON only** with this structure (no commentary).\n* Use **3 - 6/7 categories**, **3–6/7 items each**.\n* Order from abstract (user‑facing) to concrete (infrastructure).\n* Vertical axis is **visible user value**; `deps` should point from user‑visible items down to enablers they rely on.\n* Optional `logo` paths may use placeholders like `"logos/[slug].svg"`.\n\n### Domain Guidance\n\nUsers need **reliable predictions** surfaced via **APIs/UI**, backed by **versioned models**, **observability**, and **scalable infra**. Security and governance span across.\n\n### Output (JSON only)\n\n```\n{\n  "categories": [\n    {\n      "id": "experience",\n      "title": "User Experience",\n      "items": [\n        { "id": "prediction-api", "name": "Prediction API", "deps": ["model-serving", "authz"], "external": "https://example.com/api.html"},\n        { "id": "batch-scoring", "name": "Batch Scoring", "deps": ["feature-store", "orchestration"] },\n        { "id": "ui-console", "name": "Ops Console", "deps": ["monitoring", "logging"] }\n      ]\n    },\n    {\n      "id": "models",\n      "title": "Models & Data",\n      "items": [\n        { "id": "model-serving", "name": "Model Serving", "deps": ["container-runtime", "autoscaling"] },\n        { "id": "model-registry", "name": "Model Registry", "deps": ["artifact-store"] },\n        { "id": "feature-store", "name": "Feature Store", "deps": ["data-pipelines"] }\n      ]\n    },\n    {\n      "id": "platform",\n      "title": "Platform Services",\n      "items": [\n        { "id": "monitoring", "name": "Monitoring", "deps": ["metrics-backend"] },\n        { "id": "logging", "name": "Logging", "deps": ["log-backend"] },\n        { "id": "authz", "name": "AuthN/Z", "deps": ["secrets"] },\n        { "id": "orchestration", "name": "Orchestration", "deps": ["container-runtime"] }\n      ]\n    },\n    {\n      "id": "infrastructure",\n      "title": "Infrastructure",\n      "items": [\n        { "id": "autoscaling", "name": "Autoscaling", "deps": ["metrics-backend"] },\n        { "id": "container-runtime", "name": "Container Runtime", "deps": [] },\n        { "id": "artifact-store", "name": "Artifact Store", "deps": [] },\n        { "id": "data-pipelines", "name": "Data Pipelines", "deps": [] },\n        { "id": "metrics-backend", "name": "Metrics Backend", "deps": [] },\n        { "id": "log-backend", "name": "Log Backend", "deps": [] },\n        { "id": "secrets", "name": "Secrets Management", "deps": [] }\n      ]\n    }\n  ]\n}\n```\n\n---\n\n## Tips\n\n* Keep **names** user‑friendly; keep **ids** short and consistent.\n* If an item feels too broad, introduce a new category rather than bloating `deps`.\n* If there\'s a link (external), use the favicon from the website as logo\n* If you’re unsure about `logo`, omit it; you can add paths later.\n\nThe following map shows color conventions:\n\n```\n{\n  "id": "conventions",\n  "title": "Color Conventions",\n  "abstract": "Reference for color conventions.",\n  "categories": [\n    {\n      "id": "color-conventions",\n      "title": "Color conventions",\n      "items": [\n        {\n          "id": "old",\n          "name": "Old",\n          "color": "#000000",\n          "deps": []\n        },\n        {\n          "id": "new",\n          "name": "New",\n          "color": "#FFFFFF",\n          "deps": []\n        },\n        {\n          "id": "important",\n          "name": "Important",\n          "deps": [],\n          "color": "#FF0000"\n        }\n      ]\n    }\n  ]\n}\n```';
+function create_if_block_1(ctx) {
+  let div4;
+  let div1;
+  let a;
+  let t0;
+  let t1;
+  let div0;
+  let t3;
+  let div3;
+  return {
+    c() {
+      div4 = element("div");
+      div1 = element("div");
+      a = element("a");
+      t0 = text("Open Blockscape GPT");
+      t1 = space();
+      div0 = element("div");
+      div0.textContent = "Paste the copied prompt into that chat.";
+      t3 = space();
+      div3 = element("div");
+      div3.innerHTML = `<span>Gem is not available yet</span> <div class="new-panel__hint">https://gemini.google.com/gems/create</div>`;
+      attr(a, "href", gptLink);
+      attr(a, "target", "_blank");
+      attr(a, "rel", "noreferrer");
+      attr(div0, "class", "new-panel__hint");
+      attr(div1, "class", "new-panel__link");
+      attr(div3, "class", "new-panel__link new-panel__link--disabled");
+      attr(div4, "class", "new-panel__links");
+    },
+    m(target2, anchor) {
+      insert(target2, div4, anchor);
+      append(div4, div1);
+      append(div1, a);
+      append(a, t0);
+      append(div1, t1);
+      append(div1, div0);
+      append(div4, t3);
+      append(div4, div3);
+    },
+    p: noop,
+    d(detaching) {
+      if (detaching) {
+        detach(div4);
+      }
+    }
+  };
+}
+function create_if_block(ctx) {
+  let div1;
+  let div0;
+  let t1;
+  let textarea;
+  let mounted;
+  let dispose;
+  return {
+    c() {
+      div1 = element("div");
+      div0 = element("div");
+      div0.textContent = "Generated prompt";
+      t1 = space();
+      textarea = element("textarea");
+      attr(div0, "class", "new-panel__prompt-label");
+      attr(textarea, "class", "pf-v5-c-form-control new-panel__textarea");
+      attr(textarea, "rows", "4");
+      textarea.readOnly = true;
+      attr(div1, "class", "new-panel__prompt");
+    },
+    m(target2, anchor) {
+      insert(target2, div1, anchor);
+      append(div1, div0);
+      append(div1, t1);
+      append(div1, textarea);
+      set_input_value(
+        textarea,
+        /*prompt*/
+        ctx[4]
+      );
+      if (!mounted) {
+        dispose = listen(
+          textarea,
+          "input",
+          /*textarea_input_handler_1*/
+          ctx[12]
+        );
+        mounted = true;
+      }
+    },
+    p(ctx2, dirty) {
+      if (dirty & /*prompt*/
+      16) {
+        set_input_value(
+          textarea,
+          /*prompt*/
+          ctx2[4]
+        );
+      }
+    },
+    d(detaching) {
+      if (detaching) {
+        detach(div1);
+      }
+      mounted = false;
+      dispose();
+    }
+  };
+}
+function create_fragment$1(ctx) {
+  let div14;
+  let div0;
+  let t0;
+  let div13;
+  let div2;
+  let t6;
+  let form;
+  let div3;
+  let label0;
+  let t8;
+  let p1;
+  let t10;
+  let textarea;
+  let t11;
+  let div4;
+  let label1;
+  let input0;
+  let t12;
+  let span1;
+  let t15;
+  let fieldset;
+  let legend;
+  let t17;
+  let p2;
+  let t19;
+  let label2;
+  let input1;
+  let t20;
+  let div7;
+  let t24;
+  let label3;
+  let input2;
+  let t25;
+  let div10;
+  let t29;
+  let div12;
+  let button1;
+  let t31;
+  let div11;
+  let t32;
+  let t33;
+  let t34;
+  let binding_group;
+  let mounted;
+  let dispose;
+  let if_block0 = (
+    /*target*/
+    ctx[2] === "gpt" && create_if_block_1()
+  );
+  let if_block1 = (
+    /*prompt*/
+    ctx[4] && /*showPromptPanel*/
+    ctx[5] && create_if_block(ctx)
+  );
+  binding_group = init_binding_group(
+    /*$$binding_groups*/
+    ctx[10][0]
+  );
+  return {
+    c() {
+      div14 = element("div");
+      div0 = element("div");
+      t0 = space();
+      div13 = element("div");
+      div2 = element("div");
+      div2.innerHTML = `<div class="shortcut-help__title"><h2 id="newPanelTitle">New blockscape</h2> <p class="shortcut-help__subtitle">Describe what you need and we will create a prompt for you.</p></div> <button id="newPanelClose" class="shortcut-help__close" type="button" aria-label="Close new panel">×</button>`;
+      t6 = space();
+      form = element("form");
+      div3 = element("div");
+      label0 = element("label");
+      label0.textContent = "Domain";
+      t8 = space();
+      p1 = element("p");
+      p1.textContent = "Describe what you want to create a map for.";
+      t10 = space();
+      textarea = element("textarea");
+      t11 = space();
+      div4 = element("div");
+      label1 = element("label");
+      input0 = element("input");
+      t12 = space();
+      span1 = element("span");
+      span1.innerHTML = `Series
+            <span class="new-panel__hint">Toggle on to create a series instead of a single map.</span>`;
+      t15 = space();
+      fieldset = element("fieldset");
+      legend = element("legend");
+      legend.textContent = "Target";
+      t17 = space();
+      p2 = element("p");
+      p2.textContent = "Choose where you plan to use the prompt.";
+      t19 = space();
+      label2 = element("label");
+      input1 = element("input");
+      t20 = space();
+      div7 = element("div");
+      div7.innerHTML = `<div class="new-panel__option-title">GPT or Gem</div> <div class="new-panel__hint">Copies a simple prompt tailored for GPT or Gem.</div>`;
+      t24 = space();
+      label3 = element("label");
+      input2 = element("input");
+      t25 = space();
+      div10 = element("div");
+      div10.innerHTML = `<div class="new-panel__option-title">Plain LLM</div> <div class="new-panel__hint">Creates a large prompt to generate blockscape from scratch.</div>`;
+      t29 = space();
+      div12 = element("div");
+      button1 = element("button");
+      button1.textContent = "Copy prompt";
+      t31 = space();
+      div11 = element("div");
+      t32 = text(
+        /*status*/
+        ctx[3]
+      );
+      t33 = space();
+      if (if_block0) if_block0.c();
+      t34 = space();
+      if (if_block1) if_block1.c();
+      attr(div0, "id", "newPanelBackdrop");
+      attr(div0, "class", "shortcut-help__backdrop");
+      attr(div2, "class", "shortcut-help__header");
+      attr(label0, "for", "newDomain");
+      attr(p1, "class", "new-panel__hint");
+      attr(textarea, "id", "newDomain");
+      attr(textarea, "class", "pf-v5-c-form-control new-panel__textarea");
+      attr(textarea, "rows", "4");
+      textarea.required = true;
+      attr(textarea, "placeholder", "Ex: Companies building open-source geospatial tools");
+      attr(div3, "class", "new-panel__field");
+      attr(input0, "id", "seriesToggle");
+      attr(input0, "type", "checkbox");
+      attr(label1, "class", "new-panel__toggle");
+      attr(label1, "for", "seriesToggle");
+      attr(div4, "class", "new-panel__field");
+      attr(p2, "class", "new-panel__hint");
+      attr(input1, "type", "radio");
+      attr(input1, "name", "target");
+      input1.__value = "gpt";
+      set_input_value(input1, input1.__value);
+      attr(label2, "class", "new-panel__option");
+      attr(input2, "type", "radio");
+      attr(input2, "name", "target");
+      input2.__value = "plain";
+      set_input_value(input2, input2.__value);
+      attr(label3, "class", "new-panel__option");
+      attr(fieldset, "class", "new-panel__field");
+      attr(button1, "class", "pf-v5-c-button pf-m-primary");
+      attr(button1, "type", "submit");
+      attr(div11, "class", "new-panel__status");
+      attr(div11, "aria-live", "polite");
+      attr(div12, "class", "new-panel__actions");
+      attr(form, "class", "shortcut-help__list new-panel__form");
+      attr(div13, "class", "shortcut-help__panel");
+      attr(div13, "tabindex", "-1");
+      attr(div14, "id", "newPanel");
+      attr(div14, "class", "shortcut-help");
+      div14.hidden = true;
+      attr(div14, "aria-hidden", "true");
+      attr(div14, "role", "dialog");
+      attr(div14, "aria-modal", "true");
+      attr(div14, "aria-labelledby", "newPanelTitle");
+      binding_group.p(input1, input2);
+    },
+    m(target2, anchor) {
+      insert(target2, div14, anchor);
+      append(div14, div0);
+      append(div14, t0);
+      append(div14, div13);
+      append(div13, div2);
+      append(div13, t6);
+      append(div13, form);
+      append(form, div3);
+      append(div3, label0);
+      append(div3, t8);
+      append(div3, p1);
+      append(div3, t10);
+      append(div3, textarea);
+      set_input_value(
+        textarea,
+        /*domain*/
+        ctx[0]
+      );
+      append(form, t11);
+      append(form, div4);
+      append(div4, label1);
+      append(label1, input0);
+      input0.checked = /*asSeries*/
+      ctx[1];
+      append(label1, t12);
+      append(label1, span1);
+      append(form, t15);
+      append(form, fieldset);
+      append(fieldset, legend);
+      append(fieldset, t17);
+      append(fieldset, p2);
+      append(fieldset, t19);
+      append(fieldset, label2);
+      append(label2, input1);
+      input1.checked = input1.__value === /*target*/
+      ctx[2];
+      append(label2, t20);
+      append(label2, div7);
+      append(fieldset, t24);
+      append(fieldset, label3);
+      append(label3, input2);
+      input2.checked = input2.__value === /*target*/
+      ctx[2];
+      append(label3, t25);
+      append(label3, div10);
+      append(form, t29);
+      append(form, div12);
+      append(div12, button1);
+      append(div12, t31);
+      append(div12, div11);
+      append(div11, t32);
+      append(form, t33);
+      if (if_block0) if_block0.m(form, null);
+      append(form, t34);
+      if (if_block1) if_block1.m(form, null);
+      if (!mounted) {
+        dispose = [
+          listen(
+            textarea,
+            "input",
+            /*textarea_input_handler*/
+            ctx[7]
+          ),
+          listen(
+            input0,
+            "change",
+            /*input0_change_handler*/
+            ctx[8]
+          ),
+          listen(
+            input1,
+            "change",
+            /*input1_change_handler*/
+            ctx[9]
+          ),
+          listen(
+            input2,
+            "change",
+            /*input2_change_handler*/
+            ctx[11]
+          ),
+          listen(form, "submit", prevent_default(
+            /*handleSubmit*/
+            ctx[6]
+          ))
+        ];
+        mounted = true;
+      }
+    },
+    p(ctx2, [dirty]) {
+      if (dirty & /*domain*/
+      1) {
+        set_input_value(
+          textarea,
+          /*domain*/
+          ctx2[0]
+        );
+      }
+      if (dirty & /*asSeries*/
+      2) {
+        input0.checked = /*asSeries*/
+        ctx2[1];
+      }
+      if (dirty & /*target*/
+      4) {
+        input1.checked = input1.__value === /*target*/
+        ctx2[2];
+      }
+      if (dirty & /*target*/
+      4) {
+        input2.checked = input2.__value === /*target*/
+        ctx2[2];
+      }
+      if (dirty & /*status*/
+      8) set_data(
+        t32,
+        /*status*/
+        ctx2[3]
+      );
+      if (
+        /*target*/
+        ctx2[2] === "gpt"
+      ) {
+        if (if_block0) {
+          if_block0.p(ctx2, dirty);
+        } else {
+          if_block0 = create_if_block_1();
+          if_block0.c();
+          if_block0.m(form, t34);
+        }
+      } else if (if_block0) {
+        if_block0.d(1);
+        if_block0 = null;
+      }
+      if (
+        /*prompt*/
+        ctx2[4] && /*showPromptPanel*/
+        ctx2[5]
+      ) {
+        if (if_block1) {
+          if_block1.p(ctx2, dirty);
+        } else {
+          if_block1 = create_if_block(ctx2);
+          if_block1.c();
+          if_block1.m(form, null);
+        }
+      } else if (if_block1) {
+        if_block1.d(1);
+        if_block1 = null;
+      }
+    },
+    i: noop,
+    o: noop,
+    d(detaching) {
+      if (detaching) {
+        detach(div14);
+      }
+      if (if_block0) if_block0.d();
+      if (if_block1) if_block1.d();
+      binding_group.r();
+      mounted = false;
+      run_all(dispose);
+    }
+  };
+}
+const gptLink = "https://chatgpt.com/g/g-690f6217889c819191786ef16481f534-blockscape";
+function instance$1($$self, $$props, $$invalidate) {
+  let domain = "";
+  let asSeries = false;
+  let target2 = "gpt";
+  let status = "";
+  let prompt = "";
+  let showPromptPanel = false;
+  const clipboardSupported = () => {
+    var _a;
+    return typeof navigator !== "undefined" && !!((_a = navigator.clipboard) == null ? void 0 : _a.writeText);
+  };
+  function buildPlainPrompt(trimmedDomain) {
+    const domainText = trimmedDomain || "[DOMAIN]";
+    const typeText = asSeries ? "series" : "map";
+    const template = plainPromptTemplate.replaceAll("[DOMAIN NAME]", domainText).replaceAll("[DOMAIN]", domainText).replaceAll("[map|series]", typeText);
+    const lines = template.split("\n");
+    const customLead = `Generate a **blockscape ${typeText}** for the domain of ${domainText}.`;
+    const leadIndex = lines.findIndex((line) => line.toLowerCase().includes("generate a **blockscape value") || line.toLowerCase().includes("generate a blockscape [map|series]") || line.toLowerCase().startsWith("generate a blockscape"));
+    if (leadIndex >= 0) {
+      lines[leadIndex] = customLead;
+    } else {
+      lines.unshift(customLead);
+    }
+    const seriesNote = asSeries ? "\n\nUser requested a series (return an array of models)." : "";
+    return `${lines.join("\n").trim()}${seriesNote}`;
+  }
+  async function handleSubmit(event) {
+    event.preventDefault();
+    const trimmedDomain = domain.trim();
+    $$invalidate(3, status = "");
+    $$invalidate(5, showPromptPanel = target2 !== "gpt");
+    if (!trimmedDomain) {
+      $$invalidate(3, status = "Add a domain to generate a prompt.");
+      $$invalidate(4, prompt = "");
+      return;
+    }
+    const action = asSeries ? "Create a series" : "Create a map";
+    if (target2 === "gpt") {
+      $$invalidate(4, prompt = `${action} for ${trimmedDomain}`);
+    } else {
+      $$invalidate(4, prompt = buildPlainPrompt(trimmedDomain));
+      $$invalidate(5, showPromptPanel = true);
+    }
+    if (!clipboardSupported()) {
+      $$invalidate(3, status = "Clipboard access is unavailable. Copy the prompt below.");
+      $$invalidate(5, showPromptPanel = true);
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(prompt);
+      $$invalidate(3, status = target2 === "gpt" ? "Prompt copied. Open the Blockscape GPT link to paste it." : "Prompt copied to clipboard.");
+      if (target2 === "gpt") {
+        $$invalidate(5, showPromptPanel = false);
+      }
+    } catch (err) {
+      console.warn("[Blockscape] clipboard write failed", err);
+      $$invalidate(3, status = "Copy failed. Use the prompt below.");
+      $$invalidate(5, showPromptPanel = true);
+    }
+  }
+  const $$binding_groups = [[]];
+  function textarea_input_handler() {
+    domain = this.value;
+    $$invalidate(0, domain);
+  }
+  function input0_change_handler() {
+    asSeries = this.checked;
+    $$invalidate(1, asSeries);
+  }
+  function input1_change_handler() {
+    target2 = this.__value;
+    $$invalidate(2, target2);
+  }
+  function input2_change_handler() {
+    target2 = this.__value;
+    $$invalidate(2, target2);
+  }
+  function textarea_input_handler_1() {
+    prompt = this.value;
+    $$invalidate(4, prompt);
+  }
+  return [
+    domain,
+    asSeries,
+    target2,
+    status,
+    prompt,
+    showPromptPanel,
+    handleSubmit,
+    textarea_input_handler,
+    input0_change_handler,
+    input1_change_handler,
+    $$binding_groups,
+    input2_change_handler,
+    textarea_input_handler_1
+  ];
+}
+class NewPanel extends SvelteComponent {
+  constructor(options) {
+    super();
+    init(this, options, instance$1, create_fragment$1, safe_not_equal, {});
+  }
+}
+const { document: document_1 } = globals;
+function create_fragment(ctx) {
+  let link;
+  let t0;
+  let div25;
+  let header;
+  let div10;
+  let div9;
+  let div8;
+  let div0;
+  let t4;
+  let div6;
+  let div2;
+  let button0;
+  let span0;
+  let t6;
+  let span1;
+  let t8;
+  let button1;
+  let t10;
+  let form;
+  let t16;
+  let label1;
+  let t19;
+  let button3;
+  let t21;
+  let div5;
+  let div4;
+  let t25;
+  let button4;
+  let t27;
+  let button5;
+  let div5_hidden_value;
+  let div5_aria_hidden_value;
+  let div6_data_expanded_value;
+  let t29;
+  let div7;
+  let t37;
+  let main;
+  let div23;
+  let aside;
+  let div11;
+  let t39;
+  let ul;
+  let t40;
+  let div12;
+  let t44;
+  let section0;
+  let div13;
+  let t46;
+  let p0;
+  let t48;
+  let div16;
+  let label3;
+  let t50;
+  let div14;
+  let label4;
+  let t52;
+  let select0;
+  let option;
+  let t54;
+  let select1;
+  let t55;
+  let div15;
+  let t59;
+  let div17;
+  let t64;
+  let div22;
+  let t90;
+  let footer;
+  let t92;
+  let html_tag;
+  let raw_value = `<script id="seed" type="application/json">${/*seedText*/
+  ctx[1]}<\/script>`;
+  let t93;
+  let svg1;
+  let t94;
+  let div26;
+  let t95;
+  let div31;
+  let t102;
+  let shortcuthelp;
+  let t103;
+  let newpanel;
+  let current;
+  let mounted;
+  let dispose;
+  shortcuthelp = new ShortcutHelp({});
+  newpanel = new NewPanel({});
+  return {
+    c() {
+      link = element("link");
+      t0 = space();
+      div25 = element("div");
+      header = element("header");
+      div10 = element("div");
+      div9 = element("div");
+      div8 = element("div");
+      div0 = element("div");
+      div0.innerHTML = `<h1 class="sr-only">Blockscape</h1> <img class="blockscape-brand__logo" src="logos/blockscape-logo.svg" alt="Blockscape — landscape tile explorer" decoding="async"/> <a href="https://github.com/pwright/blockscape" target="_blank" class="pf-v5-c-button pf-m-plain" title="View on GitHub" aria-label="View Blockscape on GitHub"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"></path></svg></a>`;
+      t4 = space();
+      div6 = element("div");
+      div2 = element("div");
+      button0 = element("button");
+      span0 = element("span");
+      span0.textContent = "Toggle search and edit tools";
+      t6 = space();
+      span1 = element("span");
+      span1.textContent = "▾";
+      t8 = space();
+      button1 = element("button");
+      button1.textContent = "New";
+      t10 = space();
+      form = element("form");
+      form.innerHTML = `<label class="sr-only" for="urlInput">Load JSON from URL</label> <input id="urlInput" name="modelUrl" class="pf-v5-c-form-control is-url" type="url" placeholder="Load JSON from URL…" autocomplete="additional-name"/> <button id="loadUrl" class="pf-v5-c-button pf-m-primary" type="submit">Load URL</button> <div id="urlHint" class="url-hint" aria-live="polite"></div>`;
+      t16 = space();
+      label1 = element("label");
+      label1.innerHTML = `<span>Open</span> <input id="file" type="file" accept=".bs,.json,.txt" multiple=""/>`;
+      t19 = space();
+      button3 = element("button");
+      button3.textContent = "Help";
+      t21 = space();
+      div5 = element("div");
+      div4 = element("div");
+      div4.innerHTML = `<label class="sr-only" for="search">Search tiles</label> <input id="search" class="pf-v5-c-form-control" type="text" placeholder="Search…"/> <div id="searchResults" class="search-results" role="listbox" aria-label="Search across all models" hidden=""></div>`;
+      t25 = space();
+      button4 = element("button");
+      button4.textContent = "Edit";
+      t27 = space();
+      button5 = element("button");
+      button5.textContent = "Share";
+      t29 = space();
+      div7 = element("div");
+      div7.innerHTML = `<span class="legend-entry"><span class="legend-dot legend-dot--dep"></span> enables</span> <span class="legend-entry"><span class="legend-dot legend-dot--revdep"></span> dependents</span> <span class="legend-entry"><span class="legend-dot legend-dot--reused"></span> reused</span> <span class="legend-entry"><span class="legend-dot legend-dot--external"></span> external link</span>`;
+      t37 = space();
+      main = element("main");
+      div23 = element("div");
+      aside = element("aside");
+      div11 = element("div");
+      div11.textContent = "Models";
+      t39 = space();
+      ul = element("ul");
+      t40 = space();
+      div12 = element("div");
+      div12.innerHTML = `<button id="removeModel" class="pf-v5-c-button pf-m-tertiary" type="button" title="Remove selected model">Remove active</button> <button id="clear" class="pf-v5-c-button pf-m-tertiary" type="button">Clear selection</button>`;
+      t44 = space();
+      section0 = element("section");
+      div13 = element("div");
+      div13.textContent = "Local files";
+      t46 = space();
+      p0 = element("p");
+      p0.textContent = "Checking for local server…";
+      t48 = space();
+      div16 = element("div");
+      label3 = element("label");
+      label3.textContent = "Blockscape files under ~/blockscape";
+      t50 = space();
+      div14 = element("div");
+      label4 = element("label");
+      label4.textContent = "Folder";
+      t52 = space();
+      select0 = element("select");
+      option = element("option");
+      option.textContent = "All (~/blockscape)";
+      t54 = space();
+      select1 = element("select");
+      t55 = space();
+      div15 = element("div");
+      div15.innerHTML = `<button id="refreshLocalFiles" class="pf-v5-c-button pf-m-tertiary" type="button">Refresh</button> <button id="loadLocalFile" class="pf-v5-c-button pf-m-secondary" type="button">Load</button>`;
+      t59 = space();
+      div17 = element("div");
+      div17.innerHTML = `<label for="localSavePath">Save active map to ~/blockscape</label> <input id="localSavePath" class="pf-v5-c-form-control" type="text" placeholder="my-map.bs"/> <button id="saveLocalFile" class="pf-v5-c-button pf-m-primary" type="button">Save</button>`;
+      t64 = space();
+      div22 = element("div");
+      div22.innerHTML = `<section class="pf-v5-c-page__main-section blockscape-json-panel" hidden="" aria-label="Model source JSON editor"><p class="blockscape-json-panel__title">Paste / edit JSON for the <b>active</b> model (schema below)</p> <div class="muted">Schema: <code>{ id, title, abstract?, categories:[{id,title,items:[{id,name,logo?,external?:url,color?,deps:[]}}], links?:[{from,to}] }</code><br/>
+            You can paste multiple objects separated by <code>---</code> or <code>%%%</code>, or a JSON array of models, to append several models.
+            A single object replaces only when you click “Replace active with JSON”. Tip: with no input focused, press
+            Cmd/Ctrl+V anywhere on the page to append clipboard JSON instantly.</div> <div class="blockscape-json-controls"><textarea id="jsonBox" class="pf-v5-c-form-control" aria-label="JSON editor for the active model"></textarea> <div class="blockscape-json-actions"><button id="copyJson" class="pf-v5-c-button pf-m-tertiary" type="button" title="Copy the current JSON to your clipboard">Copy</button> <button id="copySeries" class="pf-v5-c-button pf-m-tertiary" type="button" title="Copy every version in this series as an array">Copy series</button> <button id="pasteJson" class="pf-v5-c-button pf-m-tertiary" type="button" title="Paste clipboard JSON to replace the editor contents">Paste</button> <button id="appendFromBox" class="pf-v5-c-button pf-m-primary" type="button">Append model(s)</button> <button id="replaceActive" class="pf-v5-c-button pf-m-secondary" type="button">Replace active with
+                JSON</button> <button id="createVersion" class="pf-v5-c-button pf-m-secondary" type="button" title="Create a new version from the current map">New version</button></div></div></section> <section class="pf-v5-c-page__main-section blockscape-main-section"><div id="app" aria-live="polite"></div></section>`;
+      t90 = space();
+      footer = element("footer");
+      footer.innerHTML = `<div class="blockscape-footer__inner"><a href="https://pwright.github.io/backscape/" target="_blank" rel="noreferrer noopener">Old versions</a></div>`;
+      t92 = space();
+      html_tag = new HtmlTag(false);
+      t93 = space();
+      svg1 = svg_element("svg");
+      t94 = space();
+      div26 = element("div");
+      t95 = space();
+      div31 = element("div");
+      div31.innerHTML = `<div class="item-preview__header"><span class="item-preview__title">Preview</span> <div class="item-preview__actions" hidden=""></div> <button type="button" class="item-preview__close" aria-label="Close preview">×</button></div> <div class="item-preview__body"><div class="item-preview__status">Right-click a tile to see related notes.</div></div>`;
+      t102 = space();
+      create_component(shortcuthelp.$$.fragment);
+      t103 = space();
+      create_component(newpanel.$$.fragment);
+      document_1.title = "Blockscape — simple landscape-style tiles";
+      attr(link, "rel", "icon");
+      attr(link, "type", "image/svg+xml");
+      attr(link, "href", "./favicon.svg");
+      attr(div0, "class", "blockscape-brand");
+      attr(span0, "class", "sr-only");
+      attr(span1, "class", "blockscape-toolbar__toggle-icon");
+      attr(span1, "aria-hidden", "true");
+      attr(button0, "class", "pf-v5-c-button pf-m-plain blockscape-toolbar__toggle");
+      attr(button0, "type", "button");
+      attr(
+        button0,
+        "aria-expanded",
+        /*headerExpanded*/
+        ctx[0]
+      );
+      attr(button0, "aria-controls", "blockscapeHeaderExtras");
+      attr(button1, "id", "newPanelButton");
+      attr(button1, "class", "pf-v5-c-button pf-m-primary");
+      attr(button1, "type", "button");
+      attr(button1, "title", "Create something new");
+      attr(form, "id", "urlForm");
+      attr(form, "class", "blockscape-url-form");
+      attr(form, "autocomplete", "on");
+      form.noValidate = true;
+      attr(label1, "class", "pf-v5-c-button pf-m-primary blockscape-file");
+      attr(button3, "id", "helpButton");
+      attr(button3, "class", "pf-v5-c-button pf-m-primary");
+      attr(button3, "type", "button");
+      attr(button3, "title", "Show keyboard shortcuts");
+      attr(div2, "class", "blockscape-toolbar__primary");
+      attr(div4, "class", "blockscape-search");
+      attr(button4, "id", "openInEditor");
+      attr(button4, "class", "pf-v5-c-button pf-m-secondary");
+      attr(button4, "type", "button");
+      attr(button4, "title", "Open current JSON in the editor");
+      attr(button5, "id", "shareModel");
+      attr(button5, "class", "pf-v5-c-button pf-m-secondary");
+      attr(button5, "type", "button");
+      attr(button5, "title", "Copy a shareable URL for this model");
+      attr(div5, "id", "blockscapeHeaderExtras");
+      attr(div5, "class", "blockscape-toolbar__extras");
+      div5.hidden = div5_hidden_value = !/*headerExpanded*/
+      ctx[0];
+      attr(div5, "aria-hidden", div5_aria_hidden_value = !/*headerExpanded*/
+      ctx[0]);
+      attr(div6, "class", "blockscape-toolbar__controls");
+      attr(div6, "data-expanded", div6_data_expanded_value = /*headerExpanded*/
+      ctx[0] ? "true" : "false");
+      attr(div7, "class", "blockscape-legend");
+      attr(div7, "role", "presentation");
+      attr(div8, "class", "blockscape-toolbar");
+      attr(div9, "class", "pf-v5-c-masthead__content");
+      attr(div10, "class", "pf-v5-c-masthead pf-m-display-inline blockscape-masthead");
+      attr(header, "class", "pf-v5-c-page__header");
+      attr(div11, "class", "sidebar-heading");
+      attr(ul, "id", "modelList");
+      attr(ul, "class", "model-nav-list");
+      attr(div12, "class", "model-actions");
+      attr(div13, "class", "sidebar-heading");
+      attr(p0, "id", "localBackendStatus");
+      attr(p0, "class", "local-backend__status muted");
+      attr(label3, "class", "sr-only");
+      attr(label3, "for", "localFileList");
+      attr(label4, "for", "localDirSelect");
+      option.__value = "";
+      set_input_value(option, option.__value);
+      attr(select0, "id", "localDirSelect");
+      attr(select0, "class", "pf-v5-c-form-control");
+      attr(select0, "aria-label", "Folder filter");
+      attr(div14, "class", "local-backend__dir");
+      attr(select1, "id", "localFileList");
+      attr(select1, "class", "pf-v5-c-form-control");
+      attr(select1, "size", "12");
+      select1.multiple = true;
+      attr(select1, "aria-label", "Blockscape files on local server");
+      attr(div15, "class", "local-backend__actions");
+      attr(div16, "class", "local-backend__list");
+      attr(div17, "class", "local-backend__save");
+      attr(section0, "id", "localBackendPanel");
+      attr(section0, "class", "local-backend");
+      section0.hidden = true;
+      attr(aside, "class", "blockscape-sidebar");
+      attr(aside, "aria-label", "Models");
+      attr(div22, "class", "blockscape-main");
+      attr(div23, "class", "blockscape-content");
+      attr(main, "class", "pf-v5-c-page__main");
+      attr(footer, "class", "pf-v5-c-page__footer blockscape-footer");
+      attr(div25, "class", "pf-v5-c-page");
+      html_tag.a = t93;
+      attr(svg1, "id", "overlay");
+      attr(svg1, "class", "svg-layer");
+      attr(div26, "id", "tabTooltip");
+      attr(div26, "class", "blockscape-tab-tooltip");
+      div26.hidden = true;
+      attr(div26, "aria-hidden", "true");
+      attr(div31, "id", "itemPreview");
+      attr(div31, "class", "item-preview");
+      div31.hidden = true;
+      attr(div31, "aria-hidden", "true");
+    },
+    m(target2, anchor) {
+      append(document_1.head, link);
+      insert(target2, t0, anchor);
+      insert(target2, div25, anchor);
+      append(div25, header);
+      append(header, div10);
+      append(div10, div9);
+      append(div9, div8);
+      append(div8, div0);
+      append(div8, t4);
+      append(div8, div6);
+      append(div6, div2);
+      append(div2, button0);
+      append(button0, span0);
+      append(button0, t6);
+      append(button0, span1);
+      append(div2, t8);
+      append(div2, button1);
+      append(div2, t10);
+      append(div2, form);
+      append(div2, t16);
+      append(div2, label1);
+      append(div2, t19);
+      append(div2, button3);
+      append(div6, t21);
+      append(div6, div5);
+      append(div5, div4);
+      append(div5, t25);
+      append(div5, button4);
+      append(div5, t27);
+      append(div5, button5);
+      append(div8, t29);
+      append(div8, div7);
+      append(div25, t37);
+      append(div25, main);
+      append(main, div23);
+      append(div23, aside);
+      append(aside, div11);
+      append(aside, t39);
+      append(aside, ul);
+      append(aside, t40);
+      append(aside, div12);
+      append(aside, t44);
+      append(aside, section0);
+      append(section0, div13);
+      append(section0, t46);
+      append(section0, p0);
+      append(section0, t48);
+      append(section0, div16);
+      append(div16, label3);
+      append(div16, t50);
+      append(div16, div14);
+      append(div14, label4);
+      append(div14, t52);
+      append(div14, select0);
+      append(select0, option);
+      append(div16, t54);
+      append(div16, select1);
+      append(div16, t55);
+      append(div16, div15);
+      append(section0, t59);
+      append(section0, div17);
+      append(div23, t64);
+      append(div23, div22);
+      append(div25, t90);
+      append(div25, footer);
+      insert(target2, t92, anchor);
+      html_tag.m(raw_value, target2, anchor);
+      insert(target2, t93, anchor);
+      insert(target2, svg1, anchor);
+      insert(target2, t94, anchor);
+      insert(target2, div26, anchor);
+      insert(target2, t95, anchor);
+      insert(target2, div31, anchor);
+      insert(target2, t102, anchor);
+      mount_component(shortcuthelp, target2, anchor);
+      insert(target2, t103, anchor);
+      mount_component(newpanel, target2, anchor);
+      current = true;
+      if (!mounted) {
+        dispose = listen(
+          button0,
+          "click",
+          /*toggleHeaderExpanded*/
+          ctx[2]
+        );
+        mounted = true;
+      }
+    },
+    p(ctx2, [dirty]) {
+      if (!current || dirty & /*headerExpanded*/
+      1) {
+        attr(
+          button0,
+          "aria-expanded",
+          /*headerExpanded*/
+          ctx2[0]
+        );
+      }
+      if (!current || dirty & /*headerExpanded*/
+      1 && div5_hidden_value !== (div5_hidden_value = !/*headerExpanded*/
+      ctx2[0])) {
+        div5.hidden = div5_hidden_value;
+      }
+      if (!current || dirty & /*headerExpanded*/
+      1 && div5_aria_hidden_value !== (div5_aria_hidden_value = !/*headerExpanded*/
+      ctx2[0])) {
+        attr(div5, "aria-hidden", div5_aria_hidden_value);
+      }
+      if (!current || dirty & /*headerExpanded*/
+      1 && div6_data_expanded_value !== (div6_data_expanded_value = /*headerExpanded*/
+      ctx2[0] ? "true" : "false")) {
+        attr(div6, "data-expanded", div6_data_expanded_value);
+      }
+    },
+    i(local) {
+      if (current) return;
+      transition_in(shortcuthelp.$$.fragment, local);
+      transition_in(newpanel.$$.fragment, local);
+      current = true;
+    },
+    o(local) {
+      transition_out(shortcuthelp.$$.fragment, local);
+      transition_out(newpanel.$$.fragment, local);
+      current = false;
+    },
+    d(detaching) {
+      if (detaching) {
+        detach(t0);
+        detach(div25);
+        detach(t92);
+        html_tag.d();
+        detach(t93);
+        detach(svg1);
+        detach(t94);
+        detach(div26);
+        detach(t95);
+        detach(div31);
+        detach(t102);
+        detach(t103);
+      }
+      detach(link);
+      destroy_component(shortcuthelp, detaching);
+      destroy_component(newpanel, detaching);
+      mounted = false;
+      dispose();
+    }
+  };
+}
+function instance($$self, $$props, $$invalidate) {
+  const seedText = `
+  {
+  "id": "blockscape",
+  "title": "Blockscape (AI maps)",
+  "abstract": "Blockscape (pronounced BYK-shed) visualizes value chains and dependencies using a BS file. Inspired by Wardley maps, these maps emphasizes the topology that makes maps useful.",
+  "categories": [
+    {
+      "id": "communication",
+      "title": "Communication",
+      "items": [
+        {
+          "id": "gestalt",
+          "name": "Visualise to understand",
+          "logo": "./logos/block-mind-blown.gif",
+          "deps": []
+        },
+        {
+          "id": "value-chain",
+          "name": "Visible value chain (y-axis)",
+          "deps": []
+        },
+        {
+          "id": "evolution",
+          "name": "Evolution and maturity (x-axis)",
+          "deps": []
+        },
+        {
+          "id": "relational-awareness",
+          "name": "Relations",
+          "logo": "./logos/relations.png",
+          "deps": []
+        },
+        {
+          "id": "icons",
+          "name": "Icons",
+          "deps": []
+        }
+      ]
+    },
+    {
+      "id": "experience",
+      "title": "User Experience",
+      "items": [
+        {
+          "id": "paste-bs-file",
+          "name": "Paste (cmd-v)",
+          "deps": [
+            "bs-format-simple"
+          ]
+        },
+        {
+          "id": "load-multidoc-file",
+          "name": "Series",
+          "deps": [
+            "bs-format-simple"
+          ]
+        },
+        {
+          "id": "create-gist-multidoc",
+          "name": "Gist",
+          "deps": [
+            "gists",
+            "bs-format-simple"
+          ]
+        },
+        {
+          "id": "abstract-gist-loading",
+          "name": "Links",
+          "deps": [
+            "gists",
+            "bs-format-simple"
+          ]
+        },
+        {
+          "id": "model-collection",
+          "name": "Portfolio",
+          "deps": [
+            "apicurio",
+            "bs-format-simple"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "authoring-ai",
+      "title": "Authoring (LLM)",
+      "items": [
+        {
+          "id": "bs-format-simple",
+          "name": "BS Schema",
+          "deps": []
+        },
+        {
+          "id": "editor-human-terms",
+          "name": "Edit",
+          "deps": [
+            "bs-format-simple",
+            "gestalt"
+          ]
+        },
+        {
+          "id": "llm-generate-bs",
+          "name": "LLM generates BS",
+          "external": "https://github.com/pwright/blockscape/blob/main/map-generation-prompt.md",
+          "deps": [
+            "bs-format-simple"
+          ]
+        },
+        {
+          "id": "llm-consume-bs",
+          "name": "LLM consumes BS",
+          "deps": [
+            "bs-format-simple"
+          ]
+        },
+        {
+          "id": "move-items",
+          "name": "Move (shift - arrow keys)",
+          "logo": "./logos/block-swap.gif",
+          "deps": []
+        }
+      ]
+    },
+    {
+      "id": "platforms",
+      "title": "Platforms",
+      "items": [
+        {
+          "id": "gists",
+          "name": "Gist",
+          "logo": "https://favicon.im/github.com",
+          "deps": []
+        },
+        {
+          "id": "apicurio",
+          "name": "Apicurio",
+          "logo": "https://www.google.com/s2/favicons?domain=apicur.io&sz=96",
+          "deps": []
+        }
+      ]
+    }
+  ]
+}`;
+  let headerExpanded = false;
+  const toggleHeaderExpanded = () => {
+    $$invalidate(0, headerExpanded = !headerExpanded);
+    if (!headerExpanded) {
+      const searchInput = document.getElementById("search");
+      if (searchInput && searchInput.value) {
+        searchInput.value = "";
+        searchInput.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+    }
+  };
+  onMount(() => {
+    initBlockscape();
+  });
+  return [headerExpanded, seedText, toggleHeaderExpanded];
+}
+class App extends SvelteComponent {
+  constructor(options) {
+    super();
+    init(this, options, instance, create_fragment, safe_not_equal, {});
+  }
+}
+const target = document.getElementById("root");
+new App({
+  target
+});

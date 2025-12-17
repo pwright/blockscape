@@ -5,7 +5,8 @@
   "scripts": {
     "serve": "http-server -c-1 -p 4173 dist",
     "dev": "vite",
-    "build": "vite build",
+    "build": "npm run clean-docs && vite build",
+    "clean-docs": "node scripts/clean-docs.js",
     "preview": "vite preview",
     "server": "node server.js",
     "cypress:open": "cypress open",
