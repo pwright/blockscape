@@ -173,6 +173,7 @@ NOTE: This process creates new tabs in your browser.
 
 - Primary app lives in `svelte/` (Vite + Svelte). Run `npm run dev` for the dev server on http://localhost:5173.
 - Production bundle: `npm run build` (writes `dist/`). `npm run preview` uses Vite’s preview server; `npm run serve` serves the built assets via `http-server`.
+- Optional local backend for loading/saving `~/blockscape/*.bs`: `npm run server` (after `npm run build`). Default URL with backend enabled: http://127.0.0.1:4173/server. Root can be changed via `BLOCKSCAPE_ROOT=~/somewhere npm run server`. Without the backend, the app runs in static mode (no local file API).
 - The JSON editor (`editor.html`) ships from `svelte/public/` and is copied into `dist/` during the build, so the `Edit` button works in both dev and production.
 - Static legacy `index.html` remains for reference only; all active work should target the Svelte app.
 

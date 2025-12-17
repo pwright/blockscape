@@ -13,7 +13,7 @@ const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 4173;
 const HOST = process.env.HOST || "127.0.0.1";
 const DIST_DIR = resolveDistDir();
 const INDEX_FILE = path.join(DIST_DIR, "index.html");
-const ROOT_DIR = path.join(os.homedir(), "blockscape");
+const ROOT_DIR = resolveRootDir();
 const JSON_LIMIT_BYTES = 2 * 1024 * 1024;
 
 const mimeTypes = {
@@ -242,6 +242,7 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, HOST, () => {
   console.log(`Blockscape server listening at http://${HOST}:${PORT}`);
+  console.log(`Open the app with local backend: http://${HOST}:${PORT}/server`);
   console.log(`Serving dist from: ${DIST_DIR}`);
   console.log(`File API root: ${ROOT_DIR}`);
 });
@@ -258,4 +259,16 @@ function resolveDistDir() {
   }
   // Last fallback to first candidate
   return candidates[0];
+}
+
+function resolveRootDir() {
+  const raw = process.env.BLOCKSCAPE_ROOT;
+  if (raw) {
+    const expanded =
+      raw.startsWith("~") && process.env.HOME
+        ? path.join(process.env.HOME, raw.slice(1))
+        : raw;
+    return path.resolve(expanded);
+  }
+  return path.join(os.homedir(), "blockscape");
 }

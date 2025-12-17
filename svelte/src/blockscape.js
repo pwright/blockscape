@@ -47,6 +47,7 @@ export function initBlockscape() {
   const localBackendPanel = document.getElementById("localBackendPanel");
   const localBackendStatus = document.getElementById("localBackendStatus");
   const localFileList = document.getElementById("localFileList");
+  const localDirSelect = document.getElementById("localDirSelect");
   const refreshLocalFilesButton = document.getElementById("refreshLocalFiles");
   const loadLocalFileButton = document.getElementById("loadLocalFile");
   const saveLocalFileButton = document.getElementById("saveLocalFile");
@@ -110,6 +111,7 @@ export function initBlockscape() {
   let versionThumbLabels = [];
   let thumbLabelMeasureTimer = null;
   const localBackend = createLocalBackend();
+  const initialBackendCheck = localBackend.detect();
   const MAX_SEARCH_RESULTS = 30;
   const SERIES_INFO_PREVIEW_DELAY = 1000;
   const TILE_HOVER_SCALE_STORAGE_KEY = "blockscape:hoverScale";
@@ -251,7 +253,12 @@ export function initBlockscape() {
     if (isGithubPagesHost()) {
       debug("Disabled on github.io host");
       if (localBackendPanel) localBackendPanel.hidden = true;
-      return { detect() {}, refresh() {}, updateActiveSavePlaceholder() {} };
+      return {
+        detect: async () => false,
+        refresh: async () => {},
+        updateActiveSavePlaceholder() {},
+        isAvailable: () => false,
+      };
     }
 
     const optIn = isLocalBackendOptIn();
@@ -259,23 +266,34 @@ export function initBlockscape() {
       debug("Opt-in flag missing or panel unavailable");
       if (localBackendPanel) localBackendPanel.hidden = true;
       return {
-        detect() {},
-        refresh() {},
+        detect: async () => false,
+        refresh: async () => {},
         updateActiveSavePlaceholder() {},
+        isAvailable: () => false,
       };
     }
 
     if (!localBackendPanel || !localBackendStatus) {
       return {
-        detect() {},
-        refresh() {},
+        detect: async () => false,
+        refresh: async () => {},
         updateActiveSavePlaceholder() {},
+        isAvailable: () => false,
       };
     }
 
     let available = false;
     let lastKnownPath = "";
     let files = [];
+    let dirs = [];
+    let currentDir = "";
+
+    function dirOfPath(p) {
+      if (!p) return "";
+      const parts = p.split("/").filter(Boolean);
+      parts.pop();
+      return parts.join("/");
+    }
 
     function setStatus(text, { error = false } = {}) {
       localBackendStatus.textContent = text;
@@ -306,10 +324,31 @@ export function initBlockscape() {
       }
     }
 
+    function renderDirFilter() {
+      if (!localDirSelect) return;
+      localDirSelect.innerHTML = "";
+      const rootOption = document.createElement("option");
+      rootOption.value = "";
+      rootOption.textContent = "All (~/blockscape)";
+      localDirSelect.appendChild(rootOption);
+      dirs.forEach((dir) => {
+        const opt = document.createElement("option");
+        opt.value = dir;
+        opt.textContent = dir || "(root)";
+        localDirSelect.appendChild(opt);
+      });
+      const desired = dirs.includes(currentDir) ? currentDir : "";
+      localDirSelect.value = desired;
+      currentDir = desired;
+    }
+
     function renderFiles() {
       if (!localFileList) return;
       localFileList.innerHTML = "";
-      if (!files.length) {
+      const filtered = currentDir
+        ? files.filter((f) => f.path.startsWith(`${currentDir}/`))
+        : files;
+      if (!filtered.length) {
         const option = document.createElement("option");
         option.disabled = true;
         option.textContent = "No .bs files found yet";
@@ -319,7 +358,7 @@ export function initBlockscape() {
       }
 
       localFileList.disabled = false;
-      files.forEach((file) => {
+      filtered.forEach((file) => {
         const option = document.createElement("option");
         option.value = file.path;
         const mtime = file.mtimeMs
@@ -384,7 +423,24 @@ export function initBlockscape() {
           throw new Error(`HTTP ${response.status}`);
         }
         const payload = await response.json();
-        files = payload.files || [];
+        files = (payload.files || []).slice().sort((a, b) => {
+          const aTime = a?.mtimeMs || 0;
+          const bTime = b?.mtimeMs || 0;
+          if (aTime === bTime) return (a.path || "").localeCompare(b.path || "");
+          return bTime - aTime; // newest first
+        });
+        const dirSet = new Set();
+        files.forEach((f) => {
+          dirSet.add(dirOfPath(f.path));
+        });
+        dirs = Array.from(dirSet).filter((d) => d !== "").sort();
+        if (currentDir && !dirSet.has(currentDir)) {
+          currentDir = "";
+        }
+        if (!currentDir && lastKnownPath) {
+          currentDir = dirOfPath(lastKnownPath);
+        }
+        renderDirFilter();
         renderFiles();
         setStatus(
           files.length
@@ -404,13 +460,17 @@ export function initBlockscape() {
       try {
         debug("Detect start");
         const healthy = await checkHealth();
-        if (!healthy) return;
+        if (!healthy) {
+          return false;
+        }
         updateActiveSavePlaceholder();
         await refresh();
+        return true;
       } catch (err) {
         available = false;
         console.log("[Blockscape] local backend not detected", err);
         debug("Detect failed", { err });
+        return false;
       }
     }
 
@@ -511,12 +571,22 @@ export function initBlockscape() {
           localSavePathInput.value = first.value;
         }
       });
+      localFileList.addEventListener("dblclick", () => {
+        loadSelected();
+      });
+    }
+    if (localDirSelect) {
+      localDirSelect.addEventListener("change", () => {
+        currentDir = localDirSelect.value || "";
+        renderFiles();
+      });
     }
 
     return {
       detect,
       refresh,
       updateActiveSavePlaceholder,
+      isAvailable: () => available,
     };
   }
 
@@ -6080,9 +6150,6 @@ export function initBlockscape() {
     }
   }
 
-  // Optional local server for ~/blockscape
-  localBackend.detect();
-
   // Bootstrap with Blockscape
   (async function bootstrap() {
     const seedEl = document.getElementById("seed");
@@ -6104,8 +6171,12 @@ export function initBlockscape() {
       if (firstSeedIndex == null) firstSeedIndex = idx;
     });
 
-    // Try to load JSON files from same directory
-    await loadJsonFiles();
+    const hasLocalBackend = await initialBackendCheck;
+
+    // Try to load JSON files from same directory only when no local backend
+    if (!hasLocalBackend) {
+      await loadJsonFiles();
+    }
 
     // Load explicit model from URL hash/search (?load= or #load=)
     const loadIndex = await consumeLoadParam();

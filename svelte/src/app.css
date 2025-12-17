@@ -997,6 +997,22 @@
       box-shadow: none;
     }
 
+    .local-backend__dir {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2xs);
+    }
+
+    .local-backend__dir label {
+      font-size: var(--font-size-xs);
+      color: var(--blockscape-muted);
+    }
+
+    .local-backend__dir select {
+      width: 100%;
+      font-size: var(--font-size-sm);
+    }
+
     .local-backend__actions {
       display: flex;
       gap: var(--space-xs);
