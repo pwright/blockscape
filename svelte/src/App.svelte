@@ -253,6 +253,24 @@
             title="Remove selected model">Remove active</button>
           <button id="clear" class="pf-v5-c-button pf-m-tertiary" type="button">Clear selection</button>
         </div>
+        <section id="localBackendPanel" class="local-backend" hidden>
+          <div class="sidebar-heading">Local files</div>
+          <p id="localBackendStatus" class="local-backend__status muted">Checking for local server…</p>
+          <div class="local-backend__list">
+            <label class="sr-only" for="localFileList">Blockscape files under ~/blockscape</label>
+            <select id="localFileList" class="pf-v5-c-form-control" size="6"
+              aria-label="Blockscape files on local server"></select>
+            <div class="local-backend__actions">
+              <button id="refreshLocalFiles" class="pf-v5-c-button pf-m-tertiary" type="button">Refresh</button>
+              <button id="loadLocalFile" class="pf-v5-c-button pf-m-secondary" type="button">Load</button>
+            </div>
+          </div>
+          <div class="local-backend__save">
+            <label for="localSavePath">Save active map to ~/blockscape</label>
+            <input id="localSavePath" class="pf-v5-c-form-control" type="text" placeholder="my-map.bs" />
+            <button id="saveLocalFile" class="pf-v5-c-button pf-m-primary" type="button">Save</button>
+          </div>
+        </section>
       </aside>
       <div class="blockscape-main">
         <section class="pf-v5-c-page__main-section blockscape-json-panel" hidden
