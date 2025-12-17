@@ -290,6 +290,9 @@ export function initBlockscape() {
     }
 
     function defaultSaveName() {
+      if (activeIndex >= 0 && models[activeIndex]?.sourcePath) {
+        return models[activeIndex].sourcePath;
+      }
       if (activeIndex < 0) return "blockscape.bs";
       const title = getModelTitle(models[activeIndex]) || "blockscape";
       return `${makeSeriesId(title, "blockscape")}.bs`;
@@ -298,6 +301,9 @@ export function initBlockscape() {
     function updateActiveSavePlaceholder() {
       if (!localSavePathInput) return;
       localSavePathInput.placeholder = defaultSaveName();
+      if (models[activeIndex]?.sourcePath) {
+        localSavePathInput.value = models[activeIndex].sourcePath;
+      }
     }
 
     function renderFiles() {
@@ -323,7 +329,12 @@ export function initBlockscape() {
         localFileList.appendChild(option);
       });
       if (lastKnownPath) {
-        localFileList.value = lastKnownPath;
+        Array.from(localFileList.options).forEach((opt) => {
+          if (opt.value === lastKnownPath) opt.selected = true;
+        });
+      }
+      if (!localFileList.value && localFileList.options.length) {
+        localFileList.options[0].selected = true;
       }
     }
 
@@ -405,41 +416,45 @@ export function initBlockscape() {
 
     async function loadSelected() {
       if (!available || !localFileList) return;
-      const relPath = localFileList.value;
-      if (!relPath) {
-        alert("Select a file to load from ~/blockscape.");
+      const selectedPaths = Array.from(localFileList.selectedOptions || [])
+        .map((opt) => opt.value)
+        .filter(Boolean);
+      if (!selectedPaths.length) {
+        alert("Select one or more files to load from ~/blockscape.");
         return;
       }
-      try {
-        setStatus(`Loading ${relPath}…`);
-        const resp = await fetch(
-          `/api/file?path=${encodeURIComponent(relPath)}`,
-          { cache: "no-store" }
-        );
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-        const payload = await resp.json();
-        const text = JSON.stringify(payload.data ?? payload, null, 2);
-        const entries = normalizeToModelsFromText(text, relPath, {
-          seriesTitleOverride: `${relPath} series`,
-        });
-        if (!entries.length) throw new Error("No models found in file");
-        let firstIndex = null;
-        entries.forEach((entry, idx) => {
-          const idxResult = addModelEntry(entry, {
-            versionLabel:
-              entries.length > 1 ? `${relPath} #${idx + 1}` : relPath,
+      let firstIndex = null;
+      for (const relPath of selectedPaths) {
+        try {
+          setStatus(`Loading ${relPath}…`);
+          const resp = await fetch(
+            `/api/file?path=${encodeURIComponent(relPath)}`,
+            { cache: "no-store" }
+          );
+          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+          const payload = await resp.json();
+          const text = JSON.stringify(payload.data ?? payload, null, 2);
+          const entries = normalizeToModelsFromText(text, relPath, {
+            seriesTitleOverride: `${relPath} series`,
           });
-          if (firstIndex == null) firstIndex = idxResult;
-        });
-        if (firstIndex != null) setActive(firstIndex);
-        setStatus(`Loaded ${relPath}`);
-        lastKnownPath = relPath;
-        renderFiles();
-      } catch (err) {
-        console.error("[Blockscape] failed to load from local server", err);
-        alert(`Local load failed: ${err.message}`);
-        hidePanel("Local server unavailable");
+          if (!entries.length) throw new Error("No models found in file");
+          entries.forEach((entry, idx) => {
+            entry.sourcePath = relPath;
+            const idxResult = addModelEntry(entry, {
+              versionLabel:
+                entries.length > 1 ? `${relPath} #${idx + 1}` : relPath,
+            });
+            if (firstIndex == null) firstIndex = idxResult;
+          });
+          lastKnownPath = relPath;
+        } catch (err) {
+          console.error("[Blockscape] failed to load from local server", err);
+          alert(`Local load failed for ${relPath}: ${err.message}`);
+        }
       }
+      if (firstIndex != null) setActive(firstIndex);
+      setStatus(`Loaded ${selectedPaths.length} file(s)`);
+      renderFiles();
     }
 
     async function saveActiveToFile() {
@@ -449,7 +464,9 @@ export function initBlockscape() {
         return;
       }
       const desiredPath =
-        normalizeSavePath(localSavePathInput?.value) || defaultSaveName();
+        normalizeSavePath(localSavePathInput?.value) ||
+        normalizeSavePath(models[activeIndex]?.sourcePath) ||
+        defaultSaveName();
       if (!desiredPath) {
         alert("Enter a relative path (no ..) to save under ~/blockscape.");
         return;
@@ -468,6 +485,7 @@ export function initBlockscape() {
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const payload = await resp.json();
         lastKnownPath = payload.path || desiredPath;
+        models[activeIndex].sourcePath = payload.path || desiredPath;
         setStatus(`Saved to ${payload.path || desiredPath}`);
         await refresh();
       } catch (err) {
@@ -488,8 +506,9 @@ export function initBlockscape() {
     }
     if (localFileList && localSavePathInput) {
       localFileList.addEventListener("change", () => {
-        if (localFileList.value) {
-          localSavePathInput.value = localFileList.value;
+        const first = Array.from(localFileList.selectedOptions || [])[0];
+        if (first?.value) {
+          localSavePathInput.value = first.value;
         }
       });
     }
@@ -1155,6 +1174,16 @@ export function initBlockscape() {
     if (!candidate) return null;
     const trimmed = candidate.toString().trim();
     return trimmed || null;
+  }
+
+  function getModelSourceLabel(entry) {
+    if (!entry?.sourcePath) return null;
+    try {
+      const parts = entry.sourcePath.split("/").filter(Boolean);
+      return parts.length ? parts[parts.length - 1] : entry.sourcePath;
+    } catch (err) {
+      return entry.sourcePath;
+    }
   }
 
   function persistActiveEdits(entryIndex) {
@@ -2154,7 +2183,7 @@ export function initBlockscape() {
       titleSpan.textContent = getModelDisplayTitle(m);
       label.appendChild(titleSpan);
 
-      const dataId = getModelId(m);
+      const dataId = getModelSourceLabel(m) || getModelId(m);
       if (dataId) {
         const idBadge = document.createElement("span");
         idBadge.className = "model-nav-id";

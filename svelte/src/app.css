@@ -977,6 +977,26 @@
       gap: var(--space-xs);
     }
 
+    .local-backend__list select[multiple] {
+      height: auto;
+      min-height: 14rem;
+      max-height: 20rem;
+      overflow: auto;
+      width: 100%;
+      padding: var(--space-2xs) var(--space-xs);
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--color-border);
+      background: var(--color-surface);
+      color: var(--blockscape-foreground);
+      font-size: var(--font-size-sm);
+      font-family: inherit;
+      line-height: 1.3;
+      appearance: auto;
+      -webkit-appearance: auto;
+      -moz-appearance: auto;
+      box-shadow: none;
+    }
+
     .local-backend__actions {
       display: flex;
       gap: var(--space-xs);

@@ -258,7 +258,7 @@
           <p id="localBackendStatus" class="local-backend__status muted">Checking for local server…</p>
           <div class="local-backend__list">
             <label class="sr-only" for="localFileList">Blockscape files under ~/blockscape</label>
-            <select id="localFileList" class="pf-v5-c-form-control" size="6"
+            <select id="localFileList" class="pf-v5-c-form-control" size="12" multiple
               aria-label="Blockscape files on local server"></select>
             <div class="local-backend__actions">
               <button id="refreshLocalFiles" class="pf-v5-c-button pf-m-tertiary" type="button">Refresh</button>
