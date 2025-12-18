@@ -118,6 +118,11 @@ export function initBlockscape() {
   const DEFAULT_TILE_HOVER_SCALE = 1.5;
   const MIN_TILE_HOVER_SCALE = 1;
   const MAX_TILE_HOVER_SCALE = 2.5;
+  const SELECTION_DIM_OPACITY_STORAGE_KEY =
+    "blockscape:selectionDimOpacity";
+  const DEFAULT_SELECTION_DIM_OPACITY = 0.2;
+  const MIN_SELECTION_DIM_OPACITY = 0.05;
+  const MAX_SELECTION_DIM_OPACITY = 1;
   const TITLE_WRAP_STORAGE_KEY = "blockscape:titleWrap";
   const TITLE_HOVER_WIDTH_STORAGE_KEY = "blockscape:titleHoverWidth";
   const TITLE_HOVER_TEXT_PORTION_STORAGE_KEY =
@@ -145,6 +150,7 @@ export function initBlockscape() {
   const MIN_AUTO_RELOAD_INTERVAL_MS = 500;
   const MAX_AUTO_RELOAD_INTERVAL_MS = 10000;
   let tileHoverScale = DEFAULT_TILE_HOVER_SCALE;
+  let selectionDimOpacity = DEFAULT_SELECTION_DIM_OPACITY;
   let tileCompactness = DEFAULT_TILE_COMPACTNESS;
   let titleWrapMode = DEFAULT_TITLE_WRAP_MODE;
   let titleHoverWidthMultiplier = DEFAULT_TITLE_HOVER_WIDTH_MULTIPLIER;
@@ -162,6 +168,7 @@ export function initBlockscape() {
   const initialBackendCheck = localBackend.detect();
   apicurio.hydrateConfig();
   initializeTileHoverScale();
+  initializeSelectionDimOpacity();
   initializeTileCompactness();
   initializeTitleWrapMode();
   initializeTitleHoverWidthMultiplier();
@@ -299,6 +306,11 @@ export function initBlockscape() {
     let autoReloadIntervalMs = readAutoReloadInterval();
     let autoReloadTimer = null;
     let autoReloadInFlight = false;
+    const autoReloadPauseReasons = new Set();
+
+    function isAutoReloadPaused() {
+      return autoReloadPauseReasons.size > 0;
+    }
 
     function readAutoReloadEnabled() {
       if (typeof window === "undefined" || !window.localStorage) return true;
@@ -374,9 +386,7 @@ export function initBlockscape() {
     }
 
     function normalizeSavePath(raw) {
-      const cleaned = (raw || "").trim().replace(/\\/g, "/").replace(/^\/+/, "");
-      if (!cleaned || cleaned.includes("..")) return null;
-      return cleaned.toLowerCase().endsWith(".bs") ? cleaned : `${cleaned}.bs`;
+      return normalizeLocalSavePath(raw);
     }
 
     function defaultSaveName() {
@@ -480,6 +490,31 @@ export function initBlockscape() {
       }
     }
 
+    function syncAutoReloadTimer() {
+      stopAutoReloadTimer();
+      if (!available || !autoReloadEnabled || isAutoReloadPaused()) return;
+      autoReloadTimer = setInterval(checkFileChanges, autoReloadIntervalMs);
+    }
+
+    function pauseAutoReload(reason) {
+      if (!reason) return;
+      const sizeBefore = autoReloadPauseReasons.size;
+      autoReloadPauseReasons.add(reason);
+      if (autoReloadPauseReasons.size !== sizeBefore) {
+        debug("Auto-reload paused", { reason });
+        syncAutoReloadTimer();
+      }
+    }
+
+    function resumeAutoReload(reason) {
+      if (!reason) return;
+      const removed = autoReloadPauseReasons.delete(reason);
+      if (removed) {
+        debug("Auto-reload resumed", { reason });
+        syncAutoReloadTimer();
+      }
+    }
+
     async function reloadModelFromSource(path) {
       const idx = models.findIndex((m) => m.sourcePath === path);
       if (idx === -1) return;
@@ -531,7 +566,13 @@ export function initBlockscape() {
     }
 
     async function checkFileChanges() {
-      if (!available || !autoReloadEnabled || autoReloadInFlight) return;
+      if (
+        !available ||
+        !autoReloadEnabled ||
+        isAutoReloadPaused() ||
+        autoReloadInFlight
+      )
+        return;
       autoReloadInFlight = true;
       try {
         const response = await fetch("/api/files", { cache: "no-store" });
@@ -570,24 +611,19 @@ export function initBlockscape() {
     }
 
     function startAutoReloadTimer() {
-      stopAutoReloadTimer();
-      if (!available || !autoReloadEnabled) return;
-      autoReloadTimer = setInterval(checkFileChanges, autoReloadIntervalMs);
+      syncAutoReloadTimer();
     }
 
     function setAutoReloadEnabled(enabled) {
       autoReloadEnabled = !!enabled;
       persistAutoReloadEnabled(autoReloadEnabled);
-      if (autoReloadEnabled) startAutoReloadTimer();
-      else stopAutoReloadTimer();
+      syncAutoReloadTimer();
     }
 
     function setAutoReloadInterval(ms) {
       autoReloadIntervalMs = clampAutoReloadInterval(ms);
       persistAutoReloadInterval(autoReloadIntervalMs);
-      if (autoReloadEnabled && available) {
-        startAutoReloadTimer();
-      }
+      syncAutoReloadTimer();
       return autoReloadIntervalMs;
     }
 
@@ -682,7 +718,7 @@ export function initBlockscape() {
         }
         updateActiveSavePlaceholder();
         await refresh();
-        startAutoReloadTimer();
+        syncAutoReloadTimer();
         return true;
       } catch (err) {
         available = false;
@@ -779,6 +815,55 @@ export function initBlockscape() {
       }
     }
 
+    async function saveModelByIndex(
+      entryIndex,
+      desiredPath,
+      { refreshAfter = true, statusPrefix = "Saved to" } = {}
+    ) {
+      if (!available) return { ok: false, error: "Local server unavailable" };
+      if (!Number.isInteger(entryIndex) || entryIndex < 0) {
+        return { ok: false, error: "Invalid model index" };
+      }
+      const target = models[entryIndex];
+      if (!target?.data) return { ok: false, error: "Model has no data" };
+      const normalized =
+        normalizeSavePath(desiredPath) ||
+        normalizeSavePath(target?.sourcePath) ||
+        defaultSaveName();
+      if (!normalized) {
+        return {
+          ok: false,
+          error: "Enter a relative path (no ..) to save under ~/blockscape.",
+        };
+      }
+      try {
+        const body = JSON.stringify(target.data, null, 2);
+        setStatus(`Saving to ${normalized}…`);
+        const resp = await fetch(
+          `/api/file?path=${encodeURIComponent(normalized)}`,
+          {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body,
+          }
+        );
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const payload = await resp.json();
+        lastKnownPath = payload.path || normalized;
+        target.sourcePath = payload.path || normalized;
+        if (entryIndex === activeIndex) {
+          updateActiveSavePlaceholder();
+        }
+        setStatus(`${statusPrefix} ${payload.path || normalized}`);
+        if (refreshAfter) await refresh();
+        return { ok: true, path: payload.path || normalized };
+      } catch (err) {
+        console.error("[Blockscape] local save failed", err);
+        hidePanel("Local server unavailable");
+        return { ok: false, error: err.message };
+      }
+    }
+
     if (refreshLocalFilesButton) {
       refreshLocalFilesButton.onclick = () => refresh();
     }
@@ -805,6 +890,38 @@ export function initBlockscape() {
         renderFiles();
       });
     }
+    if (localBackendPanel) {
+      const FOCUS_REASON = "local-files-panel-focus";
+      const POINTER_REASON = "local-files-panel-pointer";
+      let focusActive = false;
+      let pointerActive = false;
+
+      localBackendPanel.addEventListener("focusin", () => {
+        if (focusActive) return;
+        focusActive = true;
+        pauseAutoReload(FOCUS_REASON);
+      });
+
+      localBackendPanel.addEventListener("focusout", (event) => {
+        if (!focusActive) return;
+        const nextTarget = event.relatedTarget;
+        if (nextTarget && localBackendPanel.contains(nextTarget)) return;
+        focusActive = false;
+        resumeAutoReload(FOCUS_REASON);
+      });
+
+      localBackendPanel.addEventListener("pointerenter", () => {
+        if (pointerActive) return;
+        pointerActive = true;
+        pauseAutoReload(POINTER_REASON);
+      });
+
+      localBackendPanel.addEventListener("pointerleave", () => {
+        if (!pointerActive) return;
+        pointerActive = false;
+        resumeAutoReload(POINTER_REASON);
+      });
+    }
 
     return {
       detect,
@@ -812,6 +929,7 @@ export function initBlockscape() {
       updateActiveSavePlaceholder,
       isAvailable: () => available,
       highlightSource: highlightSourcePath,
+      saveModelByIndex,
       getAutoReloadConfig: () => ({
         enabled: autoReloadEnabled,
         intervalMs: autoReloadIntervalMs,
@@ -851,6 +969,103 @@ export function initBlockscape() {
     );
   }
 
+  function normalizeLocalSavePath(raw) {
+    const cleaned = (raw || "")
+      .trim()
+      .replace(/\\/g, "/")
+      .replace(/^\/+/, "");
+    if (!cleaned || cleaned.includes("..")) return null;
+    return cleaned.toLowerCase().endsWith(".bs") ? cleaned : `${cleaned}.bs`;
+  }
+
+  function getBsStem(savePath) {
+    const leaf = (savePath || "").split("/").filter(Boolean).pop() || "";
+    return leaf.replace(/\.bs$/i, "").trim();
+  }
+
+  function withNumericSuffix(savePath, suffixNumber) {
+    const normalized = normalizeLocalSavePath(savePath);
+    if (!normalized) return null;
+    const parts = normalized.split("/");
+    const leaf = parts.pop() || normalized;
+    const base = leaf.replace(/\.bs$/i, "");
+    const nextLeaf = `${base}-${suffixNumber}.bs`;
+    return [...parts, nextLeaf].filter(Boolean).join("/");
+  }
+
+  function makeTimestampSlug() {
+    const d = new Date();
+    const pad = (n) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(
+      d.getDate()
+    )}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+  }
+
+  async function isLocalBackendReady() {
+    try {
+      await initialBackendCheck;
+    } catch (_) {}
+    return typeof localBackend?.isAvailable === "function"
+      ? localBackend.isAvailable()
+      : false;
+  }
+
+  async function getExistingLocalBsPaths() {
+    try {
+      const resp = await fetch("/api/files", { cache: "no-store" });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const payload = await resp.json();
+      return new Set((payload.files || []).map((f) => f.path).filter(Boolean));
+    } catch (err) {
+      console.warn("[Blockscape] failed to list existing local files", err);
+      return new Set();
+    }
+  }
+
+  function pickUniqueLocalPath(desiredPath, takenPaths) {
+    const normalized = normalizeLocalSavePath(desiredPath);
+    if (!normalized) return null;
+    if (!takenPaths?.has(normalized)) return normalized;
+    const parts = normalized.split("/");
+    const leaf = parts.pop() || normalized;
+    const base = leaf.replace(/\.bs$/i, "");
+    for (let i = 2; i < 1000; i++) {
+      const candidateLeaf = `${base}-${i}.bs`;
+      const candidate = [...parts, candidateLeaf].filter(Boolean).join("/");
+      if (!takenPaths.has(candidate)) return candidate;
+    }
+    return null;
+  }
+
+  function suggestNewSavePathForEntry(entry, fallbackBase = "clipboard") {
+    const baseLabel =
+      getModelTitle(entry) ||
+      entry?.title ||
+      entry?.apicurioArtifactName ||
+      fallbackBase ||
+      "blockscape";
+    const slug = makeDownloadName(baseLabel);
+    const stamp = makeTimestampSlug();
+    return `${slug || "blockscape"}-${stamp}.bs`;
+  }
+
+  function applySeriesTitleFromFilename(entry, savePath) {
+    if (
+      !entry?.isSeries ||
+      !Array.isArray(entry?.apicurioVersions) ||
+      entry.apicurioVersions.length <= 1
+    )
+      return false;
+    const stem = getBsStem(savePath);
+    if (!stem) return false;
+    entry.title = stem;
+    entry.apicurioArtifactName = stem;
+    const forcedSlug = makeSeriesId(stem || "unknown");
+    applySeriesSlug(entry, forcedSlug);
+    ensureSeriesId(entry, { seriesName: stem, fallbackTitle: stem });
+    return true;
+  }
+
   function clampHoverScale(value) {
     if (!Number.isFinite(value)) return DEFAULT_TILE_HOVER_SCALE;
     return Math.min(
@@ -863,6 +1078,7 @@ export function initBlockscape() {
     if (!app) return;
     const hasSelection = !!selection || !!selectedCategoryId;
     app.classList.toggle("blockscape-has-selection", hasSelection);
+    app.classList.toggle("blockscape-has-item-selection", !!selection);
   }
 
   function applyTileHoverScale(scale) {
@@ -872,6 +1088,23 @@ export function initBlockscape() {
       tileHoverScale
     );
     return tileHoverScale;
+  }
+
+  function clampSelectionDimOpacity(value) {
+    if (!Number.isFinite(value)) return DEFAULT_SELECTION_DIM_OPACITY;
+    return Math.min(
+      MAX_SELECTION_DIM_OPACITY,
+      Math.max(MIN_SELECTION_DIM_OPACITY, value)
+    );
+  }
+
+  function applySelectionDimOpacity(value) {
+    selectionDimOpacity = clampSelectionDimOpacity(value);
+    document.documentElement.style.setProperty(
+      "--blockscape-selection-dim-opacity",
+      selectionDimOpacity
+    );
+    return selectionDimOpacity;
   }
 
   function clampTileCompactness(value) {
@@ -963,6 +1196,35 @@ export function initBlockscape() {
     } catch (error) {
       console.warn("[Blockscape] failed to read hover scale", error);
       return applyTileHoverScale(DEFAULT_TILE_HOVER_SCALE);
+    }
+  }
+
+  function persistSelectionDimOpacity(value) {
+    if (typeof window === "undefined" || !window.localStorage) return;
+    try {
+      window.localStorage.setItem(
+        SELECTION_DIM_OPACITY_STORAGE_KEY,
+        String(value)
+      );
+    } catch (error) {
+      console.warn("[Blockscape] failed to persist selection dimming", error);
+    }
+  }
+
+  function initializeSelectionDimOpacity() {
+    if (typeof window === "undefined" || !window.localStorage) {
+      return applySelectionDimOpacity(DEFAULT_SELECTION_DIM_OPACITY);
+    }
+    try {
+      const raw = window.localStorage.getItem(
+        SELECTION_DIM_OPACITY_STORAGE_KEY
+      );
+      if (!raw) return applySelectionDimOpacity(DEFAULT_SELECTION_DIM_OPACITY);
+      const parsed = parseFloat(raw);
+      return applySelectionDimOpacity(parsed);
+    } catch (error) {
+      console.warn("[Blockscape] failed to read selection dimming", error);
+      return applySelectionDimOpacity(DEFAULT_SELECTION_DIM_OPACITY);
     }
   }
 
@@ -3831,6 +4093,50 @@ export function initBlockscape() {
     hoverScaleRow.append(hoverScaleText, hoverScaleValue, hoverScaleInput);
     settingsPanel.appendChild(hoverScaleRow);
 
+    const formatSelectionDimming = (opacity) => {
+      const dimPercent = Math.round((1 - opacity) * 100);
+      return dimPercent === 0 ? "Off" : `${dimPercent}% dim`;
+    };
+    const dimRow = document.createElement("label");
+    dimRow.className = "settings-slider";
+    dimRow.setAttribute("for", "selectionDimmingSlider");
+
+    const dimText = document.createElement("div");
+    dimText.className = "settings-slider__text";
+    const dimLabel = document.createElement("span");
+    dimLabel.className = "settings-slider__label";
+    dimLabel.textContent = "Dim unrelated tiles";
+    const dimHint = document.createElement("span");
+    dimHint.className = "settings-slider__hint";
+    dimHint.textContent =
+      "When selecting a tile, fade everything except linked tiles.";
+    dimText.append(dimLabel, dimHint);
+
+    const dimValue = document.createElement("span");
+    dimValue.className = "settings-slider__value";
+    dimValue.textContent = formatSelectionDimming(selectionDimOpacity);
+
+    const dimInput = document.createElement("input");
+    dimInput.type = "range";
+    dimInput.id = "selectionDimmingSlider";
+    dimInput.className = "settings-slider__input";
+    dimInput.min = String(MIN_SELECTION_DIM_OPACITY);
+    dimInput.max = String(MAX_SELECTION_DIM_OPACITY);
+    dimInput.step = "0.05";
+    dimInput.value = String(selectionDimOpacity);
+    dimInput.setAttribute(
+      "aria-label",
+      "Adjust how much unrelated tiles dim on selection"
+    );
+    dimInput.addEventListener("input", () => {
+      const applied = applySelectionDimOpacity(parseFloat(dimInput.value));
+      dimValue.textContent = formatSelectionDimming(applied);
+      persistSelectionDimOpacity(applied);
+    });
+
+    dimRow.append(dimText, dimValue, dimInput);
+    settingsPanel.appendChild(dimRow);
+
     const formatCompactness = (value) =>
       value === 1 ? "Default" : `${Math.round(value * 100)}%`;
     const compactRow = document.createElement("label");
@@ -6002,10 +6308,11 @@ export function initBlockscape() {
   }
 
   // Append models from textarea
-  document.getElementById("appendFromBox").onclick = () => {
+  document.getElementById("appendFromBox").onclick = async () => {
     try {
+      const autoSave = await isLocalBackendReady();
       const appended = normalizeToModelsFromText(jsonBox.value, "Pasted", {
-        promptForSeriesName: true,
+        promptForSeriesName: !autoSave,
       });
       if (!appended.length) {
         alert("No valid JSON found to append.");
@@ -6013,15 +6320,22 @@ export function initBlockscape() {
       }
       console.log("[Blockscape] appending", appended.length, "model(s)");
       let firstIndex = null;
+      const addedIndices = [];
       appended.forEach((entry, idx) => {
         const idxResult = addModelEntry(entry, {
           versionLabel: appended.length > 1 ? `paste #${idx + 1}` : "paste",
         });
         if (firstIndex == null) firstIndex = idxResult;
+        addedIndices.push(idxResult);
       });
       if (activeIndex === -1 && firstIndex != null) setActive(firstIndex);
       else {
         renderModelList();
+      }
+      if (autoSave) {
+        await autoSaveNewLocalFilesForModels(addedIndices, {
+          origin: "append",
+        });
       }
     } catch (e) {
       console.error("[Blockscape] append error:", e);
@@ -6134,7 +6448,7 @@ export function initBlockscape() {
   // Paste JSON anywhere to append new models
   document.addEventListener("paste", handleClipboardPaste);
 
-  function handleClipboardPaste(event) {
+  async function handleClipboardPaste(event) {
     if (!shouldHandleGlobalPaste()) return;
     const text =
       event.clipboardData?.getData("text/plain") ||
@@ -6143,8 +6457,9 @@ export function initBlockscape() {
     if (!looksLikeModelJson(text)) return;
     let entries = [];
     try {
+      const autoSave = await isLocalBackendReady();
       entries = normalizeToModelsFromText(text, "Clipboard", {
-        promptForSeriesName: true,
+        promptForSeriesName: !autoSave,
       });
     } catch (err) {
       console.warn("[Blockscape] clipboard paste ignored (invalid JSON)", err);
@@ -6153,16 +6468,94 @@ export function initBlockscape() {
     if (!entries.length) return;
     event.preventDefault();
     let firstIndex = null;
+    const addedIndices = [];
     entries.forEach((entry, idx) => {
       const idxResult = addModelEntry(entry, {
         versionLabel: entries.length > 1 ? `paste #${idx + 1}` : "paste",
       });
       if (firstIndex == null) firstIndex = idxResult;
+      addedIndices.push(idxResult);
     });
     console.log(
       `[Blockscape] pasted ${entries.length} model(s) from clipboard`
     );
     if (firstIndex != null) setActive(firstIndex);
+    if (await isLocalBackendReady()) {
+      await autoSaveNewLocalFilesForModels(addedIndices, {
+        origin: "clipboard",
+      });
+    }
+  }
+
+  async function autoSaveNewLocalFilesForModels(
+    indices,
+    { origin = "clipboard" } = {}
+  ) {
+    if (!(await isLocalBackendReady())) return;
+    if (typeof localBackend?.saveModelByIndex !== "function") return;
+    const allIndices = Array.isArray(indices) ? indices : [];
+    const eligible = allIndices.filter((idx) => {
+      const entry = models[idx];
+      return entry && !entry.sourcePath;
+    });
+    if (!eligible.length) return;
+
+    const modelsLabel = eligible.length === 1 ? "model" : "models";
+    const firstEntry = models[eligible[0]];
+    const defaultPath = suggestNewSavePathForEntry(
+      firstEntry,
+      origin === "append" ? "pasted" : "clipboard"
+    );
+    if (typeof window === "undefined" || typeof window.prompt !== "function")
+      return;
+    const response = window.prompt(
+      `Save pasted ${modelsLabel} as a new .bs file (under ~/blockscape):`,
+      defaultPath
+    );
+    if (response == null) return;
+    const basePath = normalizeLocalSavePath(response);
+    if (!basePath) {
+      alert("Enter a relative filename (no ..) to save under ~/blockscape.");
+      return;
+    }
+
+    const existing = await getExistingLocalBsPaths();
+    const targets = [];
+    for (let i = 0; i < eligible.length; i++) {
+      const desired =
+        eligible.length === 1
+          ? basePath
+          : withNumericSuffix(basePath, i + 1);
+      const unique = pickUniqueLocalPath(desired, existing);
+      if (!unique) {
+        alert("Could not find a unique filename to save.");
+        return;
+      }
+      existing.add(unique);
+      targets.push(unique);
+    }
+
+    for (let i = 0; i < eligible.length; i++) {
+      const idx = eligible[i];
+      const targetPath = targets[i];
+      const entry = models[idx];
+      if (!entry) continue;
+      if (eligible.length === 1) {
+        applySeriesTitleFromFilename(entry, targetPath);
+      }
+      const saved = await localBackend.saveModelByIndex(idx, targetPath, {
+        refreshAfter: false,
+        statusPrefix: "Auto-saved to",
+      });
+      if (!saved?.ok) {
+        alert(`Local auto-save failed: ${saved?.error || "unknown error"}`);
+        return;
+      }
+    }
+
+    await localBackend.refresh();
+    renderModelList();
+    showNotice(`Saved ${eligible.length} ${modelsLabel}.`, 2500);
   }
 
   // Switch active model from sidebar
