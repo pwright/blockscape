@@ -2056,6 +2056,7 @@ function initBlockscape() {
   const pasteJsonButton = document.getElementById("pasteJson");
   const helpButton = document.getElementById("helpButton");
   const newPanelButton = document.getElementById("newPanelButton");
+  const newBlankButton = document.getElementById("newBlankButton");
   const shortcutHelp = document.getElementById("shortcutHelp");
   const shortcutHelpList = document.getElementById("shortcutHelpList");
   const shortcutHelpClose = document.getElementById("shortcutHelpClose");
@@ -2072,6 +2073,7 @@ function initBlockscape() {
   const refreshLocalFilesButton = document.getElementById("refreshLocalFiles");
   const loadLocalFileButton = document.getElementById("loadLocalFile");
   const saveLocalFileButton = document.getElementById("saveLocalFile");
+  const saveLocalFileAsButton = document.getElementById("saveLocalFileAs");
   const localSavePathInput = document.getElementById("localSavePath");
   const EDITOR_TRANSFER_KEY = "blockscape:editorPayload";
   const EDITOR_TRANSFER_MESSAGE_TYPE = "blockscape:editorTransfer";
@@ -2132,6 +2134,7 @@ function initBlockscape() {
   const MIN_TILE_HOVER_SCALE = 1;
   const MAX_TILE_HOVER_SCALE = 2.5;
   const SELECTION_DIM_OPACITY_STORAGE_KEY = "blockscape:selectionDimOpacity";
+  const SELECTION_DIM_ENABLED_STORAGE_KEY = "blockscape:selectionDimEnabled";
   const DEFAULT_SELECTION_DIM_OPACITY = 0.2;
   const MIN_SELECTION_DIM_OPACITY = 0.05;
   const MAX_SELECTION_DIM_OPACITY = 1;
@@ -2162,6 +2165,7 @@ function initBlockscape() {
   const MAX_AUTO_RELOAD_INTERVAL_MS = 1e4;
   let tileHoverScale = DEFAULT_TILE_HOVER_SCALE;
   let selectionDimOpacity = DEFAULT_SELECTION_DIM_OPACITY;
+  let selectionDimEnabled = true;
   let tileCompactness = DEFAULT_TILE_COMPACTNESS;
   let titleWrapMode = DEFAULT_TITLE_WRAP_MODE;
   let titleHoverWidthMultiplier = DEFAULT_TITLE_HOVER_WIDTH_MULTIPLIER;
@@ -2187,6 +2191,7 @@ function initBlockscape() {
   initializeObsidianLinksEnabled();
   initializeObsidianLinkMode();
   initializeObsidianVaultName();
+  initializeSelectionDimEnabled();
   syncSelectionClass();
   function uid() {
     return Math.random().toString(36).slice(2, 10);
@@ -2229,9 +2234,51 @@ function initBlockscape() {
     if (typeof window === "undefined" || !window.location) return false;
     const url = new URL(window.location.href);
     const normalizedPath = url.pathname.replace(/\/+$/, "");
-    const lastSegment = normalizedPath.split("/").filter(Boolean).pop() || "";
+    const segments = normalizedPath.split("/").filter(Boolean);
     const searchFlag = url.searchParams.get("server");
-    return lastSegment.toLowerCase() === "server" || searchFlag && ["1", "true", "yes", "on"].includes(searchFlag.toLowerCase());
+    const hasServerPrefix = segments[0] && segments[0].toLowerCase() === "server";
+    return hasServerPrefix || searchFlag && ["1", "true", "yes", "on"].includes(searchFlag.toLowerCase());
+  }
+  function updateUrlForServerPath(relPath) {
+    if (typeof window === "undefined" || !window.location || !relPath) return;
+    const normalized = normalizeLocalSavePath(relPath);
+    if (!normalized) return;
+    try {
+      const url = new URL(window.location.href);
+      const cleanedSearch = new URLSearchParams(url.search);
+      cleanedSearch.delete("load");
+      cleanedSearch.delete("share");
+      const newPath = `/server/${normalized}`.replace(/\/+/g, "/");
+      url.pathname = newPath;
+      url.search = cleanedSearch.toString() ? `?${cleanedSearch.toString()}` : "";
+      url.hash = "";
+      window.history.replaceState({}, document.title, url.toString());
+    } catch (err) {
+      console.warn("[Blockscape] failed to update URL for server path", err);
+    }
+  }
+  function extractServerFilePathFromUrl() {
+    if (typeof window === "undefined" || !window.location) return null;
+    const url = new URL(window.location.href);
+    const normalizedPath = url.pathname.replace(/\/+$/, "");
+    const segments = normalizedPath.split("/").filter(Boolean);
+    const serverIndex = segments.findIndex(
+      (segment) => segment.toLowerCase() === "server"
+    );
+    if (serverIndex === -1) return null;
+    const remainder = segments.slice(serverIndex + 1);
+    if (!remainder.length) return null;
+    const lastSegment = remainder[remainder.length - 1] || "";
+    if (!lastSegment.toLowerCase().endsWith(".bs")) return null;
+    const decoded = remainder.map((part) => {
+      try {
+        return decodeURIComponent(part);
+      } catch {
+        return part;
+      }
+    });
+    const joined = decoded.join("/");
+    return normalizeLocalSavePath(joined);
   }
   function isGithubPagesHost() {
     if (typeof window === "undefined" || !window.location) return false;
@@ -2371,6 +2418,11 @@ function initBlockscape() {
     }
     function normalizeSavePath(raw) {
       return normalizeLocalSavePath(raw);
+    }
+    function resolvePayloadForSave(entry) {
+      const seriesPayload = buildSeriesPayload(entry);
+      if (seriesPayload) return { payload: seriesPayload, isSeries: true };
+      return { payload: entry == null ? void 0 : entry.data, isSeries: false };
     }
     function defaultSaveName() {
       var _a;
@@ -2686,30 +2738,10 @@ function initBlockscape() {
       for (const relPath of selectedPaths) {
         try {
           setStatus(`Loading ${relPath}…`);
-          const resp = await fetch(
-            `/api/file?path=${encodeURIComponent(relPath)}`,
-            { cache: "no-store" }
-          );
-          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-          const payload = await resp.json();
-          const text2 = JSON.stringify(payload.data ?? payload, null, 2);
-          const entries = normalizeToModelsFromText(text2, relPath, {
-            seriesTitleOverride: `${relPath} series`
-          });
-          if (!entries.length) throw new Error("No models found in file");
-          entries.forEach((entry, idx) => {
-            entry.sourcePath = relPath;
-            if (entry.isSeries && !entry.title) {
-              const leaf = relPath.split("/").filter(Boolean).pop() || relPath;
-              const stem = leaf.replace(/\.bs$/i, "");
-              entry.title = stem;
-            }
-            const idxResult = addModelEntry(entry, {
-              versionLabel: entries.length > 1 ? `${relPath} #${idx + 1}` : relPath
-            });
-            if (firstIndex == null) firstIndex = idxResult;
-          });
+          const result = await importLocalBackendFile(relPath);
+          if (firstIndex == null) firstIndex = (result == null ? void 0 : result.firstIndex) ?? null;
           lastKnownPath = relPath;
+          updateUrlForServerPath(relPath);
         } catch (err) {
           console.error("[Blockscape] failed to load from local server", err);
           alert(`Local load failed for ${relPath}: ${err.message}`);
@@ -2719,23 +2751,29 @@ function initBlockscape() {
       setStatus(`Loaded ${selectedPaths.length} file(s)`);
       renderFiles();
     }
-    async function saveActiveToFile() {
-      var _a;
+    async function saveActiveToPath(desiredPath, { statusPrefix = "Saved to", updateInput = true } = {}) {
       if (!available) return;
       if (activeIndex < 0) {
         alert("No active model to save.");
         return;
       }
-      const desiredPath = normalizeSavePath(localSavePathInput == null ? void 0 : localSavePathInput.value) || normalizeSavePath((_a = models[activeIndex]) == null ? void 0 : _a.sourcePath) || defaultSaveName();
-      if (!desiredPath) {
+      const target2 = models[activeIndex];
+      const { payload: savePayload, isSeries } = resolvePayloadForSave(target2);
+      if (!savePayload) {
+        alert("No model data to save.");
+        return;
+      }
+      const normalized = normalizeSavePath(desiredPath);
+      if (!normalized) {
         alert("Enter a relative path (no ..) to save under ~/blockscape.");
         return;
       }
       try {
-        const body = JSON.stringify(models[activeIndex].data, null, 2);
-        setStatus(`Saving to ${desiredPath}…`);
+        const body = JSON.stringify(savePayload, null, 2);
+        const savingLabel = isSeries ? "series" : "map";
+        setStatus(`Saving ${savingLabel} to ${normalized}…`);
         const resp = await fetch(
-          `/api/file?path=${encodeURIComponent(desiredPath)}`,
+          `/api/file?path=${encodeURIComponent(normalized)}`,
           {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
@@ -2744,9 +2782,13 @@ function initBlockscape() {
         );
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const payload = await resp.json();
-        lastKnownPath = payload.path || desiredPath;
-        models[activeIndex].sourcePath = payload.path || desiredPath;
-        setStatus(`Saved to ${payload.path || desiredPath}`);
+        lastKnownPath = payload.path || normalized;
+        target2.sourcePath = payload.path || normalized;
+        if (updateInput && localSavePathInput) {
+          localSavePathInput.value = payload.path || normalized;
+        }
+        updateUrlForServerPath(payload.path || normalized);
+        setStatus(`${statusPrefix} ${payload.path || normalized}`);
         await refresh();
       } catch (err) {
         console.error("[Blockscape] local save failed", err);
@@ -2754,13 +2796,45 @@ function initBlockscape() {
         hidePanel("Local server unavailable");
       }
     }
+    async function saveActiveToFile() {
+      var _a;
+      const desiredPath = normalizeSavePath(localSavePathInput == null ? void 0 : localSavePathInput.value) || normalizeSavePath((_a = models[activeIndex]) == null ? void 0 : _a.sourcePath) || defaultSaveName();
+      if (!desiredPath) {
+        alert("Enter a relative path (no ..) to save under ~/blockscape.");
+        return;
+      }
+      await saveActiveToPath(desiredPath, { statusPrefix: "Saved to" });
+    }
+    async function saveActiveAs() {
+      var _a;
+      if (!available) return;
+      if (activeIndex < 0) {
+        alert("No active model to save.");
+        return;
+      }
+      if (typeof window === "undefined" || typeof window.prompt !== "function")
+        return;
+      const defaultPath = normalizeSavePath((_a = models[activeIndex]) == null ? void 0 : _a.sourcePath) || defaultSaveName();
+      const response = window.prompt(
+        "Save active map as (under ~/blockscape):",
+        defaultPath
+      );
+      if (response == null) return;
+      const normalized = normalizeSavePath(response);
+      if (!normalized) {
+        alert("Enter a relative path (no ..) to save under ~/blockscape.");
+        return;
+      }
+      await saveActiveToPath(normalized, { statusPrefix: "Saved to" });
+    }
     async function saveModelByIndex(entryIndex, desiredPath, { refreshAfter = true, statusPrefix = "Saved to" } = {}) {
       if (!available) return { ok: false, error: "Local server unavailable" };
       if (!Number.isInteger(entryIndex) || entryIndex < 0) {
         return { ok: false, error: "Invalid model index" };
       }
       const target2 = models[entryIndex];
-      if (!(target2 == null ? void 0 : target2.data)) return { ok: false, error: "Model has no data" };
+      const { payload: savePayload, isSeries } = resolvePayloadForSave(target2);
+      if (!savePayload) return { ok: false, error: "Model has no data" };
       const normalized = normalizeSavePath(desiredPath) || normalizeSavePath(target2 == null ? void 0 : target2.sourcePath) || defaultSaveName();
       if (!normalized) {
         return {
@@ -2769,8 +2843,9 @@ function initBlockscape() {
         };
       }
       try {
-        const body = JSON.stringify(target2.data, null, 2);
-        setStatus(`Saving to ${normalized}…`);
+        const body = JSON.stringify(savePayload, null, 2);
+        const savingLabel = isSeries ? "series" : "map";
+        setStatus(`Saving ${savingLabel} to ${normalized}…`);
         const resp = await fetch(
           `/api/file?path=${encodeURIComponent(normalized)}`,
           {
@@ -2786,7 +2861,9 @@ function initBlockscape() {
         if (entryIndex === activeIndex) {
           updateActiveSavePlaceholder();
         }
-        setStatus(`${statusPrefix} ${payload.path || normalized}`);
+        setStatus(
+          `${statusPrefix} ${payload.path || normalized}`
+        );
         if (refreshAfter) await refresh();
         return { ok: true, path: payload.path || normalized };
       } catch (err) {
@@ -2803,6 +2880,9 @@ function initBlockscape() {
     }
     if (saveLocalFileButton) {
       saveLocalFileButton.onclick = () => saveActiveToFile();
+    }
+    if (saveLocalFileAsButton) {
+      saveLocalFileAsButton.onclick = () => saveActiveAs();
     }
     if (localFileList && localSavePathInput) {
       localFileList.addEventListener("change", () => {
@@ -2864,6 +2944,33 @@ function initBlockscape() {
       setAutoReloadEnabled,
       setAutoReloadInterval
     };
+  }
+  async function importLocalBackendFile(relPath, { labelBase = relPath, seriesTitleOverride } = {}) {
+    if (!relPath) throw new Error("Missing path");
+    const resp = await fetch(`/api/file?path=${encodeURIComponent(relPath)}`, {
+      cache: "no-store"
+    });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const payload = await resp.json();
+    const text2 = JSON.stringify(payload.data ?? payload, null, 2);
+    const entries = normalizeToModelsFromText(text2, relPath, {
+      seriesTitleOverride: seriesTitleOverride || `${relPath} series`
+    });
+    if (!entries.length) throw new Error("No models found in file");
+    let firstIndex = null;
+    entries.forEach((entry, idx) => {
+      entry.sourcePath = relPath;
+      if (entry.isSeries && !entry.title) {
+        const leaf = relPath.split("/").filter(Boolean).pop() || relPath;
+        const stem = leaf.replace(/\.bs$/i, "");
+        entry.title = stem;
+      }
+      const idxResult = addModelEntry(entry, {
+        versionLabel: entries.length > 1 ? `${labelBase} #${idx + 1}` : labelBase
+      });
+      if (firstIndex == null) firstIndex = idxResult;
+    });
+    return { firstIndex, total: entries.length };
   }
   async function writeTextToClipboard(text2) {
     var _a;
@@ -2995,6 +3102,11 @@ function initBlockscape() {
       "--blockscape-selection-dim-opacity",
       selectionDimOpacity
     );
+    const appliedOpacity = selectionDimEnabled ? selectionDimOpacity : 1;
+    document.documentElement.style.setProperty(
+      "--blockscape-selection-dim-applied-opacity",
+      appliedOpacity
+    );
     return selectionDimOpacity;
   }
   function clampTileCompactness(value) {
@@ -3105,6 +3217,46 @@ function initBlockscape() {
     } catch (error) {
       console.warn("[Blockscape] failed to read selection dimming", error);
       return applySelectionDimOpacity(DEFAULT_SELECTION_DIM_OPACITY);
+    }
+  }
+  function applySelectionDimEnabled(enabled) {
+    selectionDimEnabled = !!enabled;
+    const appliedOpacity = selectionDimEnabled ? selectionDimOpacity : 1;
+    document.documentElement.style.setProperty(
+      "--blockscape-selection-dim-applied-opacity",
+      appliedOpacity
+    );
+    if (app)
+      app.classList.toggle("blockscape-dimming-disabled", !selectionDimEnabled);
+    return selectionDimEnabled;
+  }
+  function persistSelectionDimEnabled(enabled) {
+    if (typeof window === "undefined" || !window.localStorage) return;
+    try {
+      window.localStorage.setItem(
+        SELECTION_DIM_ENABLED_STORAGE_KEY,
+        enabled ? "1" : "0"
+      );
+    } catch (error) {
+      console.warn(
+        "[Blockscape] failed to persist selection dim toggle",
+        error
+      );
+    }
+  }
+  function initializeSelectionDimEnabled() {
+    if (typeof window === "undefined" || !window.localStorage) {
+      return applySelectionDimEnabled(true);
+    }
+    try {
+      const raw = window.localStorage.getItem(
+        SELECTION_DIM_ENABLED_STORAGE_KEY
+      );
+      if (raw == null) return applySelectionDimEnabled(true);
+      return applySelectionDimEnabled(raw === "1");
+    } catch (error) {
+      console.warn("[Blockscape] failed to read selection dim toggle", error);
+      return applySelectionDimEnabled(true);
     }
   }
   function persistTileCompactness(value) {
@@ -3915,6 +4067,62 @@ function initBlockscape() {
     ensureSeriesId(entry, { seriesName, fallbackTitle: seriesName });
     entry.isSeries = true;
     return entry;
+  }
+  function buildBlankMapPayload({
+    seriesId = null,
+    mapTitle = "Blank map"
+  } = {}) {
+    const baseId = makeDownloadName(
+      `${seriesId || "blank"}-${makeTimestampSlug()}`
+    );
+    const payload = {
+      id: baseId,
+      title: mapTitle,
+      categories: [],
+      links: [],
+      abstract: ""
+    };
+    if (seriesId) payload.seriesId = seriesId;
+    ensureModelMetadata(payload, { titleHint: mapTitle, idHint: baseId });
+    return payload;
+  }
+  function createBlankSeriesEntry() {
+    const timestamp = makeTimestampSlug();
+    const seriesTitle = `Blank series ${timestamp}`;
+    const seriesId = makeSeriesId(seriesTitle, "blank-series");
+    const blankMap = buildBlankMapPayload({
+      seriesId,
+      mapTitle: "Blank map"
+    });
+    const entry = {
+      id: seriesId,
+      title: seriesTitle,
+      apicurioArtifactName: seriesTitle,
+      data: blankMap,
+      apicurioVersions: [
+        {
+          version: "1",
+          data: blankMap,
+          createdOn: (/* @__PURE__ */ new Date()).toISOString()
+        }
+      ],
+      apicurioActiveVersionIndex: 0,
+      isSeries: true
+    };
+    applySeriesSlug(entry, seriesId);
+    ensureSeriesId(entry, {
+      seriesName: seriesTitle,
+      fallbackTitle: seriesTitle
+    });
+    return entry;
+  }
+  function createAndActivateBlankSeries() {
+    const entry = createBlankSeriesEntry();
+    const idx = addModelEntry(entry, { versionLabel: "blank" });
+    setActive(idx);
+    closeNewPanel();
+    showNotice("Blank series created. Add categories and tiles to start.", 2600);
+    return idx;
   }
   function addModelEntry(entry, { versionLabel, createdOn } = {}) {
     var _a, _b, _c;
@@ -4739,6 +4947,30 @@ function initBlockscape() {
       if (firstIndex == null) firstIndex = idx;
     });
     return firstIndex;
+  }
+  async function consumeServerPathLoad() {
+    const relPath = extractServerFilePathFromUrl();
+    if (!relPath) return null;
+    try {
+      const backendReady = await isLocalBackendReady();
+      if (!backendReady) {
+        console.log(
+          "[Blockscape] local backend not ready; skipping server-path autoload"
+        );
+        return null;
+      }
+      const result = await importLocalBackendFile(relPath);
+      if (typeof (result == null ? void 0 : result.firstIndex) === "number") {
+        if (typeof (localBackend == null ? void 0 : localBackend.highlightSource) === "function") {
+          localBackend.highlightSource(relPath);
+        }
+        return result.firstIndex;
+      }
+      return null;
+    } catch (err) {
+      console.warn("[Blockscape] server-path autoload failed", err);
+      return null;
+    }
   }
   async function consumeLoadParam() {
     const hash = window.location.hash || "";
@@ -5596,10 +5828,30 @@ ${text2}` : text2;
     });
     hoverScaleRow.append(hoverScaleText, hoverScaleValue, hoverScaleInput);
     settingsPanel.appendChild(hoverScaleRow);
+    let dimInput = null;
+    let dimValue = null;
     const formatSelectionDimming = (opacity) => {
       const dimPercent = Math.round((1 - opacity) * 100);
       return dimPercent === 0 ? "Off" : `${dimPercent}% dim`;
     };
+    const { row: dimToggleRow } = createSettingsToggle({
+      id: "toggleSelectionDimming",
+      label: "Dim unrelated tiles",
+      hint: "When selecting a tile, fade everything except linked tiles.",
+      checked: selectionDimEnabled,
+      className: "map-controls__toggle",
+      onChange: (checked) => {
+        const applied = applySelectionDimEnabled(checked);
+        persistSelectionDimEnabled(applied);
+        if (dimInput) dimInput.disabled = !applied;
+        if (dimValue) {
+          dimValue.textContent = formatSelectionDimming(
+            applied ? selectionDimOpacity : 1
+          );
+        }
+      }
+    });
+    settingsPanel.appendChild(dimToggleRow);
     const dimRow = document.createElement("label");
     dimRow.className = "settings-slider";
     dimRow.setAttribute("for", "selectionDimmingSlider");
@@ -5607,15 +5859,17 @@ ${text2}` : text2;
     dimText.className = "settings-slider__text";
     const dimLabel = document.createElement("span");
     dimLabel.className = "settings-slider__label";
-    dimLabel.textContent = "Dim unrelated tiles";
+    dimLabel.textContent = "Dimming strength";
     const dimHint = document.createElement("span");
     dimHint.className = "settings-slider__hint";
-    dimHint.textContent = "When selecting a tile, fade everything except linked tiles.";
+    dimHint.textContent = "Adjust how much unrelated tiles fade when dimming is on.";
     dimText.append(dimLabel, dimHint);
-    const dimValue = document.createElement("span");
+    dimValue = document.createElement("span");
     dimValue.className = "settings-slider__value";
-    dimValue.textContent = formatSelectionDimming(selectionDimOpacity);
-    const dimInput = document.createElement("input");
+    dimValue.textContent = formatSelectionDimming(
+      selectionDimEnabled ? selectionDimOpacity : 1
+    );
+    dimInput = document.createElement("input");
     dimInput.type = "range";
     dimInput.id = "selectionDimmingSlider";
     dimInput.className = "settings-slider__input";
@@ -5623,6 +5877,7 @@ ${text2}` : text2;
     dimInput.max = String(MAX_SELECTION_DIM_OPACITY);
     dimInput.step = "0.05";
     dimInput.value = String(selectionDimOpacity);
+    dimInput.disabled = !selectionDimEnabled;
     dimInput.setAttribute(
       "aria-label",
       "Adjust how much unrelated tiles dim on selection"
@@ -6626,6 +6881,17 @@ ${text2}` : text2;
   if (newPanelButton) {
     newPanelButton.addEventListener("click", () => {
       openNewPanel();
+    });
+  }
+  if (newBlankButton) {
+    newBlankButton.addEventListener("click", () => {
+      try {
+        scrollPageToTop();
+        createAndActivateBlankSeries();
+      } catch (error) {
+        console.error("[Blockscape] failed to create blank series", error);
+        alert((error == null ? void 0 : error.message) || "Unable to create a blank map right now.");
+      }
     });
   }
   if (shortcutHelpClose) {
@@ -7728,6 +7994,7 @@ ${text2}` : text2;
       existing.add(unique);
       targets.push(unique);
     }
+    let firstSavedPath = null;
     for (let i = 0; i < eligible.length; i++) {
       const idx = eligible[i];
       const targetPath = targets[i];
@@ -7744,6 +8011,10 @@ ${text2}` : text2;
         alert(`Local auto-save failed: ${(saved == null ? void 0 : saved.error) || "unknown error"}`);
         return;
       }
+      if (firstSavedPath == null) firstSavedPath = targetPath;
+    }
+    if (firstSavedPath) {
+      updateUrlForServerPath(firstSavedPath);
     }
     await localBackend.refresh();
     renderModelList();
@@ -8112,11 +8383,12 @@ ${text2}` : text2;
     if (!hasLocalBackend) {
       await loadJsonFiles();
     }
+    const serverPathIndex = await consumeServerPathLoad();
     const loadIndex = await consumeLoadParam();
     const editorResult = consumeEditorPayload();
     const editorIndex = editorResult == null ? void 0 : editorResult.index;
     const shareIndex = consumeShareLink();
-    const initialIndex = typeof loadIndex === "number" ? loadIndex : typeof shareIndex === "number" ? shareIndex : typeof editorIndex === "number" ? editorIndex : firstSeedIndex ?? 0;
+    const initialIndex = typeof serverPathIndex === "number" ? serverPathIndex : typeof loadIndex === "number" ? loadIndex : typeof shareIndex === "number" ? shareIndex : typeof editorIndex === "number" ? editorIndex : firstSeedIndex ?? 0;
     setActive(initialIndex);
   })();
 }
@@ -8299,10 +8571,12 @@ function create_fragment$1(ctx) {
   let div12;
   let button1;
   let t31;
-  let div11;
-  let t32;
+  let button2;
   let t33;
+  let div11;
   let t34;
+  let t35;
+  let t36;
   let binding_group;
   let mounted;
   let dispose;
@@ -8369,14 +8643,17 @@ function create_fragment$1(ctx) {
       button1 = element("button");
       button1.textContent = "Copy prompt";
       t31 = space();
+      button2 = element("button");
+      button2.textContent = "New blank";
+      t33 = space();
       div11 = element("div");
-      t32 = text(
+      t34 = text(
         /*status*/
         ctx[3]
       );
-      t33 = space();
+      t35 = space();
       if (if_block0) if_block0.c();
-      t34 = space();
+      t36 = space();
       if (if_block1) if_block1.c();
       attr(div0, "id", "newPanelBackdrop");
       attr(div0, "class", "shortcut-help__backdrop");
@@ -8408,6 +8685,10 @@ function create_fragment$1(ctx) {
       attr(fieldset, "class", "new-panel__field");
       attr(button1, "class", "pf-v5-c-button pf-m-primary");
       attr(button1, "type", "submit");
+      attr(button2, "id", "newBlankButton");
+      attr(button2, "class", "pf-v5-c-button pf-m-secondary");
+      attr(button2, "type", "button");
+      attr(button2, "title", "Start from an empty map");
       attr(div11, "class", "new-panel__status");
       attr(div11, "aria-live", "polite");
       attr(div12, "class", "new-panel__actions");
@@ -8473,11 +8754,13 @@ function create_fragment$1(ctx) {
       append(form, div12);
       append(div12, button1);
       append(div12, t31);
+      append(div12, button2);
+      append(div12, t33);
       append(div12, div11);
-      append(div11, t32);
-      append(form, t33);
+      append(div11, t34);
+      append(form, t35);
       if (if_block0) if_block0.m(form, null);
-      append(form, t34);
+      append(form, t36);
       if (if_block1) if_block1.m(form, null);
       if (!mounted) {
         dispose = [
@@ -8539,7 +8822,7 @@ function create_fragment$1(ctx) {
       }
       if (dirty & /*status*/
       8) set_data(
-        t32,
+        t34,
         /*status*/
         ctx2[3]
       );
@@ -8552,7 +8835,7 @@ function create_fragment$1(ctx) {
         } else {
           if_block0 = create_if_block_1();
           if_block0.c();
-          if_block0.m(form, t34);
+          if_block0.m(form, t36);
         }
       } else if (if_block0) {
         if_block0.d(1);
@@ -8697,7 +8980,7 @@ const { document: document_1 } = globals;
 function create_fragment(ctx) {
   let link;
   let t0;
-  let div25;
+  let div26;
   let header;
   let div10;
   let div9;
@@ -8732,7 +9015,7 @@ function create_fragment(ctx) {
   let div7;
   let t37;
   let main;
-  let div23;
+  let div24;
   let aside;
   let div11;
   let t39;
@@ -8758,24 +9041,24 @@ function create_fragment(ctx) {
   let t55;
   let div15;
   let t59;
-  let div17;
-  let t64;
-  let div22;
-  let t90;
-  let footer;
+  let div18;
+  let t66;
+  let div23;
   let t92;
+  let footer;
+  let t94;
   let html_tag;
   let raw_value = `<script id="seed" type="application/json">${/*seedText*/
   ctx[1]}<\/script>`;
-  let t93;
-  let svg1;
-  let t94;
-  let div26;
   let t95;
-  let div31;
-  let t102;
+  let svg1;
+  let t96;
+  let div27;
+  let t97;
+  let div32;
+  let t104;
   let shortcuthelp;
-  let t103;
+  let t105;
   let newpanel;
   let current;
   let mounted;
@@ -8786,7 +9069,7 @@ function create_fragment(ctx) {
     c() {
       link = element("link");
       t0 = space();
-      div25 = element("div");
+      div26 = element("div");
       header = element("header");
       div10 = element("div");
       div9 = element("div");
@@ -8829,7 +9112,7 @@ function create_fragment(ctx) {
       div7.innerHTML = `<span class="legend-entry"><span class="legend-dot legend-dot--dep"></span> enables</span> <span class="legend-entry"><span class="legend-dot legend-dot--revdep"></span> dependents</span> <span class="legend-entry"><span class="legend-dot legend-dot--reused"></span> reused</span> <span class="legend-entry"><span class="legend-dot legend-dot--external"></span> external link</span>`;
       t37 = space();
       main = element("main");
-      div23 = element("div");
+      div24 = element("div");
       aside = element("aside");
       div11 = element("div");
       div11.textContent = "Models";
@@ -8863,30 +9146,30 @@ function create_fragment(ctx) {
       div15 = element("div");
       div15.innerHTML = `<button id="refreshLocalFiles" class="pf-v5-c-button pf-m-tertiary" type="button">Refresh</button> <button id="loadLocalFile" class="pf-v5-c-button pf-m-secondary" type="button">Load</button>`;
       t59 = space();
-      div17 = element("div");
-      div17.innerHTML = `<label for="localSavePath">Save active map to ~/blockscape</label> <input id="localSavePath" class="pf-v5-c-form-control" type="text" placeholder="my-map.bs"/> <button id="saveLocalFile" class="pf-v5-c-button pf-m-primary" type="button">Save</button>`;
-      t64 = space();
-      div22 = element("div");
-      div22.innerHTML = `<section class="pf-v5-c-page__main-section blockscape-json-panel" hidden="" aria-label="Model source JSON editor"><p class="blockscape-json-panel__title">Paste / edit JSON for the <b>active</b> model (schema below)</p> <div class="muted">Schema: <code>{ id, title, abstract?, categories:[{id,title,items:[{id,name,logo?,external?:url,color?,deps:[]}}], links?:[{from,to}] }</code><br/>
+      div18 = element("div");
+      div18.innerHTML = `<label for="localSavePath">Save active map to ~/blockscape</label> <input id="localSavePath" class="pf-v5-c-form-control" type="text" placeholder="my-map.bs"/> <div class="local-backend__save-actions"><button id="saveLocalFile" class="pf-v5-c-button pf-m-primary" type="button">Save</button> <button id="saveLocalFileAs" class="pf-v5-c-button pf-m-secondary" type="button">Save as</button></div>`;
+      t66 = space();
+      div23 = element("div");
+      div23.innerHTML = `<section class="pf-v5-c-page__main-section blockscape-json-panel" hidden="" aria-label="Model source JSON editor"><p class="blockscape-json-panel__title">Paste / edit JSON for the <b>active</b> model (schema below)</p> <div class="muted">Schema: <code>{ id, title, abstract?, categories:[{id,title,items:[{id,name,logo?,external?:url,color?,deps:[]}}], links?:[{from,to}] }</code><br/>
             You can paste multiple objects separated by <code>---</code> or <code>%%%</code>, or a JSON array of models, to append several models.
             A single object replaces only when you click “Replace active with JSON”. Tip: with no input focused, press
             Cmd/Ctrl+V anywhere on the page to append clipboard JSON instantly.</div> <div class="blockscape-json-controls"><textarea id="jsonBox" class="pf-v5-c-form-control" aria-label="JSON editor for the active model"></textarea> <div class="blockscape-json-actions"><button id="copyJson" class="pf-v5-c-button pf-m-tertiary" type="button" title="Copy the current JSON to your clipboard">Copy</button> <button id="copySeries" class="pf-v5-c-button pf-m-tertiary" type="button" title="Copy every version in this series as an array">Copy series</button> <button id="pasteJson" class="pf-v5-c-button pf-m-tertiary" type="button" title="Paste clipboard JSON to replace the editor contents">Paste</button> <button id="appendFromBox" class="pf-v5-c-button pf-m-primary" type="button">Append model(s)</button> <button id="replaceActive" class="pf-v5-c-button pf-m-secondary" type="button">Replace active with
                 JSON</button> <button id="createVersion" class="pf-v5-c-button pf-m-secondary" type="button" title="Create a new version from the current map">New version</button></div></div></section> <section class="pf-v5-c-page__main-section blockscape-main-section"><div id="app" aria-live="polite"></div></section>`;
-      t90 = space();
+      t92 = space();
       footer = element("footer");
       footer.innerHTML = `<div class="blockscape-footer__inner"><a href="https://pwright.github.io/backscape/" target="_blank" rel="noreferrer noopener">Old versions</a></div>`;
-      t92 = space();
-      html_tag = new HtmlTag(false);
-      t93 = space();
-      svg1 = svg_element("svg");
       t94 = space();
-      div26 = element("div");
+      html_tag = new HtmlTag(false);
       t95 = space();
-      div31 = element("div");
-      div31.innerHTML = `<div class="item-preview__header"><span class="item-preview__title">Preview</span> <div class="item-preview__actions" hidden=""></div> <button type="button" class="item-preview__close" aria-label="Close preview">×</button></div> <div class="item-preview__body"><div class="item-preview__status">Right-click a tile to see related notes.</div></div>`;
-      t102 = space();
+      svg1 = svg_element("svg");
+      t96 = space();
+      div27 = element("div");
+      t97 = space();
+      div32 = element("div");
+      div32.innerHTML = `<div class="item-preview__header"><span class="item-preview__title">Preview</span> <div class="item-preview__actions" hidden=""></div> <button type="button" class="item-preview__close" aria-label="Close preview">×</button></div> <div class="item-preview__body"><div class="item-preview__status">Right-click a tile to see related notes.</div></div>`;
+      t104 = space();
       create_component(shortcuthelp.$$.fragment);
-      t103 = space();
+      t105 = space();
       create_component(newpanel.$$.fragment);
       document_1.title = "Blockscape — simple landscape-style tiles";
       attr(link, "rel", "icon");
@@ -8966,34 +9249,34 @@ function create_fragment(ctx) {
       attr(select1, "aria-label", "Blockscape files on local server");
       attr(div15, "class", "local-backend__actions");
       attr(div16, "class", "local-backend__list");
-      attr(div17, "class", "local-backend__save");
+      attr(div18, "class", "local-backend__save");
       attr(section0, "id", "localBackendPanel");
       attr(section0, "class", "local-backend");
       section0.hidden = true;
       attr(aside, "class", "blockscape-sidebar");
       attr(aside, "aria-label", "Models");
-      attr(div22, "class", "blockscape-main");
-      attr(div23, "class", "blockscape-content");
+      attr(div23, "class", "blockscape-main");
+      attr(div24, "class", "blockscape-content");
       attr(main, "class", "pf-v5-c-page__main");
       attr(footer, "class", "pf-v5-c-page__footer blockscape-footer");
-      attr(div25, "class", "pf-v5-c-page");
-      html_tag.a = t93;
+      attr(div26, "class", "pf-v5-c-page");
+      html_tag.a = t95;
       attr(svg1, "id", "overlay");
       attr(svg1, "class", "svg-layer");
-      attr(div26, "id", "tabTooltip");
-      attr(div26, "class", "blockscape-tab-tooltip");
-      div26.hidden = true;
-      attr(div26, "aria-hidden", "true");
-      attr(div31, "id", "itemPreview");
-      attr(div31, "class", "item-preview");
-      div31.hidden = true;
-      attr(div31, "aria-hidden", "true");
+      attr(div27, "id", "tabTooltip");
+      attr(div27, "class", "blockscape-tab-tooltip");
+      div27.hidden = true;
+      attr(div27, "aria-hidden", "true");
+      attr(div32, "id", "itemPreview");
+      attr(div32, "class", "item-preview");
+      div32.hidden = true;
+      attr(div32, "aria-hidden", "true");
     },
     m(target2, anchor) {
       append(document_1.head, link);
       insert(target2, t0, anchor);
-      insert(target2, div25, anchor);
-      append(div25, header);
+      insert(target2, div26, anchor);
+      append(div26, header);
       append(header, div10);
       append(div10, div9);
       append(div9, div8);
@@ -9022,10 +9305,10 @@ function create_fragment(ctx) {
       append(div5, button5);
       append(div8, t29);
       append(div8, div7);
-      append(div25, t37);
-      append(div25, main);
-      append(main, div23);
-      append(div23, aside);
+      append(div26, t37);
+      append(div26, main);
+      append(main, div24);
+      append(div24, aside);
       append(aside, div11);
       append(aside, t39);
       append(aside, ul);
@@ -9050,22 +9333,22 @@ function create_fragment(ctx) {
       append(div16, t55);
       append(div16, div15);
       append(section0, t59);
-      append(section0, div17);
-      append(div23, t64);
-      append(div23, div22);
-      append(div25, t90);
-      append(div25, footer);
-      insert(target2, t92, anchor);
-      html_tag.m(raw_value, target2, anchor);
-      insert(target2, t93, anchor);
-      insert(target2, svg1, anchor);
+      append(section0, div18);
+      append(div24, t66);
+      append(div24, div23);
+      append(div26, t92);
+      append(div26, footer);
       insert(target2, t94, anchor);
-      insert(target2, div26, anchor);
+      html_tag.m(raw_value, target2, anchor);
       insert(target2, t95, anchor);
-      insert(target2, div31, anchor);
-      insert(target2, t102, anchor);
+      insert(target2, svg1, anchor);
+      insert(target2, t96, anchor);
+      insert(target2, div27, anchor);
+      insert(target2, t97, anchor);
+      insert(target2, div32, anchor);
+      insert(target2, t104, anchor);
       mount_component(shortcuthelp, target2, anchor);
-      insert(target2, t103, anchor);
+      insert(target2, t105, anchor);
       mount_component(newpanel, target2, anchor);
       current = true;
       if (!mounted) {
@@ -9118,17 +9401,17 @@ function create_fragment(ctx) {
     d(detaching) {
       if (detaching) {
         detach(t0);
-        detach(div25);
-        detach(t92);
-        html_tag.d();
-        detach(t93);
-        detach(svg1);
-        detach(t94);
         detach(div26);
+        detach(t94);
+        html_tag.d();
         detach(t95);
-        detach(div31);
-        detach(t102);
-        detach(t103);
+        detach(svg1);
+        detach(t96);
+        detach(div27);
+        detach(t97);
+        detach(div32);
+        detach(t104);
+        detach(t105);
       }
       detach(link);
       destroy_component(shortcuthelp, detaching);

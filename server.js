@@ -212,6 +212,30 @@ function serveStatic(res, filePath) {
     });
 }
 
+function resolveServerScopedStatic(requestedPath) {
+  if (typeof requestedPath !== "string") return null;
+  if (!requestedPath.startsWith("/server/")) return null;
+  const normalized = path
+    .normalize(requestedPath)
+    .replace(/\\/g, "/")
+    .replace(/\/+/g, "/");
+  const parts = normalized.split("/").filter(Boolean);
+  if (!parts.length || parts[0].toLowerCase() !== "server") return null;
+  const tailParts = parts.slice(1);
+  for (let i = 0; i < tailParts.length; i++) {
+    const candidatePath = `/${tailParts.slice(i).join("/")}`;
+    const full = path.join(DIST_DIR, candidatePath);
+    if (
+      full.startsWith(DIST_DIR) &&
+      fs.existsSync(full) &&
+      fs.statSync(full).isFile()
+    ) {
+      return full;
+    }
+  }
+  return null;
+}
+
 const server = http.createServer(async (req, res) => {
   try {
     const requestUrl = new URL(req.url, `http://${req.headers.host}`);
@@ -231,6 +255,12 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    const serverScopedCandidate = resolveServerScopedStatic(requestedPath);
+    if (serverScopedCandidate) {
+      serveStatic(res, serverScopedCandidate);
+      return;
+    }
+
     // SPA fallback
     serveStatic(res, INDEX_FILE);
   } catch (err) {
@@ -243,6 +273,9 @@ const server = http.createServer(async (req, res) => {
 server.listen(PORT, HOST, () => {
   console.log(`Blockscape server listening at http://${HOST}:${PORT}`);
   console.log(`Open the app with local backend: http://${HOST}:${PORT}/server`);
+  console.log(
+    `Auto-load a local file: http://${HOST}:${PORT}/server/path/to/file.bs`
+  );
   console.log(`Serving dist from: ${DIST_DIR}`);
   console.log(`File API root: ${ROOT_DIR}`);
 });

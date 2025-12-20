@@ -58,6 +58,8 @@
       --blockscape-tile-hover-scale: 1.5;
       --blockscape-tile-hover-scale-inverse: calc(1 / var(--blockscape-tile-hover-scale));
       --blockscape-tile-hover-text-portion: 0.25;
+      --blockscape-selection-dim-opacity: 0.2;
+      --blockscape-selection-dim-applied-opacity: var(--blockscape-selection-dim-opacity);
       --blockscape-title-hover-width-multiplier: 1.3;
       --blockscape-title-white-space: normal;
       --blockscape-title-text-wrap: normal;
@@ -1023,6 +1025,15 @@
       flex: 1 1 50%;
     }
 
+    .local-backend__save-actions {
+      display: flex;
+      gap: var(--space-xs);
+    }
+
+    .local-backend__save-actions .pf-v5-c-button {
+      flex: 1 1 50%;
+    }
+
     .local-backend__save {
       display: flex;
       flex-direction: column;
@@ -1684,7 +1695,11 @@
         var(--blockscape-tile-padding-x)
         calc(var(--blockscape-tile-padding-bottom) * var(--blockscape-tile-compactness));
       cursor: grab;
-      transition: box-shadow var(--transition), transform var(--transition), border-color var(--transition);
+      transition:
+        box-shadow var(--transition),
+        transform var(--transition),
+        border-color var(--transition),
+        opacity var(--transition);
       box-shadow: var(--color-shadow);
       transform: translateY(0) scale(1);
       transform-origin: center;
@@ -1712,6 +1727,23 @@
 
     .blockscape-has-selection .tile:active {
       transform: translateY(1px) scale(1);
+    }
+
+    .blockscape-has-item-selection:not(.blockscape-dimming-disabled) .tile {
+      opacity: var(--blockscape-selection-dim-applied-opacity);
+    }
+
+    .blockscape-has-item-selection:not(.blockscape-dimming-disabled)
+      .tile.selected,
+    .blockscape-has-item-selection:not(.blockscape-dimming-disabled)
+      .tile.dep,
+    .blockscape-has-item-selection:not(.blockscape-dimming-disabled)
+      .tile.revdep,
+    .blockscape-has-item-selection:not(.blockscape-dimming-disabled)
+      .tile.dep-indirect,
+    .blockscape-has-item-selection:not(.blockscape-dimming-disabled)
+      .tile.revdep-indirect {
+      opacity: 1;
     }
 
     .tile.dragging {

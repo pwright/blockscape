@@ -146,6 +146,9 @@
 
       <div class="new-panel__actions">
         <button class="pf-v5-c-button pf-m-primary" type="submit">Copy prompt</button>
+        <button id="newBlankButton" class="pf-v5-c-button pf-m-secondary" type="button" title="Start from an empty map">
+          New blank
+        </button>
         <div class="new-panel__status" aria-live="polite">{status}</div>
       </div>
 

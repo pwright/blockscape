@@ -274,7 +274,10 @@
           <div class="local-backend__save">
             <label for="localSavePath">Save active map to ~/blockscape</label>
             <input id="localSavePath" class="pf-v5-c-form-control" type="text" placeholder="my-map.bs" />
-            <button id="saveLocalFile" class="pf-v5-c-button pf-m-primary" type="button">Save</button>
+            <div class="local-backend__save-actions">
+              <button id="saveLocalFile" class="pf-v5-c-button pf-m-primary" type="button">Save</button>
+              <button id="saveLocalFileAs" class="pf-v5-c-button pf-m-secondary" type="button">Save as</button>
+            </div>
           </div>
         </section>
       </aside>

@@ -35,6 +35,7 @@ export function initBlockscape() {
   const pasteJsonButton = document.getElementById("pasteJson");
   const helpButton = document.getElementById("helpButton");
   const newPanelButton = document.getElementById("newPanelButton");
+  const newBlankButton = document.getElementById("newBlankButton");
   const shortcutHelp = document.getElementById("shortcutHelp");
   const shortcutHelpList = document.getElementById("shortcutHelpList");
   const shortcutHelpClose = document.getElementById("shortcutHelpClose");
@@ -51,6 +52,7 @@ export function initBlockscape() {
   const refreshLocalFilesButton = document.getElementById("refreshLocalFiles");
   const loadLocalFileButton = document.getElementById("loadLocalFile");
   const saveLocalFileButton = document.getElementById("saveLocalFile");
+  const saveLocalFileAsButton = document.getElementById("saveLocalFileAs");
   const localSavePathInput = document.getElementById("localSavePath");
   const EDITOR_TRANSFER_KEY = "blockscape:editorPayload";
   const EDITOR_TRANSFER_MESSAGE_TYPE = "blockscape:editorTransfer";
@@ -120,6 +122,8 @@ export function initBlockscape() {
   const MAX_TILE_HOVER_SCALE = 2.5;
   const SELECTION_DIM_OPACITY_STORAGE_KEY =
     "blockscape:selectionDimOpacity";
+  const SELECTION_DIM_ENABLED_STORAGE_KEY =
+    "blockscape:selectionDimEnabled";
   const DEFAULT_SELECTION_DIM_OPACITY = 0.2;
   const MIN_SELECTION_DIM_OPACITY = 0.05;
   const MAX_SELECTION_DIM_OPACITY = 1;
@@ -151,6 +155,7 @@ export function initBlockscape() {
   const MAX_AUTO_RELOAD_INTERVAL_MS = 10000;
   let tileHoverScale = DEFAULT_TILE_HOVER_SCALE;
   let selectionDimOpacity = DEFAULT_SELECTION_DIM_OPACITY;
+  let selectionDimEnabled = true;
   let tileCompactness = DEFAULT_TILE_COMPACTNESS;
   let titleWrapMode = DEFAULT_TITLE_WRAP_MODE;
   let titleHoverWidthMultiplier = DEFAULT_TITLE_HOVER_WIDTH_MULTIPLIER;
@@ -177,6 +182,7 @@ export function initBlockscape() {
   initializeObsidianLinksEnabled();
   initializeObsidianLinkMode();
   initializeObsidianVaultName();
+  initializeSelectionDimEnabled();
   syncSelectionClass();
 
   // ===== Utilities =====
@@ -230,14 +236,60 @@ export function initBlockscape() {
     if (typeof window === "undefined" || !window.location) return false;
     const url = new URL(window.location.href);
     const normalizedPath = url.pathname.replace(/\/+$/, "");
-    const lastSegment =
-      normalizedPath.split("/").filter(Boolean).pop() || "";
+    const segments = normalizedPath.split("/").filter(Boolean);
     const searchFlag = url.searchParams.get("server");
+    const hasServerPrefix =
+      segments[0] && segments[0].toLowerCase() === "server";
     return (
-      lastSegment.toLowerCase() === "server" ||
+      hasServerPrefix ||
       (searchFlag &&
         ["1", "true", "yes", "on"].includes(searchFlag.toLowerCase()))
     );
+  }
+
+  function updateUrlForServerPath(relPath) {
+    if (typeof window === "undefined" || !window.location || !relPath) return;
+    const normalized = normalizeLocalSavePath(relPath);
+    if (!normalized) return;
+    try {
+      const url = new URL(window.location.href);
+      const cleanedSearch = new URLSearchParams(url.search);
+      cleanedSearch.delete("load");
+      cleanedSearch.delete("share");
+      const newPath = `/server/${normalized}`.replace(/\/+/g, "/");
+      url.pathname = newPath;
+      url.search = cleanedSearch.toString()
+        ? `?${cleanedSearch.toString()}`
+        : "";
+      url.hash = "";
+      window.history.replaceState({}, document.title, url.toString());
+    } catch (err) {
+      console.warn("[Blockscape] failed to update URL for server path", err);
+    }
+  }
+
+  function extractServerFilePathFromUrl() {
+    if (typeof window === "undefined" || !window.location) return null;
+    const url = new URL(window.location.href);
+    const normalizedPath = url.pathname.replace(/\/+$/, "");
+    const segments = normalizedPath.split("/").filter(Boolean);
+    const serverIndex = segments.findIndex(
+      (segment) => segment.toLowerCase() === "server"
+    );
+    if (serverIndex === -1) return null;
+    const remainder = segments.slice(serverIndex + 1);
+    if (!remainder.length) return null;
+    const lastSegment = remainder[remainder.length - 1] || "";
+    if (!lastSegment.toLowerCase().endsWith(".bs")) return null;
+    const decoded = remainder.map((part) => {
+      try {
+        return decodeURIComponent(part);
+      } catch {
+        return part;
+      }
+    });
+    const joined = decoded.join("/");
+    return normalizeLocalSavePath(joined);
   }
 
   function isGithubPagesHost() {
@@ -387,6 +439,12 @@ export function initBlockscape() {
 
     function normalizeSavePath(raw) {
       return normalizeLocalSavePath(raw);
+    }
+
+    function resolvePayloadForSave(entry) {
+      const seriesPayload = buildSeriesPayload(entry);
+      if (seriesPayload) return { payload: seriesPayload, isSeries: true };
+      return { payload: entry?.data, isSeries: false };
     }
 
     function defaultSaveName() {
@@ -742,31 +800,10 @@ export function initBlockscape() {
       for (const relPath of selectedPaths) {
         try {
           setStatus(`Loading ${relPath}…`);
-          const resp = await fetch(
-            `/api/file?path=${encodeURIComponent(relPath)}`,
-            { cache: "no-store" }
-          );
-          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-          const payload = await resp.json();
-          const text = JSON.stringify(payload.data ?? payload, null, 2);
-          const entries = normalizeToModelsFromText(text, relPath, {
-            seriesTitleOverride: `${relPath} series`,
-          });
-          if (!entries.length) throw new Error("No models found in file");
-          entries.forEach((entry, idx) => {
-            entry.sourcePath = relPath;
-            if (entry.isSeries && !entry.title) {
-              const leaf = relPath.split("/").filter(Boolean).pop() || relPath;
-              const stem = leaf.replace(/\.bs$/i, "");
-              entry.title = stem;
-            }
-            const idxResult = addModelEntry(entry, {
-              versionLabel:
-                entries.length > 1 ? `${relPath} #${idx + 1}` : relPath,
-            });
-            if (firstIndex == null) firstIndex = idxResult;
-          });
+          const result = await importLocalBackendFile(relPath);
+          if (firstIndex == null) firstIndex = result?.firstIndex ?? null;
           lastKnownPath = relPath;
+          updateUrlForServerPath(relPath);
         } catch (err) {
           console.error("[Blockscape] failed to load from local server", err);
           alert(`Local load failed for ${relPath}: ${err.message}`);
@@ -777,25 +814,32 @@ export function initBlockscape() {
       renderFiles();
     }
 
-    async function saveActiveToFile() {
+    async function saveActiveToPath(
+      desiredPath,
+      { statusPrefix = "Saved to", updateInput = true } = {}
+    ) {
       if (!available) return;
       if (activeIndex < 0) {
         alert("No active model to save.");
         return;
       }
-      const desiredPath =
-        normalizeSavePath(localSavePathInput?.value) ||
-        normalizeSavePath(models[activeIndex]?.sourcePath) ||
-        defaultSaveName();
-      if (!desiredPath) {
+      const target = models[activeIndex];
+      const { payload: savePayload, isSeries } = resolvePayloadForSave(target);
+      if (!savePayload) {
+        alert("No model data to save.");
+        return;
+      }
+      const normalized = normalizeSavePath(desiredPath);
+      if (!normalized) {
         alert("Enter a relative path (no ..) to save under ~/blockscape.");
         return;
       }
       try {
-        const body = JSON.stringify(models[activeIndex].data, null, 2);
-        setStatus(`Saving to ${desiredPath}…`);
+        const body = JSON.stringify(savePayload, null, 2);
+        const savingLabel = isSeries ? "series" : "map";
+        setStatus(`Saving ${savingLabel} to ${normalized}…`);
         const resp = await fetch(
-          `/api/file?path=${encodeURIComponent(desiredPath)}`,
+          `/api/file?path=${encodeURIComponent(normalized)}`,
           {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
@@ -804,15 +848,54 @@ export function initBlockscape() {
         );
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const payload = await resp.json();
-        lastKnownPath = payload.path || desiredPath;
-        models[activeIndex].sourcePath = payload.path || desiredPath;
-        setStatus(`Saved to ${payload.path || desiredPath}`);
+        lastKnownPath = payload.path || normalized;
+        target.sourcePath = payload.path || normalized;
+        if (updateInput && localSavePathInput) {
+          localSavePathInput.value = payload.path || normalized;
+        }
+        updateUrlForServerPath(payload.path || normalized);
+        setStatus(`${statusPrefix} ${payload.path || normalized}`);
         await refresh();
       } catch (err) {
         console.error("[Blockscape] local save failed", err);
         alert(`Local save failed: ${err.message}`);
         hidePanel("Local server unavailable");
       }
+    }
+
+    async function saveActiveToFile() {
+      const desiredPath =
+        normalizeSavePath(localSavePathInput?.value) ||
+        normalizeSavePath(models[activeIndex]?.sourcePath) ||
+        defaultSaveName();
+      if (!desiredPath) {
+        alert("Enter a relative path (no ..) to save under ~/blockscape.");
+        return;
+      }
+      await saveActiveToPath(desiredPath, { statusPrefix: "Saved to" });
+    }
+
+    async function saveActiveAs() {
+      if (!available) return;
+      if (activeIndex < 0) {
+        alert("No active model to save.");
+        return;
+      }
+      if (typeof window === "undefined" || typeof window.prompt !== "function")
+        return;
+      const defaultPath =
+        normalizeSavePath(models[activeIndex]?.sourcePath) || defaultSaveName();
+      const response = window.prompt(
+        "Save active map as (under ~/blockscape):",
+        defaultPath
+      );
+      if (response == null) return;
+      const normalized = normalizeSavePath(response);
+      if (!normalized) {
+        alert("Enter a relative path (no ..) to save under ~/blockscape.");
+        return;
+      }
+      await saveActiveToPath(normalized, { statusPrefix: "Saved to" });
     }
 
     async function saveModelByIndex(
@@ -825,7 +908,8 @@ export function initBlockscape() {
         return { ok: false, error: "Invalid model index" };
       }
       const target = models[entryIndex];
-      if (!target?.data) return { ok: false, error: "Model has no data" };
+      const { payload: savePayload, isSeries } = resolvePayloadForSave(target);
+      if (!savePayload) return { ok: false, error: "Model has no data" };
       const normalized =
         normalizeSavePath(desiredPath) ||
         normalizeSavePath(target?.sourcePath) ||
@@ -837,8 +921,9 @@ export function initBlockscape() {
         };
       }
       try {
-        const body = JSON.stringify(target.data, null, 2);
-        setStatus(`Saving to ${normalized}…`);
+        const body = JSON.stringify(savePayload, null, 2);
+        const savingLabel = isSeries ? "series" : "map";
+        setStatus(`Saving ${savingLabel} to ${normalized}…`);
         const resp = await fetch(
           `/api/file?path=${encodeURIComponent(normalized)}`,
           {
@@ -854,7 +939,9 @@ export function initBlockscape() {
         if (entryIndex === activeIndex) {
           updateActiveSavePlaceholder();
         }
-        setStatus(`${statusPrefix} ${payload.path || normalized}`);
+        setStatus(
+          `${statusPrefix} ${payload.path || normalized}`
+        );
         if (refreshAfter) await refresh();
         return { ok: true, path: payload.path || normalized };
       } catch (err) {
@@ -872,6 +959,9 @@ export function initBlockscape() {
     }
     if (saveLocalFileButton) {
       saveLocalFileButton.onclick = () => saveActiveToFile();
+    }
+    if (saveLocalFileAsButton) {
+      saveLocalFileAsButton.onclick = () => saveActiveAs();
     }
     if (localFileList && localSavePathInput) {
       localFileList.addEventListener("change", () => {
@@ -938,6 +1028,37 @@ export function initBlockscape() {
       setAutoReloadEnabled,
       setAutoReloadInterval,
     };
+  }
+
+  async function importLocalBackendFile(
+    relPath,
+    { labelBase = relPath, seriesTitleOverride } = {}
+  ) {
+    if (!relPath) throw new Error("Missing path");
+    const resp = await fetch(`/api/file?path=${encodeURIComponent(relPath)}`, {
+      cache: "no-store",
+    });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const payload = await resp.json();
+    const text = JSON.stringify(payload.data ?? payload, null, 2);
+    const entries = normalizeToModelsFromText(text, relPath, {
+      seriesTitleOverride: seriesTitleOverride || `${relPath} series`,
+    });
+    if (!entries.length) throw new Error("No models found in file");
+    let firstIndex = null;
+    entries.forEach((entry, idx) => {
+      entry.sourcePath = relPath;
+      if (entry.isSeries && !entry.title) {
+        const leaf = relPath.split("/").filter(Boolean).pop() || relPath;
+        const stem = leaf.replace(/\.bs$/i, "");
+        entry.title = stem;
+      }
+      const idxResult = addModelEntry(entry, {
+        versionLabel: entries.length > 1 ? `${labelBase} #${idx + 1}` : labelBase,
+      });
+      if (firstIndex == null) firstIndex = idxResult;
+    });
+    return { firstIndex, total: entries.length };
   }
 
   async function writeTextToClipboard(text) {
@@ -1104,6 +1225,11 @@ export function initBlockscape() {
       "--blockscape-selection-dim-opacity",
       selectionDimOpacity
     );
+    const appliedOpacity = selectionDimEnabled ? selectionDimOpacity : 1;
+    document.documentElement.style.setProperty(
+      "--blockscape-selection-dim-applied-opacity",
+      appliedOpacity
+    );
     return selectionDimOpacity;
   }
 
@@ -1225,6 +1351,49 @@ export function initBlockscape() {
     } catch (error) {
       console.warn("[Blockscape] failed to read selection dimming", error);
       return applySelectionDimOpacity(DEFAULT_SELECTION_DIM_OPACITY);
+    }
+  }
+
+  function applySelectionDimEnabled(enabled) {
+    selectionDimEnabled = !!enabled;
+    const appliedOpacity = selectionDimEnabled ? selectionDimOpacity : 1;
+    document.documentElement.style.setProperty(
+      "--blockscape-selection-dim-applied-opacity",
+      appliedOpacity
+    );
+    if (app)
+      app.classList.toggle("blockscape-dimming-disabled", !selectionDimEnabled);
+    return selectionDimEnabled;
+  }
+
+  function persistSelectionDimEnabled(enabled) {
+    if (typeof window === "undefined" || !window.localStorage) return;
+    try {
+      window.localStorage.setItem(
+        SELECTION_DIM_ENABLED_STORAGE_KEY,
+        enabled ? "1" : "0"
+      );
+    } catch (error) {
+      console.warn(
+        "[Blockscape] failed to persist selection dim toggle",
+        error
+      );
+    }
+  }
+
+  function initializeSelectionDimEnabled() {
+    if (typeof window === "undefined" || !window.localStorage) {
+      return applySelectionDimEnabled(true);
+    }
+    try {
+      const raw = window.localStorage.getItem(
+        SELECTION_DIM_ENABLED_STORAGE_KEY
+      );
+      if (raw == null) return applySelectionDimEnabled(true);
+      return applySelectionDimEnabled(raw === "1");
+    } catch (error) {
+      console.warn("[Blockscape] failed to read selection dim toggle", error);
+      return applySelectionDimEnabled(true);
     }
   }
 
@@ -2140,6 +2309,65 @@ export function initBlockscape() {
     ensureSeriesId(entry, { seriesName, fallbackTitle: seriesName });
     entry.isSeries = true;
     return entry;
+  }
+
+  function buildBlankMapPayload({
+    seriesId = null,
+    mapTitle = "Blank map",
+  } = {}) {
+    const baseId = makeDownloadName(
+      `${seriesId || "blank"}-${makeTimestampSlug()}`
+    );
+    const payload = {
+      id: baseId,
+      title: mapTitle,
+      categories: [],
+      links: [],
+      abstract: "",
+    };
+    if (seriesId) payload.seriesId = seriesId;
+    ensureModelMetadata(payload, { titleHint: mapTitle, idHint: baseId });
+    return payload;
+  }
+
+  function createBlankSeriesEntry() {
+    const timestamp = makeTimestampSlug();
+    const seriesTitle = `Blank series ${timestamp}`;
+    const seriesId = makeSeriesId(seriesTitle, "blank-series");
+    const blankMap = buildBlankMapPayload({
+      seriesId,
+      mapTitle: "Blank map",
+    });
+    const entry = {
+      id: seriesId,
+      title: seriesTitle,
+      apicurioArtifactName: seriesTitle,
+      data: blankMap,
+      apicurioVersions: [
+        {
+          version: "1",
+          data: blankMap,
+          createdOn: new Date().toISOString(),
+        },
+      ],
+      apicurioActiveVersionIndex: 0,
+      isSeries: true,
+    };
+    applySeriesSlug(entry, seriesId);
+    ensureSeriesId(entry, {
+      seriesName: seriesTitle,
+      fallbackTitle: seriesTitle,
+    });
+    return entry;
+  }
+
+  function createAndActivateBlankSeries() {
+    const entry = createBlankSeriesEntry();
+    const idx = addModelEntry(entry, { versionLabel: "blank" });
+    setActive(idx);
+    closeNewPanel();
+    showNotice("Blank series created. Add categories and tiles to start.", 2600);
+    return idx;
   }
 
   function addModelEntry(entry, { versionLabel, createdOn } = {}) {
@@ -3123,6 +3351,31 @@ export function initBlockscape() {
     return firstIndex;
   }
 
+  async function consumeServerPathLoad() {
+    const relPath = extractServerFilePathFromUrl();
+    if (!relPath) return null;
+    try {
+      const backendReady = await isLocalBackendReady();
+      if (!backendReady) {
+        console.log(
+          "[Blockscape] local backend not ready; skipping server-path autoload"
+        );
+        return null;
+      }
+      const result = await importLocalBackendFile(relPath);
+      if (typeof result?.firstIndex === "number") {
+        if (typeof localBackend?.highlightSource === "function") {
+          localBackend.highlightSource(relPath);
+        }
+        return result.firstIndex;
+      }
+      return null;
+    } catch (err) {
+      console.warn("[Blockscape] server-path autoload failed", err);
+      return null;
+    }
+  }
+
   async function consumeLoadParam() {
     const hash = window.location.hash || "";
     let target = null;
@@ -4093,10 +4346,30 @@ export function initBlockscape() {
     hoverScaleRow.append(hoverScaleText, hoverScaleValue, hoverScaleInput);
     settingsPanel.appendChild(hoverScaleRow);
 
+    let dimInput = null;
+    let dimValue = null;
     const formatSelectionDimming = (opacity) => {
       const dimPercent = Math.round((1 - opacity) * 100);
       return dimPercent === 0 ? "Off" : `${dimPercent}% dim`;
     };
+    const { row: dimToggleRow } = createSettingsToggle({
+      id: "toggleSelectionDimming",
+      label: "Dim unrelated tiles",
+      hint: "When selecting a tile, fade everything except linked tiles.",
+      checked: selectionDimEnabled,
+      className: "map-controls__toggle",
+      onChange: (checked) => {
+        const applied = applySelectionDimEnabled(checked);
+        persistSelectionDimEnabled(applied);
+        if (dimInput) dimInput.disabled = !applied;
+        if (dimValue) {
+          dimValue.textContent = formatSelectionDimming(
+            applied ? selectionDimOpacity : 1
+          );
+        }
+      },
+    });
+    settingsPanel.appendChild(dimToggleRow);
     const dimRow = document.createElement("label");
     dimRow.className = "settings-slider";
     dimRow.setAttribute("for", "selectionDimmingSlider");
@@ -4105,18 +4378,20 @@ export function initBlockscape() {
     dimText.className = "settings-slider__text";
     const dimLabel = document.createElement("span");
     dimLabel.className = "settings-slider__label";
-    dimLabel.textContent = "Dim unrelated tiles";
+    dimLabel.textContent = "Dimming strength";
     const dimHint = document.createElement("span");
     dimHint.className = "settings-slider__hint";
     dimHint.textContent =
-      "When selecting a tile, fade everything except linked tiles.";
+      "Adjust how much unrelated tiles fade when dimming is on.";
     dimText.append(dimLabel, dimHint);
 
-    const dimValue = document.createElement("span");
+    dimValue = document.createElement("span");
     dimValue.className = "settings-slider__value";
-    dimValue.textContent = formatSelectionDimming(selectionDimOpacity);
+    dimValue.textContent = formatSelectionDimming(
+      selectionDimEnabled ? selectionDimOpacity : 1
+    );
 
-    const dimInput = document.createElement("input");
+    dimInput = document.createElement("input");
     dimInput.type = "range";
     dimInput.id = "selectionDimmingSlider";
     dimInput.className = "settings-slider__input";
@@ -4124,6 +4399,7 @@ export function initBlockscape() {
     dimInput.max = String(MAX_SELECTION_DIM_OPACITY);
     dimInput.step = "0.05";
     dimInput.value = String(selectionDimOpacity);
+    dimInput.disabled = !selectionDimEnabled;
     dimInput.setAttribute(
       "aria-label",
       "Adjust how much unrelated tiles dim on selection"
@@ -5285,6 +5561,18 @@ export function initBlockscape() {
   if (newPanelButton) {
     newPanelButton.addEventListener("click", () => {
       openNewPanel();
+    });
+  }
+
+  if (newBlankButton) {
+    newBlankButton.addEventListener("click", () => {
+      try {
+        scrollPageToTop();
+        createAndActivateBlankSeries();
+      } catch (error) {
+        console.error("[Blockscape] failed to create blank series", error);
+        alert(error?.message || "Unable to create a blank map right now.");
+      }
     });
   }
 
@@ -6535,6 +6823,7 @@ export function initBlockscape() {
       targets.push(unique);
     }
 
+    let firstSavedPath = null;
     for (let i = 0; i < eligible.length; i++) {
       const idx = eligible[i];
       const targetPath = targets[i];
@@ -6551,6 +6840,11 @@ export function initBlockscape() {
         alert(`Local auto-save failed: ${saved?.error || "unknown error"}`);
         return;
       }
+      if (firstSavedPath == null) firstSavedPath = targetPath;
+    }
+
+    if (firstSavedPath) {
+      updateUrlForServerPath(firstSavedPath);
     }
 
     await localBackend.refresh();
@@ -6967,12 +7261,15 @@ export function initBlockscape() {
     }
 
     // Load explicit model from URL hash/search (?load= or #load=)
+    const serverPathIndex = await consumeServerPathLoad();
     const loadIndex = await consumeLoadParam();
     const editorResult = consumeEditorPayload();
     const editorIndex = editorResult?.index;
     const shareIndex = consumeShareLink();
     const initialIndex =
-      typeof loadIndex === "number"
+      typeof serverPathIndex === "number"
+        ? serverPathIndex
+        : typeof loadIndex === "number"
         ? loadIndex
         : typeof shareIndex === "number"
         ? shareIndex
