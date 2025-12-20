@@ -3508,7 +3508,7 @@ export function initBlockscape() {
     if (cached && cached.fingerprint === fp) return cached.dataUrl;
 
     const width = 160;
-    const height = 90;
+    const height = 160;
     const canvas = document.createElement("canvas");
     canvas.width = width;
     canvas.height = height;
@@ -3518,20 +3518,33 @@ export function initBlockscape() {
     ctx.strokeStyle = "#e5e7eb";
     ctx.strokeRect(0.5, 0.5, width - 1, height - 1);
 
-    const cats = Array.isArray(payload?.categories) ? payload.categories : [];
-    const catCount = Math.max(cats.length, 1);
-    const colWidth = width / catCount;
     const topPad = 8;
     const bottomPad = 8;
     const dotRadius = 4;
+    const cats = Array.isArray(payload?.categories) ? payload.categories : [];
+    const catCount = Math.max(cats.length, 1);
+    const usableWidth = width - dotRadius * 2;
+    const desiredColGap = dotRadius * 3; // diameter + extra radius for breathing room
+    const colGap =
+      catCount > 1
+        ? Math.min(desiredColGap, usableWidth / (catCount - 1))
+        : 0;
+    const colStart =
+      catCount > 1
+        ? (width - colGap * (catCount - 1)) / 2
+        : width / 2;
 
     cats.forEach((cat, cIdx) => {
-      const xCenter = cIdx * colWidth + colWidth / 2;
+      const xCenter = colStart + cIdx * colGap;
       const items = Array.isArray(cat.items) ? cat.items : [];
       const itemCount = Math.max(items.length, 1);
+      const availableHeight = height - topPad - bottomPad - dotRadius * 2;
+      const gap =
+        itemCount > 1
+          ? Math.min(dotRadius * 3, availableHeight / (itemCount - 1))
+          : 0;
       items.forEach((it, iIdx) => {
-        const y =
-          topPad + (iIdx + 0.5) * ((height - topPad - bottomPad) / itemCount);
+        const y = height - bottomPad - dotRadius - iIdx * gap;
         ctx.beginPath();
         ctx.arc(xCenter, y, dotRadius, 0, Math.PI * 2);
         const fill = getBadgeColor(it.name || it.id || "", it.color);
