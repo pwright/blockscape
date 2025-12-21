@@ -5,9 +5,7 @@ WORKDIR /workspace
 COPY package*.json ./
 RUN npm ci
 
-COPY svelte ./svelte
-COPY scripts ./scripts
-COPY vite.config.mjs svelte.config.mjs ./
+COPY . .
 
 RUN npm run build
 
