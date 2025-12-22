@@ -286,7 +286,7 @@
           aria-label="Model source JSON editor">
           <p class="blockscape-json-panel__title">Paste / edit JSON for the <b>active</b> model (schema below)</p>
           <div class="muted">
-            Schema: <code>&#123; id, title, abstract?, categories:[&#123;id,title,items:[&#123;id,name,logo?,external?:url,color?,deps:[]&#125;&#125;], links?:[&#123;from,to&#125;] &#125;</code><br />
+            Schema: <code>&#123; id, title, abstract?, categories:[&#123;id,title,items:[&#123;id,name,deps?:[],logo?,external?:url,color?,...&#125;&#125;], ... &#125;</code><br />
             You can paste multiple objects separated by <code>---</code> or <code>%%%</code>, or a JSON array of models, to append several models.
             A single object replaces only when you click “Replace active with JSON”. Tip: with no input focused, press
             Cmd/Ctrl+V anywhere on the page to append clipboard JSON instantly.
