@@ -110,6 +110,7 @@ export function initBlockscape() {
   let activeInfoTooltipHtml = "";
   let pendingInfoPreview = false;
   let infoTabTwinkleTimer = null;
+  const versionThumbScroll = new Map(); // key -> scrollLeft
   let apicurioSettingsToggle = null;
   let activeSeriesPreviewTarget = null;
   let versionThumbLabels = [];
@@ -153,6 +154,7 @@ export function initBlockscape() {
   const DEFAULT_AUTO_RELOAD_INTERVAL_MS = 1000;
   const MIN_AUTO_RELOAD_INTERVAL_MS = 500;
   const MAX_AUTO_RELOAD_INTERVAL_MS = 10000;
+  const CATEGORY_VIEW_VERSION_PREFIX = "cat:";
   let tileHoverScale = DEFAULT_TILE_HOVER_SCALE;
   let selectionDimOpacity = DEFAULT_SELECTION_DIM_OPACITY;
   let selectionDimEnabled = true;
@@ -2374,6 +2376,7 @@ export function initBlockscape() {
     if (entry?.isSeries || entry?.apicurioVersions?.length > 1) {
       const name = entry.title || getModelTitle(entry);
       ensureSeriesId(entry, { seriesName: name, fallbackTitle: name });
+      syncCategoryViewVersions(entry);
     }
     const modelId = getModelId(entry);
     if (!modelId) {
@@ -2472,12 +2475,25 @@ export function initBlockscape() {
 
   function buildSeriesPayload(entry) {
     if (!entry) return null;
+    syncCategoryViewVersions(entry);
     const versions = entry.apicurioVersions;
     if (!Array.isArray(versions) || versions.length <= 1) return null;
     const seriesName =
       entry.title || entry.apicurioArtifactName || getModelTitle(entry);
     ensureSeriesId(entry, { seriesName, fallbackTitle: seriesName });
-    return versions.map((ver) => {
+    const filtered = versions.filter((ver, idx) => {
+      const versionId = (ver?.version ?? "").toString().trim();
+      const dataId = (ver?.data?.id ?? ver?.id ?? "").toString().trim();
+      if (ver?.isCategoryView || versionId.startsWith(CATEGORY_VIEW_VERSION_PREFIX)) {
+        console.log(
+          "[Blockscape] not saving computed map",
+          { versionIndex: idx, versionId, dataId }
+        );
+        return false;
+      }
+      return true;
+    });
+    return filtered.map((ver) => {
       if (ver && typeof ver === "object" && "data" in ver) return ver.data;
       return ver;
     });
@@ -3081,6 +3097,178 @@ export function initBlockscape() {
     }
   }
 
+  function buildCategoryViewVersions(entry) {
+    const versions = (entry?.apicurioVersions || []).filter(
+      (ver) => !ver?.isCategoryView
+    );
+    if (versions.length < 2) return [];
+
+    const categoriesById = new Map();
+    versions.forEach((ver, idx) => {
+      const data = ver?.data;
+      if (!data || !Array.isArray(data.categories)) return;
+      const mapTitle = getModelTitle(data, `Map ${idx + 1}`);
+      const mapId =
+        (data.id ?? "").toString().trim() ||
+        makeDownloadName(mapTitle || `map-${idx + 1}`);
+      const mapSlug = makeDownloadName(mapId || mapTitle || `map-${idx + 1}`);
+      data.categories.forEach((cat) => {
+        const catId = (cat?.id ?? "").toString().trim();
+        if (!catId) return;
+        if (!categoriesById.has(catId)) {
+          categoriesById.set(catId, {
+            catTitle: cat.title || catId,
+            sources: [],
+          });
+        }
+        const record = categoriesById.get(catId);
+        if (!record.catTitle && (cat.title || catId)) {
+          record.catTitle = cat.title || catId;
+        }
+        record.sources.push({
+          category: cat,
+          mapId,
+          mapTitle,
+          mapSlug,
+          versionIndex: idx,
+        });
+      });
+    });
+
+    const seriesId = getSeriesId(entry) || null;
+    const seriesTitle =
+      entry?.title ||
+      entry?.apicurioArtifactName ||
+      getModelTitle(entry, "Series");
+    const derived = [];
+
+    categoriesById.forEach((info, catId) => {
+      if ((info.sources?.length || 0) < 2) return;
+      const catTitle = info.catTitle || catId;
+      const usedCategoryIds = new Set();
+
+      const categories = info.sources.map((source) => {
+        const baseCatId =
+          source.mapSlug ||
+          makeDownloadName(source.mapTitle || source.mapId) ||
+          `map-${source.versionIndex + 1}`;
+        let categoryId = baseCatId;
+        if (usedCategoryIds.has(categoryId)) {
+          categoryId = `${categoryId}-${source.versionIndex + 1}`;
+        }
+        usedCategoryIds.add(categoryId);
+
+        const idMap = new Map();
+        const items = (source.category?.items || []).map((item, itemIdx) => {
+          const originalId =
+            (item?.id ?? "").toString().trim() || `item-${itemIdx + 1}`;
+          const nextId = `${categoryId}-${originalId}`;
+          idMap.set(originalId, nextId);
+          const clone = { ...item, id: nextId };
+          clone.deps = Array.isArray(item?.deps) ? [...item.deps] : [];
+          return clone;
+        });
+
+        items.forEach((clone) => {
+          clone.deps = (clone.deps || [])
+            .map((dep) => idMap.get(dep))
+            .filter(Boolean);
+        });
+
+        return {
+          id: categoryId,
+          title:
+            source.mapTitle ||
+            source.mapId ||
+            `Map ${source.versionIndex + 1}`,
+          items,
+        };
+      });
+
+      const viewData = {
+        id: makeDownloadName(`${catId}-category-view`),
+        title: catTitle,
+        abstract: `Items from "${catTitle}" across ${
+          info.sources.length
+        } maps in this series${seriesTitle ? ` (${seriesTitle})` : ""}.`,
+        categories,
+        links: [],
+      };
+      if (seriesId) viewData.seriesId = seriesId;
+
+      ensureModelMetadata(viewData, {
+        titleHint: catTitle,
+        idHint: `${seriesId || "series"}-${catId}`,
+      });
+
+      derived.push({
+        version: `${CATEGORY_VIEW_VERSION_PREFIX}${catId}`,
+        data: viewData,
+        isCategoryView: true,
+        categoryViewKey: catId,
+      });
+    });
+
+    return derived;
+  }
+
+  function getVersionViewKey(version) {
+    if (!version) return null;
+    if (version.isCategoryView && version.categoryViewKey) {
+      return `${CATEGORY_VIEW_VERSION_PREFIX}${version.categoryViewKey}`;
+    }
+    const dataId = (version.data?.id ?? version.id ?? "")
+      .toString()
+      .trim();
+    if (dataId) return dataId;
+    const label = (version.version ?? "").toString().trim();
+    return label || null;
+  }
+
+  function syncCategoryViewVersions(entry) {
+    if (!entry?.apicurioVersions?.length) return entry;
+    const prevKey = getVersionViewKey(
+      entry.apicurioVersions[entry.apicurioActiveVersionIndex]
+    );
+    const baseVersions = entry.apicurioVersions.filter(
+      (ver) => !ver?.isCategoryView
+    );
+    if (!baseVersions.length) return entry;
+    if (baseVersions.length < 2) {
+      entry.apicurioVersions = baseVersions;
+      entry.apicurioActiveVersionIndex = Math.max(
+        0,
+        Math.min(
+          getActiveApicurioVersionIndex(entry),
+          entry.apicurioVersions.length - 1
+        )
+      );
+      const active =
+        entry.apicurioVersions[entry.apicurioActiveVersionIndex];
+      if (active?.data) entry.data = active.data;
+      return entry;
+    }
+    const derived = buildCategoryViewVersions({
+      ...entry,
+      apicurioVersions: baseVersions,
+    });
+    entry.apicurioVersions = [...baseVersions, ...derived];
+    let nextActiveIdx = entry.apicurioVersions.findIndex(
+      (ver) => getVersionViewKey(ver) === prevKey
+    );
+    if (nextActiveIdx === -1) {
+      nextActiveIdx = Math.min(
+        entry.apicurioActiveVersionIndex || 0,
+        entry.apicurioVersions.length - 1
+      );
+    }
+    entry.apicurioActiveVersionIndex = Math.max(nextActiveIdx, 0);
+    const active =
+      entry.apicurioVersions[entry.apicurioActiveVersionIndex];
+    if (active?.data) entry.data = active.data;
+    return entry;
+  }
+
   function buildSeriesEntry(list, titleBase = "Pasted", options = {}) {
     const array = Array.isArray(list) ? list : [];
     if (!array.length) return [];
@@ -3118,6 +3306,7 @@ export function initBlockscape() {
       fallbackTitle: seriesTitle,
     });
     if (seriesId) entry.id = seriesId;
+    syncCategoryViewVersions(entry);
     return [entry];
   }
 
@@ -3487,6 +3676,16 @@ export function initBlockscape() {
     return versionEntry?.version ?? null;
   }
 
+  function getThumbScrollKey(entry, fallback = "active") {
+    return (
+      getSeriesId(entry) ||
+      getModelId(entry) ||
+      entry?.apicurioArtifactId ||
+      entry?.id ||
+      fallback
+    );
+  }
+
   function buildModelIdToVersionIndex(entry) {
     const map = new Map();
     (entry?.apicurioVersions || []).forEach((ver, idx) => {
@@ -3687,6 +3886,7 @@ export function initBlockscape() {
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "version-nav__thumb";
+      if (ver?.isCategoryView) btn.classList.add("version-nav__thumb--category");
       if (idx === activeIdx) btn.classList.add("is-active");
       const thumbUrl = getSeriesThumbnail(entry, idx);
       if (thumbUrl) {
@@ -3700,14 +3900,22 @@ export function initBlockscape() {
       const lblText = document.createElement("span");
       lblText.className = "version-nav__thumb-label-text";
       const fullId = (ver?.data?.id ?? ver?.id ?? "").toString().trim();
-      const labelValue =
+      let labelValue =
         fullId || (ver?.version ? `v${ver.version}` : `${idx + 1}`);
+      let labelTitle = fullId || labelValue;
+      if (ver?.isCategoryView) {
+        const catLabel =
+          ver.data?.title || ver.categoryViewKey || labelValue || "Category";
+        labelValue = catLabel;
+        labelTitle = `Category view: ${catLabel}`;
+        btn.dataset.computed = "true";
+      }
       lblText.textContent = labelValue;
-      lbl.title = fullId || labelValue;
+      lbl.title = labelTitle;
       lbl.appendChild(lblText);
       btn.appendChild(lbl);
       registerThumbLabel(lbl, lblText);
-      if (entry.apicurioVersions.length > 1) {
+      if (entry.apicurioVersions.length > 1 && !ver?.isCategoryView) {
         const removeBtn = document.createElement("span");
         removeBtn.className = "version-nav__thumb-remove";
         removeBtn.title = `Remove ${labelValue} from this series`;
@@ -3756,12 +3964,33 @@ export function initBlockscape() {
 
     nav.appendChild(thumbs);
 
+    const scrollKey = getThumbScrollKey(entry, "active");
+    const savedScroll = versionThumbScroll.get(scrollKey);
+    if (typeof savedScroll === "number" && !Number.isNaN(savedScroll)) {
+      requestAnimationFrame(() => {
+        thumbs.scrollLeft = savedScroll;
+      });
+    }
+    thumbs.addEventListener("scroll", () => {
+      versionThumbScroll.set(scrollKey, thumbs.scrollLeft);
+    });
+
     return nav;
   }
 
   // ===== Render =====
   function render() {
     if (!model) return;
+    const activeModelEntry =
+      activeIndex >= 0 && models[activeIndex] ? models[activeIndex] : null;
+    const prevThumbs =
+      app && app.querySelector
+        ? app.querySelector(".version-nav__thumbs")
+        : null;
+    if (prevThumbs && activeModelEntry) {
+      const key = getThumbScrollKey(activeModelEntry, activeIndex);
+      versionThumbScroll.set(key, prevThumbs.scrollLeft);
+    }
     hideTabTooltip();
     if (!Array.isArray(model.m.categories)) {
       model.m.categories = [];
@@ -6871,7 +7100,6 @@ export function initBlockscape() {
     if (!button) return;
     const i = parseInt(button.dataset.index, 10);
     if (!Number.isInteger(i)) return;
-    scrollPageToTop();
     setActive(i);
   });
 
@@ -6969,6 +7197,7 @@ export function initBlockscape() {
   function rebuildFromActive() {
     if (activeIndex < 0) return;
     try {
+      syncCategoryViewVersions(models[activeIndex]);
       const parsed = parse(models[activeIndex].data);
       model = parsed;
       render();

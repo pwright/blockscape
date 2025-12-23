@@ -1341,6 +1341,15 @@
       outline: none;
     }
 
+    .version-nav__thumb--category {
+      border-style: dashed;
+      background: rgba(59, 130, 246, 0.06);
+    }
+
+    .version-nav__thumb--category .version-nav__thumb-label-text {
+      font-style: italic;
+    }
+
     .version-nav__thumb--add {
       border: 1px dashed var(--color-border);
       background: var(--color-surface-muted);

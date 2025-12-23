@@ -2123,6 +2123,7 @@ function initBlockscape() {
   let activeInfoTooltipHtml = "";
   let pendingInfoPreview = false;
   let infoTabTwinkleTimer = null;
+  const versionThumbScroll = /* @__PURE__ */ new Map();
   let apicurioSettingsToggle = null;
   let activeSeriesPreviewTarget = null;
   let versionThumbLabels = [];
@@ -2163,6 +2164,7 @@ function initBlockscape() {
   const DEFAULT_AUTO_RELOAD_INTERVAL_MS = 1e3;
   const MIN_AUTO_RELOAD_INTERVAL_MS = 500;
   const MAX_AUTO_RELOAD_INTERVAL_MS = 1e4;
+  const CATEGORY_VIEW_VERSION_PREFIX = "cat:";
   let tileHoverScale = DEFAULT_TILE_HOVER_SCALE;
   let selectionDimOpacity = DEFAULT_SELECTION_DIM_OPACITY;
   let selectionDimEnabled = true;
@@ -4129,6 +4131,7 @@ function initBlockscape() {
     if ((entry == null ? void 0 : entry.isSeries) || ((_a = entry == null ? void 0 : entry.apicurioVersions) == null ? void 0 : _a.length) > 1) {
       const name = entry.title || getModelTitle(entry);
       ensureSeriesId(entry, { seriesName: name, fallbackTitle: name });
+      syncCategoryViewVersions(entry);
     }
     const modelId = getModelId(entry);
     if (!modelId) {
@@ -4220,11 +4223,25 @@ function initBlockscape() {
   }
   function buildSeriesPayload(entry) {
     if (!entry) return null;
+    syncCategoryViewVersions(entry);
     const versions = entry.apicurioVersions;
     if (!Array.isArray(versions) || versions.length <= 1) return null;
     const seriesName = entry.title || entry.apicurioArtifactName || getModelTitle(entry);
     ensureSeriesId(entry, { seriesName, fallbackTitle: seriesName });
-    return versions.map((ver) => {
+    const filtered = versions.filter((ver, idx) => {
+      var _a;
+      const versionId = ((ver == null ? void 0 : ver.version) ?? "").toString().trim();
+      const dataId = (((_a = ver == null ? void 0 : ver.data) == null ? void 0 : _a.id) ?? (ver == null ? void 0 : ver.id) ?? "").toString().trim();
+      if ((ver == null ? void 0 : ver.isCategoryView) || versionId.startsWith(CATEGORY_VIEW_VERSION_PREFIX)) {
+        console.log(
+          "[Blockscape] not saving computed map",
+          { versionIndex: idx, versionId, dataId }
+        );
+        return false;
+      }
+      return true;
+    });
+    return filtered.map((ver) => {
       if (ver && typeof ver === "object" && "data" in ver) return ver.data;
       return ver;
     });
@@ -4744,6 +4761,148 @@ function initBlockscape() {
       return null;
     }
   }
+  function buildCategoryViewVersions(entry) {
+    const versions = ((entry == null ? void 0 : entry.apicurioVersions) || []).filter(
+      (ver) => !(ver == null ? void 0 : ver.isCategoryView)
+    );
+    if (versions.length < 2) return [];
+    const categoriesById = /* @__PURE__ */ new Map();
+    versions.forEach((ver, idx) => {
+      const data = ver == null ? void 0 : ver.data;
+      if (!data || !Array.isArray(data.categories)) return;
+      const mapTitle = getModelTitle(data, `Map ${idx + 1}`);
+      const mapId = (data.id ?? "").toString().trim() || makeDownloadName(mapTitle || `map-${idx + 1}`);
+      const mapSlug = makeDownloadName(mapId || mapTitle || `map-${idx + 1}`);
+      data.categories.forEach((cat) => {
+        const catId = ((cat == null ? void 0 : cat.id) ?? "").toString().trim();
+        if (!catId) return;
+        if (!categoriesById.has(catId)) {
+          categoriesById.set(catId, {
+            catTitle: cat.title || catId,
+            sources: []
+          });
+        }
+        const record = categoriesById.get(catId);
+        if (!record.catTitle && (cat.title || catId)) {
+          record.catTitle = cat.title || catId;
+        }
+        record.sources.push({
+          category: cat,
+          mapId,
+          mapTitle,
+          mapSlug,
+          versionIndex: idx
+        });
+      });
+    });
+    const seriesId = getSeriesId(entry) || null;
+    const seriesTitle = (entry == null ? void 0 : entry.title) || (entry == null ? void 0 : entry.apicurioArtifactName) || getModelTitle(entry, "Series");
+    const derived = [];
+    categoriesById.forEach((info, catId) => {
+      var _a;
+      if ((((_a = info.sources) == null ? void 0 : _a.length) || 0) < 2) return;
+      const catTitle = info.catTitle || catId;
+      const usedCategoryIds = /* @__PURE__ */ new Set();
+      const categories = info.sources.map((source) => {
+        var _a2;
+        const baseCatId = source.mapSlug || makeDownloadName(source.mapTitle || source.mapId) || `map-${source.versionIndex + 1}`;
+        let categoryId = baseCatId;
+        if (usedCategoryIds.has(categoryId)) {
+          categoryId = `${categoryId}-${source.versionIndex + 1}`;
+        }
+        usedCategoryIds.add(categoryId);
+        const idMap = /* @__PURE__ */ new Map();
+        const items = (((_a2 = source.category) == null ? void 0 : _a2.items) || []).map((item, itemIdx) => {
+          const originalId = ((item == null ? void 0 : item.id) ?? "").toString().trim() || `item-${itemIdx + 1}`;
+          const nextId = `${categoryId}-${originalId}`;
+          idMap.set(originalId, nextId);
+          const clone = { ...item, id: nextId };
+          clone.deps = Array.isArray(item == null ? void 0 : item.deps) ? [...item.deps] : [];
+          return clone;
+        });
+        items.forEach((clone) => {
+          clone.deps = (clone.deps || []).map((dep) => idMap.get(dep)).filter(Boolean);
+        });
+        return {
+          id: categoryId,
+          title: source.mapTitle || source.mapId || `Map ${source.versionIndex + 1}`,
+          items
+        };
+      });
+      const viewData = {
+        id: makeDownloadName(`${catId}-category-view`),
+        title: catTitle,
+        abstract: `Items from "${catTitle}" across ${info.sources.length} maps in this series${seriesTitle ? ` (${seriesTitle})` : ""}.`,
+        categories,
+        links: []
+      };
+      if (seriesId) viewData.seriesId = seriesId;
+      ensureModelMetadata(viewData, {
+        titleHint: catTitle,
+        idHint: `${seriesId || "series"}-${catId}`
+      });
+      derived.push({
+        version: `${CATEGORY_VIEW_VERSION_PREFIX}${catId}`,
+        data: viewData,
+        isCategoryView: true,
+        categoryViewKey: catId
+      });
+    });
+    return derived;
+  }
+  function getVersionViewKey(version) {
+    var _a;
+    if (!version) return null;
+    if (version.isCategoryView && version.categoryViewKey) {
+      return `${CATEGORY_VIEW_VERSION_PREFIX}${version.categoryViewKey}`;
+    }
+    const dataId = (((_a = version.data) == null ? void 0 : _a.id) ?? version.id ?? "").toString().trim();
+    if (dataId) return dataId;
+    const label = (version.version ?? "").toString().trim();
+    return label || null;
+  }
+  function syncCategoryViewVersions(entry) {
+    var _a;
+    if (!((_a = entry == null ? void 0 : entry.apicurioVersions) == null ? void 0 : _a.length)) return entry;
+    const prevKey = getVersionViewKey(
+      entry.apicurioVersions[entry.apicurioActiveVersionIndex]
+    );
+    const baseVersions = entry.apicurioVersions.filter(
+      (ver) => !(ver == null ? void 0 : ver.isCategoryView)
+    );
+    if (!baseVersions.length) return entry;
+    if (baseVersions.length < 2) {
+      entry.apicurioVersions = baseVersions;
+      entry.apicurioActiveVersionIndex = Math.max(
+        0,
+        Math.min(
+          getActiveApicurioVersionIndex(entry),
+          entry.apicurioVersions.length - 1
+        )
+      );
+      const active2 = entry.apicurioVersions[entry.apicurioActiveVersionIndex];
+      if (active2 == null ? void 0 : active2.data) entry.data = active2.data;
+      return entry;
+    }
+    const derived = buildCategoryViewVersions({
+      ...entry,
+      apicurioVersions: baseVersions
+    });
+    entry.apicurioVersions = [...baseVersions, ...derived];
+    let nextActiveIdx = entry.apicurioVersions.findIndex(
+      (ver) => getVersionViewKey(ver) === prevKey
+    );
+    if (nextActiveIdx === -1) {
+      nextActiveIdx = Math.min(
+        entry.apicurioActiveVersionIndex || 0,
+        entry.apicurioVersions.length - 1
+      );
+    }
+    entry.apicurioActiveVersionIndex = Math.max(nextActiveIdx, 0);
+    const active = entry.apicurioVersions[entry.apicurioActiveVersionIndex];
+    if (active == null ? void 0 : active.data) entry.data = active.data;
+    return entry;
+  }
   function buildSeriesEntry(list, titleBase = "Pasted", options = {}) {
     const array = Array.isArray(list) ? list : [];
     if (!array.length) return [];
@@ -4775,6 +4934,7 @@ function initBlockscape() {
       fallbackTitle: seriesTitle
     });
     if (seriesId) entry.id = seriesId;
+    syncCategoryViewVersions(entry);
     return [entry];
   }
   function normalizeToModelsFromValue(value, titleBase = "Pasted", options = {}) {
@@ -5062,6 +5222,9 @@ function initBlockscape() {
     const versionEntry = entry.apicurioVersions[idx];
     return (versionEntry == null ? void 0 : versionEntry.version) ?? null;
   }
+  function getThumbScrollKey(entry, fallback = "active") {
+    return getSeriesId(entry) || getModelId(entry) || (entry == null ? void 0 : entry.apicurioArtifactId) || (entry == null ? void 0 : entry.id) || fallback;
+  }
   function buildModelIdToVersionIndex(entry) {
     const map = /* @__PURE__ */ new Map();
     ((entry == null ? void 0 : entry.apicurioVersions) || []).forEach((ver, idx) => {
@@ -5229,10 +5392,11 @@ function initBlockscape() {
     const thumbs = document.createElement("div");
     thumbs.className = "version-nav__thumbs";
     entry.apicurioVersions.forEach((ver, idx) => {
-      var _a;
+      var _a, _b;
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "version-nav__thumb";
+      if (ver == null ? void 0 : ver.isCategoryView) btn.classList.add("version-nav__thumb--category");
       if (idx === activeIdx) btn.classList.add("is-active");
       const thumbUrl = getSeriesThumbnail(entry, idx);
       if (thumbUrl) {
@@ -5246,13 +5410,20 @@ function initBlockscape() {
       const lblText = document.createElement("span");
       lblText.className = "version-nav__thumb-label-text";
       const fullId = (((_a = ver == null ? void 0 : ver.data) == null ? void 0 : _a.id) ?? (ver == null ? void 0 : ver.id) ?? "").toString().trim();
-      const labelValue = fullId || ((ver == null ? void 0 : ver.version) ? `v${ver.version}` : `${idx + 1}`);
+      let labelValue = fullId || ((ver == null ? void 0 : ver.version) ? `v${ver.version}` : `${idx + 1}`);
+      let labelTitle = fullId || labelValue;
+      if (ver == null ? void 0 : ver.isCategoryView) {
+        const catLabel = ((_b = ver.data) == null ? void 0 : _b.title) || ver.categoryViewKey || labelValue || "Category";
+        labelValue = catLabel;
+        labelTitle = `Category view: ${catLabel}`;
+        btn.dataset.computed = "true";
+      }
       lblText.textContent = labelValue;
-      lbl.title = fullId || labelValue;
+      lbl.title = labelTitle;
       lbl.appendChild(lblText);
       btn.appendChild(lbl);
       registerThumbLabel(lbl, lblText);
-      if (entry.apicurioVersions.length > 1) {
+      if (entry.apicurioVersions.length > 1 && !(ver == null ? void 0 : ver.isCategoryView)) {
         const removeBtn = document.createElement("span");
         removeBtn.className = "version-nav__thumb-remove";
         removeBtn.title = `Remove ${labelValue} from this series`;
@@ -5299,11 +5470,27 @@ function initBlockscape() {
     addThumb.appendChild(addIcon);
     thumbs.appendChild(addThumb);
     nav.appendChild(thumbs);
+    const scrollKey = getThumbScrollKey(entry, "active");
+    const savedScroll = versionThumbScroll.get(scrollKey);
+    if (typeof savedScroll === "number" && !Number.isNaN(savedScroll)) {
+      requestAnimationFrame(() => {
+        thumbs.scrollLeft = savedScroll;
+      });
+    }
+    thumbs.addEventListener("scroll", () => {
+      versionThumbScroll.set(scrollKey, thumbs.scrollLeft);
+    });
     return nav;
   }
   function render() {
     var _a, _b, _c;
     if (!model) return;
+    const activeModelEntry = activeIndex >= 0 && models[activeIndex] ? models[activeIndex] : null;
+    const prevThumbs = app && app.querySelector ? app.querySelector(".version-nav__thumbs") : null;
+    if (prevThumbs && activeModelEntry) {
+      const key = getThumbScrollKey(activeModelEntry, activeIndex);
+      versionThumbScroll.set(key, prevThumbs.scrollLeft);
+    }
     hideTabTooltip();
     if (!Array.isArray(model.m.categories)) {
       model.m.categories = [];
@@ -8030,7 +8217,6 @@ ${text2}` : text2;
     if (!button) return;
     const i = parseInt(button.dataset.index, 10);
     if (!Number.isInteger(i)) return;
-    scrollPageToTop();
     setActive(i);
   });
   document.getElementById("removeModel").onclick = () => {
@@ -8117,6 +8303,7 @@ ${text2}` : text2;
   function rebuildFromActive() {
     if (activeIndex < 0) return;
     try {
+      syncCategoryViewVersions(models[activeIndex]);
       const parsed = parse(models[activeIndex].data);
       model = parsed;
       render();
@@ -8430,7 +8617,7 @@ class ShortcutHelp extends SvelteComponent {
     init(this, options, null, create_fragment$2, safe_not_equal, {});
   }
 }
-const plainPromptTemplate = 'Generate a blockscape [map|series] for the domain of [DOMAIN]\n\n### Requirements\n\n* Output **valid JSON only** with the structure below (no commentary):\n\n  * Model level:\n    * `id`: required string, short/sluggy (lowercase, hyphen/underscore ok)\n    * `title`: required string, human‑friendly model title\n    * `abstract`: required string (plain text or simple HTML) that explains the landscape\n    * `categories`: array of category objects\n    * optional `links`: array of `{ "from": "id", "to": "id" }` for cross‑category edges\n\n  * Each category has:\n    * `id` (short, lowercase, unique)\n    * `title` (human‑friendly)\n    * `items`: array of component objects\n\n      * each item has:\n        * `id` (short, lowercase, unique across all categories)\n        * `name` (human‑friendly)\n        * optional `logo` (e.g., `"logos/[slug].svg"`)\n        * optional `external` (string URL) pointing to external documentation or reference material for that item\n        * optional `color` (hex string) for tile tint\n        * `deps`: array of item `id`s this item **depends on** (must reference defined items only)\n* Use **3–6/7 categories** and **2–6/7 items per category**. Prefer clarity over exhaustiveness.\n* Order categories roughly from **abstract to concrete**.\n* Model **visible user value** via **vertical position** (things closer to the user are higher). Ensure `deps` reflect a flow from higher‑value items to their underlying enablers.\n* (Optional) You may imply **horizontal evolution/maturity** via category naming or item grouping, but do not add extra fields for it.\n* Keep all identifiers **ASCII**, hyphen‑separated where needed.\n\n### Domain Guidance\n\nIn **[one paragraph]**, summarize the domain’s user‑visible goals and the key enabling components. Use that understanding to choose categories and dependencies.\n\n### Output\n\nIf the user asks for a \'series\', create an array of json using the following criteria.\n\nReturn **only the JSON** matching this schema:\n\n```\n{\n  "id": "[model-id]",\n  "title": "[Model Title]",\n  "abstract": "[Short description or HTML snippet]",\n  "categories": [\n    {\n      "id": "[category-id]",\n      "title": "[Category Title]",\n      "items": [\n        { "id": "[item-id]", "name": "[Item Name]", "deps": ["[id]"] }\n      ]\n    }\n  ]\n}\n```\n\n### Validation Checklist (the model should self‑check before returning):\n\n* Top-level `id`, `title`, and `abstract` are present and non-empty.\n* All `deps` reference **existing** item IDs.\n* No duplicate `id`s across all items.\n* 3–6/7 categories; each has 2–6/7 items.\n* No extra fields beyond those listed above.\n* JSON parses.\n\n---\n\n## One‑shot Example (Machine Learning Model Deployment)\n\n**Prompt to paste**\n\nGenerate a **Blockscape value‑chain JSON** for the domain of **machine learning model deployment**.\n\n### Requirements\n\n* Output **valid JSON only** with this structure (no commentary).\n* Use **3 - 6/7 categories**, **3–6/7 items each**.\n* Order from abstract (user‑facing) to concrete (infrastructure).\n* Vertical axis is **visible user value**; `deps` should point from user‑visible items down to enablers they rely on.\n* Optional `logo` paths may use placeholders like `"logos/[slug].svg"`.\n\n### Domain Guidance\n\nUsers need **reliable predictions** surfaced via **APIs/UI**, backed by **versioned models**, **observability**, and **scalable infra**. Security and governance span across.\n\n### Output (JSON only)\n\n```\n{\n  "categories": [\n    {\n      "id": "experience",\n      "title": "User Experience",\n      "items": [\n        { "id": "prediction-api", "name": "Prediction API", "deps": ["model-serving", "authz"], "external": "https://example.com/api.html"},\n        { "id": "batch-scoring", "name": "Batch Scoring", "deps": ["feature-store", "orchestration"] },\n        { "id": "ui-console", "name": "Ops Console", "deps": ["monitoring", "logging"] }\n      ]\n    },\n    {\n      "id": "models",\n      "title": "Models & Data",\n      "items": [\n        { "id": "model-serving", "name": "Model Serving", "deps": ["container-runtime", "autoscaling"] },\n        { "id": "model-registry", "name": "Model Registry", "deps": ["artifact-store"] },\n        { "id": "feature-store", "name": "Feature Store", "deps": ["data-pipelines"] }\n      ]\n    },\n    {\n      "id": "platform",\n      "title": "Platform Services",\n      "items": [\n        { "id": "monitoring", "name": "Monitoring", "deps": ["metrics-backend"] },\n        { "id": "logging", "name": "Logging", "deps": ["log-backend"] },\n        { "id": "authz", "name": "AuthN/Z", "deps": ["secrets"] },\n        { "id": "orchestration", "name": "Orchestration", "deps": ["container-runtime"] }\n      ]\n    },\n    {\n      "id": "infrastructure",\n      "title": "Infrastructure",\n      "items": [\n        { "id": "autoscaling", "name": "Autoscaling", "deps": ["metrics-backend"] },\n        { "id": "container-runtime", "name": "Container Runtime", "deps": [] },\n        { "id": "artifact-store", "name": "Artifact Store", "deps": [] },\n        { "id": "data-pipelines", "name": "Data Pipelines", "deps": [] },\n        { "id": "metrics-backend", "name": "Metrics Backend", "deps": [] },\n        { "id": "log-backend", "name": "Log Backend", "deps": [] },\n        { "id": "secrets", "name": "Secrets Management", "deps": [] }\n      ]\n    }\n  ]\n}\n```\n\n---\n\n## Tips\n\n* Keep **names** user‑friendly; keep **ids** short and consistent.\n* If an item feels too broad, introduce a new category rather than bloating `deps`.\n* If there\'s a link (external), use the favicon from the website as logo\n* If you’re unsure about `logo`, omit it; you can add paths later.\n\nThe following map shows color conventions:\n\n```\n{\n  "id": "conventions",\n  "title": "Color Conventions",\n  "abstract": "Reference for color conventions.",\n  "categories": [\n    {\n      "id": "color-conventions",\n      "title": "Color conventions",\n      "items": [\n        {\n          "id": "old",\n          "name": "Old",\n          "color": "#000000",\n          "deps": []\n        },\n        {\n          "id": "new",\n          "name": "New",\n          "color": "#FFFFFF",\n          "deps": []\n        },\n        {\n          "id": "important",\n          "name": "Important",\n          "deps": [],\n          "color": "#FF0000"\n        }\n      ]\n    }\n  ]\n}\n```';
+const plainPromptTemplate = 'Generate a blockscape [map|series] for the domain of [DOMAIN]\n\n### Requirements\n\n* Output **valid JSON only** with the structure below (no commentary):\n\n  * Model level:\n    * `id`: required string, short/sluggy (lowercase, hyphen/underscore ok)\n    * `title`: required string, human‑friendly model title\n    * `abstract`: optional string (plain text or simple HTML) that explains the landscape\n    * `categories`: array of category objects\n\n  * Each category has:\n    * `id` (short, lowercase, unique)\n    * `title` (human‑friendly)\n    * `items`: array of component objects\n\n      * each item has:\n        * `id` (short, lowercase, unique across all categories)\n        * `name` (human‑friendly)\n        * optional `logo` (e.g., `"logos/[slug].svg"`)\n        * optional `external` (string URL) pointing to external documentation or reference material for that item\n        * optional `color` (hex string) for tile tint\n        * optional `deps`: array of item `id`s this item **depends on** (when present, must reference defined items only)\n* Use **3–6/7 categories** and **2–6/7 items per category**. Prefer clarity over exhaustiveness.\n* Order categories roughly from **abstract to concrete**.\n* Model **visible user value** via **vertical position** (things closer to the user are higher). Ensure `deps` reflect a flow from higher‑value items to their underlying enablers.\n* (Optional) You may imply **horizontal evolution/maturity** via category naming or item grouping, but do not add extra fields for it.\n* Keep all identifiers **ASCII**, hyphen‑separated where needed.\n\n### Domain Guidance\n\nIn **[one paragraph]**, summarize the domain’s user‑visible goals and the key enabling components. Use that understanding to choose categories and dependencies.\n\n### Output\n\nIf the user asks for a \'series\', create an array of json using the following criteria.\n\nReturn **only the JSON** matching this schema:\n\n```\n{\n  "id": "[model-id]",\n  "title": "[Model Title]",\n  "abstract": "[Short description or HTML snippet, optional]",\n  "categories": [\n    {\n      "id": "[category-id]",\n      "title": "[Category Title]",\n      "items": [\n        { "id": "[item-id]", "name": "[Item Name]", "deps": ["[id]"] }\n      ]\n    }\n  ]\n}\n```\n\n### Validation Checklist (the model should self‑check before returning):\n\n* Top-level `id` and `title` are present and non-empty; if `abstract` is provided, it is non-empty.\n* All provided `deps` reference **existing** item IDs.\n* No duplicate `id`s across all items.\n* 3–6/7 categories; each has 2–6/7 items.\n* JSON parses.\n\n---\n\n## One‑shot Example (Machine Learning Model Deployment)\n\n**Prompt to paste**\n\nGenerate a **Blockscape value‑chain JSON** for the domain of **machine learning model deployment**.\n\n### Requirements\n\n* Output **valid JSON only** with this structure (no commentary).\n* Use **3 - 6/7 categories**, **3–6/7 items each**.\n* Order from abstract (user‑facing) to concrete (infrastructure).\n* Vertical axis is **visible user value**; `deps` should point from user‑visible items down to enablers they rely on.\n* Optional `logo` paths may use placeholders like `"logos/[slug].svg"`.\n\n### Domain Guidance\n\nUsers need **reliable predictions** surfaced via **APIs/UI**, backed by **versioned models**, **observability**, and **scalable infra**. Security and governance span across.\n\n### Output (JSON only)\n\n```\n{\n  "categories": [\n    {\n      "id": "experience",\n      "title": "User Experience",\n      "items": [\n        { "id": "prediction-api", "name": "Prediction API", "deps": ["model-serving", "authz"], "external": "https://example.com/api.html"},\n        { "id": "batch-scoring", "name": "Batch Scoring", "deps": ["feature-store", "orchestration"] },\n        { "id": "ui-console", "name": "Ops Console", "deps": ["monitoring", "logging"] }\n      ]\n    },\n    {\n      "id": "models",\n      "title": "Models & Data",\n      "items": [\n        { "id": "model-serving", "name": "Model Serving", "deps": ["container-runtime", "autoscaling"] },\n        { "id": "model-registry", "name": "Model Registry", "deps": ["artifact-store"] },\n        { "id": "feature-store", "name": "Feature Store", "deps": ["data-pipelines"] }\n      ]\n    },\n    {\n      "id": "platform",\n      "title": "Platform Services",\n      "items": [\n        { "id": "monitoring", "name": "Monitoring", "deps": ["metrics-backend"] },\n        { "id": "logging", "name": "Logging", "deps": ["log-backend"] },\n        { "id": "authz", "name": "AuthN/Z", "deps": ["secrets"] },\n        { "id": "orchestration", "name": "Orchestration", "deps": ["container-runtime"] }\n      ]\n    },\n    {\n      "id": "infrastructure",\n      "title": "Infrastructure",\n      "items": [\n        { "id": "autoscaling", "name": "Autoscaling", "deps": ["metrics-backend"] },\n        { "id": "container-runtime", "name": "Container Runtime", "deps": [] },\n        { "id": "artifact-store", "name": "Artifact Store", "deps": [] },\n        { "id": "data-pipelines", "name": "Data Pipelines", "deps": [] },\n        { "id": "metrics-backend", "name": "Metrics Backend", "deps": [] },\n        { "id": "log-backend", "name": "Log Backend", "deps": [] },\n        { "id": "secrets", "name": "Secrets Management", "deps": [] }\n      ]\n    }\n  ]\n}\n```\n\n---\n\n## Tips\n\n* Keep **names** user‑friendly; keep **ids** short and consistent.\n* If an item feels too broad, introduce a new category rather than bloating `deps`.\n* If there\'s a link (external), use the favicon from the website as logo\n* If you’re unsure about `logo`, omit it; you can add paths later.\n\nThe following map shows color conventions:\n\n```\n{\n  "id": "conventions",\n  "title": "Color Conventions",\n  "abstract": "Reference for color conventions.",\n  "categories": [\n    {\n      "id": "color-conventions",\n      "title": "Color conventions",\n      "items": [\n        {\n          "id": "old",\n          "name": "Old",\n          "color": "#000000",\n          "deps": []\n        },\n        {\n          "id": "new",\n          "name": "New",\n          "color": "#FFFFFF",\n          "deps": []\n        },\n        {\n          "id": "important",\n          "name": "Important",\n          "deps": [],\n          "color": "#FF0000"\n        }\n      ]\n    }\n  ]\n}\n```\n';
 function create_if_block_1(ctx) {
   let div4;
   let div1;
@@ -9155,7 +9342,7 @@ function create_fragment(ctx) {
       div18.innerHTML = `<label for="localSavePath">Save active map to ~/blockscape</label> <input id="localSavePath" class="pf-v5-c-form-control" type="text" placeholder="my-map.bs"/> <div class="local-backend__save-actions"><button id="saveLocalFile" class="pf-v5-c-button pf-m-primary" type="button">Save</button> <button id="saveLocalFileAs" class="pf-v5-c-button pf-m-secondary" type="button">Save as</button></div>`;
       t66 = space();
       div23 = element("div");
-      div23.innerHTML = `<section class="pf-v5-c-page__main-section blockscape-json-panel" hidden="" aria-label="Model source JSON editor"><p class="blockscape-json-panel__title">Paste / edit JSON for the <b>active</b> model (schema below)</p> <div class="muted">Schema: <code>{ id, title, abstract?, categories:[{id,title,items:[{id,name,logo?,external?:url,color?,deps:[]}}], links?:[{from,to}] }</code><br/>
+      div23.innerHTML = `<section class="pf-v5-c-page__main-section blockscape-json-panel" hidden="" aria-label="Model source JSON editor"><p class="blockscape-json-panel__title">Paste / edit JSON for the <b>active</b> model (schema below)</p> <div class="muted">Schema: <code>{ id, title, abstract?, categories:[{id,title,items:[{id,name,deps?:[],logo?,external?:url,color?,...}}], ... }</code><br/>
             You can paste multiple objects separated by <code>---</code> or <code>%%%</code>, or a JSON array of models, to append several models.
             A single object replaces only when you click “Replace active with JSON”. Tip: with no input focused, press
             Cmd/Ctrl+V anywhere on the page to append clipboard JSON instantly.</div> <div class="blockscape-json-controls"><textarea id="jsonBox" class="pf-v5-c-form-control" aria-label="JSON editor for the active model"></textarea> <div class="blockscape-json-actions"><button id="copyJson" class="pf-v5-c-button pf-m-tertiary" type="button" title="Copy the current JSON to your clipboard">Copy</button> <button id="copySeries" class="pf-v5-c-button pf-m-tertiary" type="button" title="Copy every version in this series as an array">Copy series</button> <button id="pasteJson" class="pf-v5-c-button pf-m-tertiary" type="button" title="Paste clipboard JSON to replace the editor contents">Paste</button> <button id="appendFromBox" class="pf-v5-c-button pf-m-primary" type="button">Append model(s)</button> <button id="replaceActive" class="pf-v5-c-button pf-m-secondary" type="button">Replace active with
