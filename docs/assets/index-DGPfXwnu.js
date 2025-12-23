@@ -1975,6 +1975,293 @@ function createItemEditor({
     isOpen: () => !!state.wrapper && !state.wrapper.hidden
   };
 }
+function createTileContextMenu({
+  menuEl,
+  previewEl,
+  previewTitleEl,
+  previewBodyEl,
+  previewActionsEl,
+  previewCloseEl,
+  escapeHtml,
+  onEditItem,
+  onChangeColor,
+  selectItem
+} = {}) {
+  const menu = menuEl || (() => {
+    const el = document.createElement("div");
+    el.className = "tile-context-menu";
+    el.hidden = true;
+    el.setAttribute("aria-hidden", "true");
+    document.body.appendChild(el);
+    return el;
+  })();
+  let previewAnchor = { x: 0, y: 0 };
+  let previewRequestId = 0;
+  function hideMenu() {
+    if (!menu) return;
+    menu.classList.remove("is-open");
+    menu.hidden = true;
+    menu.setAttribute("aria-hidden", "true");
+    menu.innerHTML = "";
+  }
+  function setPreviewActions(actions = []) {
+    if (!previewActionsEl) return;
+    previewActionsEl.innerHTML = "";
+    actions.forEach((actionDef) => {
+      const action = document.createElement("button");
+      action.type = "button";
+      action.className = "item-preview__action";
+      action.textContent = actionDef.label || "Action";
+      if (actionDef.title) action.title = actionDef.title;
+      action.addEventListener("click", (event) => {
+        event.stopPropagation();
+        if (typeof actionDef.onClick === "function") {
+          actionDef.onClick(event);
+        }
+      });
+      previewActionsEl.appendChild(action);
+    });
+    previewActionsEl.hidden = actions.length === 0;
+  }
+  function hidePreview() {
+    hideMenu();
+    if (!previewEl) return;
+    previewEl.classList.remove(
+      "is-visible",
+      "item-preview--has-frame",
+      "item-preview--expanded"
+    );
+    previewEl.setAttribute("aria-hidden", "true");
+    previewEl.hidden = true;
+    setPreviewActions([]);
+  }
+  function showPreviewAt(x, y) {
+    if (!previewEl) return;
+    previewAnchor = { x, y };
+    previewEl.hidden = false;
+    previewEl.setAttribute("aria-hidden", "false");
+    previewEl.classList.add("is-visible");
+    positionPreview(x, y);
+  }
+  function positionPreview(x, y) {
+    if (!previewEl) return;
+    const margin = 12;
+    previewEl.style.left = `${x + margin}px`;
+    previewEl.style.top = `${y + margin}px`;
+    const rect = previewEl.getBoundingClientRect();
+    let left = rect.left;
+    let top = rect.top;
+    if (rect.right > window.innerWidth - margin) {
+      left = Math.max(margin, window.innerWidth - rect.width - margin);
+    }
+    if (rect.bottom > window.innerHeight - margin) {
+      top = Math.max(margin, window.innerHeight - rect.height - margin);
+    }
+    previewEl.style.left = `${left}px`;
+    previewEl.style.top = `${top}px`;
+  }
+  function buildTileMeta(tile, event) {
+    var _a;
+    if (!tile) return null;
+    const id = tile.dataset.id;
+    const displayName = ((_a = tile.querySelector(".name")) == null ? void 0 : _a.textContent) || id || "Preview";
+    const filename = id ? `${id}.html` : "";
+    const filepath = filename ? `items/${filename}` : "";
+    return {
+      id,
+      displayName,
+      filename,
+      filepath,
+      externalUrl: tile.dataset.externalUrl || "",
+      obsidianUrl: tile.dataset.obsidianUrl || "",
+      anchorX: (event == null ? void 0 : event.clientX) ?? 0,
+      anchorY: (event == null ? void 0 : event.clientY) ?? 0
+    };
+  }
+  function makeMenuButton(label, handler) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "tile-context-menu__item";
+    btn.textContent = label;
+    btn.addEventListener("click", () => {
+      hideMenu();
+      if (typeof handler === "function") handler();
+    });
+    return btn;
+  }
+  function renderMenu(meta) {
+    if (!menu) return;
+    menu.innerHTML = "";
+    const list = document.createElement("div");
+    list.className = "tile-context-menu__list";
+    list.appendChild(
+      makeMenuButton("File view", () => openFileView(meta))
+    );
+    if (typeof onEditItem === "function") {
+      list.appendChild(
+        makeMenuButton("Edit", () => onEditItem(meta.id))
+      );
+    }
+    if (typeof onChangeColor === "function" && meta.id) {
+      list.appendChild(
+        makeMenuButton(
+          "Set color: Black",
+          () => onChangeColor(meta.id, "#111111")
+        )
+      );
+      list.appendChild(
+        makeMenuButton(
+          "Set color: White",
+          () => onChangeColor(meta.id, "#ffffff")
+        )
+      );
+      list.appendChild(
+        makeMenuButton(
+          "Set color: Red",
+          () => onChangeColor(meta.id, "#ef4444")
+        )
+      );
+      list.appendChild(
+        makeMenuButton(
+          "Set color: Green",
+          () => onChangeColor(meta.id, "#22c55e")
+        )
+      );
+    }
+    menu.appendChild(list);
+  }
+  function showMenuAt(x, y) {
+    if (!menu) return;
+    const margin = 4;
+    menu.style.left = `${x + margin}px`;
+    menu.style.top = `${y + margin}px`;
+    menu.hidden = false;
+    menu.setAttribute("aria-hidden", "false");
+    menu.classList.add("is-open");
+    const rect = menu.getBoundingClientRect();
+    let left = rect.left;
+    let top = rect.top;
+    if (rect.right > window.innerWidth - margin) {
+      left = Math.max(margin, window.innerWidth - rect.width - margin);
+    }
+    if (rect.bottom > window.innerHeight - margin) {
+      top = Math.max(margin, window.innerHeight - rect.height - margin);
+    }
+    menu.style.left = `${left}px`;
+    menu.style.top = `${top}px`;
+  }
+  async function openFileView(meta) {
+    if (!previewEl || !previewTitleEl || !previewBodyEl || !meta) return;
+    const requestId = ++previewRequestId;
+    const actions = [];
+    if (typeof onEditItem === "function" && meta.id) {
+      actions.push({
+        label: "Edit",
+        title: "Edit this item",
+        onClick: () => {
+          hidePreview();
+          onEditItem(meta.id);
+        }
+      });
+    }
+    if (meta.externalUrl) {
+      actions.push({
+        label: "Open link ↗",
+        title: meta.externalUrl,
+        onClick: () => window.open(meta.externalUrl, "_blank", "noopener")
+      });
+    }
+    if (meta.obsidianUrl) {
+      actions.push({
+        label: "Open in Obsidian",
+        title: meta.obsidianUrl,
+        onClick: () => window.open(meta.obsidianUrl, "_blank", "noopener")
+      });
+    }
+    setPreviewActions(actions);
+    if (meta.id && typeof selectItem === "function") {
+      selectItem(meta.id);
+    }
+    previewTitleEl.textContent = meta.displayName;
+    previewBodyEl.innerHTML = '<div class="item-preview__status">Loading…</div>';
+    previewEl.classList.remove("item-preview--has-frame");
+    previewEl.classList.add("item-preview--expanded");
+    showPreviewAt(meta.anchorX, meta.anchorY);
+    if (!meta.filepath) {
+      previewBodyEl.innerHTML = '<div class="item-preview__status">Preview unavailable for this item.</div>';
+      positionPreview(previewAnchor.x, previewAnchor.y);
+      return;
+    }
+    try {
+      const response = await fetch(meta.filepath, { cache: "no-cache" });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const html = await response.text();
+      if (requestId !== previewRequestId) return;
+      const trimmed = html.trim();
+      if (!trimmed) {
+        const safeName = escapeHtml ? escapeHtml(meta.filename) : meta.filename;
+        previewBodyEl.innerHTML = `<div class="item-preview__status">No content in <code>${safeName}</code>.</div>`;
+        positionPreview(previewAnchor.x, previewAnchor.y);
+        return;
+      }
+      const frame = document.createElement("iframe");
+      frame.className = "item-preview__frame";
+      frame.title = `${meta.displayName} details`;
+      frame.srcdoc = html;
+      previewBodyEl.innerHTML = "";
+      previewBodyEl.appendChild(frame);
+      previewEl.classList.add("item-preview--has-frame");
+      positionPreview(previewAnchor.x, previewAnchor.y);
+    } catch (error) {
+      if (requestId !== previewRequestId) return;
+      const safeName = escapeHtml ? escapeHtml(meta.displayName) : meta.displayName;
+      previewBodyEl.innerHTML = `<div class="item-preview__status">No preview available for <strong>${safeName}</strong>.</div>`;
+      console.warn(
+        `[Blockscape] preview unavailable for ${meta.filepath}`,
+        error
+      );
+      positionPreview(previewAnchor.x, previewAnchor.y);
+    }
+  }
+  function handleTileContextMenu(event, tile) {
+    if (!tile) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const meta = buildTileMeta(tile, event);
+    if (!meta || !meta.id) return;
+    if (typeof selectItem === "function") {
+      selectItem(meta.id);
+    }
+    renderMenu(meta);
+    showMenuAt(event.clientX, event.clientY);
+  }
+  function handleDocumentClick(event) {
+    const target2 = event == null ? void 0 : event.target;
+    const clickedInsideMenu = menu && !menu.hidden && menu.contains(target2);
+    const clickedInsidePreview = previewEl && !previewEl.hidden && previewEl.contains(target2);
+    if (!clickedInsideMenu && !clickedInsidePreview) {
+      hidePreview();
+    }
+  }
+  function handleWindowResize() {
+    if (!previewEl || previewEl.hidden) return;
+    positionPreview(previewAnchor.x, previewAnchor.y);
+  }
+  function handleWindowScroll() {
+    hidePreview();
+  }
+  if (previewCloseEl) {
+    previewCloseEl.addEventListener("click", hidePreview);
+  }
+  return {
+    handleTileContextMenu,
+    hidePreview,
+    hideMenu,
+    handleDocumentClick,
+    handleWindowResize,
+    handleWindowScroll
+  };
+}
 function slugify(base, fallback = "series") {
   return (base || fallback).trim().toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "") || fallback;
 }
@@ -2103,8 +2390,6 @@ function initBlockscape() {
   let categoryEntryHint = null;
   let showSecondaryLinks = true;
   let showReusedInMap = false;
-  let previewRequestId = 0;
-  let previewAnchor = { x: 0, y: 0 };
   let lastActiveTabId = "map";
   let lastDeletedItem = null;
   let lastDeletedCategory = null;
@@ -3787,6 +4072,19 @@ function initBlockscape() {
     }
     return null;
   }
+  function setItemColor(itemId, color) {
+    const match = findItemAndCategoryById(itemId);
+    if (!match) return false;
+    if (color) {
+      match.item.color = color;
+    } else {
+      delete match.item.color;
+    }
+    loadActiveIntoEditor();
+    rebuildFromActive();
+    select(itemId);
+    return true;
+  }
   function makeUniqueItemId(base, modelData) {
     const ids = collectAllItemIds2(modelData);
     let candidate = makeDownloadName(base || "item");
@@ -4046,6 +4344,24 @@ function initBlockscape() {
         syncSelectionClass();
       }
     }
+  });
+  const {
+    handleTileContextMenu,
+    hidePreview,
+    handleDocumentClick: handleTileMenuDocumentClick,
+    handleWindowResize: handleTileMenuWindowResize,
+    handleWindowScroll: handleTileMenuWindowScroll
+  } = createTileContextMenu({
+    menuEl: document.getElementById("tileContextMenu"),
+    previewEl: preview,
+    previewTitleEl: previewTitle,
+    previewBodyEl: previewBody,
+    previewActionsEl: previewActions,
+    previewCloseEl: previewClose,
+    escapeHtml,
+    onEditItem: (id) => itemEditor.open(id),
+    onChangeColor: (id, color) => setItemColor(id, color),
+    selectItem: (id) => select(id)
   });
   function ensureVersionContainer(entry, { versionLabel = "1", createdOn } = {}) {
     if (!entry) return entry;
@@ -6438,6 +6754,17 @@ ${text2}` : text2;
       window.addEventListener("resize", scheduleOverlaySync);
       window.addEventListener("scroll", scheduleOverlaySync, { passive: true });
       window.addEventListener("resize", scheduleThumbLabelMeasure);
+      document.addEventListener("click", (event) => {
+        var _a, _b, _c;
+        if (!selection && !selectedCategoryId) return;
+        if (typeof event.button === "number" && event.button !== 0) return;
+        const target2 = event.target;
+        const clickedTile = (_a = target2 == null ? void 0 : target2.closest) == null ? void 0 : _a.call(target2, ".tile");
+        const clickedCategoryHead = (_b = target2 == null ? void 0 : target2.closest) == null ? void 0 : _b.call(target2, ".cat-head");
+        const clickedTileMenu = (_c = target2 == null ? void 0 : target2.closest) == null ? void 0 : _c.call(target2, ".tile-context-menu");
+        if (clickedTile || clickedCategoryHead || clickedTileMenu) return;
+        clearSelection();
+      });
     }
     document.getElementById("clear").onclick = () => clearSelection();
   }
@@ -6929,142 +7256,6 @@ ${text2}` : text2;
   }
   window.addEventListener("scroll", hideTabTooltip, true);
   window.addEventListener("resize", hideTabTooltip);
-  function hidePreview() {
-    if (!preview) return;
-    preview.classList.remove(
-      "is-visible",
-      "item-preview--has-frame",
-      "item-preview--expanded"
-    );
-    preview.setAttribute("aria-hidden", "true");
-    preview.hidden = true;
-    setPreviewActions([]);
-  }
-  function showPreviewAt(x, y) {
-    if (!preview) return;
-    previewAnchor = { x, y };
-    preview.hidden = false;
-    preview.setAttribute("aria-hidden", "false");
-    preview.classList.add("is-visible");
-    positionPreview(x, y);
-  }
-  function positionPreview(x, y) {
-    if (!preview) return;
-    const margin = 12;
-    preview.style.left = `${x + margin}px`;
-    preview.style.top = `${y + margin}px`;
-    const rect = preview.getBoundingClientRect();
-    let left = rect.left;
-    let top = rect.top;
-    if (rect.right > window.innerWidth - margin) {
-      left = Math.max(margin, window.innerWidth - rect.width - margin);
-    }
-    if (rect.bottom > window.innerHeight - margin) {
-      top = Math.max(margin, window.innerHeight - rect.height - margin);
-    }
-    preview.style.left = `${left}px`;
-    preview.style.top = `${top}px`;
-  }
-  function setPreviewActions(actions = []) {
-    if (!previewActions) return;
-    previewActions.innerHTML = "";
-    actions.forEach((actionDef) => {
-      const action = document.createElement("button");
-      action.type = "button";
-      action.className = "item-preview__action";
-      action.textContent = actionDef.label || "Action";
-      if (actionDef.title) action.title = actionDef.title;
-      action.addEventListener("click", (event) => {
-        event.stopPropagation();
-        if (typeof actionDef.onClick === "function") {
-          actionDef.onClick(event);
-        }
-      });
-      previewActions.appendChild(action);
-    });
-    previewActions.hidden = actions.length === 0;
-  }
-  async function handleTileContextMenu(event, tile) {
-    var _a;
-    if (!preview) return;
-    event.stopPropagation();
-    event.preventDefault();
-    const id = tile.dataset.id;
-    const displayName = ((_a = tile.querySelector(".name")) == null ? void 0 : _a.textContent) || id || "Preview";
-    const filename = id ? `${id}.html` : "";
-    const filepath = filename ? `items/${filename}` : "";
-    const requestId = ++previewRequestId;
-    const externalUrl = tile.dataset.externalUrl || "";
-    const obsidianUrl = tile.dataset.obsidianUrl || "";
-    const actionList = [
-      {
-        label: "Edit",
-        title: "Edit this item",
-        onClick: () => {
-          hidePreview();
-          itemEditor.open(id);
-        }
-      }
-    ];
-    if (externalUrl) {
-      actionList.push({
-        label: "Open link ↗",
-        title: externalUrl,
-        onClick: () => window.open(externalUrl, "_blank", "noopener")
-      });
-    }
-    if (obsidianUrl) {
-      actionList.push({
-        label: "Open in Obsidian",
-        title: obsidianUrl,
-        onClick: () => window.open(obsidianUrl, "_blank", "noopener")
-      });
-    }
-    setPreviewActions(actionList);
-    if (id) select(id);
-    previewTitle.textContent = displayName;
-    previewBody.innerHTML = '<div class="item-preview__status">Loading…</div>';
-    preview.classList.remove("item-preview--has-frame");
-    preview.classList.add("item-preview--expanded");
-    showPreviewAt(event.clientX, event.clientY);
-    if (!filepath) {
-      previewBody.innerHTML = '<div class="item-preview__status">Preview unavailable for this item.</div>';
-      positionPreview(previewAnchor.x, previewAnchor.y);
-      return;
-    }
-    try {
-      const response = await fetch(filepath, { cache: "no-cache" });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const html = await response.text();
-      if (requestId !== previewRequestId) return;
-      const trimmed = html.trim();
-      if (!trimmed) {
-        previewBody.innerHTML = `<div class="item-preview__status">No content in <code>${escapeHtml(
-          filename
-        )}</code>.</div>`;
-        positionPreview(previewAnchor.x, previewAnchor.y);
-        return;
-      }
-      const frame = document.createElement("iframe");
-      frame.className = "item-preview__frame";
-      frame.title = `${displayName} details`;
-      frame.srcdoc = html;
-      previewBody.innerHTML = "";
-      previewBody.appendChild(frame);
-      preview.classList.add("item-preview--has-frame");
-      positionPreview(previewAnchor.x, previewAnchor.y);
-    } catch (error) {
-      if (requestId !== previewRequestId) return;
-      previewBody.innerHTML = `<div class="item-preview__status">No preview available for <strong>${escapeHtml(
-        displayName
-      )}</strong>.</div>`;
-      console.warn(`[Blockscape] preview unavailable for ${filepath}`, error);
-      positionPreview(previewAnchor.x, previewAnchor.y);
-    }
-  }
-  if (previewClose) {
-    previewClose.addEventListener("click", hidePreview);
-  }
   if (helpButton) {
     helpButton.addEventListener("click", () => {
       openShortcutHelp();
@@ -7107,9 +7298,7 @@ ${text2}` : text2;
   }
   document.addEventListener("click", (event) => {
     if (typeof event.button === "number" && event.button !== 0) return;
-    if (!preview || preview.hidden) return;
-    if (preview.contains(event.target)) return;
-    hidePreview();
+    handleTileMenuDocumentClick(event);
   });
   if (downloadButton) {
     downloadButton.addEventListener("click", () => {
@@ -7393,17 +7582,9 @@ ${text2}` : text2;
     }
   });
   window.addEventListener("resize", () => {
-    if (!preview || preview.hidden) return;
-    positionPreview(previewAnchor.x, previewAnchor.y);
+    handleTileMenuWindowResize();
   });
-  window.addEventListener(
-    "scroll",
-    () => {
-      if (!preview || preview.hidden) return;
-      hidePreview();
-    },
-    true
-  );
+  window.addEventListener("scroll", () => handleTileMenuWindowScroll(), true);
   let draggedItemId = null;
   let draggedCategoryId = null;
   function handleDragStart(e) {
@@ -9247,10 +9428,12 @@ function create_fragment(ctx) {
   let t96;
   let div27;
   let t97;
-  let div32;
-  let t104;
-  let shortcuthelp;
+  let div28;
+  let t98;
+  let div33;
   let t105;
+  let shortcuthelp;
+  let t106;
   let newpanel;
   let current;
   let mounted;
@@ -9357,11 +9540,13 @@ function create_fragment(ctx) {
       t96 = space();
       div27 = element("div");
       t97 = space();
-      div32 = element("div");
-      div32.innerHTML = `<div class="item-preview__header"><span class="item-preview__title">Preview</span> <div class="item-preview__actions" hidden=""></div> <button type="button" class="item-preview__close" aria-label="Close preview">×</button></div> <div class="item-preview__body"><div class="item-preview__status">Right-click a tile to see related notes.</div></div>`;
-      t104 = space();
-      create_component(shortcuthelp.$$.fragment);
+      div28 = element("div");
+      t98 = space();
+      div33 = element("div");
+      div33.innerHTML = `<div class="item-preview__header"><span class="item-preview__title">Preview</span> <div class="item-preview__actions" hidden=""></div> <button type="button" class="item-preview__close" aria-label="Close preview">×</button></div> <div class="item-preview__body"><div class="item-preview__status">Right-click a tile to see related notes.</div></div>`;
       t105 = space();
+      create_component(shortcuthelp.$$.fragment);
+      t106 = space();
       create_component(newpanel.$$.fragment);
       document_1.title = "Blockscape — simple landscape-style tiles";
       attr(link, "rel", "icon");
@@ -9459,10 +9644,14 @@ function create_fragment(ctx) {
       attr(div27, "class", "blockscape-tab-tooltip");
       div27.hidden = true;
       attr(div27, "aria-hidden", "true");
-      attr(div32, "id", "itemPreview");
-      attr(div32, "class", "item-preview");
-      div32.hidden = true;
-      attr(div32, "aria-hidden", "true");
+      attr(div28, "id", "tileContextMenu");
+      attr(div28, "class", "tile-context-menu");
+      div28.hidden = true;
+      attr(div28, "aria-hidden", "true");
+      attr(div33, "id", "itemPreview");
+      attr(div33, "class", "item-preview");
+      div33.hidden = true;
+      attr(div33, "aria-hidden", "true");
     },
     m(target2, anchor) {
       append(document_1.head, link);
@@ -9537,10 +9726,12 @@ function create_fragment(ctx) {
       insert(target2, t96, anchor);
       insert(target2, div27, anchor);
       insert(target2, t97, anchor);
-      insert(target2, div32, anchor);
-      insert(target2, t104, anchor);
-      mount_component(shortcuthelp, target2, anchor);
+      insert(target2, div28, anchor);
+      insert(target2, t98, anchor);
+      insert(target2, div33, anchor);
       insert(target2, t105, anchor);
+      mount_component(shortcuthelp, target2, anchor);
+      insert(target2, t106, anchor);
       mount_component(newpanel, target2, anchor);
       current = true;
       if (!mounted) {
@@ -9601,9 +9792,11 @@ function create_fragment(ctx) {
         detach(t96);
         detach(div27);
         detach(t97);
-        detach(div32);
-        detach(t104);
+        detach(div28);
+        detach(t98);
+        detach(div33);
         detach(t105);
+        detach(t106);
       }
       detach(link);
       destroy_component(shortcuthelp, detaching);

@@ -4,6 +4,7 @@ import {
   createItemEditor,
   updateItemReferences,
 } from "./itemEditor";
+import { createTileContextMenu } from "./tileContextMenu";
 import { ensureSeriesId, getSeriesId, makeSeriesId } from "./series";
 
 const ASSET_BASE =
@@ -90,8 +91,6 @@ export function initBlockscape() {
   let categoryEntryHint = null;
   let showSecondaryLinks = true;
   let showReusedInMap = false;
-  let previewRequestId = 0;
-  let previewAnchor = { x: 0, y: 0 };
   let lastActiveTabId = "map";
   let lastDeletedItem = null;
   let lastDeletedCategory = null;
@@ -1993,6 +1992,20 @@ export function initBlockscape() {
     return null;
   }
 
+  function setItemColor(itemId, color) {
+    const match = findItemAndCategoryById(itemId);
+    if (!match) return false;
+    if (color) {
+      match.item.color = color;
+    } else {
+      delete match.item.color;
+    }
+    loadActiveIntoEditor();
+    rebuildFromActive();
+    select(itemId);
+    return true;
+  }
+
   function makeUniqueItemId(base, modelData) {
     const ids = collectAllItemIds(modelData);
     let candidate = makeDownloadName(base || "item") || `item-${uid()}`;
@@ -2277,6 +2290,25 @@ export function initBlockscape() {
         syncSelectionClass();
       }
     },
+  });
+
+  const {
+    handleTileContextMenu,
+    hidePreview,
+    handleDocumentClick: handleTileMenuDocumentClick,
+    handleWindowResize: handleTileMenuWindowResize,
+    handleWindowScroll: handleTileMenuWindowScroll,
+  } = createTileContextMenu({
+    menuEl: document.getElementById("tileContextMenu"),
+    previewEl: preview,
+    previewTitleEl: previewTitle,
+    previewBodyEl: previewBody,
+    previewActionsEl: previewActions,
+    previewCloseEl: previewClose,
+    escapeHtml,
+    onEditItem: (id) => itemEditor.open(id),
+    onChangeColor: (id, color) => setItemColor(id, color),
+    selectItem: (id) => select(id),
   });
 
   function ensureVersionContainer(
@@ -5097,6 +5129,16 @@ export function initBlockscape() {
       window.addEventListener("resize", scheduleOverlaySync);
       window.addEventListener("scroll", scheduleOverlaySync, { passive: true });
       window.addEventListener("resize", scheduleThumbLabelMeasure);
+      document.addEventListener("click", (event) => {
+        if (!selection && !selectedCategoryId) return;
+        if (typeof event.button === "number" && event.button !== 0) return;
+        const target = event.target;
+        const clickedTile = target?.closest?.(".tile");
+        const clickedCategoryHead = target?.closest?.(".cat-head");
+        const clickedTileMenu = target?.closest?.(".tile-context-menu");
+        if (clickedTile || clickedCategoryHead || clickedTileMenu) return;
+        clearSelection();
+      });
     }
     document.getElementById("clear").onclick = () => clearSelection();
   }
@@ -5648,152 +5690,6 @@ export function initBlockscape() {
   window.addEventListener("scroll", hideTabTooltip, true);
   window.addEventListener("resize", hideTabTooltip);
 
-  function hidePreview() {
-    if (!preview) return;
-    preview.classList.remove(
-      "is-visible",
-      "item-preview--has-frame",
-      "item-preview--expanded"
-    );
-    preview.setAttribute("aria-hidden", "true");
-    preview.hidden = true;
-    setPreviewActions([]);
-  }
-
-  function showPreviewAt(x, y) {
-    if (!preview) return;
-    previewAnchor = { x, y };
-    preview.hidden = false;
-    preview.setAttribute("aria-hidden", "false");
-    preview.classList.add("is-visible");
-    positionPreview(x, y);
-  }
-
-  function positionPreview(x, y) {
-    if (!preview) return;
-    const margin = 12;
-    preview.style.left = `${x + margin}px`;
-    preview.style.top = `${y + margin}px`;
-    const rect = preview.getBoundingClientRect();
-    let left = rect.left;
-    let top = rect.top;
-    if (rect.right > window.innerWidth - margin) {
-      left = Math.max(margin, window.innerWidth - rect.width - margin);
-    }
-    if (rect.bottom > window.innerHeight - margin) {
-      top = Math.max(margin, window.innerHeight - rect.height - margin);
-    }
-    preview.style.left = `${left}px`;
-    preview.style.top = `${top}px`;
-  }
-
-  function setPreviewActions(actions = []) {
-    if (!previewActions) return;
-    previewActions.innerHTML = "";
-    actions.forEach((actionDef) => {
-      const action = document.createElement("button");
-      action.type = "button";
-      action.className = "item-preview__action";
-      action.textContent = actionDef.label || "Action";
-      if (actionDef.title) action.title = actionDef.title;
-      action.addEventListener("click", (event) => {
-        event.stopPropagation();
-        if (typeof actionDef.onClick === "function") {
-          actionDef.onClick(event);
-        }
-      });
-      previewActions.appendChild(action);
-    });
-    previewActions.hidden = actions.length === 0;
-  }
-
-  async function handleTileContextMenu(event, tile) {
-    if (!preview) return;
-    event.stopPropagation();
-    event.preventDefault();
-    const id = tile.dataset.id;
-    const displayName =
-      tile.querySelector(".name")?.textContent || id || "Preview";
-    const filename = id ? `${id}.html` : "";
-    const filepath = filename ? `items/${filename}` : "";
-    const requestId = ++previewRequestId;
-    const externalUrl = tile.dataset.externalUrl || "";
-    const obsidianUrl = tile.dataset.obsidianUrl || "";
-    const actionList = [
-      {
-        label: "Edit",
-        title: "Edit this item",
-        onClick: () => {
-          hidePreview();
-          itemEditor.open(id);
-        },
-      },
-    ];
-    if (externalUrl) {
-      actionList.push({
-        label: "Open link ↗",
-        title: externalUrl,
-        onClick: () => window.open(externalUrl, "_blank", "noopener"),
-      });
-    }
-    if (obsidianUrl) {
-      actionList.push({
-        label: "Open in Obsidian",
-        title: obsidianUrl,
-        onClick: () => window.open(obsidianUrl, "_blank", "noopener"),
-      });
-    }
-    setPreviewActions(actionList);
-    if (id) select(id);
-
-    previewTitle.textContent = displayName;
-    previewBody.innerHTML = '<div class="item-preview__status">Loading…</div>';
-    preview.classList.remove("item-preview--has-frame");
-    preview.classList.add("item-preview--expanded");
-    showPreviewAt(event.clientX, event.clientY);
-
-    if (!filepath) {
-      previewBody.innerHTML =
-        '<div class="item-preview__status">Preview unavailable for this item.</div>';
-      positionPreview(previewAnchor.x, previewAnchor.y);
-      return;
-    }
-
-    try {
-      const response = await fetch(filepath, { cache: "no-cache" });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const html = await response.text();
-      if (requestId !== previewRequestId) return;
-      const trimmed = html.trim();
-      if (!trimmed) {
-        previewBody.innerHTML = `<div class="item-preview__status">No content in <code>${escapeHtml(
-          filename
-        )}</code>.</div>`;
-        positionPreview(previewAnchor.x, previewAnchor.y);
-        return;
-      }
-      const frame = document.createElement("iframe");
-      frame.className = "item-preview__frame";
-      frame.title = `${displayName} details`;
-      frame.srcdoc = html;
-      previewBody.innerHTML = "";
-      previewBody.appendChild(frame);
-      preview.classList.add("item-preview--has-frame");
-      positionPreview(previewAnchor.x, previewAnchor.y);
-    } catch (error) {
-      if (requestId !== previewRequestId) return;
-      previewBody.innerHTML = `<div class="item-preview__status">No preview available for <strong>${escapeHtml(
-        displayName
-      )}</strong>.</div>`;
-      console.warn(`[Blockscape] preview unavailable for ${filepath}`, error);
-      positionPreview(previewAnchor.x, previewAnchor.y);
-    }
-  }
-
-  if (previewClose) {
-    previewClose.addEventListener("click", hidePreview);
-  }
-
   if (helpButton) {
     helpButton.addEventListener("click", () => {
       openShortcutHelp();
@@ -5844,9 +5740,7 @@ export function initBlockscape() {
 
   document.addEventListener("click", (event) => {
     if (typeof event.button === "number" && event.button !== 0) return;
-    if (!preview || preview.hidden) return;
-    if (preview.contains(event.target)) return;
-    hidePreview();
+    handleTileMenuDocumentClick(event);
   });
 
   if (downloadButton) {
@@ -6162,18 +6056,10 @@ export function initBlockscape() {
   });
 
   window.addEventListener("resize", () => {
-    if (!preview || preview.hidden) return;
-    positionPreview(previewAnchor.x, previewAnchor.y);
+    handleTileMenuWindowResize();
   });
 
-  window.addEventListener(
-    "scroll",
-    () => {
-      if (!preview || preview.hidden) return;
-      hidePreview();
-    },
-    true
-  );
+  window.addEventListener("scroll", () => handleTileMenuWindowScroll(), true);
 
   // ===== Drag and drop reorder (per model) =====
   let draggedItemId = null;

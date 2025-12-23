@@ -2259,6 +2259,52 @@
       color: var(--color-muted);
     }
 
+    .tile-context-menu {
+      position: fixed;
+      min-width: 190px;
+      background: var(--blockscape-surface);
+      border: 1px solid var(--blockscape-border);
+      border-radius: var(--radius-md);
+      box-shadow: var(--color-shadow);
+      padding: var(--space-2xs);
+      opacity: 0;
+      transform: translateY(4px);
+      pointer-events: none;
+      transition: opacity var(--transition), transform var(--transition);
+      z-index: 1001;
+    }
+
+    .tile-context-menu.is-open {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+    }
+
+    .tile-context-menu__list {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2xs);
+    }
+
+    .tile-context-menu__item {
+      width: 100%;
+      text-align: left;
+      border: 1px solid transparent;
+      background: transparent;
+      padding: var(--space-2xs) var(--space-sm);
+      border-radius: var(--radius-sm);
+      color: var(--blockscape-foreground);
+      cursor: pointer;
+      font-size: var(--font-size-xs);
+    }
+
+    .tile-context-menu__item:hover,
+    .tile-context-menu__item:focus-visible {
+      background: var(--color-surface-muted);
+      border-color: var(--color-border);
+      outline: none;
+    }
+
     .shortcut-help {
       position: fixed;
       inset: 0;

@@ -326,6 +326,7 @@
 
 <svg id="overlay" class="svg-layer"></svg>
 <div id="tabTooltip" class="blockscape-tab-tooltip" hidden aria-hidden="true"></div>
+<div id="tileContextMenu" class="tile-context-menu" hidden aria-hidden="true"></div>
 
 <div id="itemPreview" class="item-preview" hidden aria-hidden="true">
   <div class="item-preview__header">
