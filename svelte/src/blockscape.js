@@ -90,6 +90,7 @@ export function initBlockscape() {
   let selectionRelations = null;
   let categoryEntryHint = null;
   let showSecondaryLinks = true;
+  let activeViewIsCategory = false;
   let showReusedInMap = false;
   let lastActiveTabId = "map";
   let lastDeletedItem = null;
@@ -248,16 +249,44 @@ export function initBlockscape() {
     );
   }
 
-  function updateUrlForServerPath(relPath) {
+  function updateUrlForServerPath(relPath, { modelId, itemId } = {}) {
     if (typeof window === "undefined" || !window.location || !relPath) return;
     const normalized = normalizeLocalSavePath(relPath);
     if (!normalized) return;
+    const activeModel = models[activeIndex];
+    const normalizedSource = normalizeLocalSavePath(activeModel?.sourcePath);
+    const resolvedModelId =
+      modelId ??
+      (normalizedSource && normalizedSource === normalized
+        ? getModelId(activeModel)
+        : null);
+    const resolvedItemId =
+      itemId ??
+      (normalizedSource && normalizedSource === normalized ? selection : null);
+    const encodedPathSegments = normalized
+      .split("/")
+      .filter(Boolean)
+      .map((part) => encodeURIComponent(part));
+    const encodedModel = resolvedModelId
+      ? encodeURIComponent(resolvedModelId)
+      : null;
+    const encodedItem = resolvedItemId
+      ? encodeURIComponent(resolvedItemId)
+      : null;
     try {
       const url = new URL(window.location.href);
       const cleanedSearch = new URLSearchParams(url.search);
       cleanedSearch.delete("load");
       cleanedSearch.delete("share");
-      const newPath = `/server/${normalized}`.replace(/\/+/g, "/");
+      const newPath = [
+        "",
+        "server",
+        ...encodedPathSegments,
+        ...(encodedModel ? [encodedModel] : []),
+        ...(encodedItem ? [encodedItem] : []),
+      ]
+        .join("/")
+        .replace(/\/+/g, "/");
       url.pathname = newPath;
       url.search = cleanedSearch.toString()
         ? `?${cleanedSearch.toString()}`
@@ -280,17 +309,36 @@ export function initBlockscape() {
     if (serverIndex === -1) return null;
     const remainder = segments.slice(serverIndex + 1);
     if (!remainder.length) return null;
-    const lastSegment = remainder[remainder.length - 1] || "";
-    if (!lastSegment.toLowerCase().endsWith(".bs")) return null;
-    const decoded = remainder.map((part) => {
+    const bsIndex = remainder.findIndex((part) =>
+      part.toLowerCase().endsWith(".bs")
+    );
+    if (bsIndex === -1) return null;
+    const fileParts = remainder.slice(0, bsIndex + 1);
+    const extraParts = remainder.slice(bsIndex + 1);
+    const decodePart = (part) => {
       try {
         return decodeURIComponent(part);
       } catch {
         return part;
       }
+    };
+    const decodedFile = fileParts.map(decodePart);
+    const decodedExtras = extraParts.map(decodePart);
+    const joined = decodedFile.join("/");
+    const normalized = normalizeLocalSavePath(joined);
+    if (!normalized) return null;
+    const modelId = decodedExtras[0] ? decodedExtras[0].trim() : null;
+    const itemId = decodedExtras[1] ? decodedExtras[1].trim() : null;
+    return { path: normalized, modelId: modelId || null, itemId: itemId || null };
+  }
+
+  function updateServerUrlFromActive({ itemId } = {}) {
+    const active = models[activeIndex];
+    if (!active?.sourcePath) return;
+    updateUrlForServerPath(active.sourcePath, {
+      modelId: getModelId(active),
+      itemId: itemId === undefined ? selection : itemId,
     });
-    const joined = decoded.join("/");
-    return normalizeLocalSavePath(joined);
   }
 
   function isGithubPagesHost() {
@@ -3042,6 +3090,7 @@ export function initBlockscape() {
     }
     localBackend.updateActiveSavePlaceholder();
     apicurio.updateAvailability();
+    updateServerUrlFromActive();
   }
 
   function renderModelList() {
@@ -3573,8 +3622,9 @@ export function initBlockscape() {
   }
 
   async function consumeServerPathLoad() {
-    const relPath = extractServerFilePathFromUrl();
-    if (!relPath) return null;
+    const serverPath = extractServerFilePathFromUrl();
+    if (!serverPath?.path) return null;
+    const { path: relPath, modelId, itemId } = serverPath;
     try {
       const backendReady = await isLocalBackendReady();
       if (!backendReady) {
@@ -3588,7 +3638,14 @@ export function initBlockscape() {
         if (typeof localBackend?.highlightSource === "function") {
           localBackend.highlightSource(relPath);
         }
-        return result.firstIndex;
+        let modelIndex = result.firstIndex;
+        if (modelId) {
+          const found = findModelIndexByIdOrSource(modelId);
+          if (found !== -1) {
+            modelIndex = found;
+          }
+        }
+        return { modelIndex, itemId: itemId || null, modelId: modelId || null };
       }
       return null;
     } catch (err) {
@@ -3727,6 +3784,32 @@ export function initBlockscape() {
       if (seriesId && !map.has(seriesId)) map.set(seriesId, idx);
     });
     return map;
+  }
+
+  function resolveVersionIndexFromCategory(cat, seriesIdLookup) {
+    if (!cat || !seriesIdLookup) return null;
+    const candidates = new Set();
+    const addCandidate = (value) => {
+      const trimmed = (value ?? "").toString().trim();
+      if (!trimmed) return;
+      candidates.add(trimmed);
+      candidates.add(trimmed.toLowerCase());
+      candidates.add(makeDownloadName(trimmed));
+    };
+    addCandidate(cat.id);
+    addCandidate(cat.title);
+
+    for (const cand of candidates) {
+      if (seriesIdLookup.has(cand)) return seriesIdLookup.get(cand);
+    }
+
+    for (const cand of candidates) {
+      const lower = cand.toLowerCase();
+      for (const [key, idx] of seriesIdLookup.entries()) {
+        if (key.toLowerCase() === lower) return idx;
+      }
+    }
+    return null;
   }
 
   const thumbnailCache = new WeakMap();
@@ -4127,6 +4210,15 @@ export function initBlockscape() {
     const activeSeriesIndex = getActiveApicurioVersionIndex(
       models[activeIndex]
     );
+    const activeVersionEntry =
+      models[activeIndex]?.apicurioVersions?.[activeSeriesIndex] || null;
+    const activeIsCategoryView =
+      (activeViewIsCategory = Boolean(
+        activeVersionEntry?.isCategoryView ||
+          (activeVersionEntry?.version || "").startsWith(
+            CATEGORY_VIEW_VERSION_PREFIX
+          )
+      ));
     infoTabButton = null;
     activeInfoTooltipHtml = "";
 
@@ -4864,23 +4956,58 @@ export function initBlockscape() {
       const section = document.createElement("section");
       section.className = "category";
       section.dataset.cat = cat.id;
+      const categorySeriesVersionIndex = activeIsCategoryView
+        ? resolveVersionIndexFromCategory(cat, seriesIdLookup)
+        : null;
 
       const head = document.createElement("div");
       head.className = "cat-head";
       head.dataset.cat = cat.id;
       head.tabIndex = 0;
-      head.title = "Select category";
+      if (
+        activeIsCategoryView &&
+        Number.isInteger(categorySeriesVersionIndex)
+      ) {
+        head.dataset.seriesVersionIndex = String(categorySeriesVersionIndex);
+        head.title = "Open this category's map in the series";
+        head.classList.add("cat-head--series-link");
+      } else {
+        head.title = "Select category";
+      }
       head.innerHTML = `<div class="cat-title">${escapeHtml(
         cat.title || cat.id
       )}</div>
                           <div class="muted cat-count">${
                             (cat.items || []).length
                           } items</div>`;
-      head.addEventListener("click", () => selectCategory(cat.id));
+      head.addEventListener("click", () => {
+        const targetSeriesIndex =
+          head.dataset.seriesVersionIndex != null
+            ? parseInt(head.dataset.seriesVersionIndex, 10)
+            : null;
+        const activeEntry = models[activeIndex];
+        const currentSeriesIndex = activeEntry
+          ? getActiveApicurioVersionIndex(activeEntry)
+          : -1;
+        const canNavigateToSeries =
+          activeIsCategoryView &&
+          activeEntry?.apicurioVersions?.length > 1 &&
+          Number.isInteger(targetSeriesIndex) &&
+          targetSeriesIndex !== currentSeriesIndex;
+        if (canNavigateToSeries) {
+          const changed = setActiveApicurioVersion(
+            activeIndex,
+            targetSeriesIndex
+          );
+          if (changed) return;
+        }
+
+        selectCategory(cat.id);
+      });
       head.addEventListener("keydown", (event) => {
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
-          selectCategory(cat.id);
+          head.click();
         }
       });
       head.addEventListener("focus", () =>
@@ -4907,24 +5034,31 @@ export function initBlockscape() {
         if (externalMeta.url) {
           tile.dataset.externalUrl = externalMeta.url;
         }
-        if (seriesIdLookup.has(it.id)) {
-          const targetIdx = seriesIdLookup.get(it.id);
-          tile.dataset.seriesVersionIndex = String(targetIdx);
-          tile.classList.add("tile--series-link");
-          const label =
-            targetIdx === activeSeriesIndex
-              ? "Current map in this series"
-              : `Open version ${targetIdx + 1} in this series`;
-          appendTitleLine(tile, label);
+        if (!activeIsCategoryView) {
+          let targetSeriesIndex = null;
+          if (seriesIdLookup.has(it.id)) {
+            targetSeriesIndex = seriesIdLookup.get(it.id);
+          }
+          if (Number.isInteger(targetSeriesIndex)) {
+            tile.dataset.seriesVersionIndex = String(targetSeriesIndex);
+            tile.classList.add("tile--series-link");
+            const label =
+              targetSeriesIndex === activeSeriesIndex
+                ? "Current map in this series"
+                : `Open version ${targetSeriesIndex + 1} in this series`;
+            appendTitleLine(tile, label);
+          }
         }
         if (obsidianUrl) {
           tile.dataset.obsidianUrl = obsidianUrl;
         }
 
-        const navTargetIndex = findModelIndexByIdOrSource(it.id);
-        if (navTargetIndex !== -1 && navTargetIndex !== activeIndex) {
-          tile.classList.add("tile--series-link");
-          tile.dataset.navTargetIndex = String(navTargetIndex);
+        if (!activeIsCategoryView) {
+          const navTargetIndex = findModelIndexByIdOrSource(it.id);
+          if (navTargetIndex !== -1 && navTargetIndex !== activeIndex) {
+            tile.classList.add("tile--series-link");
+            tile.dataset.navTargetIndex = String(navTargetIndex);
+          }
         }
 
         const img = document.createElement("img");
@@ -4950,21 +5084,24 @@ export function initBlockscape() {
         badge.className = "badge";
         badge.textContent = "reused";
 
-        const deleteBtn = document.createElement("button");
-        deleteBtn.type = "button";
-        deleteBtn.className = "tile-delete";
-        deleteBtn.setAttribute("aria-label", `Delete ${it.name || it.id}`);
-        deleteBtn.textContent = "×";
-        deleteBtn.addEventListener("click", (event) => {
-          event.stopPropagation();
-          deleteItemById(it.id);
-        });
+        let deleteBtn = null;
+        if (!activeIsCategoryView) {
+          deleteBtn = document.createElement("button");
+          deleteBtn.type = "button";
+          deleteBtn.className = "tile-delete";
+          deleteBtn.setAttribute("aria-label", `Delete ${it.name || it.id}`);
+          deleteBtn.textContent = "×";
+          deleteBtn.addEventListener("click", (event) => {
+            event.stopPropagation();
+            deleteItemById(it.id);
+          });
+        }
 
         if (externalMeta.url) {
           tile.appendChild(createExternalLinkButton(externalMeta.url));
         }
         applyObsidianLinkToTile(tile, obsidianUrl);
-        tile.appendChild(deleteBtn);
+        if (deleteBtn) tile.appendChild(deleteBtn);
         tile.appendChild(img);
         tile.appendChild(nm);
         tile.appendChild(idLine);
@@ -4977,22 +5114,26 @@ export function initBlockscape() {
       renderHost.appendChild(section);
       categoryIndex.set(cat.id, { el: section, headEl: head });
 
-      const addTile = document.createElement("button");
-      addTile.type = "button";
-      addTile.className = "tile-add";
-      addTile.innerHTML =
-        '<span class="tile-add__icon" aria-hidden="true">+</span><span class="tile-add__label"></span>';
-      addTile.addEventListener("click", () => addItemToCategory(cat.id));
-      grid.appendChild(addTile);
+      if (!activeIsCategoryView) {
+        const addTile = document.createElement("button");
+        addTile.type = "button";
+        addTile.className = "tile-add";
+        addTile.innerHTML =
+          '<span class="tile-add__icon" aria-hidden="true">+</span><span class="tile-add__label"></span>';
+        addTile.addEventListener("click", () => addItemToCategory(cat.id));
+        grid.appendChild(addTile);
+      }
     });
 
-    const addCategoryButton = document.createElement("button");
-    addCategoryButton.type = "button";
-    addCategoryButton.className = "category-add";
-    addCategoryButton.innerHTML =
-      '<span class="category-add__icon" aria-hidden="true">+</span><span class="category-add__label">Add category</span><span class="category-add__hint">(Insert)</span>';
-    addCategoryButton.addEventListener("click", () => addCategoryAtEnd());
-    renderHost.appendChild(addCategoryButton);
+    if (!activeIsCategoryView) {
+      const addCategoryButton = document.createElement("button");
+      addCategoryButton.type = "button";
+      addCategoryButton.className = "category-add";
+      addCategoryButton.innerHTML =
+        '<span class="category-add__icon" aria-hidden="true">+</span><span class="category-add__label">Add category</span><span class="category-add__hint">(Insert)</span>';
+      addCategoryButton.addEventListener("click", () => addCategoryAtEnd());
+      renderHost.appendChild(addCategoryButton);
+    }
 
     applyReusedHighlights();
 
@@ -5241,6 +5382,7 @@ export function initBlockscape() {
     if (externalUrl) {
       showNotice("This item has link to", NOTICE_TIMEOUT_MS, externalUrl);
     }
+    updateServerUrlFromActive();
   }
 
   function selectCategory(
@@ -5311,6 +5453,7 @@ export function initBlockscape() {
     selectionRelations = null;
     clearStyles();
     drawLinks();
+    updateServerUrlFromActive({ itemId: null });
   }
 
   function clearCategorySelection() {
@@ -5733,6 +5876,7 @@ export function initBlockscape() {
   if (app) {
     app.addEventListener("contextmenu", (event) => {
       const tile = event.target.closest(".tile");
+      if (activeViewIsCategory) return;
       if (!tile || !app.contains(tile)) return;
       handleTileContextMenu(event, tile);
     });
@@ -5905,6 +6049,7 @@ export function initBlockscape() {
     if (isEditingItem) {
       return;
     }
+    const isCategoryView = activeViewIsCategory;
 
     if ((event.ctrlKey || event.metaKey) && event.code === "KeyS") {
       event.preventDefault();
@@ -5945,6 +6090,7 @@ export function initBlockscape() {
     }
 
     if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+      if (isCategoryView) return;
       if (!shouldHandleGlobalPaste()) return;
       const step = event.key === "ArrowLeft" ? -1 : 1;
       if (event.altKey) return;
@@ -5974,6 +6120,7 @@ export function initBlockscape() {
     }
 
     if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+      if (isCategoryView) return;
       if (!shouldHandleGlobalPaste()) return;
       const step = event.key === "ArrowUp" ? -1 : 1;
       if ((event.ctrlKey || event.metaKey) && !event.altKey) {
@@ -6010,6 +6157,7 @@ export function initBlockscape() {
     }
 
     if (event.key === "Delete") {
+      if (isCategoryView) return;
       if (!shouldHandleGlobalPaste()) return;
       if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey)
         return;
@@ -6023,6 +6171,7 @@ export function initBlockscape() {
     }
 
     if (event.key === "F2") {
+      if (isCategoryView) return;
       if (!shouldHandleGlobalPaste()) return;
       const targetCategoryId =
         (selectedCategoryId && !selection && selectedCategoryId) ||
@@ -6045,6 +6194,7 @@ export function initBlockscape() {
     }
 
     if (event.key === "Insert") {
+      if (isCategoryView) return;
       if (!shouldHandleGlobalPaste()) return;
       if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey)
         return;
@@ -6066,6 +6216,10 @@ export function initBlockscape() {
   let draggedCategoryId = null;
 
   function handleDragStart(e) {
+    if (activeViewIsCategory) {
+      e.preventDefault();
+      return;
+    }
     hidePreview();
     draggedItemId = e.target.dataset.id;
     draggedCategoryId = e.target.closest(".category").dataset.cat;
@@ -7389,7 +7543,11 @@ export function initBlockscape() {
     }
 
     // Load explicit model from URL hash/search (?load= or #load=)
-    const serverPathIndex = await consumeServerPathLoad();
+    const serverPathResult = await consumeServerPathLoad();
+    const serverPathIndex =
+      typeof serverPathResult?.modelIndex === "number"
+        ? serverPathResult.modelIndex
+        : null;
     const loadIndex = await consumeLoadParam();
     const editorResult = consumeEditorPayload();
     const editorIndex = editorResult?.index;
@@ -7405,5 +7563,23 @@ export function initBlockscape() {
         ? editorIndex
         : firstSeedIndex ?? 0;
     setActive(initialIndex);
+    if (
+      serverPathResult?.itemId &&
+      typeof serverPathResult.modelIndex === "number" &&
+      serverPathResult.modelIndex === initialIndex
+    ) {
+      requestAnimationFrame(() => {
+        if (activeIndex !== serverPathResult.modelIndex) return;
+        const tile = index.get(serverPathResult.itemId)?.el;
+        if (!tile) return;
+        select(serverPathResult.itemId);
+        tile.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+          inline: "center",
+        });
+        tile.focus({ preventScroll: true });
+      });
+    }
   })();
 }

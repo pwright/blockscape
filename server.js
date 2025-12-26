@@ -274,7 +274,7 @@ server.listen(PORT, HOST, () => {
   console.log(`Blockscape server listening at http://${HOST}:${PORT}`);
   console.log(`Open the app with local backend: http://${HOST}:${PORT}/server`);
   console.log(
-    `Auto-load a local file: http://${HOST}:${PORT}/server/path/to/file.bs`
+    `Auto-load a local file (optionally with /model-id/item-id): http://${HOST}:${PORT}/server/path/to/file.bs`
   );
   console.log(`Serving dist from: ${DIST_DIR}`);
   console.log(`File API root: ${ROOT_DIR}`);

@@ -2389,6 +2389,7 @@ function initBlockscape() {
   let selectionRelations = null;
   let categoryEntryHint = null;
   let showSecondaryLinks = true;
+  let activeViewIsCategory = false;
   let showReusedInMap = false;
   let lastActiveTabId = "map";
   let lastDeletedItem = null;
@@ -2526,16 +2527,29 @@ function initBlockscape() {
     const hasServerPrefix = segments[0] && segments[0].toLowerCase() === "server";
     return hasServerPrefix || searchFlag && ["1", "true", "yes", "on"].includes(searchFlag.toLowerCase());
   }
-  function updateUrlForServerPath(relPath) {
+  function updateUrlForServerPath(relPath, { modelId, itemId } = {}) {
     if (typeof window === "undefined" || !window.location || !relPath) return;
     const normalized = normalizeLocalSavePath(relPath);
     if (!normalized) return;
+    const activeModel = models[activeIndex];
+    const normalizedSource = normalizeLocalSavePath(activeModel == null ? void 0 : activeModel.sourcePath);
+    const resolvedModelId = modelId ?? (normalizedSource && normalizedSource === normalized ? getModelId(activeModel) : null);
+    const resolvedItemId = itemId ?? (normalizedSource && normalizedSource === normalized ? selection : null);
+    const encodedPathSegments = normalized.split("/").filter(Boolean).map((part) => encodeURIComponent(part));
+    const encodedModel = resolvedModelId ? encodeURIComponent(resolvedModelId) : null;
+    const encodedItem = resolvedItemId ? encodeURIComponent(resolvedItemId) : null;
     try {
       const url = new URL(window.location.href);
       const cleanedSearch = new URLSearchParams(url.search);
       cleanedSearch.delete("load");
       cleanedSearch.delete("share");
-      const newPath = `/server/${normalized}`.replace(/\/+/g, "/");
+      const newPath = [
+        "",
+        "server",
+        ...encodedPathSegments,
+        ...encodedModel ? [encodedModel] : [],
+        ...encodedItem ? [encodedItem] : []
+      ].join("/").replace(/\/+/g, "/");
       url.pathname = newPath;
       url.search = cleanedSearch.toString() ? `?${cleanedSearch.toString()}` : "";
       url.hash = "";
@@ -2555,17 +2569,35 @@ function initBlockscape() {
     if (serverIndex === -1) return null;
     const remainder = segments.slice(serverIndex + 1);
     if (!remainder.length) return null;
-    const lastSegment = remainder[remainder.length - 1] || "";
-    if (!lastSegment.toLowerCase().endsWith(".bs")) return null;
-    const decoded = remainder.map((part) => {
+    const bsIndex = remainder.findIndex(
+      (part) => part.toLowerCase().endsWith(".bs")
+    );
+    if (bsIndex === -1) return null;
+    const fileParts = remainder.slice(0, bsIndex + 1);
+    const extraParts = remainder.slice(bsIndex + 1);
+    const decodePart = (part) => {
       try {
         return decodeURIComponent(part);
       } catch {
         return part;
       }
+    };
+    const decodedFile = fileParts.map(decodePart);
+    const decodedExtras = extraParts.map(decodePart);
+    const joined = decodedFile.join("/");
+    const normalized = normalizeLocalSavePath(joined);
+    if (!normalized) return null;
+    const modelId = decodedExtras[0] ? decodedExtras[0].trim() : null;
+    const itemId = decodedExtras[1] ? decodedExtras[1].trim() : null;
+    return { path: normalized, modelId: modelId || null, itemId: itemId || null };
+  }
+  function updateServerUrlFromActive({ itemId } = {}) {
+    const active = models[activeIndex];
+    if (!(active == null ? void 0 : active.sourcePath)) return;
+    updateUrlForServerPath(active.sourcePath, {
+      modelId: getModelId(active),
+      itemId: itemId === void 0 ? selection : itemId
     });
-    const joined = decoded.join("/");
-    return normalizeLocalSavePath(joined);
   }
   function isGithubPagesHost() {
     if (typeof window === "undefined" || !window.location) return false;
@@ -5008,6 +5040,7 @@ function initBlockscape() {
     }
     localBackend.updateActiveSavePlaceholder();
     apicurio.updateAvailability();
+    updateServerUrlFromActive();
   }
   function renderModelList() {
     modelList.innerHTML = "";
@@ -5425,8 +5458,9 @@ function initBlockscape() {
     return firstIndex;
   }
   async function consumeServerPathLoad() {
-    const relPath = extractServerFilePathFromUrl();
-    if (!relPath) return null;
+    const serverPath = extractServerFilePathFromUrl();
+    if (!(serverPath == null ? void 0 : serverPath.path)) return null;
+    const { path: relPath, modelId, itemId } = serverPath;
     try {
       const backendReady = await isLocalBackendReady();
       if (!backendReady) {
@@ -5440,7 +5474,14 @@ function initBlockscape() {
         if (typeof (localBackend == null ? void 0 : localBackend.highlightSource) === "function") {
           localBackend.highlightSource(relPath);
         }
-        return result.firstIndex;
+        let modelIndex = result.firstIndex;
+        if (modelId) {
+          const found = findModelIndexByIdOrSource(modelId);
+          if (found !== -1) {
+            modelIndex = found;
+          }
+        }
+        return { modelIndex, itemId: itemId || null, modelId: modelId || null };
       }
       return null;
     } catch (err) {
@@ -5551,6 +5592,29 @@ function initBlockscape() {
       if (seriesId && !map.has(seriesId)) map.set(seriesId, idx);
     });
     return map;
+  }
+  function resolveVersionIndexFromCategory(cat, seriesIdLookup) {
+    if (!cat || !seriesIdLookup) return null;
+    const candidates = /* @__PURE__ */ new Set();
+    const addCandidate = (value) => {
+      const trimmed = (value ?? "").toString().trim();
+      if (!trimmed) return;
+      candidates.add(trimmed);
+      candidates.add(trimmed.toLowerCase());
+      candidates.add(makeDownloadName(trimmed));
+    };
+    addCandidate(cat.id);
+    addCandidate(cat.title);
+    for (const cand of candidates) {
+      if (seriesIdLookup.has(cand)) return seriesIdLookup.get(cand);
+    }
+    for (const cand of candidates) {
+      const lower = cand.toLowerCase();
+      for (const [key, idx] of seriesIdLookup.entries()) {
+        if (key.toLowerCase() === lower) return idx;
+      }
+    }
+    return null;
   }
   const thumbnailCache = /* @__PURE__ */ new WeakMap();
   function getSeriesThumbnail(entry, versionIdx) {
@@ -5799,7 +5863,7 @@ function initBlockscape() {
     return nav;
   }
   function render() {
-    var _a, _b, _c;
+    var _a, _b, _c, _d, _e;
     if (!model) return;
     const activeModelEntry = activeIndex >= 0 && models[activeIndex] ? models[activeIndex] : null;
     const prevThumbs = app && app.querySelector ? app.querySelector(".version-nav__thumbs") : null;
@@ -5887,6 +5951,12 @@ function initBlockscape() {
     const seriesIdLookup = buildModelIdToVersionIndex(models[activeIndex]);
     const activeSeriesIndex = getActiveApicurioVersionIndex(
       models[activeIndex]
+    );
+    const activeVersionEntry = ((_e = (_d = models[activeIndex]) == null ? void 0 : _d.apicurioVersions) == null ? void 0 : _e[activeSeriesIndex]) || null;
+    const activeIsCategoryView = activeViewIsCategory = Boolean(
+      (activeVersionEntry == null ? void 0 : activeVersionEntry.isCategoryView) || ((activeVersionEntry == null ? void 0 : activeVersionEntry.version) || "").startsWith(
+        CATEGORY_VIEW_VERSION_PREFIX
+      )
     );
     infoTabButton = null;
     activeInfoTooltipHtml = "";
@@ -6550,20 +6620,41 @@ ${text2}` : text2;
       const section = document.createElement("section");
       section.className = "category";
       section.dataset.cat = cat.id;
+      const categorySeriesVersionIndex = activeIsCategoryView ? resolveVersionIndexFromCategory(cat, seriesIdLookup) : null;
       const head = document.createElement("div");
       head.className = "cat-head";
       head.dataset.cat = cat.id;
       head.tabIndex = 0;
-      head.title = "Select category";
+      if (activeIsCategoryView && Number.isInteger(categorySeriesVersionIndex)) {
+        head.dataset.seriesVersionIndex = String(categorySeriesVersionIndex);
+        head.title = "Open this category's map in the series";
+        head.classList.add("cat-head--series-link");
+      } else {
+        head.title = "Select category";
+      }
       head.innerHTML = `<div class="cat-title">${escapeHtml(
         cat.title || cat.id
       )}</div>
                           <div class="muted cat-count">${(cat.items || []).length} items</div>`;
-      head.addEventListener("click", () => selectCategory(cat.id));
+      head.addEventListener("click", () => {
+        var _a2;
+        const targetSeriesIndex = head.dataset.seriesVersionIndex != null ? parseInt(head.dataset.seriesVersionIndex, 10) : null;
+        const activeEntry = models[activeIndex];
+        const currentSeriesIndex = activeEntry ? getActiveApicurioVersionIndex(activeEntry) : -1;
+        const canNavigateToSeries = activeIsCategoryView && ((_a2 = activeEntry == null ? void 0 : activeEntry.apicurioVersions) == null ? void 0 : _a2.length) > 1 && Number.isInteger(targetSeriesIndex) && targetSeriesIndex !== currentSeriesIndex;
+        if (canNavigateToSeries) {
+          const changed = setActiveApicurioVersion(
+            activeIndex,
+            targetSeriesIndex
+          );
+          if (changed) return;
+        }
+        selectCategory(cat.id);
+      });
       head.addEventListener("keydown", (event) => {
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
-          selectCategory(cat.id);
+          head.click();
         }
       });
       head.addEventListener(
@@ -6589,20 +6680,27 @@ ${text2}` : text2;
         if (externalMeta.url) {
           tile.dataset.externalUrl = externalMeta.url;
         }
-        if (seriesIdLookup.has(it.id)) {
-          const targetIdx = seriesIdLookup.get(it.id);
-          tile.dataset.seriesVersionIndex = String(targetIdx);
-          tile.classList.add("tile--series-link");
-          const label = targetIdx === activeSeriesIndex ? "Current map in this series" : `Open version ${targetIdx + 1} in this series`;
-          appendTitleLine(tile, label);
+        if (!activeIsCategoryView) {
+          let targetSeriesIndex = null;
+          if (seriesIdLookup.has(it.id)) {
+            targetSeriesIndex = seriesIdLookup.get(it.id);
+          }
+          if (Number.isInteger(targetSeriesIndex)) {
+            tile.dataset.seriesVersionIndex = String(targetSeriesIndex);
+            tile.classList.add("tile--series-link");
+            const label = targetSeriesIndex === activeSeriesIndex ? "Current map in this series" : `Open version ${targetSeriesIndex + 1} in this series`;
+            appendTitleLine(tile, label);
+          }
         }
         if (obsidianUrl) {
           tile.dataset.obsidianUrl = obsidianUrl;
         }
-        const navTargetIndex = findModelIndexByIdOrSource(it.id);
-        if (navTargetIndex !== -1 && navTargetIndex !== activeIndex) {
-          tile.classList.add("tile--series-link");
-          tile.dataset.navTargetIndex = String(navTargetIndex);
+        if (!activeIsCategoryView) {
+          const navTargetIndex = findModelIndexByIdOrSource(it.id);
+          if (navTargetIndex !== -1 && navTargetIndex !== activeIndex) {
+            tile.classList.add("tile--series-link");
+            tile.dataset.navTargetIndex = String(navTargetIndex);
+          }
         }
         const img = document.createElement("img");
         img.className = "logo";
@@ -6623,20 +6721,23 @@ ${text2}` : text2;
         const badge = document.createElement("div");
         badge.className = "badge";
         badge.textContent = "reused";
-        const deleteBtn = document.createElement("button");
-        deleteBtn.type = "button";
-        deleteBtn.className = "tile-delete";
-        deleteBtn.setAttribute("aria-label", `Delete ${it.name || it.id}`);
-        deleteBtn.textContent = "×";
-        deleteBtn.addEventListener("click", (event) => {
-          event.stopPropagation();
-          deleteItemById(it.id);
-        });
+        let deleteBtn = null;
+        if (!activeIsCategoryView) {
+          deleteBtn = document.createElement("button");
+          deleteBtn.type = "button";
+          deleteBtn.className = "tile-delete";
+          deleteBtn.setAttribute("aria-label", `Delete ${it.name || it.id}`);
+          deleteBtn.textContent = "×";
+          deleteBtn.addEventListener("click", (event) => {
+            event.stopPropagation();
+            deleteItemById(it.id);
+          });
+        }
         if (externalMeta.url) {
           tile.appendChild(createExternalLinkButton(externalMeta.url));
         }
         applyObsidianLinkToTile(tile, obsidianUrl);
-        tile.appendChild(deleteBtn);
+        if (deleteBtn) tile.appendChild(deleteBtn);
         tile.appendChild(img);
         tile.appendChild(nm);
         tile.appendChild(idLine);
@@ -6646,19 +6747,23 @@ ${text2}` : text2;
       });
       renderHost.appendChild(section);
       categoryIndex.set(cat.id, { el: section, headEl: head });
-      const addTile = document.createElement("button");
-      addTile.type = "button";
-      addTile.className = "tile-add";
-      addTile.innerHTML = '<span class="tile-add__icon" aria-hidden="true">+</span><span class="tile-add__label"></span>';
-      addTile.addEventListener("click", () => addItemToCategory(cat.id));
-      grid.appendChild(addTile);
+      if (!activeIsCategoryView) {
+        const addTile = document.createElement("button");
+        addTile.type = "button";
+        addTile.className = "tile-add";
+        addTile.innerHTML = '<span class="tile-add__icon" aria-hidden="true">+</span><span class="tile-add__label"></span>';
+        addTile.addEventListener("click", () => addItemToCategory(cat.id));
+        grid.appendChild(addTile);
+      }
     });
-    const addCategoryButton = document.createElement("button");
-    addCategoryButton.type = "button";
-    addCategoryButton.className = "category-add";
-    addCategoryButton.innerHTML = '<span class="category-add__icon" aria-hidden="true">+</span><span class="category-add__label">Add category</span><span class="category-add__hint">(Insert)</span>';
-    addCategoryButton.addEventListener("click", () => addCategoryAtEnd());
-    renderHost.appendChild(addCategoryButton);
+    if (!activeIsCategoryView) {
+      const addCategoryButton = document.createElement("button");
+      addCategoryButton.type = "button";
+      addCategoryButton.className = "category-add";
+      addCategoryButton.innerHTML = '<span class="category-add__icon" aria-hidden="true">+</span><span class="category-add__label">Add category</span><span class="category-add__hint">(Insert)</span>';
+      addCategoryButton.addEventListener("click", () => addCategoryAtEnd());
+      renderHost.appendChild(addCategoryButton);
+    }
     applyReusedHighlights();
     wireEvents();
     reflowRects();
@@ -6856,6 +6961,7 @@ ${text2}` : text2;
     if (externalUrl) {
       showNotice("This item has link to", NOTICE_TIMEOUT_MS, externalUrl);
     }
+    updateServerUrlFromActive();
   }
   function selectCategory(catId, { scrollIntoView = true, preserveEntryHint = false } = {}) {
     var _a, _b;
@@ -6918,6 +7024,7 @@ ${text2}` : text2;
     selectionRelations = null;
     clearStyles();
     drawLinks();
+    updateServerUrlFromActive({ itemId: null });
   }
   function clearCategorySelection() {
     selectedCategoryId = null;
@@ -7292,6 +7399,7 @@ ${text2}` : text2;
   if (app) {
     app.addEventListener("contextmenu", (event) => {
       const tile = event.target.closest(".tile");
+      if (activeViewIsCategory) return;
       if (!tile || !app.contains(tile)) return;
       handleTileContextMenu(event, tile);
     });
@@ -7453,6 +7561,7 @@ ${text2}` : text2;
     if (isEditingItem) {
       return;
     }
+    const isCategoryView = activeViewIsCategory;
     if ((event.ctrlKey || event.metaKey) && event.code === "KeyS") {
       event.preventDefault();
       const active = models[activeIndex];
@@ -7483,6 +7592,7 @@ ${text2}` : text2;
       }
     }
     if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+      if (isCategoryView) return;
       if (!shouldHandleGlobalPaste()) return;
       const step = event.key === "ArrowLeft" ? -1 : 1;
       if (event.altKey) return;
@@ -7511,6 +7621,7 @@ ${text2}` : text2;
       }
     }
     if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+      if (isCategoryView) return;
       if (!shouldHandleGlobalPaste()) return;
       const step = event.key === "ArrowUp" ? -1 : 1;
       if ((event.ctrlKey || event.metaKey) && !event.altKey) {
@@ -7546,6 +7657,7 @@ ${text2}` : text2;
       }
     }
     if (event.key === "Delete") {
+      if (isCategoryView) return;
       if (!shouldHandleGlobalPaste()) return;
       if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey)
         return;
@@ -7556,6 +7668,7 @@ ${text2}` : text2;
       }
     }
     if (event.key === "F2") {
+      if (isCategoryView) return;
       if (!shouldHandleGlobalPaste()) return;
       const targetCategoryId = selectedCategoryId && !selection && selectedCategoryId || !selection && ((_f = (_e = (_d = (_c = event.target) == null ? void 0 : _c.closest) == null ? void 0 : _d.call(_c, ".category")) == null ? void 0 : _e.dataset) == null ? void 0 : _f.cat) || null;
       if (targetCategoryId && !selection) {
@@ -7572,6 +7685,7 @@ ${text2}` : text2;
       }
     }
     if (event.key === "Insert") {
+      if (isCategoryView) return;
       if (!shouldHandleGlobalPaste()) return;
       if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey)
         return;
@@ -7588,6 +7702,10 @@ ${text2}` : text2;
   let draggedItemId = null;
   let draggedCategoryId = null;
   function handleDragStart(e) {
+    if (activeViewIsCategory) {
+      e.preventDefault();
+      return;
+    }
     hidePreview();
     draggedItemId = e.target.dataset.id;
     draggedCategoryId = e.target.closest(".category").dataset.cat;
@@ -8756,13 +8874,29 @@ ${text2}` : text2;
     if (!hasLocalBackend) {
       await loadJsonFiles();
     }
-    const serverPathIndex = await consumeServerPathLoad();
+    const serverPathResult = await consumeServerPathLoad();
+    const serverPathIndex = typeof (serverPathResult == null ? void 0 : serverPathResult.modelIndex) === "number" ? serverPathResult.modelIndex : null;
     const loadIndex = await consumeLoadParam();
     const editorResult = consumeEditorPayload();
     const editorIndex = editorResult == null ? void 0 : editorResult.index;
     const shareIndex = consumeShareLink();
     const initialIndex = typeof serverPathIndex === "number" ? serverPathIndex : typeof loadIndex === "number" ? loadIndex : typeof shareIndex === "number" ? shareIndex : typeof editorIndex === "number" ? editorIndex : firstSeedIndex ?? 0;
     setActive(initialIndex);
+    if ((serverPathResult == null ? void 0 : serverPathResult.itemId) && typeof serverPathResult.modelIndex === "number" && serverPathResult.modelIndex === initialIndex) {
+      requestAnimationFrame(() => {
+        var _a;
+        if (activeIndex !== serverPathResult.modelIndex) return;
+        const tile = (_a = index.get(serverPathResult.itemId)) == null ? void 0 : _a.el;
+        if (!tile) return;
+        select(serverPathResult.itemId);
+        tile.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+          inline: "center"
+        });
+        tile.focus({ preventScroll: true });
+      });
+    }
   })();
 }
 function create_fragment$2(ctx) {
