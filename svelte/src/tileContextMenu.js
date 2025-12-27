@@ -11,6 +11,7 @@ export function createTileContextMenu({
   onEditItem,
   onChangeColor,
   selectItem,
+  colorPresets = [],
 } = {}) {
   const menu =
     menuEl ||
@@ -25,6 +26,7 @@ export function createTileContextMenu({
 
   let previewAnchor = { x: 0, y: 0 };
   let previewRequestId = 0;
+  let presetColors = Array.isArray(colorPresets) ? colorPresets : [];
 
   function hideMenu() {
     if (!menu) return;
@@ -142,26 +144,15 @@ export function createTileContextMenu({
     }
 
     if (typeof onChangeColor === "function" && meta.id) {
-      list.appendChild(
-        makeMenuButton("Set color: Black", () =>
-          onChangeColor(meta.id, tokens.color.ink)
-        )
-      );
-      list.appendChild(
-        makeMenuButton("Set color: White", () =>
-          onChangeColor(meta.id, tokens.color.white)
-        )
-      );
-      list.appendChild(
-        makeMenuButton("Set color: Red", () =>
-          onChangeColor(meta.id, tokens.blockscape.revdep)
-        )
-      );
-      list.appendChild(
-        makeMenuButton("Set color: Green", () =>
-          onChangeColor(meta.id, tokens.color.success)
-        )
-      );
+      presetColors.forEach((preset) => {
+        if (!preset?.value) return;
+        const label = preset.name || preset.value;
+        list.appendChild(
+          makeMenuButton(`Set color: ${label}`, () =>
+            onChangeColor(meta.id, preset.value)
+          )
+        );
+      });
     }
 
     menu.appendChild(list);
@@ -313,5 +304,8 @@ export function createTileContextMenu({
     handleDocumentClick,
     handleWindowResize,
     handleWindowScroll,
+    updateColorPresets: (next) => {
+      presetColors = Array.isArray(next) ? next : [];
+    },
   };
 }

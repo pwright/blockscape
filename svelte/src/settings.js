@@ -111,6 +111,7 @@ export function buildSettingsSnapshot(current, { localBackend } = {}) {
     seriesNavDoubleClickMs: current.seriesNavDoubleClickWaitMs,
     showSecondaryLinks: current.showSecondaryLinks,
     showReusedInMap: current.showReusedInMap,
+    colorPresets: current.colorPresets,
   };
   if (autoReloadConfig) {
     snapshot.autoReloadEnabled = !!autoReloadConfig.enabled;
@@ -276,6 +277,13 @@ export function applySettingsSnapshot(snapshot = {}, ctx) {
     if (ui?.obsidianVaultInput) ui.obsidianVaultInput.value = applied;
     refreshObsidianLinks?.();
     appliedKeys.push("obsidianVault");
+  }
+
+  if (snapshot.colorPresets) {
+    if (typeof ctx.setColorPresets === "function") {
+      ctx.setColorPresets(snapshot.colorPresets);
+    }
+    appliedKeys.push("colorPresets");
   }
 
   if (snapshot.autoIdFromName != null) {

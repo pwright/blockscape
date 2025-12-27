@@ -163,6 +163,7 @@ export function initBlockscape() {
   const MAX_AUTO_RELOAD_INTERVAL_MS = 10000;
   const AUTO_ID_FROM_NAME_STORAGE_KEY = "blockscape:autoIdFromName";
   const DEFAULT_AUTO_ID_FROM_NAME = true;
+  const COLOR_PRESETS_STORAGE_KEY = "blockscape:colorPresets";
   const THEME_STORAGE_KEY = "blockscape:theme";
   const THEME_LIGHT = "light";
   const THEME_DARK = "dark";
@@ -179,6 +180,8 @@ export function initBlockscape() {
   let obsidianVaultName = "";
   let autoIdFromNameEnabled = DEFAULT_AUTO_ID_FROM_NAME;
   let theme = THEME_LIGHT;
+  let colorPresets = [];
+  let renderColorPresetsUI = null;
   const SERIES_NAV_DOUBLE_CLICK_STORAGE_KEY =
     "blockscape:seriesNavDoubleClickMs";
   const DEFAULT_SERIES_NAV_DOUBLE_CLICK_MS = 900;
@@ -210,11 +213,13 @@ export function initBlockscape() {
     secondaryLinksToggle: null,
     reusedToggle: null,
     themeToggle: null,
+    colorPresetList: null,
   };
   const localBackend = createLocalBackend();
   const initialBackendCheck = localBackend.detect();
   apicurio.hydrateConfig();
   applyTheme(readStoredTheme());
+  setColorPresets(loadColorPresets(), { silent: true });
   initializeTileHoverScale();
   initializeSelectionDimOpacity();
   initializeTileCompactness();
@@ -302,6 +307,64 @@ export function initBlockscape() {
     if (typeof window === "undefined") return "";
     const styles = getComputedStyle(document.documentElement);
     return styles.getPropertyValue(varName).trim();
+  }
+
+  function normalizeColorPresets(list) {
+    const isHex = (val) => /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(val || "");
+    if (!Array.isArray(list)) return defaultColorPresets();
+    const cleaned = list
+      .map((entry) => ({
+        name: (entry?.name || "").toString().trim() || "Custom",
+        value: (entry?.value || "").toString().trim(),
+      }))
+      .filter((entry) => isHex(entry.value));
+    return cleaned.length ? cleaned : defaultColorPresets();
+  }
+
+  function defaultColorPresets() {
+    return [
+      { name: "Black", value: tokens.color.ink },
+      { name: "White", value: tokens.color.white },
+      { name: "Red", value: tokens.blockscape.revdep },
+      { name: "Green", value: tokens.color.success },
+    ];
+  }
+
+  function loadColorPresets() {
+    if (typeof window === "undefined" || !window.localStorage) {
+      return defaultColorPresets();
+    }
+    try {
+      const raw = window.localStorage.getItem(COLOR_PRESETS_STORAGE_KEY);
+      if (!raw) return defaultColorPresets();
+      const parsed = JSON.parse(raw);
+      return normalizeColorPresets(parsed);
+    } catch (err) {
+      console.warn("[Blockscape] failed to load color presets", err);
+      return defaultColorPresets();
+    }
+  }
+
+  function persistColorPresets(list) {
+    if (typeof window === "undefined" || !window.localStorage) return;
+    try {
+      window.localStorage.setItem(
+        COLOR_PRESETS_STORAGE_KEY,
+        JSON.stringify(list)
+      );
+    } catch (err) {
+      console.warn("[Blockscape] failed to persist color presets", err);
+    }
+  }
+
+  function setColorPresets(list, { silent = false } = {}) {
+    colorPresets = normalizeColorPresets(list);
+    persistColorPresets(colorPresets);
+    if (!silent && typeof updateTileMenuColors === "function") {
+      updateTileMenuColors(colorPresets);
+    }
+    renderColorPresetsUI?.();
+    return colorPresets;
   }
 
   function isLocalBackendOptIn() {
@@ -1705,6 +1768,7 @@ export function initBlockscape() {
       showSecondaryLinks,
       showReusedInMap,
       theme,
+      colorPresets,
     };
   }
 
@@ -1746,6 +1810,7 @@ export function initBlockscape() {
       setShowSecondaryLinks,
       setShowReusedInMap,
       applyTheme,
+      setColorPresets,
       current: getCurrentSettingsState(),
     });
   }
@@ -2573,6 +2638,7 @@ export function initBlockscape() {
     handleDocumentClick: handleTileMenuDocumentClick,
     handleWindowResize: handleTileMenuWindowResize,
     handleWindowScroll: handleTileMenuWindowScroll,
+    updateColorPresets: updateTileMenuColors,
   } = createTileContextMenu({
     menuEl: document.getElementById("tileContextMenu"),
     previewEl: preview,
@@ -2584,6 +2650,7 @@ export function initBlockscape() {
     onEditItem: (id) => itemEditor.open(id),
     onChangeColor: (id, color) => setItemColor(id, color),
     selectItem: (id) => select(id),
+    colorPresets,
   });
 
   function ensureVersionContainer(
@@ -4674,6 +4741,86 @@ export function initBlockscape() {
 
     settingsActions.append(loadSettingsBtn, saveSettingsBtn, settingsFileInput);
     settingsPanel.appendChild(settingsActions);
+    const colorPresetSection = document.createElement("div");
+    colorPresetSection.className = "color-presets";
+    const colorPresetTitle = document.createElement("div");
+    colorPresetTitle.className = "settings-text__label";
+    colorPresetTitle.textContent = "Color presets";
+    const colorPresetHint = document.createElement("div");
+    colorPresetHint.className = "settings-text__hint";
+    colorPresetHint.textContent =
+      "Shown in tile context menu for quick coloring.";
+    colorPresetSection.append(colorPresetTitle, colorPresetHint);
+    const colorPresetList = document.createElement("div");
+    colorPresetList.className = "color-presets__list";
+    const addRow = document.createElement("div");
+    addRow.className = "color-presets__add";
+    const addName = document.createElement("input");
+    addName.type = "text";
+    addName.placeholder = "Name";
+    addName.className = "settings-text__input";
+    const addColor = document.createElement("input");
+    addColor.type = "color";
+    addColor.value = "#2563eb";
+    addColor.className = "settings-color-input";
+    const addBtn = document.createElement("button");
+    addBtn.type = "button";
+    addBtn.className = "pf-v5-c-button pf-m-primary";
+    addBtn.textContent = "Add preset";
+    addBtn.addEventListener("click", () => {
+      const name = addName.value.trim() || "Custom";
+      const value = addColor.value;
+      const next = [...colorPresets, { name, value }];
+      setColorPresets(next);
+      updateTileMenuColors(colorPresets);
+      addName.value = "";
+    });
+    addRow.append(addName, addColor, addBtn);
+    colorPresetSection.append(colorPresetList, addRow);
+    settingsPanel.appendChild(colorPresetSection);
+    settingsUi.colorPresetList = colorPresetList;
+    renderColorPresetsUI = () => {
+      colorPresetList.innerHTML = "";
+      colorPresets.forEach((preset, idx) => {
+        const row = document.createElement("div");
+        row.className = "color-presets__row";
+        const nameInput = document.createElement("input");
+        nameInput.type = "text";
+        nameInput.className = "settings-text__input";
+        nameInput.value = preset.name || "";
+        nameInput.placeholder = "Name";
+        nameInput.addEventListener("input", () => {
+          const next = [...colorPresets];
+          next[idx] = { ...next[idx], name: nameInput.value };
+          setColorPresets(next);
+          updateTileMenuColors(colorPresets);
+        });
+        const colorInput = document.createElement("input");
+        colorInput.type = "color";
+        colorInput.className = "settings-color-input";
+        colorInput.value = preset.value;
+        colorInput.addEventListener("input", () => {
+          const next = [...colorPresets];
+          next[idx] = { ...next[idx], value: colorInput.value };
+          setColorPresets(next);
+          updateTileMenuColors(colorPresets);
+        });
+        const removeBtn = document.createElement("button");
+        removeBtn.type = "button";
+        removeBtn.className = "pf-v5-c-button pf-m-plain";
+        removeBtn.textContent = "✕";
+        removeBtn.title = "Remove preset";
+        removeBtn.addEventListener("click", () => {
+          const next = colorPresets.filter((_, i) => i !== idx);
+          setColorPresets(next);
+          updateTileMenuColors(colorPresets);
+          renderColorPresetsUI();
+        });
+        row.append(nameInput, colorInput, removeBtn);
+        colorPresetList.appendChild(row);
+      });
+    };
+    renderColorPresetsUI();
     const createSettingsToggle = ({
       id,
       label,
