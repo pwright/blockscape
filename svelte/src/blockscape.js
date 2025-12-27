@@ -154,6 +154,8 @@ export function initBlockscape() {
   const DEFAULT_AUTO_RELOAD_INTERVAL_MS = 1000;
   const MIN_AUTO_RELOAD_INTERVAL_MS = 500;
   const MAX_AUTO_RELOAD_INTERVAL_MS = 10000;
+  const AUTO_ID_FROM_NAME_STORAGE_KEY = "blockscape:autoIdFromName";
+  const DEFAULT_AUTO_ID_FROM_NAME = true;
   const CATEGORY_VIEW_VERSION_PREFIX = "cat:";
   let tileHoverScale = DEFAULT_TILE_HOVER_SCALE;
   let selectionDimOpacity = DEFAULT_SELECTION_DIM_OPACITY;
@@ -165,6 +167,7 @@ export function initBlockscape() {
   let obsidianLinksEnabled = false;
   let obsidianLinkMode = DEFAULT_OBSIDIAN_LINK_MODE;
   let obsidianVaultName = "";
+  let autoIdFromNameEnabled = DEFAULT_AUTO_ID_FROM_NAME;
   const SERIES_NAV_DOUBLE_CLICK_STORAGE_KEY =
     "blockscape:seriesNavDoubleClickMs";
   const DEFAULT_SERIES_NAV_DOUBLE_CLICK_MS = 900;
@@ -185,6 +188,7 @@ export function initBlockscape() {
   initializeObsidianLinkMode();
   initializeObsidianVaultName();
   initializeSelectionDimEnabled();
+  initializeAutoIdFromNameEnabled();
   syncSelectionClass();
 
   // ===== Utilities =====
@@ -1446,6 +1450,42 @@ export function initBlockscape() {
     }
   }
 
+  function applyAutoIdFromNameEnabled(enabled) {
+    autoIdFromNameEnabled = !!enabled;
+    return autoIdFromNameEnabled;
+  }
+
+  function persistAutoIdFromNameEnabled(enabled) {
+    if (typeof window === "undefined" || !window.localStorage) return;
+    try {
+      window.localStorage.setItem(
+        AUTO_ID_FROM_NAME_STORAGE_KEY,
+        enabled ? "1" : "0"
+      );
+    } catch (error) {
+      console.warn(
+        "[Blockscape] failed to persist auto-id toggle",
+        error
+      );
+    }
+  }
+
+  function initializeAutoIdFromNameEnabled() {
+    if (typeof window === "undefined" || !window.localStorage) {
+      return applyAutoIdFromNameEnabled(DEFAULT_AUTO_ID_FROM_NAME);
+    }
+    try {
+      const raw = window.localStorage.getItem(AUTO_ID_FROM_NAME_STORAGE_KEY);
+      if (raw == null) {
+        return applyAutoIdFromNameEnabled(DEFAULT_AUTO_ID_FROM_NAME);
+      }
+      return applyAutoIdFromNameEnabled(raw === "1");
+    } catch (error) {
+      console.warn("[Blockscape] failed to read auto-id toggle", error);
+      return applyAutoIdFromNameEnabled(DEFAULT_AUTO_ID_FROM_NAME);
+    }
+  }
+
   function persistTileCompactness(value) {
     if (typeof window === "undefined" || !window.localStorage) return;
     try {
@@ -2092,6 +2132,8 @@ export function initBlockscape() {
       }
       if (lastDeletedItem?.item?.id === oldId) lastDeletedItem.item.id = newId;
     },
+    makeSlug: makeDownloadName,
+    isAutoIdFromNameEnabled: () => autoIdFromNameEnabled,
   });
 
   function createCategoryEditor({
@@ -2106,6 +2148,8 @@ export function initBlockscape() {
       fields: {},
       categoryId: null,
       modelData: null,
+      idManuallyEdited: false,
+      autoSyncEnabled: true,
     };
 
     const setError = (message) => {
@@ -2138,6 +2182,16 @@ export function initBlockscape() {
         state.fields.titleInput?.focus();
         state.fields.titleInput?.select();
       });
+    };
+
+    const syncCategoryIdFromTitle = ({ force } = {}) => {
+      if (!autoIdFromNameEnabled || !state.autoSyncEnabled) return;
+      if (!state.fields?.idInput || !state.fields?.titleInput) return;
+      if (!force && state.idManuallyEdited) return;
+      const slug = makeDownloadName(
+        state.fields.titleInput.value || state.categoryId || "category"
+      );
+      state.fields.idInput.value = slug;
     };
 
     const applyEdits = () => {
@@ -2258,6 +2312,22 @@ export function initBlockscape() {
         )
       );
 
+      const syncToggle = document.createElement("div");
+      syncToggle.className = "item-editor__checkbox";
+      const syncRow = document.createElement("label");
+      syncRow.className = "item-editor__checkbox-row";
+      const syncCheckbox = document.createElement("input");
+      syncCheckbox.type = "checkbox";
+      const syncLabel = document.createElement("span");
+      syncLabel.textContent = "Sync ID while editing title";
+      const syncHint = document.createElement("div");
+      syncHint.className = "item-editor__hint";
+      syncHint.textContent =
+        "Turn off to keep typing titles without changing the ID.";
+      syncRow.append(syncCheckbox, syncLabel);
+      syncToggle.append(syncRow, syncHint);
+      form.appendChild(syncToggle);
+
       const actions = document.createElement("div");
       actions.className = "item-editor__actions";
 
@@ -2282,6 +2352,17 @@ export function initBlockscape() {
       cancelBtn.addEventListener("click", hide);
       closeBtn.addEventListener("click", hide);
       backdrop.addEventListener("click", hide);
+      idInput.addEventListener("input", () => {
+        state.idManuallyEdited = true;
+      });
+      titleInput.addEventListener("input", () => syncCategoryIdFromTitle());
+      syncCheckbox.addEventListener("change", () => {
+        state.autoSyncEnabled = !!syncCheckbox.checked;
+        if (state.autoSyncEnabled) {
+          state.idManuallyEdited = false;
+          syncCategoryIdFromTitle({ force: true });
+        }
+      });
       wrapper.addEventListener("keydown", (event) => {
         if (event.key === "Escape") {
           event.preventDefault();
@@ -2311,10 +2392,16 @@ export function initBlockscape() {
       if (!category) return false;
       state.categoryId = category.id;
       state.modelData = modelData;
+      state.idManuallyEdited = false;
+      state.autoSyncEnabled = !!autoIdFromNameEnabled;
       state.fields.metaLabel.textContent =
         category.title || category.id || "Category";
       state.fields.titleInput.value = category.title || category.id || "";
       state.fields.idInput.value = category.id || "";
+      state.fields.syncCheckbox.checked = state.autoSyncEnabled;
+      if (!state.fields.idInput.value) {
+        syncCategoryIdFromTitle({ force: true });
+      }
       setError("");
       show();
       return true;
@@ -3178,6 +3265,12 @@ export function initBlockscape() {
     }
   }
 
+  function unwrapMarkdownCodeBlock(txt) {
+    if (typeof txt !== "string") return txt;
+    const match = txt.trim().match(/^```[a-zA-Z0-9_-]*\s*\r?\n([\s\S]*?)\r?\n```$/);
+    return match ? match[1] : txt;
+  }
+
   function buildCategoryViewVersions(entry) {
     const versions = (entry?.apicurioVersions || []).filter(
       (ver) => !ver?.isCategoryView
@@ -3412,7 +3505,8 @@ export function initBlockscape() {
 
   // Accept 1) object, 2) array-of-objects, 3) '---' or '%%%' separated objects
   function normalizeToModelsFromText(txt, titleBase = "Pasted", options = {}) {
-    const trimmed = (txt || "").trim();
+    const defenced = unwrapMarkdownCodeBlock(typeof txt === "string" ? txt : "");
+    const trimmed = (defenced || "").trim();
     if (!trimmed) return [];
     const parsed = tryParseJson(trimmed);
     if (parsed) {
@@ -3468,7 +3562,8 @@ export function initBlockscape() {
 
   function looksLikeModelJson(text) {
     if (!text) return false;
-    const start = text.trimStart();
+    const defenced = unwrapMarkdownCodeBlock(text) || "";
+    const start = defenced.trimStart();
     return /^\s*(\{|\[|---|%%%)/.test(start);
   }
 
@@ -4468,6 +4563,19 @@ export function initBlockscape() {
       },
     });
     settingsPanel.appendChild(reusedToggleRow);
+
+    const { row: autoIdToggleRow } = createSettingsToggle({
+      id: "toggleAutoIdFromName",
+      label: "Auto-fill IDs from titles",
+      hint: "Keep ID in sync while editing name/title (can be overridden manually).",
+      checked: autoIdFromNameEnabled,
+      className: "map-controls__toggle",
+      onChange: (checked) => {
+        const applied = applyAutoIdFromNameEnabled(checked);
+        persistAutoIdFromNameEnabled(applied);
+      },
+    });
+    settingsPanel.appendChild(autoIdToggleRow);
 
     const obsidianModeInputs = [];
     const { row: obsidianToggleRow } = createSettingsToggle({

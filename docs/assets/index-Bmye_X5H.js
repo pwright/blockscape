@@ -1666,6 +1666,9 @@ function assertFn(fn, name) {
     throw new Error(`[itemEditor] expected ${name} to be a function`);
   }
 }
+function defaultMakeSlug(base) {
+  return (base || "item").trim().toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "") || "item";
+}
 function normalizeDepsInput(value, { excludeId } = {}) {
   if (!value) return [];
   const parts = value.split(/[\s,]+/).map((v) => v.trim()).filter(Boolean);
@@ -1700,7 +1703,9 @@ function createItemEditor({
   loadActiveIntoEditor,
   rebuildFromActive,
   select,
-  onSelectionRenamed
+  onSelectionRenamed,
+  makeSlug = defaultMakeSlug,
+  isAutoIdFromNameEnabled = () => true
 } = {}) {
   assertFn(findItemAndCategoryById, "findItemAndCategoryById");
   assertFn(collectAllItemIds, "collectAllItemIds");
@@ -1708,12 +1713,16 @@ function createItemEditor({
   assertFn(loadActiveIntoEditor, "loadActiveIntoEditor");
   assertFn(rebuildFromActive, "rebuildFromActive");
   assertFn(select, "select");
+  assertFn(makeSlug, "makeSlug");
+  assertFn(isAutoIdFromNameEnabled, "isAutoIdFromNameEnabled");
   const state = {
     wrapper: null,
     fields: {},
     categoryId: null,
     itemId: null,
-    modelData: null
+    modelData: null,
+    autoIdManuallyEdited: false,
+    autoSyncEnabled: true
   };
   function setError(message) {
     if (!state.fields.errorEl) return;
@@ -1745,6 +1754,14 @@ function createItemEditor({
       (_a = state.fields.nameInput) == null ? void 0 : _a.focus();
       (_b = state.fields.nameInput) == null ? void 0 : _b.select();
     });
+  }
+  function syncIdFromName({ force } = {}) {
+    var _a, _b;
+    if (!((_a = state.fields) == null ? void 0 : _a.idInput) || !((_b = state.fields) == null ? void 0 : _b.nameInput)) return;
+    if (!state.autoSyncEnabled || !isAutoIdFromNameEnabled()) return;
+    if (!force && state.autoIdManuallyEdited) return;
+    const slug = makeSlug(state.fields.nameInput.value || state.itemId || "item");
+    state.fields.idInput.value = slug;
   }
   function applyItemEdits(payload) {
     var _a;
@@ -1907,6 +1924,22 @@ function createItemEditor({
     depsInput.rows = 2;
     depsInput.placeholder = "Comma or space separated ids";
     form.appendChild(makeField("Dependencies", depsInput, "Use item IDs, separated by commas or spaces."));
+    const syncToggle = document.createElement("div");
+    syncToggle.className = "item-editor__checkbox";
+    const syncRow = document.createElement("label");
+    syncRow.className = "item-editor__checkbox-row";
+    const syncCheckbox = document.createElement("input");
+    syncCheckbox.type = "checkbox";
+    const syncLabel = document.createElement("span");
+    syncLabel.textContent = "Sync ID while editing name";
+    const syncHint = document.createElement("div");
+    syncHint.className = "item-editor__hint";
+    syncHint.textContent = "Turn off to keep typing names without changing the ID.";
+    syncRow.appendChild(syncCheckbox);
+    syncRow.appendChild(syncLabel);
+    syncToggle.appendChild(syncRow);
+    syncToggle.appendChild(syncHint);
+    form.appendChild(syncToggle);
     const actions = document.createElement("div");
     actions.className = "item-editor__actions";
     const cancelBtn = document.createElement("button");
@@ -1929,12 +1962,24 @@ function createItemEditor({
       externalFlagInput,
       colorInput,
       depsInput,
+      syncCheckbox,
       categoryValue: meta.querySelector(".item-editor__meta-value"),
       errorEl
     };
     cancelBtn.addEventListener("click", hide);
     closeBtn.addEventListener("click", hide);
     backdrop.addEventListener("click", hide);
+    idInput.addEventListener("input", () => {
+      state.autoIdManuallyEdited = true;
+    });
+    nameInput.addEventListener("input", syncIdFromName);
+    syncCheckbox.addEventListener("change", () => {
+      state.autoSyncEnabled = !!syncCheckbox.checked;
+      if (state.autoSyncEnabled) {
+        state.autoIdManuallyEdited = false;
+        syncIdFromName({ force: true });
+      }
+    });
     form.addEventListener("submit", (event) => {
       event.preventDefault();
       saveItemEdits();
@@ -1956,6 +2001,8 @@ function createItemEditor({
     state.categoryId = hit.category.id;
     state.itemId = hit.item.id;
     state.modelData = hit.modelData;
+    state.autoIdManuallyEdited = false;
+    state.autoSyncEnabled = !!isAutoIdFromNameEnabled();
     state.fields.categoryValue.textContent = hit.category.title || hit.category.id;
     state.fields.idInput.value = hit.item.id || "";
     state.fields.nameInput.value = hit.item.name || "";
@@ -1964,6 +2011,10 @@ function createItemEditor({
     state.fields.externalFlagInput.checked = hit.item.external === true;
     state.fields.colorInput.value = hit.item.color || "";
     state.fields.depsInput.value = Array.isArray(hit.item.deps) ? hit.item.deps.join(", ") : "";
+    state.fields.syncCheckbox.checked = state.autoSyncEnabled;
+    if (!state.fields.idInput.value) {
+      syncIdFromName({ force: true });
+    }
     setError("");
     select(hit.item.id);
     show();
@@ -2450,6 +2501,8 @@ function initBlockscape() {
   const DEFAULT_AUTO_RELOAD_INTERVAL_MS = 1e3;
   const MIN_AUTO_RELOAD_INTERVAL_MS = 500;
   const MAX_AUTO_RELOAD_INTERVAL_MS = 1e4;
+  const AUTO_ID_FROM_NAME_STORAGE_KEY = "blockscape:autoIdFromName";
+  const DEFAULT_AUTO_ID_FROM_NAME = true;
   const CATEGORY_VIEW_VERSION_PREFIX = "cat:";
   let tileHoverScale = DEFAULT_TILE_HOVER_SCALE;
   let selectionDimOpacity = DEFAULT_SELECTION_DIM_OPACITY;
@@ -2461,6 +2514,7 @@ function initBlockscape() {
   let obsidianLinksEnabled = false;
   let obsidianLinkMode = DEFAULT_OBSIDIAN_LINK_MODE;
   let obsidianVaultName = "";
+  let autoIdFromNameEnabled = DEFAULT_AUTO_ID_FROM_NAME;
   const SERIES_NAV_DOUBLE_CLICK_STORAGE_KEY = "blockscape:seriesNavDoubleClickMs";
   const DEFAULT_SERIES_NAV_DOUBLE_CLICK_MS = 900;
   const MIN_SERIES_NAV_DOUBLE_CLICK_MS = 300;
@@ -2480,6 +2534,7 @@ function initBlockscape() {
   initializeObsidianLinkMode();
   initializeObsidianVaultName();
   initializeSelectionDimEnabled();
+  initializeAutoIdFromNameEnabled();
   syncSelectionClass();
   function uid() {
     return Math.random().toString(36).slice(2, 10);
@@ -3578,6 +3633,39 @@ function initBlockscape() {
       return applySelectionDimEnabled(true);
     }
   }
+  function applyAutoIdFromNameEnabled(enabled) {
+    autoIdFromNameEnabled = !!enabled;
+    return autoIdFromNameEnabled;
+  }
+  function persistAutoIdFromNameEnabled(enabled) {
+    if (typeof window === "undefined" || !window.localStorage) return;
+    try {
+      window.localStorage.setItem(
+        AUTO_ID_FROM_NAME_STORAGE_KEY,
+        enabled ? "1" : "0"
+      );
+    } catch (error) {
+      console.warn(
+        "[Blockscape] failed to persist auto-id toggle",
+        error
+      );
+    }
+  }
+  function initializeAutoIdFromNameEnabled() {
+    if (typeof window === "undefined" || !window.localStorage) {
+      return applyAutoIdFromNameEnabled(DEFAULT_AUTO_ID_FROM_NAME);
+    }
+    try {
+      const raw = window.localStorage.getItem(AUTO_ID_FROM_NAME_STORAGE_KEY);
+      if (raw == null) {
+        return applyAutoIdFromNameEnabled(DEFAULT_AUTO_ID_FROM_NAME);
+      }
+      return applyAutoIdFromNameEnabled(raw === "1");
+    } catch (error) {
+      console.warn("[Blockscape] failed to read auto-id toggle", error);
+      return applyAutoIdFromNameEnabled(DEFAULT_AUTO_ID_FROM_NAME);
+    }
+  }
   function persistTileCompactness(value) {
     if (typeof window === "undefined" || !window.localStorage) return;
     try {
@@ -4153,7 +4241,9 @@ function initBlockscape() {
         syncSelectionClass();
       }
       if (((_a = lastDeletedItem == null ? void 0 : lastDeletedItem.item) == null ? void 0 : _a.id) === oldId) lastDeletedItem.item.id = newId;
-    }
+    },
+    makeSlug: makeDownloadName,
+    isAutoIdFromNameEnabled: () => autoIdFromNameEnabled
   });
   function createCategoryEditor({
     getActiveModelData,
@@ -4166,7 +4256,9 @@ function initBlockscape() {
       wrapper: null,
       fields: {},
       categoryId: null,
-      modelData: null
+      modelData: null,
+      idManuallyEdited: false,
+      autoSyncEnabled: true
     };
     const setError = (message) => {
       if (!state.fields.errorEl) return;
@@ -4197,6 +4289,16 @@ function initBlockscape() {
         (_a = state.fields.titleInput) == null ? void 0 : _a.focus();
         (_b = state.fields.titleInput) == null ? void 0 : _b.select();
       });
+    };
+    const syncCategoryIdFromTitle = ({ force } = {}) => {
+      var _a, _b;
+      if (!autoIdFromNameEnabled || !state.autoSyncEnabled) return;
+      if (!((_a = state.fields) == null ? void 0 : _a.idInput) || !((_b = state.fields) == null ? void 0 : _b.titleInput)) return;
+      if (!force && state.idManuallyEdited) return;
+      const slug = makeDownloadName(
+        state.fields.titleInput.value || state.categoryId || "category"
+      );
+      state.fields.idInput.value = slug;
     };
     const applyEdits = () => {
       if (!state.modelData || !state.categoryId) {
@@ -4303,6 +4405,20 @@ function initBlockscape() {
           "Unique identifier for this category (used in URLs and references)."
         )
       );
+      const syncToggle = document.createElement("div");
+      syncToggle.className = "item-editor__checkbox";
+      const syncRow = document.createElement("label");
+      syncRow.className = "item-editor__checkbox-row";
+      const syncCheckbox = document.createElement("input");
+      syncCheckbox.type = "checkbox";
+      const syncLabel = document.createElement("span");
+      syncLabel.textContent = "Sync ID while editing title";
+      const syncHint = document.createElement("div");
+      syncHint.className = "item-editor__hint";
+      syncHint.textContent = "Turn off to keep typing titles without changing the ID.";
+      syncRow.append(syncCheckbox, syncLabel);
+      syncToggle.append(syncRow, syncHint);
+      form.appendChild(syncToggle);
       const actions = document.createElement("div");
       actions.className = "item-editor__actions";
       const saveBtn = document.createElement("button");
@@ -4323,6 +4439,17 @@ function initBlockscape() {
       cancelBtn.addEventListener("click", hide);
       closeBtn.addEventListener("click", hide);
       backdrop.addEventListener("click", hide);
+      idInput.addEventListener("input", () => {
+        state.idManuallyEdited = true;
+      });
+      titleInput.addEventListener("input", () => syncCategoryIdFromTitle());
+      syncCheckbox.addEventListener("change", () => {
+        state.autoSyncEnabled = !!syncCheckbox.checked;
+        if (state.autoSyncEnabled) {
+          state.idManuallyEdited = false;
+          syncCategoryIdFromTitle({ force: true });
+        }
+      });
       wrapper.addEventListener("keydown", (event) => {
         if (event.key === "Escape") {
           event.preventDefault();
@@ -4349,9 +4476,15 @@ function initBlockscape() {
       if (!category) return false;
       state.categoryId = category.id;
       state.modelData = modelData;
+      state.idManuallyEdited = false;
+      state.autoSyncEnabled = !!autoIdFromNameEnabled;
       state.fields.metaLabel.textContent = category.title || category.id || "Category";
       state.fields.titleInput.value = category.title || category.id || "";
       state.fields.idInput.value = category.id || "";
+      state.fields.syncCheckbox.checked = state.autoSyncEnabled;
+      if (!state.fields.idInput.value) {
+        syncCategoryIdFromTitle({ force: true });
+      }
       setError("");
       show();
       return true;
@@ -5110,6 +5243,11 @@ function initBlockscape() {
       return null;
     }
   }
+  function unwrapMarkdownCodeBlock(txt) {
+    if (typeof txt !== "string") return txt;
+    const match = txt.trim().match(/^```[a-zA-Z0-9_-]*\s*\r?\n([\s\S]*?)\r?\n```$/);
+    return match ? match[1] : txt;
+  }
   function buildCategoryViewVersions(entry) {
     const versions = ((entry == null ? void 0 : entry.apicurioVersions) || []).filter(
       (ver) => !(ver == null ? void 0 : ver.isCategoryView)
@@ -5301,7 +5439,8 @@ function initBlockscape() {
     ];
   }
   function normalizeToModelsFromText(txt, titleBase = "Pasted", options = {}) {
-    const trimmed = (txt || "").trim();
+    const defenced = unwrapMarkdownCodeBlock(typeof txt === "string" ? txt : "");
+    const trimmed = (defenced || "").trim();
     if (!trimmed) return [];
     const parsed = tryParseJson(trimmed);
     if (parsed) {
@@ -5347,7 +5486,8 @@ function initBlockscape() {
   }
   function looksLikeModelJson(text2) {
     if (!text2) return false;
-    const start = text2.trimStart();
+    const defenced = unwrapMarkdownCodeBlock(text2) || "";
+    const start = defenced.trimStart();
     return /^\s*(\{|\[|---|%%%)/.test(start);
   }
   function consumeEditorPayload() {
@@ -6191,6 +6331,18 @@ ${text2}` : text2;
       }
     });
     settingsPanel.appendChild(reusedToggleRow);
+    const { row: autoIdToggleRow } = createSettingsToggle({
+      id: "toggleAutoIdFromName",
+      label: "Auto-fill IDs from titles",
+      hint: "Keep ID in sync while editing name/title (can be overridden manually).",
+      checked: autoIdFromNameEnabled,
+      className: "map-controls__toggle",
+      onChange: (checked) => {
+        const applied = applyAutoIdFromNameEnabled(checked);
+        persistAutoIdFromNameEnabled(applied);
+      }
+    });
+    settingsPanel.appendChild(autoIdToggleRow);
     const obsidianModeInputs = [];
     const { row: obsidianToggleRow } = createSettingsToggle({
       id: "toggleObsidianLinks",
