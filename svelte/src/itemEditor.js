@@ -1,3 +1,5 @@
+import { tokens } from "./generated/tokens";
+
 function assertFn(fn, name) {
   if (typeof fn !== 'function') {
     throw new Error(`[itemEditor] expected ${name} to be a function`);
@@ -298,7 +300,7 @@ export function createItemEditor({
 
     const colorInput = document.createElement('input');
     colorInput.type = 'text';
-    colorInput.placeholder = '#2563eb';
+    colorInput.placeholder = tokens.color.primary;
     form.appendChild(makeField('Color', colorInput, 'Optional badge color (hex or CSS color).'));
 
     const depsInput = document.createElement('textarea');
@@ -358,13 +360,13 @@ export function createItemEditor({
       state.autoIdManuallyEdited = true;
     });
     nameInput.addEventListener('input', syncIdFromName);
-    syncCheckbox.addEventListener('change', () => {
-      state.autoSyncEnabled = !!syncCheckbox.checked;
-      if (state.autoSyncEnabled) {
-        state.autoIdManuallyEdited = false;
-        syncIdFromName({ force: true });
-      }
-    });
+      syncCheckbox.addEventListener('change', () => {
+        state.autoSyncEnabled = !!syncCheckbox.checked;
+        if (state.autoSyncEnabled) {
+          state.autoIdManuallyEdited = false;
+          syncIdFromName({ force: true });
+        }
+      });
     form.addEventListener('submit', (event) => {
       event.preventDefault();
       saveItemEdits();
@@ -389,7 +391,8 @@ export function createItemEditor({
     state.itemId = hit.item.id;
     state.modelData = hit.modelData;
     state.autoIdManuallyEdited = false;
-    state.autoSyncEnabled = !!isAutoIdFromNameEnabled();
+    const autoSyncAllowed = !!isAutoIdFromNameEnabled();
+    state.autoSyncEnabled = autoSyncAllowed;
     state.fields.categoryValue.textContent = hit.category.title || hit.category.id;
     state.fields.idInput.value = hit.item.id || '';
     state.fields.nameInput.value = hit.item.name || '';
@@ -399,7 +402,8 @@ export function createItemEditor({
     state.fields.colorInput.value = hit.item.color || '';
     state.fields.depsInput.value = Array.isArray(hit.item.deps) ? hit.item.deps.join(', ') : '';
     state.fields.syncCheckbox.checked = state.autoSyncEnabled;
-    if (!state.fields.idInput.value) {
+    state.fields.syncCheckbox.disabled = !autoSyncAllowed;
+    if (!state.fields.idInput.value && autoSyncAllowed) {
       syncIdFromName({ force: true });
     }
     setError('');

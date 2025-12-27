@@ -4,8 +4,10 @@
   "private": true,
   "scripts": {
     "serve": "http-server -c-1 -p 4173 dist",
+    "predev": "npm run build:tokens",
     "dev": "vite",
-    "build": "npm run clean-docs && vite build",
+    "build:tokens": "node scripts/build-tokens.js",
+    "build": "npm run build:tokens && npm run clean-docs && vite build",
     "clean-docs": "node scripts/clean-docs.js",
     "preview": "vite preview",
     "server": "node server.js",

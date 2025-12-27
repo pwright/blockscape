@@ -6,6 +6,13 @@ import {
 } from "./itemEditor";
 import { createTileContextMenu } from "./tileContextMenu";
 import { ensureSeriesId, getSeriesId, makeSeriesId } from "./series";
+import {
+  applySettingsSnapshot,
+  buildSettingsSnapshot,
+  formatSettings,
+  downloadJson,
+  tokens,
+} from "./settings";
 
 const ASSET_BASE =
   (typeof import.meta !== "undefined" && import.meta.env?.BASE_URL) || "";
@@ -156,6 +163,9 @@ export function initBlockscape() {
   const MAX_AUTO_RELOAD_INTERVAL_MS = 10000;
   const AUTO_ID_FROM_NAME_STORAGE_KEY = "blockscape:autoIdFromName";
   const DEFAULT_AUTO_ID_FROM_NAME = true;
+  const THEME_STORAGE_KEY = "blockscape:theme";
+  const THEME_LIGHT = "light";
+  const THEME_DARK = "dark";
   const CATEGORY_VIEW_VERSION_PREFIX = "cat:";
   let tileHoverScale = DEFAULT_TILE_HOVER_SCALE;
   let selectionDimOpacity = DEFAULT_SELECTION_DIM_OPACITY;
@@ -168,15 +178,43 @@ export function initBlockscape() {
   let obsidianLinkMode = DEFAULT_OBSIDIAN_LINK_MODE;
   let obsidianVaultName = "";
   let autoIdFromNameEnabled = DEFAULT_AUTO_ID_FROM_NAME;
+  let theme = THEME_LIGHT;
   const SERIES_NAV_DOUBLE_CLICK_STORAGE_KEY =
     "blockscape:seriesNavDoubleClickMs";
   const DEFAULT_SERIES_NAV_DOUBLE_CLICK_MS = 900;
   const MIN_SERIES_NAV_DOUBLE_CLICK_MS = 300;
   const MAX_SERIES_NAV_DOUBLE_CLICK_MS = 4000;
   let seriesNavDoubleClickWaitMs = DEFAULT_SERIES_NAV_DOUBLE_CLICK_MS;
+  const settingsUi = {
+    hoverScaleInput: null,
+    hoverScaleValue: null,
+    selectionDimToggle: null,
+    selectionDimInput: null,
+    selectionDimValue: null,
+    tileCompactnessInput: null,
+    tileCompactnessValue: null,
+    titleWrapInput: null,
+    titleWidthInput: null,
+    titleWidthValue: null,
+    titleZoomInput: null,
+    titleZoomValue: null,
+    seriesNavInput: null,
+    seriesNavValue: null,
+    obsidianToggle: null,
+    obsidianModeInputs: [],
+    obsidianVaultInput: null,
+    autoIdToggle: null,
+    autoReloadToggle: null,
+    autoReloadInput: null,
+    autoReloadValue: null,
+    secondaryLinksToggle: null,
+    reusedToggle: null,
+    themeToggle: null,
+  };
   const localBackend = createLocalBackend();
   const initialBackendCheck = localBackend.detect();
   apicurio.hydrateConfig();
+  applyTheme(readStoredTheme());
   initializeTileHoverScale();
   initializeSelectionDimOpacity();
   initializeTileCompactness();
@@ -228,14 +266,42 @@ export function initBlockscape() {
     return base64Decode(base64);
   }
 
-  function download(filename, text) {
-    const blob = new Blob([text], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
+  const download = (filename, text) => downloadJson(filename, text);
+
+  function readStoredTheme() {
+    if (typeof window === "undefined" || !window.localStorage)
+      return THEME_LIGHT;
+    try {
+      const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
+      return stored === THEME_DARK ? THEME_DARK : THEME_LIGHT;
+    } catch (err) {
+      return THEME_LIGHT;
+    }
+  }
+
+  function persistTheme(nextTheme) {
+    if (typeof window === "undefined" || !window.localStorage) return;
+    try {
+      window.localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
+    } catch (err) {
+      console.warn("[Blockscape] theme persistence failed", err);
+    }
+  }
+
+  function applyTheme(nextTheme) {
+    const normalized = nextTheme === THEME_DARK ? THEME_DARK : THEME_LIGHT;
+    theme = normalized;
+    if (typeof document !== "undefined") {
+      document.documentElement.setAttribute("data-theme", normalized);
+    }
+    persistTheme(normalized);
+    return theme;
+  }
+
+  function getCssVarValue(varName) {
+    if (typeof window === "undefined") return "";
+    const styles = getComputedStyle(document.documentElement);
+    return styles.getPropertyValue(varName).trim();
   }
 
   function isLocalBackendOptIn() {
@@ -486,7 +552,7 @@ export function initBlockscape() {
 
     function setStatus(text, { error = false } = {}) {
       localBackendStatus.textContent = text;
-      localBackendStatus.style.color = error ? "#b42318" : "";
+      localBackendStatus.style.color = error ? tokens.color.dangerStrong : "";
       debug("Status", { text, error });
     }
 
@@ -1614,6 +1680,76 @@ export function initBlockscape() {
     return seriesNavDoubleClickWaitMs;
   }
 
+  function setShowSecondaryLinks(next) {
+    showSecondaryLinks = !!next;
+  }
+
+  function setShowReusedInMap(next) {
+    showReusedInMap = !!next;
+  }
+
+  function getCurrentSettingsState() {
+    return {
+      hoverScale: tileHoverScale,
+      selectionDimOpacity,
+      selectionDimEnabled,
+      tileCompactness,
+      titleWrapMode,
+      titleHoverWidthMultiplier,
+      titleHoverTextPortion,
+      obsidianLinksEnabled,
+      obsidianLinkMode,
+      obsidianVaultName,
+      autoIdFromNameEnabled,
+      seriesNavDoubleClickWaitMs,
+      showSecondaryLinks,
+      showReusedInMap,
+      theme,
+    };
+  }
+
+  function applyImportedSettings(snapshot, { refreshObsidianLinks: obsidianRefresh } = {}) {
+    return applySettingsSnapshot(snapshot, {
+      applyTileHoverScale,
+      persistTileHoverScale,
+      applySelectionDimEnabled,
+      persistSelectionDimEnabled,
+      applySelectionDimOpacity,
+      persistSelectionDimOpacity,
+      applyTileCompactness,
+      persistTileCompactness,
+      applyTitleWrapMode,
+      persistTitleWrapMode,
+      applyTitleHoverWidthMultiplier,
+      persistTitleHoverWidthMultiplier,
+      applyTitleHoverTextPortion,
+      persistTitleHoverTextPortion,
+      applyObsidianLinksEnabled,
+      persistObsidianLinksEnabled,
+      applyObsidianLinkMode,
+      persistObsidianLinkMode,
+      applyObsidianVaultName,
+      persistObsidianVaultName,
+      applyAutoIdFromNameEnabled,
+      persistAutoIdFromNameEnabled,
+      applySeriesNavDoubleClickWait,
+      persistSeriesNavDoubleClickWait,
+      localBackend,
+      ui: settingsUi,
+      refreshObsidianLinks: obsidianRefresh,
+      scheduleOverlaySync,
+      selection,
+      select,
+      clearStyles,
+      drawLinks,
+      applyReusedHighlights,
+      setShowSecondaryLinks,
+      setShowReusedInMap,
+      applyTheme,
+      current: getCurrentSettingsState(),
+    });
+  }
+
   function persistSeriesNavDoubleClickWait(value) {
     if (typeof window === "undefined" || !window.localStorage) return;
     try {
@@ -1747,6 +1883,7 @@ export function initBlockscape() {
       return applyObsidianVaultName("");
     }
   }
+
 
   function promptForSeriesTitle(defaultTitle) {
     if (typeof window === "undefined" || typeof window.prompt !== "function")
@@ -2378,6 +2515,7 @@ export function initBlockscape() {
         idInput,
         errorEl,
         metaLabel: meta.querySelector(".item-editor__meta-value"),
+        syncCheckbox,
       };
       return wrapper;
     };
@@ -2393,13 +2531,15 @@ export function initBlockscape() {
       state.categoryId = category.id;
       state.modelData = modelData;
       state.idManuallyEdited = false;
-      state.autoSyncEnabled = !!autoIdFromNameEnabled;
+      const autoSyncAllowed = !!autoIdFromNameEnabled;
+      state.autoSyncEnabled = autoSyncAllowed;
       state.fields.metaLabel.textContent =
         category.title || category.id || "Category";
       state.fields.titleInput.value = category.title || category.id || "";
       state.fields.idInput.value = category.id || "";
       state.fields.syncCheckbox.checked = state.autoSyncEnabled;
-      if (!state.fields.idInput.value) {
+      state.fields.syncCheckbox.disabled = !autoSyncAllowed;
+      if (!state.fields.idInput.value && autoSyncAllowed) {
         syncCategoryIdFromTitle({ force: true });
       }
       setError("");
@@ -2703,42 +2843,15 @@ export function initBlockscape() {
   }
 
   // --- NEW: letter → color mapping and helpers ---
-  // Letter → color mapping (tailwind-ish palette). G => green.
-  const LETTER_COLOR_MAP = {
-    A: "#0284c7",
-    B: "#3b82f6",
-    C: "#06b6d4",
-    D: "#a855f7",
-    E: "#f59e0b",
-    F: "#f97316",
-    G: "#22c55e",
-    H: "#84cc16",
-    I: "#10b981",
-    J: "#14b8a6",
-    K: "#0ea5e9",
-    L: "#60a5fa",
-    M: "#8b5cf6",
-    N: "#d946ef",
-    O: "#e879f9",
-    P: "#67e8f9",
-    Q: "#4ade80",
-    R: "#facc15",
-    S: "#eab308",
-    T: "#a3e635",
-    U: "#22d3ee",
-    V: "#38bdf8",
-    W: "#818cf8",
-    X: "#a78bfa",
-    Y: "#f472b6",
-    Z: "#fb7185",
-  };
+  const LETTER_COLOR_MAP = tokens.palette.letter;
+  const LETTER_COLOR_FALLBACK = tokens.palette.letterFallback;
 
   // Prefer explicit item.color (if present), else map by first letter.
   function getBadgeColor(text, explicit) {
     if (explicit && /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(explicit))
       return explicit;
     const ch = (text || "?").charAt(0).toUpperCase();
-    return LETTER_COLOR_MAP[ch] || "#9ca3af"; // fallback gray
+    return LETTER_COLOR_MAP[ch] || LETTER_COLOR_FALLBACK; // fallback gray
   }
 
   // Compute readable letter color (black/white) against bg
@@ -2760,7 +2873,7 @@ export function initBlockscape() {
       0.2126 * Math.pow(r / 255, 2.2) +
       0.7152 * Math.pow(g / 255, 2.2) +
       0.0722 * Math.pow(b / 255, 2.2);
-    return L > 0.35 ? "#111111" : "#ffffff";
+    return L > 0.35 ? tokens.color.ink : tokens.color.white;
   }
 
   function scrollPageToTop() {
@@ -3922,9 +4035,13 @@ export function initBlockscape() {
     canvas.width = width;
     canvas.height = height;
     const ctx = canvas.getContext("2d");
-    ctx.fillStyle = "#f8fafc";
+    const canvasBg =
+      getCssVarValue("--color-surface-ghost") || tokens.color.surfaceGhost;
+    const canvasBorder =
+      getCssVarValue("--color-border-muted") || tokens.color.borderMuted;
+    ctx.fillStyle = canvasBg;
     ctx.fillRect(0, 0, width, height);
-    ctx.strokeStyle = "#e5e7eb";
+    ctx.strokeStyle = canvasBorder;
     ctx.strokeRect(0.5, 0.5, width - 1, height - 1);
 
     const topPad = 8;
@@ -4485,6 +4602,78 @@ export function initBlockscape() {
     settingsHeading.className = "blockscape-settings-panel__title";
     settingsHeading.textContent = "Feature toggles";
     settingsPanel.appendChild(settingsHeading);
+    const themeRow = document.createElement("label");
+    themeRow.className = "settings-toggle";
+    const themeInput = document.createElement("input");
+    themeInput.type = "checkbox";
+    themeInput.checked = theme === THEME_DARK;
+    const themeText = document.createElement("span");
+    themeText.className = "settings-toggle__text";
+    const themeLabel = document.createElement("span");
+    themeLabel.className = "settings-toggle__label";
+    themeLabel.textContent = "Dark mode";
+    const themeHint = document.createElement("span");
+    themeHint.className = "settings-toggle__hint";
+    themeHint.textContent = "Switch Blockscape UI to dark colors.";
+    themeText.append(themeLabel, themeHint);
+    themeRow.append(themeInput, themeText);
+    themeInput.addEventListener("change", () => {
+      applyTheme(themeInput.checked ? THEME_DARK : THEME_LIGHT);
+    });
+    settingsPanel.appendChild(themeRow);
+    settingsUi.themeToggle = themeInput;
+    const settingsActions = document.createElement("div");
+    settingsActions.className = "settings-actions";
+    const settingsFileInput = document.createElement("input");
+    settingsFileInput.type = "file";
+    settingsFileInput.accept = "application/json";
+    settingsFileInput.hidden = true;
+    const loadSettingsBtn = document.createElement("button");
+    loadSettingsBtn.type = "button";
+    loadSettingsBtn.className = "pf-v5-c-button pf-m-secondary";
+    loadSettingsBtn.textContent = "Load settings";
+    loadSettingsBtn.addEventListener("click", () => settingsFileInput.click());
+    settingsFileInput.addEventListener("change", async () => {
+      const file = settingsFileInput.files?.[0];
+      if (!file) return;
+      try {
+        const raw = await file.text();
+        const parsed = JSON.parse(raw);
+        const snapshot = parsed?.settings || parsed;
+        const result = applyImportedSettings(snapshot || {}, { refreshObsidianLinks });
+        const appliedCount = result.applied?.length || 0;
+        showNotice(
+          appliedCount
+            ? `Loaded ${appliedCount} setting${appliedCount === 1 ? "" : "s"} from ${file.name}.`
+            : `No matching settings found in ${file.name}.`,
+          2200
+        );
+      } catch (error) {
+        console.warn("[Blockscape] failed to load settings.json", error);
+        showNotice("Invalid settings file.", 2400);
+      } finally {
+        settingsFileInput.value = "";
+      }
+    });
+
+    const saveSettingsBtn = document.createElement("button");
+    saveSettingsBtn.type = "button";
+    saveSettingsBtn.className = "pf-v5-c-button pf-m-tertiary";
+    saveSettingsBtn.textContent = "Download settings";
+    saveSettingsBtn.addEventListener("click", () => {
+      const payload = {
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        settings: buildSettingsSnapshot(getCurrentSettingsState(), {
+          localBackend,
+        }),
+      };
+      download("settings.json", JSON.stringify(payload, null, 2));
+      showNotice("Settings downloaded.", 2000);
+    });
+
+    settingsActions.append(loadSettingsBtn, saveSettingsBtn, settingsFileInput);
+    settingsPanel.appendChild(settingsActions);
     const createSettingsToggle = ({
       id,
       label,
@@ -4550,8 +4739,9 @@ export function initBlockscape() {
         },
       });
     settingsPanel.appendChild(secondaryToggleRow);
+    settingsUi.secondaryLinksToggle = secondaryToggleInput;
 
-    const { row: reusedToggleRow } = createSettingsToggle({
+    const { row: reusedToggleRow, input: reusedToggleInput } = createSettingsToggle({
       id: "toggleReusedInMap",
       label: "Display reused in map view",
       hint: "Show markers for nodes used multiple times.",
@@ -4563,8 +4753,9 @@ export function initBlockscape() {
       },
     });
     settingsPanel.appendChild(reusedToggleRow);
+    settingsUi.reusedToggle = reusedToggleInput;
 
-    const { row: autoIdToggleRow } = createSettingsToggle({
+    const { row: autoIdToggleRow, input: autoIdToggleInput } = createSettingsToggle({
       id: "toggleAutoIdFromName",
       label: "Auto-fill IDs from titles",
       hint: "Keep ID in sync while editing name/title (can be overridden manually).",
@@ -4576,9 +4767,10 @@ export function initBlockscape() {
       },
     });
     settingsPanel.appendChild(autoIdToggleRow);
+    settingsUi.autoIdToggle = autoIdToggleInput;
 
     const obsidianModeInputs = [];
-    const { row: obsidianToggleRow } = createSettingsToggle({
+    const { row: obsidianToggleRow, input: obsidianToggleInput } = createSettingsToggle({
       id: "toggleObsidianLinks",
       label: "Obsidian",
       hint: "Make tiles open Obsidian when no external URL exists.",
@@ -4594,6 +4786,7 @@ export function initBlockscape() {
       },
     });
     settingsPanel.appendChild(obsidianToggleRow);
+    settingsUi.obsidianToggle = obsidianToggleInput;
 
     const hasLocalBackend =
       typeof localBackend?.isAvailable === "function" &&
@@ -4613,9 +4806,10 @@ export function initBlockscape() {
           onChange: (checked) => {
             localBackend.setAutoReloadEnabled(checked);
             if (autoReloadSlider) autoReloadSlider.disabled = !checked;
-          },
-        });
+        },
+      });
       settingsPanel.appendChild(autoReloadToggle);
+      settingsUi.autoReloadToggle = autoReloadInput;
 
       const formatAutoReloadInterval = (ms) =>
         `${(ms / 1000).toFixed(2)}s`;
@@ -4655,6 +4849,8 @@ export function initBlockscape() {
       });
       autoReloadRow.append(autoReloadText, autoReloadValue, autoReloadSlider);
       settingsPanel.appendChild(autoReloadRow);
+      settingsUi.autoReloadInput = autoReloadSlider;
+      settingsUi.autoReloadValue = autoReloadValue;
     }
 
     const obsidianModeRow = document.createElement("div");
@@ -4699,6 +4895,7 @@ export function initBlockscape() {
       obsidianModeHint
     );
     settingsPanel.appendChild(obsidianModeRow);
+    settingsUi.obsidianModeInputs = obsidianModeInputs;
 
     const obsidianVaultRow = document.createElement("label");
     obsidianVaultRow.className = "settings-text";
@@ -4726,6 +4923,7 @@ export function initBlockscape() {
     });
     obsidianVaultRow.append(obsidianVaultText, obsidianVaultInput);
     settingsPanel.appendChild(obsidianVaultRow);
+    settingsUi.obsidianVaultInput = obsidianVaultInput;
 
     const obsidianPluginNote = document.createElement("p");
     obsidianPluginNote.className = "settings-note";
@@ -4781,6 +4979,8 @@ export function initBlockscape() {
       seriesNavWaitInput
     );
     settingsPanel.appendChild(seriesNavWaitRow);
+    settingsUi.seriesNavInput = seriesNavWaitInput;
+    settingsUi.seriesNavValue = seriesNavWaitValue;
 
     const formatHoverScale = (value) => `${Math.round((value - 1) * 100)}%`;
     const hoverScaleRow = document.createElement("label");
@@ -4819,6 +5019,8 @@ export function initBlockscape() {
 
     hoverScaleRow.append(hoverScaleText, hoverScaleValue, hoverScaleInput);
     settingsPanel.appendChild(hoverScaleRow);
+    settingsUi.hoverScaleInput = hoverScaleInput;
+    settingsUi.hoverScaleValue = hoverScaleValue;
 
     let dimInput = null;
     let dimValue = null;
@@ -4826,7 +5028,7 @@ export function initBlockscape() {
       const dimPercent = Math.round((1 - opacity) * 100);
       return dimPercent === 0 ? "Off" : `${dimPercent}% dim`;
     };
-    const { row: dimToggleRow } = createSettingsToggle({
+    const { row: dimToggleRow, input: dimToggleInput } = createSettingsToggle({
       id: "toggleSelectionDimming",
       label: "Dim unrelated tiles",
       hint: "When selecting a tile, fade everything except linked tiles.",
@@ -4844,6 +5046,7 @@ export function initBlockscape() {
       },
     });
     settingsPanel.appendChild(dimToggleRow);
+    settingsUi.selectionDimToggle = dimToggleInput;
     const dimRow = document.createElement("label");
     dimRow.className = "settings-slider";
     dimRow.setAttribute("for", "selectionDimmingSlider");
@@ -4886,6 +5089,8 @@ export function initBlockscape() {
 
     dimRow.append(dimText, dimValue, dimInput);
     settingsPanel.appendChild(dimRow);
+    settingsUi.selectionDimInput = dimInput;
+    settingsUi.selectionDimValue = dimValue;
 
     const formatCompactness = (value) =>
       value === 1 ? "Default" : `${Math.round(value * 100)}%`;
@@ -4926,6 +5131,8 @@ export function initBlockscape() {
 
     compactRow.append(compactText, compactValue, compactInput);
     settingsPanel.appendChild(compactRow);
+    settingsUi.tileCompactnessInput = compactInput;
+    settingsUi.tileCompactnessValue = compactValue;
 
     const { row: titleWrapRow, input: titleWrapInput } = createSettingsToggle({
       id: "titleWrapToggle",
@@ -4940,6 +5147,7 @@ export function initBlockscape() {
       },
     });
     settingsPanel.appendChild(titleWrapRow);
+    settingsUi.titleWrapInput = titleWrapInput;
 
     const formatTitleWidth = (value) =>
       `${Math.round((value - 1) * 100)}% extra`;
@@ -4983,6 +5191,8 @@ export function initBlockscape() {
 
     titleWidthRow.append(titleWidthText, titleWidthValue, titleWidthInput);
     settingsPanel.appendChild(titleWidthRow);
+    settingsUi.titleWidthInput = titleWidthInput;
+    settingsUi.titleWidthValue = titleWidthValue;
 
     const formatTitleZoomPortion = (value) =>
       `${Math.round(value * 100)}% of hover zoom`;
@@ -5027,6 +5237,8 @@ export function initBlockscape() {
 
     titleZoomRow.append(titleZoomText, titleZoomValue, titleZoomInput);
     settingsPanel.appendChild(titleZoomRow);
+    settingsUi.titleZoomInput = titleZoomInput;
+    settingsUi.titleZoomValue = titleZoomValue;
 
     const apicurioEnabled =
       typeof apicurio.isEnabled === "function" ? apicurio.isEnabled() : false;

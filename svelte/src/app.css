@@ -1,75 +1,8 @@
-    :root {
-      color-scheme: light;
-      --space-2xs: 0.2rem;
-      --space-xs: 0.35rem;
-      --space-sm: 0.5rem;
-      --space-md: 0.75rem;
-      --space-lg: 1.25rem;
-      --space-xl: 2rem;
-      --space-2xl: 3rem;
+@import "./generated/tokens.css";
 
-      --radius-sm: 6px;
-      --radius-md: 10px;
-      --radius-lg: 16px;
-
-      --font-text: "Inter", "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
-      --font-mono: "JetBrains Mono", "Fira Code", monospace;
-      --font-size-xs: 0.75rem;
-      --font-size-sm: 0.875rem;
-      --font-size-md: 1rem;
-      --font-size-lg: 1.2rem;
-      --font-weight-regular: 400;
-      --font-weight-medium: 500;
-      --font-weight-semibold: 600;
-      --font-weight-bold: 700;
-
-      --color-text: #1f2937;
-      --color-muted: #6b7280;
-      --color-border: #d8dde8;
-      --color-border-strong: #c3cad7;
-      --color-surface: #ffffff;
-      --color-surface-muted: #f4f6fb;
-      --color-surface-subtle: #eef2f8;
-      --color-shadow: 0 18px 36px -22px rgba(15, 23, 42, 0.45);
-
-      --color-primary: #2563eb;
-      --color-primary-soft: #e3edff;
-      --color-danger: #dc2626;
-      --color-danger-soft: #fde4e2;
-      --color-warning: #f97316;
-      --color-warning-soft: #ffe8d6;
-      --color-accent: #0ea5e9;
-      --color-external: #94a3b8;
-
-      --transition: 160ms ease;
-
-      --blockscape-tile: 6.5rem;
-      --blockscape-gap: var(--space-md);
-      --blockscape-radius: var(--radius-lg);
-      --blockscape-foreground: var(--color-text);
-      --blockscape-muted: var(--color-muted);
-      --blockscape-border: var(--color-border);
-      --blockscape-surface: var(--color-surface);
-      --blockscape-surface-alt: var(--color-surface-muted);
-      --blockscape-dep: var(--color-primary);
-      --blockscape-revdep: #ef4444;
-      --blockscape-reused: var(--color-warning);
-      --blockscape-external: var(--color-external);
-      --blockscape-tile-hover-scale: 1.5;
-      --blockscape-tile-hover-scale-inverse: calc(1 / var(--blockscape-tile-hover-scale));
-      --blockscape-tile-hover-text-portion: 0.25;
-      --blockscape-selection-dim-opacity: 0.2;
-      --blockscape-selection-dim-applied-opacity: var(--blockscape-selection-dim-opacity);
-      --blockscape-title-hover-width-multiplier: 1.3;
-      --blockscape-title-white-space: normal;
-      --blockscape-title-text-wrap: normal;
-      --blockscape-tile-compactness: 1;
-      --blockscape-logo-size: 40px;
-      --blockscape-tile-padding-top: var(--space-xs);
-      --blockscape-tile-padding-bottom: var(--space-sm);
-      --blockscape-tile-padding-x: var(--space-md);
-      --blockscape-tile-gap-inner: calc(var(--space-2xs) * 0.5);
-    }
+:root {
+  color-scheme: light;
+}
 
     *,
     *::before,
@@ -592,12 +525,12 @@
     .pf-v5-c-button.pf-m-primary {
       background: var(--color-primary);
       border-color: var(--color-primary);
-      color: #fff;
+      color: var(--color-white);
     }
 
     .pf-v5-c-button.pf-m-primary:hover {
-      background: #1d4fd7;
-      border-color: #1d4fd7;
+      background: var(--color-primary-hover);
+      border-color: var(--color-primary-hover);
     }
 
     .pf-v5-c-button.pf-m-secondary {
@@ -607,7 +540,7 @@
     }
 
     .pf-v5-c-button.pf-m-secondary:hover {
-      background: #e5e9f4;
+      background: var(--color-surface-hover);
     }
 
     .pf-v5-c-button.pf-m-tertiary {
@@ -669,7 +602,7 @@
       background: var(--color-surface);
       border: 1px solid var(--color-border);
       border-radius: var(--radius-md);
-      box-shadow: var(--color-shadow);
+      box-shadow: var(--shadow-lg);
       max-height: 22rem;
       overflow-y: auto;
       z-index: 25;
@@ -793,7 +726,7 @@
     }
 
     .legend-dot--external {
-      background: #edf1f7;
+      background: var(--color-surface-soft);
       border-color: var(--blockscape-external);
     }
 
@@ -844,7 +777,7 @@
       border: 1px solid var(--blockscape-border);
       border-radius: var(--radius-md);
       padding: var(--space-md);
-      box-shadow: var(--color-shadow);
+      box-shadow: var(--shadow-lg);
       display: flex;
       flex-direction: column;
       gap: var(--space-md);
@@ -1079,6 +1012,13 @@
       background: var(--color-surface-muted);
     }
 
+    .settings-actions {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: var(--space-xs);
+    }
+
     .blockscape-settings-panel__title {
       margin: 0;
       font-weight: var(--font-weight-semibold);
@@ -1164,7 +1104,7 @@
       background: var(--color-surface);
       border: 1px solid var(--color-border);
       border-radius: var(--radius-md);
-      box-shadow: var(--color-shadow);
+      box-shadow: var(--shadow-lg);
     }
 
     .version-nav__title {
@@ -1443,7 +1383,7 @@
       color: var(--color-text);
       background: var(--color-surface);
       border-color: var(--color-border);
-      box-shadow: var(--color-shadow);
+      box-shadow: var(--shadow-lg);
       position: relative;
       top: 1px;
     }
@@ -1473,7 +1413,7 @@
       border: 1px solid var(--color-border);
       border-radius: var(--radius-lg);
       background: var(--color-surface);
-      box-shadow: var(--color-shadow);
+      box-shadow: var(--shadow-lg);
     }
 
     .blockscape-tabpanel {
@@ -1493,7 +1433,7 @@
       background: var(--blockscape-surface);
       border: 1px solid var(--color-border);
       border-radius: var(--radius-md);
-      box-shadow: var(--color-shadow);
+      box-shadow: var(--shadow-lg);
     }
 
     .blockscape-registry-header {
@@ -1528,7 +1468,7 @@
       border-radius: var(--radius-md);
       border-left: 3px solid var(--blockscape-dep);
       margin: 0;
-      box-shadow: var(--color-shadow);
+      box-shadow: var(--shadow-lg);
     }
 
     .blockscape-abstract a {
@@ -1603,7 +1543,7 @@
       max-width: min(420px, calc(100% - 2 * var(--space-md)));
       padding: var(--space-md);
       background: var(--color-surface);
-      box-shadow: var(--color-shadow);
+      box-shadow: var(--shadow-lg);
       border: 1px solid var(--color-border);
       border-radius: var(--radius-md);
       font-size: var(--font-size-sm);
@@ -1656,10 +1596,10 @@
 
     .cat-head--series-link:hover,
     .cat-head--series-link:focus {
-      background: #d9e6ff;
-      color: #1d4ed8;
+      background: var(--color-primary-surface-hover);
+      color: var(--color-primary-strong);
       box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.3),
-        0 8px 18px -14px rgba(37, 99, 235, 0.8);
+        var(--shadow-primary-glow);
       transform: translateY(-1px);
       text-decoration: none;
       outline: none;
@@ -1750,7 +1690,7 @@
         transform var(--transition),
         border-color var(--transition),
         opacity var(--transition);
-      box-shadow: var(--color-shadow);
+      box-shadow: var(--shadow-lg);
       transform: translateY(0) scale(1);
       transform-origin: center;
       will-change: transform;
@@ -1914,7 +1854,7 @@
       border-style: dashed;
       border-color: var(--color-external);
       color: var(--blockscape-muted);
-      background: #f8fafc;
+      background: var(--color-surface-ghost);
     }
 
     .tile .external-link,
@@ -1987,7 +1927,7 @@
     .tile .tile-delete:hover,
     .tile .tile-delete:focus-visible {
       background: var(--color-danger);
-      color: #fff;
+      color: var(--color-white);
       border-color: var(--color-danger);
       outline: none;
       box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.15);
@@ -2014,7 +1954,7 @@
       color: var(--color-text);
       border: 1px solid var(--color-border);
       border-radius: var(--radius-md);
-      box-shadow: var(--color-shadow);
+      box-shadow: var(--shadow-lg);
       font-size: var(--font-size-sm);
       z-index: 240;
     }
@@ -2191,7 +2131,7 @@
       background: var(--blockscape-surface);
       border: 1px solid var(--blockscape-border);
       border-radius: var(--radius-md);
-      box-shadow: var(--color-shadow);
+      box-shadow: var(--shadow-lg);
       opacity: 0;
       transform: translateY(4px);
       pointer-events: none;
@@ -2303,7 +2243,7 @@
       background: var(--blockscape-surface);
       border: 1px solid var(--blockscape-border);
       border-radius: var(--radius-md);
-      box-shadow: var(--color-shadow);
+      box-shadow: var(--shadow-lg);
       padding: var(--space-2xs);
       opacity: 0;
       transform: translateY(4px);

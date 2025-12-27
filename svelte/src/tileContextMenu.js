@@ -1,3 +1,5 @@
+import { tokens } from "./generated/tokens";
+
 export function createTileContextMenu({
   menuEl,
   previewEl,
@@ -142,22 +144,22 @@ export function createTileContextMenu({
     if (typeof onChangeColor === "function" && meta.id) {
       list.appendChild(
         makeMenuButton("Set color: Black", () =>
-          onChangeColor(meta.id, "#111111")
+          onChangeColor(meta.id, tokens.color.ink)
         )
       );
       list.appendChild(
         makeMenuButton("Set color: White", () =>
-          onChangeColor(meta.id, "#ffffff")
+          onChangeColor(meta.id, tokens.color.white)
         )
       );
       list.appendChild(
         makeMenuButton("Set color: Red", () =>
-          onChangeColor(meta.id, "#ef4444")
+          onChangeColor(meta.id, tokens.blockscape.revdep)
         )
       );
       list.appendChild(
         makeMenuButton("Set color: Green", () =>
-          onChangeColor(meta.id, "#22c55e")
+          onChangeColor(meta.id, tokens.color.success)
         )
       );
     }

@@ -1661,6 +1661,51 @@ function createApicurioIntegration({
     onEnabledChange: onApicurioEnabledChange
   };
 }
+const tokens = {
+  "color": {
+    "borderMuted": "#e5e7eb",
+    "surfaceGhost": "#f8fafc",
+    "primary": "#2563eb",
+    "dangerStrong": "#b42318",
+    "success": "#22c55e",
+    "ink": "#111111",
+    "white": "#ffffff"
+  },
+  "blockscape": {
+    "revdep": "#ef4444"
+  },
+  "palette": {
+    "letter": {
+      "A": "#0284c7",
+      "B": "#3b82f6",
+      "C": "#06b6d4",
+      "D": "#a855f7",
+      "E": "#f59e0b",
+      "F": "#f97316",
+      "G": "#22c55e",
+      "H": "#84cc16",
+      "I": "#10b981",
+      "J": "#14b8a6",
+      "K": "#0ea5e9",
+      "L": "#60a5fa",
+      "M": "#8b5cf6",
+      "N": "#d946ef",
+      "O": "#e879f9",
+      "P": "#67e8f9",
+      "Q": "#4ade80",
+      "R": "#facc15",
+      "S": "#eab308",
+      "T": "#a3e635",
+      "U": "#22d3ee",
+      "V": "#38bdf8",
+      "W": "#818cf8",
+      "X": "#a78bfa",
+      "Y": "#f472b6",
+      "Z": "#fb7185"
+    },
+    "letterFallback": "#9ca3af"
+  }
+};
 function assertFn(fn, name) {
   if (typeof fn !== "function") {
     throw new Error(`[itemEditor] expected ${name} to be a function`);
@@ -1918,7 +1963,7 @@ function createItemEditor({
     form.appendChild(externalToggle);
     const colorInput = document.createElement("input");
     colorInput.type = "text";
-    colorInput.placeholder = "#2563eb";
+    colorInput.placeholder = tokens.color.primary;
     form.appendChild(makeField("Color", colorInput, "Optional badge color (hex or CSS color)."));
     const depsInput = document.createElement("textarea");
     depsInput.rows = 2;
@@ -2002,7 +2047,8 @@ function createItemEditor({
     state.itemId = hit.item.id;
     state.modelData = hit.modelData;
     state.autoIdManuallyEdited = false;
-    state.autoSyncEnabled = !!isAutoIdFromNameEnabled();
+    const autoSyncAllowed = !!isAutoIdFromNameEnabled();
+    state.autoSyncEnabled = autoSyncAllowed;
     state.fields.categoryValue.textContent = hit.category.title || hit.category.id;
     state.fields.idInput.value = hit.item.id || "";
     state.fields.nameInput.value = hit.item.name || "";
@@ -2012,7 +2058,8 @@ function createItemEditor({
     state.fields.colorInput.value = hit.item.color || "";
     state.fields.depsInput.value = Array.isArray(hit.item.deps) ? hit.item.deps.join(", ") : "";
     state.fields.syncCheckbox.checked = state.autoSyncEnabled;
-    if (!state.fields.idInput.value) {
+    state.fields.syncCheckbox.disabled = !autoSyncAllowed;
+    if (!state.fields.idInput.value && autoSyncAllowed) {
       syncIdFromName({ force: true });
     }
     setError("");
@@ -2157,25 +2204,25 @@ function createTileContextMenu({
       list.appendChild(
         makeMenuButton(
           "Set color: Black",
-          () => onChangeColor(meta.id, "#111111")
+          () => onChangeColor(meta.id, tokens.color.ink)
         )
       );
       list.appendChild(
         makeMenuButton(
           "Set color: White",
-          () => onChangeColor(meta.id, "#ffffff")
+          () => onChangeColor(meta.id, tokens.color.white)
         )
       );
       list.appendChild(
         makeMenuButton(
           "Set color: Red",
-          () => onChangeColor(meta.id, "#ef4444")
+          () => onChangeColor(meta.id, tokens.blockscape.revdep)
         )
       );
       list.appendChild(
         makeMenuButton(
           "Set color: Green",
-          () => onChangeColor(meta.id, "#22c55e")
+          () => onChangeColor(meta.id, tokens.color.success)
         )
       );
     }
@@ -2368,6 +2415,261 @@ function getSeriesId(entry, options = {}) {
   }
   return null;
 }
+const DEFAULTS = {
+  selectionDimOpacity: 0.2,
+  selectionDimEnabled: true
+};
+const formatSettings = {
+  seriesNavWait: (value) => `${(value / 1e3).toFixed(1)}s`,
+  hoverScale: (value) => `${Math.round((value - 1) * 100)}%`,
+  selectionDimming: (opacity, enabled = true) => {
+    const dimPercent = Math.round((1 - opacity) * 100);
+    if (!enabled) return "Off";
+    return dimPercent === 0 ? "Off" : `${dimPercent}% dim`;
+  },
+  compactness: (value) => value === 1 ? "Default" : `${Math.round(value * 100)}%`,
+  titleWidth: (value) => `${Math.round((value - 1) * 100)}% extra`,
+  titleZoomPortion: (value) => `${Math.round(value * 100)}% of hover zoom`,
+  autoReloadInterval: (value) => `${(value / 1e3).toFixed(2)}s`
+};
+function asBool(value) {
+  return value === true || value === "true" || value === 1 || value === "1";
+}
+function buildSettingsSnapshot(current, { localBackend } = {}) {
+  const autoReloadConfig = localBackend && typeof localBackend.getAutoReloadConfig === "function" && localBackend.getAutoReloadConfig();
+  const snapshot = {
+    theme: current.theme,
+    hoverScale: current.hoverScale,
+    selectionDimOpacity: current.selectionDimOpacity,
+    selectionDimEnabled: current.selectionDimEnabled,
+    tileCompactness: current.tileCompactness,
+    titleWrapMode: current.titleWrapMode,
+    titleHoverWidthMultiplier: current.titleHoverWidthMultiplier,
+    titleHoverTextPortion: current.titleHoverTextPortion,
+    obsidianLinksEnabled: current.obsidianLinksEnabled,
+    obsidianLinkMode: current.obsidianLinkMode,
+    obsidianVault: current.obsidianVaultName,
+    autoIdFromName: current.autoIdFromNameEnabled,
+    seriesNavDoubleClickMs: current.seriesNavDoubleClickWaitMs,
+    showSecondaryLinks: current.showSecondaryLinks,
+    showReusedInMap: current.showReusedInMap
+  };
+  if (autoReloadConfig) {
+    snapshot.autoReloadEnabled = !!autoReloadConfig.enabled;
+    snapshot.autoReloadIntervalMs = autoReloadConfig.intervalMs;
+  }
+  return snapshot;
+}
+function applySettingsSnapshot(snapshot = {}, ctx) {
+  var _a, _b, _c;
+  if (!snapshot || typeof snapshot !== "object") return { applied: [] };
+  const appliedKeys = [];
+  const {
+    applyTheme,
+    applyTileHoverScale,
+    persistTileHoverScale,
+    applySelectionDimEnabled,
+    persistSelectionDimEnabled,
+    applySelectionDimOpacity,
+    persistSelectionDimOpacity,
+    applyTileCompactness,
+    persistTileCompactness,
+    applyTitleWrapMode,
+    persistTitleWrapMode,
+    applyTitleHoverWidthMultiplier,
+    persistTitleHoverWidthMultiplier,
+    applyTitleHoverTextPortion,
+    persistTitleHoverTextPortion,
+    applyObsidianLinksEnabled,
+    persistObsidianLinksEnabled,
+    applyObsidianLinkMode,
+    persistObsidianLinkMode,
+    applyObsidianVaultName,
+    persistObsidianVaultName,
+    applyAutoIdFromNameEnabled,
+    persistAutoIdFromNameEnabled,
+    applySeriesNavDoubleClickWait,
+    persistSeriesNavDoubleClickWait,
+    localBackend,
+    ui,
+    refreshObsidianLinks,
+    scheduleOverlaySync,
+    selection,
+    select,
+    clearStyles,
+    drawLinks,
+    applyReusedHighlights,
+    current
+  } = ctx;
+  if (snapshot.theme) {
+    applyTheme == null ? void 0 : applyTheme(snapshot.theme);
+    if ((_a = ctx.ui) == null ? void 0 : _a.themeToggle) {
+      ctx.ui.themeToggle.checked = snapshot.theme === "dark";
+    }
+    appliedKeys.push("theme");
+  }
+  if (snapshot.hoverScale != null) {
+    const applied = applyTileHoverScale(parseFloat(snapshot.hoverScale));
+    persistTileHoverScale(applied);
+    (ui == null ? void 0 : ui.hoverScaleInput) && (ui.hoverScaleInput.value = String(applied));
+    (ui == null ? void 0 : ui.hoverScaleValue) && (ui.hoverScaleValue.textContent = formatSettings.hoverScale(applied));
+    if (selection) scheduleOverlaySync();
+    appliedKeys.push("hoverScale");
+  }
+  if (snapshot.selectionDimEnabled != null) {
+    const applied = applySelectionDimEnabled(asBool(snapshot.selectionDimEnabled));
+    persistSelectionDimEnabled(applied);
+    if (ui == null ? void 0 : ui.selectionDimToggle) ui.selectionDimToggle.checked = applied;
+    if (ui == null ? void 0 : ui.selectionDimInput) ui.selectionDimInput.disabled = !applied;
+    if (ui == null ? void 0 : ui.selectionDimValue) {
+      ui.selectionDimValue.textContent = formatSettings.selectionDimming(
+        current.selectionDimOpacity ?? DEFAULTS.selectionDimOpacity,
+        applied
+      );
+    }
+    appliedKeys.push("selectionDimEnabled");
+  }
+  if (snapshot.selectionDimOpacity != null) {
+    const applied = applySelectionDimOpacity(
+      parseFloat(snapshot.selectionDimOpacity)
+    );
+    persistSelectionDimOpacity(applied);
+    (ui == null ? void 0 : ui.selectionDimInput) && (ui.selectionDimInput.value = String(applied));
+    (ui == null ? void 0 : ui.selectionDimValue) && (ui.selectionDimValue.textContent = formatSettings.selectionDimming(
+      applied,
+      current.selectionDimEnabled ?? DEFAULTS.selectionDimEnabled
+    ));
+    appliedKeys.push("selectionDimOpacity");
+  }
+  if (snapshot.tileCompactness != null) {
+    const applied = applyTileCompactness(parseFloat(snapshot.tileCompactness));
+    persistTileCompactness(applied);
+    (ui == null ? void 0 : ui.tileCompactnessInput) && (ui.tileCompactnessInput.value = String(applied));
+    (ui == null ? void 0 : ui.tileCompactnessValue) && (ui.tileCompactnessValue.textContent = formatSettings.compactness(applied));
+    if (selection) scheduleOverlaySync();
+    appliedKeys.push("tileCompactness");
+  }
+  if (snapshot.titleWrapMode) {
+    const applied = applyTitleWrapMode(snapshot.titleWrapMode);
+    persistTitleWrapMode(applied);
+    if (ui == null ? void 0 : ui.titleWrapInput) ui.titleWrapInput.checked = applied !== "nowrap";
+    appliedKeys.push("titleWrapMode");
+  }
+  if (snapshot.titleHoverWidthMultiplier != null) {
+    const applied = applyTitleHoverWidthMultiplier(
+      parseFloat(snapshot.titleHoverWidthMultiplier)
+    );
+    persistTitleHoverWidthMultiplier(applied);
+    (ui == null ? void 0 : ui.titleWidthInput) && (ui.titleWidthInput.value = String(applied));
+    (ui == null ? void 0 : ui.titleWidthValue) && (ui.titleWidthValue.textContent = formatSettings.titleWidth(applied));
+    appliedKeys.push("titleHoverWidthMultiplier");
+  }
+  if (snapshot.titleHoverTextPortion != null) {
+    const applied = applyTitleHoverTextPortion(
+      parseFloat(snapshot.titleHoverTextPortion)
+    );
+    persistTitleHoverTextPortion(applied);
+    (ui == null ? void 0 : ui.titleZoomInput) && (ui.titleZoomInput.value = String(applied));
+    (ui == null ? void 0 : ui.titleZoomValue) && (ui.titleZoomValue.textContent = formatSettings.titleZoomPortion(applied));
+    appliedKeys.push("titleHoverTextPortion");
+  }
+  if (snapshot.obsidianLinksEnabled != null) {
+    const applied = applyObsidianLinksEnabled(
+      asBool(snapshot.obsidianLinksEnabled)
+    );
+    persistObsidianLinksEnabled(applied);
+    if (ui == null ? void 0 : ui.obsidianToggle) ui.obsidianToggle.checked = applied;
+    (_b = ui == null ? void 0 : ui.obsidianModeInputs) == null ? void 0 : _b.forEach((input) => {
+      input.disabled = !applied;
+    });
+    if (ui == null ? void 0 : ui.obsidianVaultInput) ui.obsidianVaultInput.disabled = !applied;
+    refreshObsidianLinks == null ? void 0 : refreshObsidianLinks();
+    appliedKeys.push("obsidianLinksEnabled");
+  }
+  if (snapshot.obsidianLinkMode) {
+    const applied = applyObsidianLinkMode(snapshot.obsidianLinkMode);
+    persistObsidianLinkMode(applied);
+    (_c = ui == null ? void 0 : ui.obsidianModeInputs) == null ? void 0 : _c.forEach((input) => {
+      input.checked = input.value === applied;
+    });
+    refreshObsidianLinks == null ? void 0 : refreshObsidianLinks();
+    appliedKeys.push("obsidianLinkMode");
+  }
+  if (snapshot.obsidianVault != null) {
+    const applied = applyObsidianVaultName(snapshot.obsidianVault);
+    persistObsidianVaultName(applied);
+    if (ui == null ? void 0 : ui.obsidianVaultInput) ui.obsidianVaultInput.value = applied;
+    refreshObsidianLinks == null ? void 0 : refreshObsidianLinks();
+    appliedKeys.push("obsidianVault");
+  }
+  if (snapshot.autoIdFromName != null) {
+    const applied = applyAutoIdFromNameEnabled(asBool(snapshot.autoIdFromName));
+    persistAutoIdFromNameEnabled(applied);
+    if (ui == null ? void 0 : ui.autoIdToggle) ui.autoIdToggle.checked = applied;
+    appliedKeys.push("autoIdFromName");
+  }
+  if (snapshot.seriesNavDoubleClickMs != null) {
+    const applied = applySeriesNavDoubleClickWait(
+      parseInt(snapshot.seriesNavDoubleClickMs, 10)
+    );
+    persistSeriesNavDoubleClickWait(applied);
+    (ui == null ? void 0 : ui.seriesNavInput) && (ui.seriesNavInput.value = String(applied));
+    (ui == null ? void 0 : ui.seriesNavValue) && (ui.seriesNavValue.textContent = formatSettings.seriesNavWait(applied));
+    appliedKeys.push("seriesNavDoubleClickMs");
+  }
+  if (snapshot.autoReloadEnabled != null && localBackend && typeof localBackend.setAutoReloadEnabled === "function") {
+    const enabled = asBool(snapshot.autoReloadEnabled);
+    localBackend.setAutoReloadEnabled(enabled);
+    if (ui == null ? void 0 : ui.autoReloadToggle) ui.autoReloadToggle.checked = enabled;
+    if (ui == null ? void 0 : ui.autoReloadInput) ui.autoReloadInput.disabled = !enabled;
+    appliedKeys.push("autoReloadEnabled");
+  }
+  if (snapshot.autoReloadIntervalMs != null && localBackend && typeof localBackend.setAutoReloadInterval === "function") {
+    const applied = localBackend.setAutoReloadInterval(
+      parseInt(snapshot.autoReloadIntervalMs, 10)
+    );
+    (ui == null ? void 0 : ui.autoReloadInput) && (ui.autoReloadInput.value = String(applied));
+    (ui == null ? void 0 : ui.autoReloadValue) && (ui.autoReloadValue.textContent = formatSettings.autoReloadInterval(applied));
+    appliedKeys.push("autoReloadIntervalMs");
+  }
+  if (snapshot.showSecondaryLinks != null) {
+    const next = asBool(snapshot.showSecondaryLinks);
+    if (typeof ctx.setShowSecondaryLinks === "function") {
+      ctx.setShowSecondaryLinks(next);
+    } else {
+      ctx.showSecondaryLinks = next;
+    }
+    if (ui == null ? void 0 : ui.secondaryLinksToggle) ui.secondaryLinksToggle.checked = next;
+    if (selection) {
+      select(selection);
+    } else {
+      clearStyles();
+      drawLinks();
+    }
+    appliedKeys.push("showSecondaryLinks");
+  }
+  if (snapshot.showReusedInMap != null) {
+    const next = asBool(snapshot.showReusedInMap);
+    if (typeof ctx.setShowReusedInMap === "function") {
+      ctx.setShowReusedInMap(next);
+    } else {
+      ctx.showReusedInMap = next;
+    }
+    if (ui == null ? void 0 : ui.reusedToggle) ui.reusedToggle.checked = next;
+    applyReusedHighlights == null ? void 0 : applyReusedHighlights();
+    appliedKeys.push("showReusedInMap");
+  }
+  return { applied: appliedKeys };
+}
+function downloadJson(filename, data) {
+  const blob = new Blob([data], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 const ASSET_BASE = typeof import.meta !== "undefined" && "./" || "";
 function initBlockscape() {
   console.log("[Blockscape] init");
@@ -2503,6 +2805,9 @@ function initBlockscape() {
   const MAX_AUTO_RELOAD_INTERVAL_MS = 1e4;
   const AUTO_ID_FROM_NAME_STORAGE_KEY = "blockscape:autoIdFromName";
   const DEFAULT_AUTO_ID_FROM_NAME = true;
+  const THEME_STORAGE_KEY = "blockscape:theme";
+  const THEME_LIGHT = "light";
+  const THEME_DARK = "dark";
   const CATEGORY_VIEW_VERSION_PREFIX = "cat:";
   let tileHoverScale = DEFAULT_TILE_HOVER_SCALE;
   let selectionDimOpacity = DEFAULT_SELECTION_DIM_OPACITY;
@@ -2515,14 +2820,42 @@ function initBlockscape() {
   let obsidianLinkMode = DEFAULT_OBSIDIAN_LINK_MODE;
   let obsidianVaultName = "";
   let autoIdFromNameEnabled = DEFAULT_AUTO_ID_FROM_NAME;
+  let theme = THEME_LIGHT;
   const SERIES_NAV_DOUBLE_CLICK_STORAGE_KEY = "blockscape:seriesNavDoubleClickMs";
   const DEFAULT_SERIES_NAV_DOUBLE_CLICK_MS = 900;
   const MIN_SERIES_NAV_DOUBLE_CLICK_MS = 300;
   const MAX_SERIES_NAV_DOUBLE_CLICK_MS = 4e3;
   let seriesNavDoubleClickWaitMs = DEFAULT_SERIES_NAV_DOUBLE_CLICK_MS;
+  const settingsUi = {
+    hoverScaleInput: null,
+    hoverScaleValue: null,
+    selectionDimToggle: null,
+    selectionDimInput: null,
+    selectionDimValue: null,
+    tileCompactnessInput: null,
+    tileCompactnessValue: null,
+    titleWrapInput: null,
+    titleWidthInput: null,
+    titleWidthValue: null,
+    titleZoomInput: null,
+    titleZoomValue: null,
+    seriesNavInput: null,
+    seriesNavValue: null,
+    obsidianToggle: null,
+    obsidianModeInputs: [],
+    obsidianVaultInput: null,
+    autoIdToggle: null,
+    autoReloadToggle: null,
+    autoReloadInput: null,
+    autoReloadValue: null,
+    secondaryLinksToggle: null,
+    reusedToggle: null,
+    themeToggle: null
+  };
   const localBackend = createLocalBackend();
   const initialBackendCheck = localBackend.detect();
   apicurio.hydrateConfig();
+  applyTheme(readStoredTheme());
   initializeTileHoverScale();
   initializeSelectionDimOpacity();
   initializeTileCompactness();
@@ -2564,14 +2897,38 @@ function initBlockscape() {
     if (pad) base64 += "=".repeat(4 - pad);
     return base64Decode(base64);
   }
-  function download(filename, text2) {
-    const blob = new Blob([text2], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
+  const download = (filename, text2) => downloadJson(filename, text2);
+  function readStoredTheme() {
+    if (typeof window === "undefined" || !window.localStorage)
+      return THEME_LIGHT;
+    try {
+      const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
+      return stored === THEME_DARK ? THEME_DARK : THEME_LIGHT;
+    } catch (err) {
+      return THEME_LIGHT;
+    }
+  }
+  function persistTheme(nextTheme) {
+    if (typeof window === "undefined" || !window.localStorage) return;
+    try {
+      window.localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
+    } catch (err) {
+      console.warn("[Blockscape] theme persistence failed", err);
+    }
+  }
+  function applyTheme(nextTheme) {
+    const normalized = nextTheme === THEME_DARK ? THEME_DARK : THEME_LIGHT;
+    theme = normalized;
+    if (typeof document !== "undefined") {
+      document.documentElement.setAttribute("data-theme", normalized);
+    }
+    persistTheme(normalized);
+    return theme;
+  }
+  function getCssVarValue(varName) {
+    if (typeof window === "undefined") return "";
+    const styles = getComputedStyle(document.documentElement);
+    return styles.getPropertyValue(varName).trim();
   }
   function isLocalBackendOptIn() {
     if (typeof window === "undefined" || !window.location) return false;
@@ -2787,7 +3144,7 @@ function initBlockscape() {
     }
     function setStatus(text2, { error = false } = {}) {
       localBackendStatus.textContent = text2;
-      localBackendStatus.style.color = error ? "#b42318" : "";
+      localBackendStatus.style.color = error ? tokens.color.dangerStrong : "";
       debug("Status", { text: text2, error });
     }
     function normalizeSavePath(raw) {
@@ -3784,6 +4141,72 @@ function initBlockscape() {
     seriesNavDoubleClickWaitMs = clampSeriesNavDoubleClickWait(value);
     return seriesNavDoubleClickWaitMs;
   }
+  function setShowSecondaryLinks(next) {
+    showSecondaryLinks = !!next;
+  }
+  function setShowReusedInMap(next) {
+    showReusedInMap = !!next;
+  }
+  function getCurrentSettingsState() {
+    return {
+      hoverScale: tileHoverScale,
+      selectionDimOpacity,
+      selectionDimEnabled,
+      tileCompactness,
+      titleWrapMode,
+      titleHoverWidthMultiplier,
+      titleHoverTextPortion,
+      obsidianLinksEnabled,
+      obsidianLinkMode,
+      obsidianVaultName,
+      autoIdFromNameEnabled,
+      seriesNavDoubleClickWaitMs,
+      showSecondaryLinks,
+      showReusedInMap,
+      theme
+    };
+  }
+  function applyImportedSettings(snapshot, { refreshObsidianLinks: obsidianRefresh } = {}) {
+    return applySettingsSnapshot(snapshot, {
+      applyTileHoverScale,
+      persistTileHoverScale,
+      applySelectionDimEnabled,
+      persistSelectionDimEnabled,
+      applySelectionDimOpacity,
+      persistSelectionDimOpacity,
+      applyTileCompactness,
+      persistTileCompactness,
+      applyTitleWrapMode,
+      persistTitleWrapMode,
+      applyTitleHoverWidthMultiplier,
+      persistTitleHoverWidthMultiplier,
+      applyTitleHoverTextPortion,
+      persistTitleHoverTextPortion,
+      applyObsidianLinksEnabled,
+      persistObsidianLinksEnabled,
+      applyObsidianLinkMode,
+      persistObsidianLinkMode,
+      applyObsidianVaultName,
+      persistObsidianVaultName,
+      applyAutoIdFromNameEnabled,
+      persistAutoIdFromNameEnabled,
+      applySeriesNavDoubleClickWait,
+      persistSeriesNavDoubleClickWait,
+      localBackend,
+      ui: settingsUi,
+      refreshObsidianLinks: obsidianRefresh,
+      scheduleOverlaySync,
+      selection,
+      select,
+      clearStyles,
+      drawLinks,
+      applyReusedHighlights,
+      setShowSecondaryLinks,
+      setShowReusedInMap,
+      applyTheme,
+      current: getCurrentSettingsState()
+    });
+  }
   function persistSeriesNavDoubleClickWait(value) {
     if (typeof window === "undefined" || !window.localStorage) return;
     try {
@@ -4462,7 +4885,8 @@ function initBlockscape() {
         titleInput,
         idInput,
         errorEl,
-        metaLabel: meta.querySelector(".item-editor__meta-value")
+        metaLabel: meta.querySelector(".item-editor__meta-value"),
+        syncCheckbox
       };
       return wrapper;
     };
@@ -4477,12 +4901,14 @@ function initBlockscape() {
       state.categoryId = category.id;
       state.modelData = modelData;
       state.idManuallyEdited = false;
-      state.autoSyncEnabled = !!autoIdFromNameEnabled;
+      const autoSyncAllowed = !!autoIdFromNameEnabled;
+      state.autoSyncEnabled = autoSyncAllowed;
       state.fields.metaLabel.textContent = category.title || category.id || "Category";
       state.fields.titleInput.value = category.title || category.id || "";
       state.fields.idInput.value = category.id || "";
       state.fields.syncCheckbox.checked = state.autoSyncEnabled;
-      if (!state.fields.idInput.value) {
+      state.fields.syncCheckbox.disabled = !autoSyncAllowed;
+      if (!state.fields.idInput.value && autoSyncAllowed) {
         syncCategoryIdFromTitle({ force: true });
       }
       setError("");
@@ -4757,39 +5183,13 @@ function initBlockscape() {
     console.log(`[Blockscape] saved JSON (${source}):`, filename);
     return true;
   }
-  const LETTER_COLOR_MAP = {
-    A: "#0284c7",
-    B: "#3b82f6",
-    C: "#06b6d4",
-    D: "#a855f7",
-    E: "#f59e0b",
-    F: "#f97316",
-    G: "#22c55e",
-    H: "#84cc16",
-    I: "#10b981",
-    J: "#14b8a6",
-    K: "#0ea5e9",
-    L: "#60a5fa",
-    M: "#8b5cf6",
-    N: "#d946ef",
-    O: "#e879f9",
-    P: "#67e8f9",
-    Q: "#4ade80",
-    R: "#facc15",
-    S: "#eab308",
-    T: "#a3e635",
-    U: "#22d3ee",
-    V: "#38bdf8",
-    W: "#818cf8",
-    X: "#a78bfa",
-    Y: "#f472b6",
-    Z: "#fb7185"
-  };
+  const LETTER_COLOR_MAP = tokens.palette.letter;
+  const LETTER_COLOR_FALLBACK = tokens.palette.letterFallback;
   function getBadgeColor(text2, explicit) {
     if (explicit && /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(explicit))
       return explicit;
     const ch = (text2 || "?").charAt(0).toUpperCase();
-    return LETTER_COLOR_MAP[ch] || "#9ca3af";
+    return LETTER_COLOR_MAP[ch] || LETTER_COLOR_FALLBACK;
   }
   function idealTextColor(bgHex) {
     const hex = bgHex.replace("#", "");
@@ -4797,7 +5197,7 @@ function initBlockscape() {
     const bigint = parseInt(expanded, 16);
     const r = bigint >> 16 & 255, g = bigint >> 8 & 255, b = bigint & 255;
     const L = 0.2126 * Math.pow(r / 255, 2.2) + 0.7152 * Math.pow(g / 255, 2.2) + 0.0722 * Math.pow(b / 255, 2.2);
-    return L > 0.35 ? "#111111" : "#ffffff";
+    return L > 0.35 ? tokens.color.ink : tokens.color.white;
   }
   function scrollPageToTop() {
     if (typeof window === "undefined" || typeof window.scrollTo !== "function")
@@ -5771,9 +6171,11 @@ function initBlockscape() {
     canvas.width = width;
     canvas.height = height;
     const ctx = canvas.getContext("2d");
-    ctx.fillStyle = "#f8fafc";
+    const canvasBg = getCssVarValue("--color-surface-ghost") || tokens.color.surfaceGhost;
+    const canvasBorder = getCssVarValue("--color-border-muted") || tokens.color.borderMuted;
+    ctx.fillStyle = canvasBg;
     ctx.fillRect(0, 0, width, height);
-    ctx.strokeStyle = "#e5e7eb";
+    ctx.strokeStyle = canvasBorder;
     ctx.strokeRect(0.5, 0.5, width - 1, height - 1);
     const topPad = 8;
     const bottomPad = 8;
@@ -6257,6 +6659,75 @@ ${text2}` : text2;
     settingsHeading.className = "blockscape-settings-panel__title";
     settingsHeading.textContent = "Feature toggles";
     settingsPanel.appendChild(settingsHeading);
+    const themeRow = document.createElement("label");
+    themeRow.className = "settings-toggle";
+    const themeInput = document.createElement("input");
+    themeInput.type = "checkbox";
+    themeInput.checked = theme === THEME_DARK;
+    const themeText = document.createElement("span");
+    themeText.className = "settings-toggle__text";
+    const themeLabel = document.createElement("span");
+    themeLabel.className = "settings-toggle__label";
+    themeLabel.textContent = "Dark mode";
+    const themeHint = document.createElement("span");
+    themeHint.className = "settings-toggle__hint";
+    themeHint.textContent = "Switch Blockscape UI to dark colors.";
+    themeText.append(themeLabel, themeHint);
+    themeRow.append(themeInput, themeText);
+    themeInput.addEventListener("change", () => {
+      applyTheme(themeInput.checked ? THEME_DARK : THEME_LIGHT);
+    });
+    settingsPanel.appendChild(themeRow);
+    settingsUi.themeToggle = themeInput;
+    const settingsActions = document.createElement("div");
+    settingsActions.className = "settings-actions";
+    const settingsFileInput = document.createElement("input");
+    settingsFileInput.type = "file";
+    settingsFileInput.accept = "application/json";
+    settingsFileInput.hidden = true;
+    const loadSettingsBtn = document.createElement("button");
+    loadSettingsBtn.type = "button";
+    loadSettingsBtn.className = "pf-v5-c-button pf-m-secondary";
+    loadSettingsBtn.textContent = "Load settings";
+    loadSettingsBtn.addEventListener("click", () => settingsFileInput.click());
+    settingsFileInput.addEventListener("change", async () => {
+      var _a2, _b2;
+      const file = (_a2 = settingsFileInput.files) == null ? void 0 : _a2[0];
+      if (!file) return;
+      try {
+        const raw = await file.text();
+        const parsed = JSON.parse(raw);
+        const snapshot = (parsed == null ? void 0 : parsed.settings) || parsed;
+        const result = applyImportedSettings(snapshot || {}, { refreshObsidianLinks });
+        const appliedCount = ((_b2 = result.applied) == null ? void 0 : _b2.length) || 0;
+        showNotice(
+          appliedCount ? `Loaded ${appliedCount} setting${appliedCount === 1 ? "" : "s"} from ${file.name}.` : `No matching settings found in ${file.name}.`,
+          2200
+        );
+      } catch (error) {
+        console.warn("[Blockscape] failed to load settings.json", error);
+        showNotice("Invalid settings file.", 2400);
+      } finally {
+        settingsFileInput.value = "";
+      }
+    });
+    const saveSettingsBtn = document.createElement("button");
+    saveSettingsBtn.type = "button";
+    saveSettingsBtn.className = "pf-v5-c-button pf-m-tertiary";
+    saveSettingsBtn.textContent = "Download settings";
+    saveSettingsBtn.addEventListener("click", () => {
+      const payload = {
+        version: 1,
+        exportedAt: (/* @__PURE__ */ new Date()).toISOString(),
+        settings: buildSettingsSnapshot(getCurrentSettingsState(), {
+          localBackend
+        })
+      };
+      download("settings.json", JSON.stringify(payload, null, 2));
+      showNotice("Settings downloaded.", 2e3);
+    });
+    settingsActions.append(loadSettingsBtn, saveSettingsBtn, settingsFileInput);
+    settingsPanel.appendChild(settingsActions);
     const createSettingsToggle = ({
       id,
       label,
@@ -6303,7 +6774,7 @@ ${text2}` : text2;
         applyObsidianLinkToTile(tile, obsidianUrl);
       });
     };
-    const { row: secondaryToggleRow } = createSettingsToggle({
+    const { row: secondaryToggleRow, input: secondaryToggleInput } = createSettingsToggle({
       id: "toggleSecondaryLinks",
       label: "Show indirect links",
       checked: showSecondaryLinks,
@@ -6319,7 +6790,8 @@ ${text2}` : text2;
       }
     });
     settingsPanel.appendChild(secondaryToggleRow);
-    const { row: reusedToggleRow } = createSettingsToggle({
+    settingsUi.secondaryLinksToggle = secondaryToggleInput;
+    const { row: reusedToggleRow, input: reusedToggleInput } = createSettingsToggle({
       id: "toggleReusedInMap",
       label: "Display reused in map view",
       hint: "Show markers for nodes used multiple times.",
@@ -6331,7 +6803,8 @@ ${text2}` : text2;
       }
     });
     settingsPanel.appendChild(reusedToggleRow);
-    const { row: autoIdToggleRow } = createSettingsToggle({
+    settingsUi.reusedToggle = reusedToggleInput;
+    const { row: autoIdToggleRow, input: autoIdToggleInput } = createSettingsToggle({
       id: "toggleAutoIdFromName",
       label: "Auto-fill IDs from titles",
       hint: "Keep ID in sync while editing name/title (can be overridden manually).",
@@ -6343,8 +6816,9 @@ ${text2}` : text2;
       }
     });
     settingsPanel.appendChild(autoIdToggleRow);
+    settingsUi.autoIdToggle = autoIdToggleInput;
     const obsidianModeInputs = [];
-    const { row: obsidianToggleRow } = createSettingsToggle({
+    const { row: obsidianToggleRow, input: obsidianToggleInput } = createSettingsToggle({
       id: "toggleObsidianLinks",
       label: "Obsidian",
       hint: "Make tiles open Obsidian when no external URL exists.",
@@ -6360,11 +6834,12 @@ ${text2}` : text2;
       }
     });
     settingsPanel.appendChild(obsidianToggleRow);
+    settingsUi.obsidianToggle = obsidianToggleInput;
     const hasLocalBackend = typeof (localBackend == null ? void 0 : localBackend.isAvailable) === "function" && localBackend.isAvailable() && typeof (localBackend == null ? void 0 : localBackend.getAutoReloadConfig) === "function";
     if (hasLocalBackend) {
       const { enabled: autoEnabled, intervalMs: autoInterval } = localBackend.getAutoReloadConfig();
       let autoReloadSlider = null;
-      const { row: autoReloadToggle } = createSettingsToggle({
+      const { row: autoReloadToggle, input: autoReloadInput } = createSettingsToggle({
         id: "toggleAutoReload",
         label: "Auto-reload local files",
         hint: "Poll the local backend for file changes and refresh matching models.",
@@ -6376,6 +6851,7 @@ ${text2}` : text2;
         }
       });
       settingsPanel.appendChild(autoReloadToggle);
+      settingsUi.autoReloadToggle = autoReloadInput;
       const formatAutoReloadInterval = (ms) => `${(ms / 1e3).toFixed(2)}s`;
       const autoReloadRow = document.createElement("label");
       autoReloadRow.className = "settings-slider";
@@ -6413,6 +6889,8 @@ ${text2}` : text2;
       });
       autoReloadRow.append(autoReloadText, autoReloadValue, autoReloadSlider);
       settingsPanel.appendChild(autoReloadRow);
+      settingsUi.autoReloadInput = autoReloadSlider;
+      settingsUi.autoReloadValue = autoReloadValue;
     }
     const obsidianModeRow = document.createElement("div");
     obsidianModeRow.className = "settings-radio";
@@ -6453,6 +6931,7 @@ ${text2}` : text2;
       obsidianModeHint
     );
     settingsPanel.appendChild(obsidianModeRow);
+    settingsUi.obsidianModeInputs = obsidianModeInputs;
     const obsidianVaultRow = document.createElement("label");
     obsidianVaultRow.className = "settings-text";
     obsidianVaultRow.setAttribute("for", "obsidianVaultInput");
@@ -6478,6 +6957,7 @@ ${text2}` : text2;
     });
     obsidianVaultRow.append(obsidianVaultText, obsidianVaultInput);
     settingsPanel.appendChild(obsidianVaultRow);
+    settingsUi.obsidianVaultInput = obsidianVaultInput;
     const obsidianPluginNote = document.createElement("p");
     obsidianPluginNote.className = "settings-note";
     obsidianPluginNote.innerHTML = 'Requires the Obsidian <a href="https://vinzent03.github.io/obsidian-advanced-uri/" target="_blank" rel="noreferrer noopener">Advanced URI</a> plugin for create/open behavior.';
@@ -6525,6 +7005,8 @@ ${text2}` : text2;
       seriesNavWaitInput
     );
     settingsPanel.appendChild(seriesNavWaitRow);
+    settingsUi.seriesNavInput = seriesNavWaitInput;
+    settingsUi.seriesNavValue = seriesNavWaitValue;
     const formatHoverScale = (value) => `${Math.round((value - 1) * 100)}%`;
     const hoverScaleRow = document.createElement("label");
     hoverScaleRow.className = "settings-slider";
@@ -6558,13 +7040,15 @@ ${text2}` : text2;
     });
     hoverScaleRow.append(hoverScaleText, hoverScaleValue, hoverScaleInput);
     settingsPanel.appendChild(hoverScaleRow);
+    settingsUi.hoverScaleInput = hoverScaleInput;
+    settingsUi.hoverScaleValue = hoverScaleValue;
     let dimInput = null;
     let dimValue = null;
     const formatSelectionDimming = (opacity) => {
       const dimPercent = Math.round((1 - opacity) * 100);
       return dimPercent === 0 ? "Off" : `${dimPercent}% dim`;
     };
-    const { row: dimToggleRow } = createSettingsToggle({
+    const { row: dimToggleRow, input: dimToggleInput } = createSettingsToggle({
       id: "toggleSelectionDimming",
       label: "Dim unrelated tiles",
       hint: "When selecting a tile, fade everything except linked tiles.",
@@ -6582,6 +7066,7 @@ ${text2}` : text2;
       }
     });
     settingsPanel.appendChild(dimToggleRow);
+    settingsUi.selectionDimToggle = dimToggleInput;
     const dimRow = document.createElement("label");
     dimRow.className = "settings-slider";
     dimRow.setAttribute("for", "selectionDimmingSlider");
@@ -6619,6 +7104,8 @@ ${text2}` : text2;
     });
     dimRow.append(dimText, dimValue, dimInput);
     settingsPanel.appendChild(dimRow);
+    settingsUi.selectionDimInput = dimInput;
+    settingsUi.selectionDimValue = dimValue;
     const formatCompactness = (value) => value === 1 ? "Default" : `${Math.round(value * 100)}%`;
     const compactRow = document.createElement("label");
     compactRow.className = "settings-slider";
@@ -6652,7 +7139,9 @@ ${text2}` : text2;
     });
     compactRow.append(compactText, compactValue, compactInput);
     settingsPanel.appendChild(compactRow);
-    const { row: titleWrapRow } = createSettingsToggle({
+    settingsUi.tileCompactnessInput = compactInput;
+    settingsUi.tileCompactnessValue = compactValue;
+    const { row: titleWrapRow, input: titleWrapInput } = createSettingsToggle({
       id: "titleWrapToggle",
       label: "Wrap titles",
       hint: "Allow long titles to wrap instead of truncating.",
@@ -6665,6 +7154,7 @@ ${text2}` : text2;
       }
     });
     settingsPanel.appendChild(titleWrapRow);
+    settingsUi.titleWrapInput = titleWrapInput;
     const formatTitleWidth = (value) => `${Math.round((value - 1) * 100)}% extra`;
     const titleWidthRow = document.createElement("label");
     titleWidthRow.className = "settings-slider";
@@ -6702,6 +7192,8 @@ ${text2}` : text2;
     });
     titleWidthRow.append(titleWidthText, titleWidthValue, titleWidthInput);
     settingsPanel.appendChild(titleWidthRow);
+    settingsUi.titleWidthInput = titleWidthInput;
+    settingsUi.titleWidthValue = titleWidthValue;
     const formatTitleZoomPortion = (value) => `${Math.round(value * 100)}% of hover zoom`;
     const titleZoomRow = document.createElement("label");
     titleZoomRow.className = "settings-slider";
@@ -6739,6 +7231,8 @@ ${text2}` : text2;
     });
     titleZoomRow.append(titleZoomText, titleZoomValue, titleZoomInput);
     settingsPanel.appendChild(titleZoomRow);
+    settingsUi.titleZoomInput = titleZoomInput;
+    settingsUi.titleZoomValue = titleZoomValue;
     const apicurioEnabled = typeof apicurio.isEnabled === "function" ? apicurio.isEnabled() : false;
     const { row: apicurioToggleRow, input: apicurioToggleInput } = createSettingsToggle({
       id: "apicurioFeatureToggle",
