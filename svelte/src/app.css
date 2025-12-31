@@ -23,6 +23,10 @@
       -webkit-font-smoothing: antialiased;
     }
 
+    .blockscape-root {
+      --blockscape-name-offset: -18px;
+    }
+
     a {
       color: inherit;
     }
@@ -1854,7 +1858,7 @@
       padding: 0 var(--space-2xs) 0;
       width: 100%;
       max-width: 100%;
-      margin: 0 auto;
+      margin: var(--blockscape-name-offset, 0) auto 0;
       display: block;
       word-break: keep-all;
       white-space: var(--blockscape-title-white-space);

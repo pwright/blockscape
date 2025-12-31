@@ -17,8 +17,19 @@ import {
 const ASSET_BASE =
   (typeof import.meta !== "undefined" && import.meta.env?.BASE_URL) || "";
 
-export function initBlockscape() {
+export function initBlockscape(featureOverrides = {}) {
   console.log("[Blockscape] init");
+
+  const features = {
+    localBackend: true,
+    fileOpen: true,
+    fileSave: true,
+    autoLoadFromDir: true,
+    showHeader: true,
+    showSidebar: true,
+    seriesNavMinVersions: 1,
+    ...featureOverrides,
+  };
 
   const jsonBox = document.getElementById("jsonBox");
   const jsonPanel = document.querySelector(".blockscape-json-panel");
@@ -68,6 +79,18 @@ export function initBlockscape() {
 
   // Ensure local backend panel starts hidden; it will only unhide after a successful health check.
   if (localBackendPanel) localBackendPanel.hidden = true;
+  if (!features.localBackend && localBackendPanel) localBackendPanel.hidden = true;
+  if (!features.fileOpen) {
+    if (loadLocalFileButton) loadLocalFileButton.hidden = true;
+    if (localDirSelect) localDirSelect.hidden = true;
+    if (refreshLocalFilesButton) refreshLocalFilesButton.hidden = true;
+    if (localFileList) localFileList.hidden = true;
+  }
+  if (!features.fileSave) {
+    if (saveLocalFileButton) saveLocalFileButton.hidden = true;
+    if (saveLocalFileAsButton) saveLocalFileAsButton.hidden = true;
+    if (localSavePathInput) localSavePathInput.hidden = true;
+  }
 
   // Show the seed in the editor initially.
   jsonBox.value = document.getElementById("seed").textContent.trim();
@@ -221,8 +244,26 @@ export function initBlockscape() {
     tabCenterToggle: null,
     colorPresetList: null,
   };
-  const localBackend = createLocalBackend();
-  const initialBackendCheck = localBackend.detect();
+  const disabledLocalBackend = {
+    detect: async () => false,
+    refresh: async () => {},
+    updateActiveSavePlaceholder() {},
+    isAvailable: () => false,
+    highlightSource() {},
+    getAutoReloadConfig: () => ({
+      enabled: false,
+      intervalMs: DEFAULT_AUTO_RELOAD_INTERVAL_MS,
+    }),
+    setAutoReloadEnabled() {},
+    setAutoReloadInterval() {},
+    saveModelByIndex: async () => false,
+  };
+  const localBackend = features.localBackend
+    ? createLocalBackend()
+    : disabledLocalBackend;
+  const initialBackendCheck = features.localBackend
+    ? localBackend.detect()
+    : Promise.resolve(false);
   apicurio.hydrateConfig();
   applyTheme(readStoredTheme());
   setColorPresets(loadColorPresets(), { silent: true });
@@ -4279,6 +4320,8 @@ export function initBlockscape() {
 
   function renderVersionNavigator(entry) {
     if (!entry?.apicurioVersions || !entry.apicurioVersions.length) return null;
+    const minVersions = Math.max(1, features.seriesNavMinVersions || 1);
+    if (entry.apicurioVersions.length < minVersions) return null;
     const nav = document.createElement("div");
     nav.className = "version-nav";
 
@@ -8153,7 +8196,7 @@ export function initBlockscape() {
     const hasLocalBackend = await initialBackendCheck;
 
     // Try to load JSON files from same directory only when no local backend
-    if (!hasLocalBackend) {
+    if (!hasLocalBackend && features.autoLoadFromDir) {
       await loadJsonFiles();
     }
 

@@ -3,6 +3,7 @@
   import App from './App.svelte';
 
   export let seed;
+  export let features = {};
 </script>
 
-<App {seed} />
+<App {seed} {features} />

@@ -27,7 +27,18 @@
 
     new Blockscape({
       target: root,
-      props: { seed },
+      props: {
+        seed,
+        features: {
+          localBackend: false,
+          fileOpen: false,
+          fileSave: false,
+          autoLoadFromDir: false,
+          showHeader: false,
+          showSidebar: false,
+          seriesNavMinVersions: 2,
+        },
+      },
     });
   });
 })();

@@ -2683,8 +2683,16 @@ function downloadJson(filename, data) {
   URL.revokeObjectURL(url);
 }
 const ASSET_BASE = typeof import.meta !== "undefined" && "./" || "";
-function initBlockscape() {
+function initBlockscape(featureOverrides = {}) {
   console.log("[Blockscape] init");
+  const features = {
+    localBackend: true,
+    fileOpen: true,
+    fileSave: true,
+    autoLoadFromDir: true,
+    seriesNavMinVersions: 1,
+    ...featureOverrides
+  };
   const jsonBox = document.getElementById("jsonBox");
   const jsonPanel = document.querySelector(".blockscape-json-panel");
   const app = document.getElementById("app");
@@ -2731,6 +2739,18 @@ function initBlockscape() {
   const EDITOR_TRANSFER_MESSAGE_TYPE = "blockscape:editorTransfer";
   const defaultDocumentTitle = document.title;
   if (localBackendPanel) localBackendPanel.hidden = true;
+  if (!features.localBackend && localBackendPanel) localBackendPanel.hidden = true;
+  if (!features.fileOpen) {
+    if (loadLocalFileButton) loadLocalFileButton.hidden = true;
+    if (localDirSelect) localDirSelect.hidden = true;
+    if (refreshLocalFilesButton) refreshLocalFilesButton.hidden = true;
+    if (localFileList) localFileList.hidden = true;
+  }
+  if (!features.fileSave) {
+    if (saveLocalFileButton) saveLocalFileButton.hidden = true;
+    if (saveLocalFileAsButton) saveLocalFileAsButton.hidden = true;
+    if (localSavePathInput) localSavePathInput.hidden = true;
+  }
   jsonBox.value = document.getElementById("seed").textContent.trim();
   let models = [];
   let activeIndex = -1;
@@ -2874,8 +2894,27 @@ function initBlockscape() {
     tabCenterToggle: null,
     colorPresetList: null
   };
-  const localBackend = createLocalBackend();
-  const initialBackendCheck = localBackend.detect();
+  const disabledLocalBackend = {
+    detect: async () => false,
+    refresh: async () => {
+    },
+    updateActiveSavePlaceholder() {
+    },
+    isAvailable: () => false,
+    highlightSource() {
+    },
+    getAutoReloadConfig: () => ({
+      enabled: false,
+      intervalMs: DEFAULT_AUTO_RELOAD_INTERVAL_MS
+    }),
+    setAutoReloadEnabled() {
+    },
+    setAutoReloadInterval() {
+    },
+    saveModelByIndex: async () => false
+  };
+  const localBackend = features.localBackend ? createLocalBackend() : disabledLocalBackend;
+  const initialBackendCheck = features.localBackend ? localBackend.detect() : Promise.resolve(false);
   apicurio.hydrateConfig();
   applyTheme(readStoredTheme());
   setColorPresets(loadColorPresets(), { silent: true });
@@ -6396,6 +6435,8 @@ function initBlockscape() {
   }
   function renderVersionNavigator(entry) {
     if (!(entry == null ? void 0 : entry.apicurioVersions) || !entry.apicurioVersions.length) return null;
+    const minVersions = Math.max(1, features.seriesNavMinVersions || 1);
+    if (entry.apicurioVersions.length < minVersions) return null;
     const nav = document.createElement("div");
     nav.className = "version-nav";
     const title = document.createElement("div");
@@ -9798,7 +9839,7 @@ ${text2}` : text2;
       if (firstSeedIndex == null) firstSeedIndex = idx;
     });
     const hasLocalBackend = await initialBackendCheck;
-    if (!hasLocalBackend) {
+    if (!hasLocalBackend && features.autoLoadFromDir) {
       await loadJsonFiles();
     }
     const serverPathResult = await consumeServerPathLoad();
@@ -10447,6 +10488,7 @@ function create_fragment$1(ctx) {
   let div6_data_expanded_value;
   let t29;
   let div7;
+  let header_hidden_value;
   let t37;
   let main;
   let div24;
@@ -10476,6 +10518,7 @@ function create_fragment$1(ctx) {
   let div15;
   let t59;
   let div18;
+  let aside_hidden_value;
   let t66;
   let div23;
   let t92;
@@ -10483,7 +10526,7 @@ function create_fragment$1(ctx) {
   let t94;
   let html_tag;
   let raw_value = `<script id="seed" type="application/json">${/*seedText*/
-  ctx[1]}<\/script>`;
+  ctx[3]}<\/script>`;
   let t95;
   let svg1;
   let t96;
@@ -10664,6 +10707,8 @@ function create_fragment$1(ctx) {
       attr(div9, "class", "pf-v5-c-masthead__content");
       attr(div10, "class", "pf-v5-c-masthead pf-m-display-inline blockscape-masthead");
       attr(header, "class", "pf-v5-c-page__header");
+      header.hidden = header_hidden_value = !/*showHeader*/
+      ctx[2];
       attr(div11, "class", "sidebar-heading");
       attr(ul, "id", "modelList");
       attr(ul, "class", "model-nav-list");
@@ -10693,6 +10738,8 @@ function create_fragment$1(ctx) {
       section0.hidden = true;
       attr(aside, "class", "blockscape-sidebar");
       attr(aside, "aria-label", "Models");
+      aside.hidden = aside_hidden_value = !/*showSidebar*/
+      ctx[1];
       attr(div23, "class", "blockscape-main");
       attr(div24, "class", "blockscape-content");
       attr(main, "class", "pf-v5-c-page__main");
@@ -10800,7 +10847,7 @@ function create_fragment$1(ctx) {
           button0,
           "click",
           /*toggleHeaderExpanded*/
-          ctx[2]
+          ctx[4]
         );
         mounted = true;
       }
@@ -10829,6 +10876,16 @@ function create_fragment$1(ctx) {
       1 && div6_data_expanded_value !== (div6_data_expanded_value = /*headerExpanded*/
       ctx2[0] ? "true" : "false")) {
         attr(div6, "data-expanded", div6_data_expanded_value);
+      }
+      if (!current || dirty & /*showHeader*/
+      4 && header_hidden_value !== (header_hidden_value = !/*showHeader*/
+      ctx2[2])) {
+        header.hidden = header_hidden_value;
+      }
+      if (!current || dirty & /*showSidebar*/
+      2 && aside_hidden_value !== (aside_hidden_value = !/*showSidebar*/
+      ctx2[1])) {
+        aside.hidden = aside_hidden_value;
       }
     },
     i(local) {
@@ -10868,7 +10925,10 @@ function create_fragment$1(ctx) {
   };
 }
 function instance$1($$self, $$props, $$invalidate) {
+  let showHeader;
+  let showSidebar;
   let { seed } = $$props;
+  let { features = {} } = $$props;
   const defaultSeedText = `
   {
   "id": "blockscape",
@@ -11025,26 +11085,53 @@ function instance$1($$self, $$props, $$invalidate) {
     }
   };
   onMount(() => {
-    initBlockscape();
+    initBlockscape(features);
   });
   $$self.$$set = ($$props2) => {
-    if ("seed" in $$props2) $$invalidate(3, seed = $$props2.seed);
+    if ("seed" in $$props2) $$invalidate(5, seed = $$props2.seed);
+    if ("features" in $$props2) $$invalidate(6, features = $$props2.features);
   };
-  return [headerExpanded, seedText, toggleHeaderExpanded, seed];
+  $$self.$$.update = () => {
+    if ($$self.$$.dirty & /*features*/
+    64) {
+      $$invalidate(2, showHeader = features.showHeader !== false);
+    }
+    if ($$self.$$.dirty & /*features*/
+    64) {
+      $$invalidate(1, showSidebar = features.showSidebar !== false);
+    }
+  };
+  return [
+    headerExpanded,
+    showSidebar,
+    showHeader,
+    seedText,
+    toggleHeaderExpanded,
+    seed,
+    features
+  ];
 }
 class App extends SvelteComponent {
   constructor(options) {
     super();
-    init(this, options, instance$1, create_fragment$1, safe_not_equal, { seed: 3 });
+    init(this, options, instance$1, create_fragment$1, safe_not_equal, { seed: 5, features: 6 });
   }
 }
 function create_fragment(ctx) {
   let app;
   let current;
-  app = new App({ props: { seed: (
-    /*seed*/
-    ctx[0]
-  ) } });
+  app = new App({
+    props: {
+      seed: (
+        /*seed*/
+        ctx[0]
+      ),
+      features: (
+        /*features*/
+        ctx[1]
+      )
+    }
+  });
   return {
     c() {
       create_component(app.$$.fragment);
@@ -11058,6 +11145,9 @@ function create_fragment(ctx) {
       if (dirty & /*seed*/
       1) app_changes.seed = /*seed*/
       ctx2[0];
+      if (dirty & /*features*/
+      2) app_changes.features = /*features*/
+      ctx2[1];
       app.$set(app_changes);
     },
     i(local) {
@@ -11076,15 +11166,17 @@ function create_fragment(ctx) {
 }
 function instance($$self, $$props, $$invalidate) {
   let { seed } = $$props;
+  let { features = {} } = $$props;
   $$self.$$set = ($$props2) => {
     if ("seed" in $$props2) $$invalidate(0, seed = $$props2.seed);
+    if ("features" in $$props2) $$invalidate(1, features = $$props2.features);
   };
-  return [seed];
+  return [seed, features];
 }
 class Blockscape extends SvelteComponent {
   constructor(options) {
     super();
-    init(this, options, instance, create_fragment, safe_not_equal, { seed: 0 });
+    init(this, options, instance, create_fragment, safe_not_equal, { seed: 0, features: 1 });
   }
 }
 const target = document.getElementById("root");

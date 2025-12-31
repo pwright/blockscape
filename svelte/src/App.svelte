@@ -4,6 +4,7 @@
   import ShortcutHelp from './components/ShortcutHelp.svelte';
   import NewPanel from './components/NewPanel.svelte';
   export let seed;
+  export let features = {};
 
   const defaultSeedText = `
   {
@@ -150,6 +151,8 @@
 }`;
 
   const seedText = seed ? JSON.stringify(seed, null, 2) : defaultSeedText;
+  $: showHeader = features.showHeader !== false;
+  $: showSidebar = features.showSidebar !== false;
 
   let headerExpanded = false;
 
@@ -165,7 +168,7 @@
   };
 
   onMount(() => {
-    initBlockscape();
+    initBlockscape(features);
   });
 </script>
 
@@ -175,7 +178,7 @@
 </svelte:head>
 
 <div class="pf-v5-c-page">
-  <header class="pf-v5-c-page__header">
+  <header class="pf-v5-c-page__header" hidden={!showHeader}>
     <div class="pf-v5-c-masthead pf-m-display-inline blockscape-masthead">
       <div class="pf-v5-c-masthead__content">
         <div class="blockscape-toolbar">
@@ -248,7 +251,7 @@
 
   <main class="pf-v5-c-page__main">
     <div class="blockscape-content">
-      <aside class="blockscape-sidebar" aria-label="Models">
+      <aside class="blockscape-sidebar" aria-label="Models" hidden={!showSidebar}>
         <div class="sidebar-heading">Models</div>
         <ul id="modelList" class="model-nav-list"></ul>
         <div class="model-actions">
