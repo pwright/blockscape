@@ -2,145 +2,74 @@
 
 ```blockscape
 {
-  "id": "blockscape",
-  "title": "Blockscape (AI maps)",
-  "abstract": "Blockscape (pronounced BYK-shed) visualizes value chains and dependencies using a BS file. Inspired by Wardley maps, these maps emphasizes the topology that makes maps useful.",
+  "id": "wardley-minimap",
+  "title": "Wardley-Inspired Minimal Value-Chain Map (with Maturity)",
+  "abstract": "Users want to quickly understand a system’s value chain (from user needs down to enabling components) and how maturity/evolution affects decisions. This minimal Wardley-inspired model adds one explicit maturity signal per layer to show how value becomes more standardized and predictable as it moves down the stack.",
   "categories": [
     {
-      "id": "communication",
-      "title": "Communication",
+      "id": "outcomes",
+      "title": "User Outcomes",
       "items": [
         {
-          "id": "gestalt",
-          "name": "Visualise to understand",
-          "logo": "./logos/block-mind-blown.gif",
-          "deps": []
+          "id": "situational-awareness",
+          "name": "Situational Awareness",
+          "deps": ["map-view"]
         },
         {
-          "id": "value-chain",
-          "name": "Visible value chain (y-axis)",
-          "deps": []
+          "id": "decision-support",
+          "name": "Decision Support",
+          "deps": ["map-view"]
         },
         {
-          "id": "evolution",
-          "name": "Evolution and maturity (x-axis)",
-          "deps": []
-        },
-        {
-          "id": "relational-awareness",
-          "name": "Relations",
-          "logo": "./logos/relations.png",
-          "deps": []
-        },
-        {
-          "id": "icons",
-          "name": "Icons",
-          "deps": []
+          "id": "accepted-practice",
+          "name": "Accepted Practice",
+          "deps": ["decision-support"]
         }
       ]
     },
     {
-      "id": "experience",
-      "title": "User Experience",
+      "id": "mapping",
+      "title": "Mapping Core",
       "items": [
         {
-          "id": "paste-bs-file",
-          "name": "Paste (cmd-v)",
-          "deps": [
-            "bs-format-simple"
-          ]
+          "id": "map-view",
+          "name": "Wardley-Style Map View",
+          "deps": ["component-model", "rendering-engine"]
         },
         {
-          "id": "load-multidoc-file",
-          "name": "Series",
-          "deps": [
-            "bs-format-simple"
-          ]
+          "id": "component-model",
+          "name": "Component & Dependency Model",
+          "deps": ["storage"]
         },
         {
-          "id": "create-gist-multidoc",
-          "name": "Gist",
-          "deps": [
-            "gists",
-            "bs-format-simple"
-          ]
-        },
-        {
-          "id": "abstract-gist-loading",
-          "name": "Links",
-          "deps": [
-            "gists",
-            "bs-format-simple"
-          ]
-        },
-        {
-          "id": "model-collection",
-          "name": "Portfolio",
-          "deps": [
-            "apicurio",
-            "bs-format-simple"
-          ]
+          "id": "repeatable-workflow",
+          "name": "Repeatable Mapping Workflow",
+          "deps": ["component-model"]
         }
       ]
     },
     {
-      "id": "authoring-ai",
-      "title": "Authoring (LLM)",
+      "id": "platform",
+      "title": "Platform Enablers",
       "items": [
         {
-          "id": "bs-format-simple",
-          "name": "BS Schema",
+          "id": "rendering-engine",
+          "name": "Rendering Engine",
           "deps": []
         },
         {
-          "id": "editor-human-terms",
-          "name": "Edit",
-          "deps": [
-            "bs-format-simple",
-            "gestalt"
-          ]
-        },
-        {
-          "id": "llm-generate-bs",
-          "name": "LLM generates BS",
-          "external": "https://github.com/pwright/blockscape/blob/main/map-generation-prompt.md",
-          "deps": [
-            "bs-format-simple"
-          ]
-        },
-        {
-          "id": "llm-consume-bs",
-          "name": "LLM consumes BS",
-          "deps": [
-            "bs-format-simple"
-          ]
-        },
-        {
-          "id": "move-items",
-          "name": "Move (shift - arrow keys)",
-          "logo": "./logos/block-swap.gif",
-          "deps": []
-        }
-      ]
-    },
-    {
-      "id": "platforms",
-      "title": "Platforms",
-      "items": [
-        {
-          "id": "gists",
-          "name": "Gist",
-          "logo": "https://favicon.im/github.com",
+          "id": "storage",
+          "name": "Persistence & Sharing",
           "deps": []
         },
         {
-          "id": "apicurio",
-          "name": "Apicurio",
-          "logo": "https://www.google.com/s2/favicons?domain=apicur.io&sz=96",
-          "deps": []
+          "id": "commodity-infrastructure",
+          "name": "Commodity Infrastructure",
+          "deps": ["storage", "rendering-engine"]
         }
       ]
     }
   ]
 }
+
 ```

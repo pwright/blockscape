@@ -28,6 +28,8 @@ export function initBlockscape(featureOverrides = {}) {
     showHeader: true,
     showSidebar: true,
     seriesNavMinVersions: 1,
+    initialSettings: null,
+    initialSettingsUrl: null,
     ...featureOverrides,
   };
 
@@ -320,6 +322,91 @@ export function initBlockscape(featureOverrides = {}) {
   }
 
   const download = (filename, text) => downloadJson(filename, text);
+
+  function normalizeSettingsPayload(candidate) {
+    if (!candidate || typeof candidate !== "object") return null;
+    if (candidate.settings && typeof candidate.settings === "object") {
+      return candidate.settings;
+    }
+    return candidate;
+  }
+
+  async function fetchInitialSettingsSnapshot(url) {
+    if (!url) return null;
+    const urls = Array.isArray(url) ? url : [url];
+    const candidates = [];
+    urls.forEach((entry) => {
+      if (typeof entry === "string" && entry.trim()) {
+        candidates.push(entry.trim());
+        try {
+          const absolute = new URL(entry, window.location.origin).toString();
+          if (absolute !== entry.trim()) {
+            candidates.push(absolute);
+          }
+        } catch {
+          // ignore URL parse errors; we'll try the raw entry
+        }
+      }
+    });
+    const attempted = new Set();
+    for (const candidate of candidates) {
+      if (attempted.has(candidate)) continue;
+      attempted.add(candidate);
+      try {
+        const text = await fetchTextWithCacheBypass(candidate);
+        const parsed = JSON.parse(text);
+        const snapshot = normalizeSettingsPayload(parsed);
+        if (snapshot) return snapshot;
+      } catch (error) {
+        console.warn(
+          "[Blockscape] initial settings fetch failed",
+          candidate,
+          error
+        );
+      }
+    }
+    return null;
+  }
+
+  async function applyInitialSettings() {
+    const refresh =
+      typeof refreshObsidianLinks === "function" ? refreshObsidianLinks : null;
+    const sources = [];
+    if (features.initialSettings) {
+      sources.push({ type: "inline", snapshot: features.initialSettings });
+    }
+    if (features.initialSettingsUrl) {
+      sources.push({
+        type: "url",
+        url: features.initialSettingsUrl,
+      });
+    }
+    let appliedCount = 0;
+    for (const source of sources) {
+      try {
+        const snapshot =
+          source.type === "inline"
+            ? normalizeSettingsPayload(source.snapshot)
+            : await fetchInitialSettingsSnapshot(source.url);
+        if (!snapshot) continue;
+        const result = applyImportedSettings(snapshot, {
+          refreshObsidianLinks: refresh,
+        });
+        const applied = result?.applied || [];
+        if (applied.length) {
+          appliedCount += applied.length;
+          console.log(
+            `[Blockscape] applied ${applied.length} setting${
+              applied.length === 1 ? "" : "s"
+            } from ${source.type === "inline" ? "inline config" : source.url}.`
+          );
+        }
+      } catch (error) {
+        console.warn("[Blockscape] initial settings apply failed", error);
+      }
+    }
+    return appliedCount;
+  }
 
   function readStoredTheme() {
     if (typeof window === "undefined" || !window.localStorage)
@@ -8192,6 +8279,8 @@ export function initBlockscape(featureOverrides = {}) {
       const idx = addModelEntry(entry, { versionLabel: "seed" });
       if (firstSeedIndex == null) firstSeedIndex = idx;
     });
+
+    await applyInitialSettings();
 
     const hasLocalBackend = await initialBackendCheck;
 

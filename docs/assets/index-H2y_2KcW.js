@@ -2487,7 +2487,7 @@ function applySettingsSnapshot(snapshot = {}, ctx) {
     persistCenterItems,
     localBackend,
     ui,
-    refreshObsidianLinks,
+    refreshObsidianLinks: refreshObsidianLinks2,
     scheduleOverlaySync,
     selection,
     select,
@@ -2582,7 +2582,7 @@ function applySettingsSnapshot(snapshot = {}, ctx) {
       input.disabled = !applied;
     });
     if (ui == null ? void 0 : ui.obsidianVaultInput) ui.obsidianVaultInput.disabled = !applied;
-    refreshObsidianLinks == null ? void 0 : refreshObsidianLinks();
+    refreshObsidianLinks2 == null ? void 0 : refreshObsidianLinks2();
     appliedKeys.push("obsidianLinksEnabled");
   }
   if (snapshot.obsidianLinkMode) {
@@ -2591,14 +2591,14 @@ function applySettingsSnapshot(snapshot = {}, ctx) {
     (_d = ui == null ? void 0 : ui.obsidianModeInputs) == null ? void 0 : _d.forEach((input) => {
       input.checked = input.value === applied;
     });
-    refreshObsidianLinks == null ? void 0 : refreshObsidianLinks();
+    refreshObsidianLinks2 == null ? void 0 : refreshObsidianLinks2();
     appliedKeys.push("obsidianLinkMode");
   }
   if (snapshot.obsidianVault != null) {
     const applied = applyObsidianVaultName(snapshot.obsidianVault);
     persistObsidianVaultName(applied);
     if (ui == null ? void 0 : ui.obsidianVaultInput) ui.obsidianVaultInput.value = applied;
-    refreshObsidianLinks == null ? void 0 : refreshObsidianLinks();
+    refreshObsidianLinks2 == null ? void 0 : refreshObsidianLinks2();
     appliedKeys.push("obsidianVault");
   }
   if (snapshot.colorPresets) {
@@ -2691,6 +2691,8 @@ function initBlockscape(featureOverrides = {}) {
     fileSave: true,
     autoLoadFromDir: true,
     seriesNavMinVersions: 1,
+    initialSettings: null,
+    initialSettingsUrl: null,
     ...featureOverrides
   };
   const jsonBox = document.getElementById("jsonBox");
@@ -2961,6 +2963,81 @@ function initBlockscape(featureOverrides = {}) {
     return base64Decode(base64);
   }
   const download = (filename, text2) => downloadJson(filename, text2);
+  function normalizeSettingsPayload(candidate) {
+    if (!candidate || typeof candidate !== "object") return null;
+    if (candidate.settings && typeof candidate.settings === "object") {
+      return candidate.settings;
+    }
+    return candidate;
+  }
+  async function fetchInitialSettingsSnapshot(url) {
+    if (!url) return null;
+    const urls = Array.isArray(url) ? url : [url];
+    const candidates = [];
+    urls.forEach((entry) => {
+      if (typeof entry === "string" && entry.trim()) {
+        candidates.push(entry.trim());
+        try {
+          const absolute = new URL(entry, window.location.origin).toString();
+          if (absolute !== entry.trim()) {
+            candidates.push(absolute);
+          }
+        } catch {
+        }
+      }
+    });
+    const attempted = /* @__PURE__ */ new Set();
+    for (const candidate of candidates) {
+      if (attempted.has(candidate)) continue;
+      attempted.add(candidate);
+      try {
+        const text2 = await fetchTextWithCacheBypass(candidate);
+        const parsed = JSON.parse(text2);
+        const snapshot = normalizeSettingsPayload(parsed);
+        if (snapshot) return snapshot;
+      } catch (error) {
+        console.warn(
+          "[Blockscape] initial settings fetch failed",
+          candidate,
+          error
+        );
+      }
+    }
+    return null;
+  }
+  async function applyInitialSettings() {
+    const refresh = typeof refreshObsidianLinks === "function" ? refreshObsidianLinks : null;
+    const sources = [];
+    if (features.initialSettings) {
+      sources.push({ type: "inline", snapshot: features.initialSettings });
+    }
+    if (features.initialSettingsUrl) {
+      sources.push({
+        type: "url",
+        url: features.initialSettingsUrl
+      });
+    }
+    let appliedCount = 0;
+    for (const source of sources) {
+      try {
+        const snapshot = source.type === "inline" ? normalizeSettingsPayload(source.snapshot) : await fetchInitialSettingsSnapshot(source.url);
+        if (!snapshot) continue;
+        const result = applyImportedSettings(snapshot, {
+          refreshObsidianLinks: refresh
+        });
+        const applied = (result == null ? void 0 : result.applied) || [];
+        if (applied.length) {
+          appliedCount += applied.length;
+          console.log(
+            `[Blockscape] applied ${applied.length} setting${applied.length === 1 ? "" : "s"} from ${source.type === "inline" ? "inline config" : source.url}.`
+          );
+        }
+      } catch (error) {
+        console.warn("[Blockscape] initial settings apply failed", error);
+      }
+    }
+    return appliedCount;
+  }
   function readStoredTheme() {
     if (typeof window === "undefined" || !window.localStorage)
       return THEME_LIGHT;
@@ -6946,7 +7023,7 @@ ${text2}` : text2;
         const raw = await file.text();
         const parsed = JSON.parse(raw);
         const snapshot = (parsed == null ? void 0 : parsed.settings) || parsed;
-        const result = applyImportedSettings(snapshot || {}, { refreshObsidianLinks });
+        const result = applyImportedSettings(snapshot || {}, { refreshObsidianLinks: refreshObsidianLinks2 });
         const appliedCount = ((_b2 = result.applied) == null ? void 0 : _b2.length) || 0;
         showNotice(
           appliedCount ? `Loaded ${appliedCount} setting${appliedCount === 1 ? "" : "s"} from ${file.name}.` : `No matching settings found in ${file.name}.`,
@@ -7088,7 +7165,7 @@ ${text2}` : text2;
       }
       return { row, input };
     };
-    const refreshObsidianLinks = () => {
+    const refreshObsidianLinks2 = () => {
       app.querySelectorAll(".tile").forEach((tile) => {
         const id = tile.dataset.id;
         const match = findItemAndCategoryById(id);
@@ -7149,7 +7226,7 @@ ${text2}` : text2;
         obsidianModeInputs.forEach((input) => {
           input.disabled = !applied;
         });
-        refreshObsidianLinks();
+        refreshObsidianLinks2();
       }
     });
     settingsPanel.appendChild(obsidianToggleRow);
@@ -7234,7 +7311,7 @@ ${text2}` : text2;
         if (!radio.checked) return;
         const applied = applyObsidianLinkMode(value);
         persistObsidianLinkMode(applied);
-        refreshObsidianLinks();
+        refreshObsidianLinks2();
       });
       const textNode = document.createElement("span");
       textNode.textContent = text2;
@@ -7272,7 +7349,7 @@ ${text2}` : text2;
     obsidianVaultInput.addEventListener("input", () => {
       const applied = applyObsidianVaultName(obsidianVaultInput.value);
       persistObsidianVaultName(applied);
-      refreshObsidianLinks();
+      refreshObsidianLinks2();
     });
     obsidianVaultRow.append(obsidianVaultText, obsidianVaultInput);
     settingsPanel.appendChild(obsidianVaultRow);
@@ -9838,6 +9915,7 @@ ${text2}` : text2;
       const idx = addModelEntry(entry, { versionLabel: "seed" });
       if (firstSeedIndex == null) firstSeedIndex = idx;
     });
+    await applyInitialSettings();
     const hasLocalBackend = await initialBackendCheck;
     if (!hasLocalBackend && features.autoLoadFromDir) {
       await loadJsonFiles();

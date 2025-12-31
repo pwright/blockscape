@@ -7,6 +7,25 @@
     return;
   }
 
+  const scriptSrc =
+    document.currentScript?.src ||
+    document.querySelector('script[src*="blockscape/mount.js"]')?.src;
+  let initialSettingsUrl = "settings.json";
+  if (scriptSrc) {
+    try {
+      const parsed = new URL(scriptSrc);
+      const parts = parsed.pathname.split("/").filter(Boolean);
+      const baseParts = parts.length >= 3 ? parts.slice(0, -3) : [];
+      const basePath = "/" + baseParts.join("/");
+      initialSettingsUrl = new URL(
+        "settings.json",
+        `${parsed.origin}${basePath ? `${basePath}/` : "/"}`
+      ).toString();
+    } catch (error) {
+      console.warn("Blockscape: unable to resolve settings.json path", error);
+    }
+  }
+
   window.__blockscapeMounted = true;
 
   document.querySelectorAll(".blockscape-root").forEach((root) => {
@@ -37,6 +56,7 @@
           showHeader: false,
           showSidebar: false,
           seriesNavMinVersions: 2,
+          initialSettingsUrl,
         },
       },
     });
