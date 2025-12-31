@@ -3,8 +3,9 @@
   import { initBlockscape } from './blockscape';
   import ShortcutHelp from './components/ShortcutHelp.svelte';
   import NewPanel from './components/NewPanel.svelte';
+  export let seed;
 
-  const seedText = `
+  const defaultSeedText = `
   {
   "id": "blockscape",
   "title": "Blockscape (AI maps)",
@@ -147,6 +148,8 @@
     }
   ]
 }`;
+
+  const seedText = seed ? JSON.stringify(seed, null, 2) : defaultSeedText;
 
   let headerExpanded = false;
 

@@ -9826,7 +9826,7 @@ ${text2}` : text2;
     }
   })();
 }
-function create_fragment$2(ctx) {
+function create_fragment$3(ctx) {
   let div5;
   return {
     c() {
@@ -9856,7 +9856,7 @@ function create_fragment$2(ctx) {
 class ShortcutHelp extends SvelteComponent {
   constructor(options) {
     super();
-    init(this, options, null, create_fragment$2, safe_not_equal, {});
+    init(this, options, null, create_fragment$3, safe_not_equal, {});
   }
 }
 const plainPromptTemplate = 'Generate a blockscape [map|series] for the domain of [DOMAIN]\n\n### Requirements\n\n* Output **valid JSON only** with the structure below (no commentary):\n\n  * Model level:\n    * `id`: required string, short/sluggy (lowercase, hyphen/underscore ok)\n    * `title`: required string, human‑friendly model title\n    * `abstract`: optional string (plain text or simple HTML) that explains the landscape\n    * `categories`: array of category objects\n\n  * Each category has:\n    * `id` (short, lowercase, unique)\n    * `title` (human‑friendly)\n    * `items`: array of component objects\n\n      * each item has:\n        * `id` (short, lowercase, unique across all categories)\n        * `name` (human‑friendly)\n        * optional `logo` (e.g., `"logos/[slug].svg"`)\n        * optional `external` (string URL) pointing to external documentation or reference material for that item\n        * optional `color` (hex string) for tile tint\n        * optional `deps`: array of item `id`s this item **depends on** (when present, must reference defined items only)\n* Use **3–6/7 categories** and **2–6/7 items per category**. Prefer clarity over exhaustiveness.\n* Order categories roughly from **abstract to concrete**.\n* Model **visible user value** via **vertical position** (things closer to the user are higher). Ensure `deps` reflect a flow from higher‑value items to their underlying enablers.\n* (Optional) You may imply **horizontal evolution/maturity** via category naming or item grouping, but do not add extra fields for it.\n* Keep all identifiers **ASCII**, hyphen‑separated where needed.\n\n### Domain Guidance\n\nIn **[one paragraph]**, summarize the domain’s user‑visible goals and the key enabling components. Use that understanding to choose categories and dependencies.\n\n### Output\n\nIf the user asks for a \'series\', create an array of json using the following criteria.\n\nReturn **only the JSON** matching this schema:\n\n```\n{\n  "id": "[model-id]",\n  "title": "[Model Title]",\n  "abstract": "[Short description or HTML snippet, optional]",\n  "categories": [\n    {\n      "id": "[category-id]",\n      "title": "[Category Title]",\n      "items": [\n        { "id": "[item-id]", "name": "[Item Name]", "deps": ["[id]"] }\n      ]\n    }\n  ]\n}\n```\n\n### Validation Checklist (the model should self‑check before returning):\n\n* Top-level `id` and `title` are present and non-empty; if `abstract` is provided, it is non-empty.\n* All provided `deps` reference **existing** item IDs.\n* No duplicate `id`s across all items.\n* 3–6/7 categories; each has 2–6/7 items.\n* JSON parses.\n\n---\n\n## One‑shot Example (Machine Learning Model Deployment)\n\n**Prompt to paste**\n\nGenerate a **Blockscape value‑chain JSON** for the domain of **machine learning model deployment**.\n\n### Requirements\n\n* Output **valid JSON only** with this structure (no commentary).\n* Use **3 - 6/7 categories**, **3–6/7 items each**.\n* Order from abstract (user‑facing) to concrete (infrastructure).\n* Vertical axis is **visible user value**; `deps` should point from user‑visible items down to enablers they rely on.\n* Optional `logo` paths may use placeholders like `"logos/[slug].svg"`.\n\n### Domain Guidance\n\nUsers need **reliable predictions** surfaced via **APIs/UI**, backed by **versioned models**, **observability**, and **scalable infra**. Security and governance span across.\n\n### Output (JSON only)\n\n```\n{\n  "categories": [\n    {\n      "id": "experience",\n      "title": "User Experience",\n      "items": [\n        { "id": "prediction-api", "name": "Prediction API", "deps": ["model-serving", "authz"], "external": "https://example.com/api.html"},\n        { "id": "batch-scoring", "name": "Batch Scoring", "deps": ["feature-store", "orchestration"] },\n        { "id": "ui-console", "name": "Ops Console", "deps": ["monitoring", "logging"] }\n      ]\n    },\n    {\n      "id": "models",\n      "title": "Models & Data",\n      "items": [\n        { "id": "model-serving", "name": "Model Serving", "deps": ["container-runtime", "autoscaling"] },\n        { "id": "model-registry", "name": "Model Registry", "deps": ["artifact-store"] },\n        { "id": "feature-store", "name": "Feature Store", "deps": ["data-pipelines"] }\n      ]\n    },\n    {\n      "id": "platform",\n      "title": "Platform Services",\n      "items": [\n        { "id": "monitoring", "name": "Monitoring", "deps": ["metrics-backend"] },\n        { "id": "logging", "name": "Logging", "deps": ["log-backend"] },\n        { "id": "authz", "name": "AuthN/Z", "deps": ["secrets"] },\n        { "id": "orchestration", "name": "Orchestration", "deps": ["container-runtime"] }\n      ]\n    },\n    {\n      "id": "infrastructure",\n      "title": "Infrastructure",\n      "items": [\n        { "id": "autoscaling", "name": "Autoscaling", "deps": ["metrics-backend"] },\n        { "id": "container-runtime", "name": "Container Runtime", "deps": [] },\n        { "id": "artifact-store", "name": "Artifact Store", "deps": [] },\n        { "id": "data-pipelines", "name": "Data Pipelines", "deps": [] },\n        { "id": "metrics-backend", "name": "Metrics Backend", "deps": [] },\n        { "id": "log-backend", "name": "Log Backend", "deps": [] },\n        { "id": "secrets", "name": "Secrets Management", "deps": [] }\n      ]\n    }\n  ]\n}\n```\n\n---\n\n## Tips\n\n* Keep **names** user‑friendly; keep **ids** short and consistent.\n* If an item feels too broad, introduce a new category rather than bloating `deps`.\n* If there\'s a link (external), use the favicon from the website as logo\n* If you’re unsure about `logo`, omit it; you can add paths later.\n\nThe following map shows color conventions:\n\n```\n{\n  "id": "conventions",\n  "title": "Color Conventions",\n  "abstract": "Reference for color conventions.",\n  "categories": [\n    {\n      "id": "color-conventions",\n      "title": "Color conventions",\n      "items": [\n        {\n          "id": "old",\n          "name": "Old",\n          "color": "#000000",\n          "deps": []\n        },\n        {\n          "id": "new",\n          "name": "New",\n          "color": "#FFFFFF",\n          "deps": []\n        },\n        {\n          "id": "important",\n          "name": "Important",\n          "deps": [],\n          "color": "#FF0000"\n        }\n      ]\n    }\n  ]\n}\n```\n';
@@ -9966,7 +9966,7 @@ function create_if_block(ctx) {
     }
   };
 }
-function create_fragment$1(ctx) {
+function create_fragment$2(ctx) {
   let div14;
   let div0;
   let t0;
@@ -10307,7 +10307,7 @@ function create_fragment$1(ctx) {
   };
 }
 const gptLink = "https://chatgpt.com/g/g-690f6217889c819191786ef16481f534-blockscape";
-function instance$1($$self, $$props, $$invalidate) {
+function instance$2($$self, $$props, $$invalidate) {
   let domain = "";
   let asSeries = false;
   let target2 = "gpt";
@@ -10407,11 +10407,11 @@ function instance$1($$self, $$props, $$invalidate) {
 class NewPanel extends SvelteComponent {
   constructor(options) {
     super();
-    init(this, options, instance$1, create_fragment$1, safe_not_equal, {});
+    init(this, options, instance$2, create_fragment$2, safe_not_equal, {});
   }
 }
 const { document: document_1 } = globals;
-function create_fragment(ctx) {
+function create_fragment$1(ctx) {
   let link;
   let t0;
   let div26;
@@ -10867,8 +10867,9 @@ function create_fragment(ctx) {
     }
   };
 }
-function instance($$self, $$props, $$invalidate) {
-  const seedText = `
+function instance$1($$self, $$props, $$invalidate) {
+  let { seed } = $$props;
+  const defaultSeedText = `
   {
   "id": "blockscape",
   "title": "Blockscape (AI maps)",
@@ -11011,6 +11012,7 @@ function instance($$self, $$props, $$invalidate) {
     }
   ]
 }`;
+  const seedText = seed ? JSON.stringify(seed, null, 2) : defaultSeedText;
   let headerExpanded = false;
   const toggleHeaderExpanded = () => {
     $$invalidate(0, headerExpanded = !headerExpanded);
@@ -11025,15 +11027,67 @@ function instance($$self, $$props, $$invalidate) {
   onMount(() => {
     initBlockscape();
   });
-  return [headerExpanded, seedText, toggleHeaderExpanded];
+  $$self.$$set = ($$props2) => {
+    if ("seed" in $$props2) $$invalidate(3, seed = $$props2.seed);
+  };
+  return [headerExpanded, seedText, toggleHeaderExpanded, seed];
 }
 class App extends SvelteComponent {
   constructor(options) {
     super();
-    init(this, options, instance, create_fragment, safe_not_equal, {});
+    init(this, options, instance$1, create_fragment$1, safe_not_equal, { seed: 3 });
+  }
+}
+function create_fragment(ctx) {
+  let app;
+  let current;
+  app = new App({ props: { seed: (
+    /*seed*/
+    ctx[0]
+  ) } });
+  return {
+    c() {
+      create_component(app.$$.fragment);
+    },
+    m(target2, anchor) {
+      mount_component(app, target2, anchor);
+      current = true;
+    },
+    p(ctx2, [dirty]) {
+      const app_changes = {};
+      if (dirty & /*seed*/
+      1) app_changes.seed = /*seed*/
+      ctx2[0];
+      app.$set(app_changes);
+    },
+    i(local) {
+      if (current) return;
+      transition_in(app.$$.fragment, local);
+      current = true;
+    },
+    o(local) {
+      transition_out(app.$$.fragment, local);
+      current = false;
+    },
+    d(detaching) {
+      destroy_component(app, detaching);
+    }
+  };
+}
+function instance($$self, $$props, $$invalidate) {
+  let { seed } = $$props;
+  $$self.$$set = ($$props2) => {
+    if ("seed" in $$props2) $$invalidate(0, seed = $$props2.seed);
+  };
+  return [seed];
+}
+class Blockscape extends SvelteComponent {
+  constructor(options) {
+    super();
+    init(this, options, instance, create_fragment, safe_not_equal, { seed: 0 });
   }
 }
 const target = document.getElementById("root");
-new App({
+new Blockscape({
   target
 });

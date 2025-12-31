@@ -5,4 +5,5 @@ cypress/results/
 blockscape-data/
 *.log
 .DS_Store
-mkdocs-blockscape/
+site/
+#mkdocs-blockscape/

@@ -1,9 +1,8 @@
-import './app.css';
-import App from './App.svelte';
+import Blockscape from './Blockscape.svelte';
 
 const target = document.getElementById('root');
 
-const app = new App({
+const app = new Blockscape({
   target,
 });
 

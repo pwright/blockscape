@@ -8,6 +8,7 @@
     "dev": "vite",
     "build:tokens": "node scripts/build-tokens.js",
     "build": "npm run build:tokens && npm run clean-docs && vite build",
+    "export": "npm run build:tokens && vite build --config vite.config.export.mjs && cp svelte/src/mount.js mkdocs-blockscape/docs/site_assets/blockscape/mount.js",
     "clean-docs": "node scripts/clean-docs.js",
     "preview": "vite preview",
     "server": "node server.js",
