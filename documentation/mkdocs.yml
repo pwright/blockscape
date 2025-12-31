@@ -1,0 +1,14 @@
+site_name: Blockscape Docs
+
+docs_dir: docs
+site_dir: ../docs/documentation
+
+markdown_extensions:
+  - mkdocs_blockscape.extension
+
+extra_css:
+  - site_assets/blockscape/blockscape.css
+
+extra_javascript:
+  - site_assets/blockscape/blockscape.js
+  - site_assets/blockscape/mount.js

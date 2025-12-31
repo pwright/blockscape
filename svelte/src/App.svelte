@@ -3,8 +3,10 @@
   import { initBlockscape } from './blockscape';
   import ShortcutHelp from './components/ShortcutHelp.svelte';
   import NewPanel from './components/NewPanel.svelte';
+  export let seed;
+  export let features = {};
 
-  const seedText = `
+  const defaultSeedText = `
   {
   "id": "blockscape",
   "title": "Blockscape (AI maps)",
@@ -148,6 +150,10 @@
   ]
 }`;
 
+  const seedText = seed ? JSON.stringify(seed, null, 2) : defaultSeedText;
+  $: showHeader = features.showHeader !== false;
+  $: showSidebar = features.showSidebar !== false;
+
   let headerExpanded = false;
 
   const toggleHeaderExpanded = () => {
@@ -162,7 +168,7 @@
   };
 
   onMount(() => {
-    initBlockscape();
+    initBlockscape(features);
   });
 </script>
 
@@ -172,7 +178,7 @@
 </svelte:head>
 
 <div class="pf-v5-c-page">
-  <header class="pf-v5-c-page__header">
+  <header class="pf-v5-c-page__header" hidden={!showHeader}>
     <div class="pf-v5-c-masthead pf-m-display-inline blockscape-masthead">
       <div class="pf-v5-c-masthead__content">
         <div class="blockscape-toolbar">
@@ -245,7 +251,7 @@
 
   <main class="pf-v5-c-page__main">
     <div class="blockscape-content">
-      <aside class="blockscape-sidebar" aria-label="Models">
+      <aside class="blockscape-sidebar" aria-label="Models" hidden={!showSidebar}>
         <div class="sidebar-heading">Models</div>
         <ul id="modelList" class="model-nav-list"></ul>
         <div class="model-actions">
@@ -253,13 +259,40 @@
             title="Remove selected model">Remove active</button>
           <button id="clear" class="pf-v5-c-button pf-m-tertiary" type="button">Clear selection</button>
         </div>
+        <section id="localBackendPanel" class="local-backend" hidden>
+          <div class="sidebar-heading">Local files</div>
+          <p id="localBackendStatus" class="local-backend__status muted">Checking for local server…</p>
+          <div class="local-backend__list">
+            <label class="sr-only" for="localFileList">Blockscape files under ~/blockscape</label>
+            <div class="local-backend__dir">
+              <label for="localDirSelect">Folder</label>
+              <select id="localDirSelect" class="pf-v5-c-form-control" aria-label="Folder filter">
+                <option value="">All (~/blockscape)</option>
+              </select>
+            </div>
+            <select id="localFileList" class="pf-v5-c-form-control" size="12" multiple
+              aria-label="Blockscape files on local server"></select>
+            <div class="local-backend__actions">
+              <button id="refreshLocalFiles" class="pf-v5-c-button pf-m-tertiary" type="button">Refresh</button>
+              <button id="loadLocalFile" class="pf-v5-c-button pf-m-secondary" type="button">Load</button>
+            </div>
+          </div>
+          <div class="local-backend__save">
+            <label for="localSavePath">Save active map to ~/blockscape</label>
+            <input id="localSavePath" class="pf-v5-c-form-control" type="text" placeholder="my-map.bs" />
+            <div class="local-backend__save-actions">
+              <button id="saveLocalFile" class="pf-v5-c-button pf-m-primary" type="button">Save</button>
+              <button id="saveLocalFileAs" class="pf-v5-c-button pf-m-secondary" type="button">Save as</button>
+            </div>
+          </div>
+        </section>
       </aside>
       <div class="blockscape-main">
         <section class="pf-v5-c-page__main-section blockscape-json-panel" hidden
           aria-label="Model source JSON editor">
           <p class="blockscape-json-panel__title">Paste / edit JSON for the <b>active</b> model (schema below)</p>
           <div class="muted">
-            Schema: <code>&#123; id, title, abstract?, categories:[&#123;id,title,items:[&#123;id,name,logo?,external?:url,color?,deps:[]&#125;&#125;], links?:[&#123;from,to&#125;] &#125;</code><br />
+            Schema: <code>&#123; id, title, abstract?, categories:[&#123;id,title,items:[&#123;id,name,deps?:[],logo?,external?:url,color?,...&#125;&#125;], ... &#125;</code><br />
             You can paste multiple objects separated by <code>---</code> or <code>%%%</code>, or a JSON array of models, to append several models.
             A single object replaces only when you click “Replace active with JSON”. Tip: with no input focused, press
             Cmd/Ctrl+V anywhere on the page to append clipboard JSON instantly.
@@ -299,6 +332,7 @@
 
 <svg id="overlay" class="svg-layer"></svg>
 <div id="tabTooltip" class="blockscape-tab-tooltip" hidden aria-hidden="true"></div>
+<div id="tileContextMenu" class="tile-context-menu" hidden aria-hidden="true"></div>
 
 <div id="itemPreview" class="item-preview" hidden aria-hidden="true">
   <div class="item-preview__header">

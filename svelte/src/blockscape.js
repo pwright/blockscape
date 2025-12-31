@@ -4,13 +4,32 @@ import {
   createItemEditor,
   updateItemReferences,
 } from "./itemEditor";
+import { createTileContextMenu } from "./tileContextMenu";
 import { ensureSeriesId, getSeriesId, makeSeriesId } from "./series";
+import {
+  applySettingsSnapshot,
+  buildSettingsSnapshot,
+  formatSettings,
+  downloadJson,
+  tokens,
+} from "./settings";
 
 const ASSET_BASE =
   (typeof import.meta !== "undefined" && import.meta.env?.BASE_URL) || "";
 
-export function initBlockscape() {
+export function initBlockscape(featureOverrides = {}) {
   console.log("[Blockscape] init");
+
+  const features = {
+    localBackend: true,
+    fileOpen: true,
+    fileSave: true,
+    autoLoadFromDir: true,
+    showHeader: true,
+    showSidebar: true,
+    seriesNavMinVersions: 1,
+    ...featureOverrides,
+  };
 
   const jsonBox = document.getElementById("jsonBox");
   const jsonPanel = document.querySelector(".blockscape-json-panel");
@@ -35,6 +54,7 @@ export function initBlockscape() {
   const pasteJsonButton = document.getElementById("pasteJson");
   const helpButton = document.getElementById("helpButton");
   const newPanelButton = document.getElementById("newPanelButton");
+  const newBlankButton = document.getElementById("newBlankButton");
   const shortcutHelp = document.getElementById("shortcutHelp");
   const shortcutHelpList = document.getElementById("shortcutHelpList");
   const shortcutHelpClose = document.getElementById("shortcutHelpClose");
@@ -44,9 +64,33 @@ export function initBlockscape() {
   const newPanelBackdrop = document.getElementById("newPanelBackdrop");
   const searchInput = document.getElementById("search");
   const searchResults = document.getElementById("searchResults");
+  const localBackendPanel = document.getElementById("localBackendPanel");
+  const localBackendStatus = document.getElementById("localBackendStatus");
+  const localFileList = document.getElementById("localFileList");
+  const localDirSelect = document.getElementById("localDirSelect");
+  const refreshLocalFilesButton = document.getElementById("refreshLocalFiles");
+  const loadLocalFileButton = document.getElementById("loadLocalFile");
+  const saveLocalFileButton = document.getElementById("saveLocalFile");
+  const saveLocalFileAsButton = document.getElementById("saveLocalFileAs");
+  const localSavePathInput = document.getElementById("localSavePath");
   const EDITOR_TRANSFER_KEY = "blockscape:editorPayload";
   const EDITOR_TRANSFER_MESSAGE_TYPE = "blockscape:editorTransfer";
   const defaultDocumentTitle = document.title;
+
+  // Ensure local backend panel starts hidden; it will only unhide after a successful health check.
+  if (localBackendPanel) localBackendPanel.hidden = true;
+  if (!features.localBackend && localBackendPanel) localBackendPanel.hidden = true;
+  if (!features.fileOpen) {
+    if (loadLocalFileButton) loadLocalFileButton.hidden = true;
+    if (localDirSelect) localDirSelect.hidden = true;
+    if (refreshLocalFilesButton) refreshLocalFilesButton.hidden = true;
+    if (localFileList) localFileList.hidden = true;
+  }
+  if (!features.fileSave) {
+    if (saveLocalFileButton) saveLocalFileButton.hidden = true;
+    if (saveLocalFileAsButton) saveLocalFileAsButton.hidden = true;
+    if (localSavePathInput) localSavePathInput.hidden = true;
+  }
 
   // Show the seed in the editor initially.
   jsonBox.value = document.getElementById("seed").textContent.trim();
@@ -76,9 +120,8 @@ export function initBlockscape() {
   let selectionRelations = null;
   let categoryEntryHint = null;
   let showSecondaryLinks = true;
+  let activeViewIsCategory = false;
   let showReusedInMap = false;
-  let previewRequestId = 0;
-  let previewAnchor = { x: 0, y: 0 };
   let lastActiveTabId = "map";
   let lastDeletedItem = null;
   let lastDeletedCategory = null;
@@ -87,6 +130,8 @@ export function initBlockscape() {
   const NOTICE_TIMEOUT_MS = 2000;
   let pendingSeriesNavigation = null;
   let pendingSeriesNavigationTimer = null;
+  let pendingModelNavigation = null;
+  let pendingModelNavigationTimer = null;
   let noticeEl = null;
   let noticeTextEl = null;
   let noticeTimer = null;
@@ -95,6 +140,7 @@ export function initBlockscape() {
   let activeInfoTooltipHtml = "";
   let pendingInfoPreview = false;
   let infoTabTwinkleTimer = null;
+  const versionThumbScroll = new Map(); // key -> scrollLeft
   let apicurioSettingsToggle = null;
   let activeSeriesPreviewTarget = null;
   let versionThumbLabels = [];
@@ -105,6 +151,13 @@ export function initBlockscape() {
   const DEFAULT_TILE_HOVER_SCALE = 1.5;
   const MIN_TILE_HOVER_SCALE = 1;
   const MAX_TILE_HOVER_SCALE = 2.5;
+  const SELECTION_DIM_OPACITY_STORAGE_KEY =
+    "blockscape:selectionDimOpacity";
+  const SELECTION_DIM_ENABLED_STORAGE_KEY =
+    "blockscape:selectionDimEnabled";
+  const DEFAULT_SELECTION_DIM_OPACITY = 0.2;
+  const MIN_SELECTION_DIM_OPACITY = 0.05;
+  const MAX_SELECTION_DIM_OPACITY = 1;
   const TITLE_WRAP_STORAGE_KEY = "blockscape:titleWrap";
   const TITLE_HOVER_WIDTH_STORAGE_KEY = "blockscape:titleHoverWidth";
   const TITLE_HOVER_TEXT_PORTION_STORAGE_KEY =
@@ -126,7 +179,23 @@ export function initBlockscape() {
   const OBSIDIAN_LINK_MODE_TITLE = "title";
   const OBSIDIAN_LINK_MODE_ID = "id";
   const DEFAULT_OBSIDIAN_LINK_MODE = OBSIDIAN_LINK_MODE_TITLE;
+  const AUTO_RELOAD_ENABLED_STORAGE_KEY = "blockscape:autoReloadEnabled";
+  const AUTO_RELOAD_INTERVAL_STORAGE_KEY = "blockscape:autoReloadIntervalMs";
+  const DEFAULT_AUTO_RELOAD_INTERVAL_MS = 1000;
+  const MIN_AUTO_RELOAD_INTERVAL_MS = 500;
+  const MAX_AUTO_RELOAD_INTERVAL_MS = 10000;
+  const AUTO_ID_FROM_NAME_STORAGE_KEY = "blockscape:autoIdFromName";
+  const DEFAULT_AUTO_ID_FROM_NAME = true;
+  const COLOR_PRESETS_STORAGE_KEY = "blockscape:colorPresets";
+  const CENTER_ITEMS_STORAGE_KEY = "blockscape:centerItems";
+  const THEME_STORAGE_KEY = "blockscape:theme";
+  const THEME_LIGHT = "light";
+  const THEME_DARK = "dark";
+  const CATEGORY_VIEW_VERSION_PREFIX = "cat:";
+  const DEFAULT_CENTER_ITEMS = false;
   let tileHoverScale = DEFAULT_TILE_HOVER_SCALE;
+  let selectionDimOpacity = DEFAULT_SELECTION_DIM_OPACITY;
+  let selectionDimEnabled = true;
   let tileCompactness = DEFAULT_TILE_COMPACTNESS;
   let titleWrapMode = DEFAULT_TITLE_WRAP_MODE;
   let titleHoverWidthMultiplier = DEFAULT_TITLE_HOVER_WIDTH_MULTIPLIER;
@@ -134,14 +203,72 @@ export function initBlockscape() {
   let obsidianLinksEnabled = false;
   let obsidianLinkMode = DEFAULT_OBSIDIAN_LINK_MODE;
   let obsidianVaultName = "";
+  let autoIdFromNameEnabled = DEFAULT_AUTO_ID_FROM_NAME;
+  let theme = THEME_LIGHT;
+  let colorPresets = [];
+  let centerItems = DEFAULT_CENTER_ITEMS;
+  let renderColorPresetsUI = null;
   const SERIES_NAV_DOUBLE_CLICK_STORAGE_KEY =
     "blockscape:seriesNavDoubleClickMs";
   const DEFAULT_SERIES_NAV_DOUBLE_CLICK_MS = 900;
   const MIN_SERIES_NAV_DOUBLE_CLICK_MS = 300;
   const MAX_SERIES_NAV_DOUBLE_CLICK_MS = 4000;
   let seriesNavDoubleClickWaitMs = DEFAULT_SERIES_NAV_DOUBLE_CLICK_MS;
+  const settingsUi = {
+    hoverScaleInput: null,
+    hoverScaleValue: null,
+    selectionDimToggle: null,
+    selectionDimInput: null,
+    selectionDimValue: null,
+    tileCompactnessInput: null,
+    tileCompactnessValue: null,
+    titleWrapInput: null,
+    titleWidthInput: null,
+    titleWidthValue: null,
+    titleZoomInput: null,
+    titleZoomValue: null,
+    seriesNavInput: null,
+    seriesNavValue: null,
+    obsidianToggle: null,
+    obsidianModeInputs: [],
+    obsidianVaultInput: null,
+    autoIdToggle: null,
+    autoReloadToggle: null,
+    autoReloadInput: null,
+    autoReloadValue: null,
+    secondaryLinksToggle: null,
+    reusedToggle: null,
+    themeToggle: null,
+    tabThemeToggle: null,
+    tabSecondaryLinksToggle: null,
+    tabCenterToggle: null,
+    colorPresetList: null,
+  };
+  const disabledLocalBackend = {
+    detect: async () => false,
+    refresh: async () => {},
+    updateActiveSavePlaceholder() {},
+    isAvailable: () => false,
+    highlightSource() {},
+    getAutoReloadConfig: () => ({
+      enabled: false,
+      intervalMs: DEFAULT_AUTO_RELOAD_INTERVAL_MS,
+    }),
+    setAutoReloadEnabled() {},
+    setAutoReloadInterval() {},
+    saveModelByIndex: async () => false,
+  };
+  const localBackend = features.localBackend
+    ? createLocalBackend()
+    : disabledLocalBackend;
+  const initialBackendCheck = features.localBackend
+    ? localBackend.detect()
+    : Promise.resolve(false);
   apicurio.hydrateConfig();
+  applyTheme(readStoredTheme());
+  setColorPresets(loadColorPresets(), { silent: true });
   initializeTileHoverScale();
+  initializeSelectionDimOpacity();
   initializeTileCompactness();
   initializeTitleWrapMode();
   initializeTitleHoverWidthMultiplier();
@@ -150,6 +277,9 @@ export function initBlockscape() {
   initializeObsidianLinksEnabled();
   initializeObsidianLinkMode();
   initializeObsidianVaultName();
+  initializeSelectionDimEnabled();
+  initializeAutoIdFromNameEnabled();
+  initializeCenterItems();
   syncSelectionClass();
 
   // ===== Utilities =====
@@ -189,14 +319,1022 @@ export function initBlockscape() {
     return base64Decode(base64);
   }
 
-  function download(filename, text) {
-    const blob = new Blob([text], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
+  const download = (filename, text) => downloadJson(filename, text);
+
+  function readStoredTheme() {
+    if (typeof window === "undefined" || !window.localStorage)
+      return THEME_LIGHT;
+    try {
+      const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
+      return stored === THEME_DARK ? THEME_DARK : THEME_LIGHT;
+    } catch (err) {
+      return THEME_LIGHT;
+    }
+  }
+
+  function persistTheme(nextTheme) {
+    if (typeof window === "undefined" || !window.localStorage) return;
+    try {
+      window.localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
+    } catch (err) {
+      console.warn("[Blockscape] theme persistence failed", err);
+    }
+  }
+
+  function applyTheme(nextTheme) {
+    const normalized = nextTheme === THEME_DARK ? THEME_DARK : THEME_LIGHT;
+    theme = normalized;
+    if (typeof document !== "undefined") {
+      document.documentElement.setAttribute("data-theme", normalized);
+    }
+    persistTheme(normalized);
+    return theme;
+  }
+
+  function persistCenterItems(enabled) {
+    if (typeof window === "undefined" || !window.localStorage) return;
+    try {
+      window.localStorage.setItem(
+        CENTER_ITEMS_STORAGE_KEY,
+        enabled ? "true" : "false"
+      );
+    } catch (error) {
+      console.warn("[Blockscape] failed to persist center items", error);
+    }
+  }
+
+  function applyCenterItems(enabled) {
+    centerItems = !!enabled;
+    if (app) {
+      app.classList.toggle("is-center-mode", centerItems);
+      app.querySelectorAll(".grid").forEach((grid) => {
+        grid.classList.toggle("is-centered", centerItems);
+      });
+      app.querySelectorAll(".tile-add").forEach((btn) => {
+        btn.hidden = centerItems;
+        btn.tabIndex = centerItems ? -1 : 0;
+        btn.setAttribute("aria-hidden", centerItems ? "true" : "false");
+      });
+    }
+    if (model) {
+      reflowRects();
+      drawLinks();
+    }
+    return centerItems;
+  }
+
+  function initializeCenterItems() {
+    if (typeof window === "undefined" || !window.localStorage) {
+      return applyCenterItems(DEFAULT_CENTER_ITEMS);
+    }
+    try {
+      const stored = window.localStorage.getItem(CENTER_ITEMS_STORAGE_KEY);
+      if (stored == null) return applyCenterItems(DEFAULT_CENTER_ITEMS);
+      return applyCenterItems(stored === "true" || stored === "1");
+    } catch (error) {
+      console.warn("[Blockscape] failed to read center items pref", error);
+      return applyCenterItems(DEFAULT_CENTER_ITEMS);
+    }
+  }
+
+  function getCssVarValue(varName) {
+    if (typeof window === "undefined") return "";
+    const styles = getComputedStyle(document.documentElement);
+    return styles.getPropertyValue(varName).trim();
+  }
+
+  function normalizeColorPresets(list) {
+    const isHex = (val) => /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(val || "");
+    if (!Array.isArray(list)) return defaultColorPresets();
+    const cleaned = list
+      .map((entry) => ({
+        name: (entry?.name || "").toString().trim() || "Custom",
+        value: (entry?.value || "").toString().trim(),
+      }))
+      .filter((entry) => isHex(entry.value));
+    return cleaned.length ? cleaned : defaultColorPresets();
+  }
+
+  function defaultColorPresets() {
+    return [
+      { name: "Black", value: tokens.color.ink },
+      { name: "White", value: tokens.color.white },
+      { name: "Red", value: tokens.blockscape.revdep },
+      { name: "Green", value: tokens.color.success },
+    ];
+  }
+
+  function loadColorPresets() {
+    if (typeof window === "undefined" || !window.localStorage) {
+      return defaultColorPresets();
+    }
+    try {
+      const raw = window.localStorage.getItem(COLOR_PRESETS_STORAGE_KEY);
+      if (!raw) return defaultColorPresets();
+      const parsed = JSON.parse(raw);
+      return normalizeColorPresets(parsed);
+    } catch (err) {
+      console.warn("[Blockscape] failed to load color presets", err);
+      return defaultColorPresets();
+    }
+  }
+
+  function persistColorPresets(list) {
+    if (typeof window === "undefined" || !window.localStorage) return;
+    try {
+      window.localStorage.setItem(
+        COLOR_PRESETS_STORAGE_KEY,
+        JSON.stringify(list)
+      );
+    } catch (err) {
+      console.warn("[Blockscape] failed to persist color presets", err);
+    }
+  }
+
+  function setColorPresets(list, { silent = false } = {}) {
+    colorPresets = normalizeColorPresets(list);
+    persistColorPresets(colorPresets);
+    if (!silent && typeof updateTileMenuColors === "function") {
+      updateTileMenuColors(colorPresets);
+    }
+    renderColorPresetsUI?.();
+    return colorPresets;
+  }
+
+  function isLocalBackendOptIn() {
+    if (typeof window === "undefined" || !window.location) return false;
+    const url = new URL(window.location.href);
+    const normalizedPath = url.pathname.replace(/\/+$/, "");
+    const segments = normalizedPath.split("/").filter(Boolean);
+    const searchFlag = url.searchParams.get("server");
+    const hasServerPrefix =
+      segments[0] && segments[0].toLowerCase() === "server";
+    return (
+      hasServerPrefix ||
+      (searchFlag &&
+        ["1", "true", "yes", "on"].includes(searchFlag.toLowerCase()))
+    );
+  }
+
+  function updateUrlForServerPath(relPath, { modelId, itemId } = {}) {
+    if (typeof window === "undefined" || !window.location || !relPath) return;
+    const normalized = normalizeLocalSavePath(relPath);
+    if (!normalized) return;
+    const activeModel = models[activeIndex];
+    const normalizedSource = normalizeLocalSavePath(activeModel?.sourcePath);
+    const resolvedModelId =
+      modelId ??
+      (normalizedSource && normalizedSource === normalized
+        ? getModelId(activeModel)
+        : null);
+    const resolvedItemId =
+      itemId ??
+      (normalizedSource && normalizedSource === normalized ? selection : null);
+    const encodedPathSegments = normalized
+      .split("/")
+      .filter(Boolean)
+      .map((part) => encodeURIComponent(part));
+    const encodedModel = resolvedModelId
+      ? encodeURIComponent(resolvedModelId)
+      : null;
+    const encodedItem = resolvedItemId
+      ? encodeURIComponent(resolvedItemId)
+      : null;
+    try {
+      const url = new URL(window.location.href);
+      const cleanedSearch = new URLSearchParams(url.search);
+      cleanedSearch.delete("load");
+      cleanedSearch.delete("share");
+      const newPath = [
+        "",
+        "server",
+        ...encodedPathSegments,
+        ...(encodedModel ? [encodedModel] : []),
+        ...(encodedItem ? [encodedItem] : []),
+      ]
+        .join("/")
+        .replace(/\/+/g, "/");
+      url.pathname = newPath;
+      url.search = cleanedSearch.toString()
+        ? `?${cleanedSearch.toString()}`
+        : "";
+      url.hash = "";
+      window.history.replaceState({}, document.title, url.toString());
+    } catch (err) {
+      console.warn("[Blockscape] failed to update URL for server path", err);
+    }
+  }
+
+  function extractServerFilePathFromUrl() {
+    if (typeof window === "undefined" || !window.location) return null;
+    const url = new URL(window.location.href);
+    const normalizedPath = url.pathname.replace(/\/+$/, "");
+    const segments = normalizedPath.split("/").filter(Boolean);
+    const serverIndex = segments.findIndex(
+      (segment) => segment.toLowerCase() === "server"
+    );
+    if (serverIndex === -1) return null;
+    const remainder = segments.slice(serverIndex + 1);
+    if (!remainder.length) return null;
+    const bsIndex = remainder.findIndex((part) =>
+      part.toLowerCase().endsWith(".bs")
+    );
+    if (bsIndex === -1) return null;
+    const fileParts = remainder.slice(0, bsIndex + 1);
+    const extraParts = remainder.slice(bsIndex + 1);
+    const decodePart = (part) => {
+      try {
+        return decodeURIComponent(part);
+      } catch {
+        return part;
+      }
+    };
+    const decodedFile = fileParts.map(decodePart);
+    const decodedExtras = extraParts.map(decodePart);
+    const joined = decodedFile.join("/");
+    const normalized = normalizeLocalSavePath(joined);
+    if (!normalized) return null;
+    const modelId = decodedExtras[0] ? decodedExtras[0].trim() : null;
+    const itemId = decodedExtras[1] ? decodedExtras[1].trim() : null;
+    return { path: normalized, modelId: modelId || null, itemId: itemId || null };
+  }
+
+  function updateServerUrlFromActive({ itemId } = {}) {
+    const active = models[activeIndex];
+    if (!active?.sourcePath) return;
+    updateUrlForServerPath(active.sourcePath, {
+      modelId: getModelId(active),
+      itemId: itemId === undefined ? selection : itemId,
+    });
+  }
+
+  function isGithubPagesHost() {
+    if (typeof window === "undefined" || !window.location) return false;
+    const host = (window.location.hostname || "").toLowerCase();
+    return host.endsWith("github.io");
+  }
+
+  function createLocalBackend() {
+    const debugContext = () => {
+      if (typeof window === "undefined" || !window.location) return {};
+      return {
+        host: window.location.host,
+        path: window.location.pathname,
+        search: window.location.search,
+        hash: window.location.hash,
+      };
+    };
+
+    function debug(message, extra = {}) {
+      console.log("[Blockscape][local-backend]", message, {
+        ...debugContext(),
+        ...extra,
+      });
+    }
+
+    if (isGithubPagesHost()) {
+      debug("Disabled on github.io host");
+      if (localBackendPanel) localBackendPanel.hidden = true;
+      return {
+        detect: async () => false,
+        refresh: async () => {},
+        updateActiveSavePlaceholder() {},
+        isAvailable: () => false,
+      };
+    }
+
+    const optIn = isLocalBackendOptIn();
+    if (!optIn || !localBackendPanel || !localBackendStatus) {
+      debug("Opt-in flag missing or panel unavailable");
+      if (localBackendPanel) localBackendPanel.hidden = true;
+      return {
+        detect: async () => false,
+        refresh: async () => {},
+        updateActiveSavePlaceholder() {},
+        isAvailable: () => false,
+      };
+    }
+
+    if (!localBackendPanel || !localBackendStatus) {
+      return {
+        detect: async () => false,
+        refresh: async () => {},
+        updateActiveSavePlaceholder() {},
+        isAvailable: () => false,
+      };
+    }
+
+    let available = false;
+    let lastKnownPath = "";
+    let files = [];
+    let dirs = [];
+    let currentDir = "";
+    let knownMtimes = new Map();
+    let autoReloadEnabled = readAutoReloadEnabled();
+    let autoReloadIntervalMs = readAutoReloadInterval();
+    let autoReloadTimer = null;
+    let autoReloadInFlight = false;
+    const autoReloadPauseReasons = new Set();
+
+    function isAutoReloadPaused() {
+      return autoReloadPauseReasons.size > 0;
+    }
+
+    function readAutoReloadEnabled() {
+      if (typeof window === "undefined" || !window.localStorage) return true;
+      try {
+        const raw = window.localStorage.getItem(
+          AUTO_RELOAD_ENABLED_STORAGE_KEY
+        );
+        if (raw == null) return true;
+        return raw === "true";
+      } catch (err) {
+        return true;
+      }
+    }
+
+    function persistAutoReloadEnabled(value) {
+      if (typeof window === "undefined" || !window.localStorage) return;
+      try {
+        window.localStorage.setItem(
+          AUTO_RELOAD_ENABLED_STORAGE_KEY,
+          value ? "true" : "false"
+        );
+      } catch (err) {
+        console.warn("[Blockscape] auto-reload: failed to persist", err);
+      }
+    }
+
+    function readAutoReloadInterval() {
+      if (typeof window === "undefined" || !window.localStorage)
+        return DEFAULT_AUTO_RELOAD_INTERVAL_MS;
+      try {
+        const raw = window.localStorage.getItem(
+          AUTO_RELOAD_INTERVAL_STORAGE_KEY
+        );
+        if (!raw) return DEFAULT_AUTO_RELOAD_INTERVAL_MS;
+        const parsed = parseInt(raw, 10);
+        return clampAutoReloadInterval(parsed);
+      } catch (err) {
+        return DEFAULT_AUTO_RELOAD_INTERVAL_MS;
+      }
+    }
+
+    function persistAutoReloadInterval(value) {
+      if (typeof window === "undefined" || !window.localStorage) return;
+      try {
+        window.localStorage.setItem(
+          AUTO_RELOAD_INTERVAL_STORAGE_KEY,
+          String(value)
+        );
+      } catch (err) {
+        console.warn("[Blockscape] auto-reload: failed to persist interval", err);
+      }
+    }
+
+    function clampAutoReloadInterval(value) {
+      if (!Number.isFinite(value)) return DEFAULT_AUTO_RELOAD_INTERVAL_MS;
+      return Math.min(
+        MAX_AUTO_RELOAD_INTERVAL_MS,
+        Math.max(MIN_AUTO_RELOAD_INTERVAL_MS, value)
+      );
+    }
+
+    function dirOfPath(p) {
+      if (!p) return "";
+      const parts = p.split("/").filter(Boolean);
+      parts.pop();
+      return parts.join("/");
+    }
+
+    function setStatus(text, { error = false } = {}) {
+      localBackendStatus.textContent = text;
+      localBackendStatus.style.color = error ? tokens.color.dangerStrong : "";
+      debug("Status", { text, error });
+    }
+
+    function normalizeSavePath(raw) {
+      return normalizeLocalSavePath(raw);
+    }
+
+    function resolvePayloadForSave(entry) {
+      const seriesPayload = buildSeriesPayload(entry);
+      if (seriesPayload) return { payload: seriesPayload, isSeries: true };
+      return { payload: entry?.data, isSeries: false };
+    }
+
+    function defaultSaveName() {
+      if (activeIndex >= 0 && models[activeIndex]?.sourcePath) {
+        return models[activeIndex].sourcePath;
+      }
+      if (activeIndex < 0) return "blockscape.bs";
+      const title = getModelTitle(models[activeIndex]) || "blockscape";
+      return `${makeSeriesId(title, "blockscape")}.bs`;
+    }
+
+    function updateActiveSavePlaceholder() {
+      if (!localSavePathInput) return;
+      localSavePathInput.placeholder = defaultSaveName();
+      if (models[activeIndex]?.sourcePath) {
+        localSavePathInput.value = models[activeIndex].sourcePath;
+      }
+    }
+
+    function renderDirFilter() {
+      if (!localDirSelect) return;
+      localDirSelect.innerHTML = "";
+      const rootOption = document.createElement("option");
+      rootOption.value = "";
+      rootOption.textContent = "All (~/blockscape)";
+      localDirSelect.appendChild(rootOption);
+      dirs.forEach((dir) => {
+        const opt = document.createElement("option");
+        opt.value = dir;
+        opt.textContent = dir || "(root)";
+        localDirSelect.appendChild(opt);
+      });
+      const desired = dirs.includes(currentDir) ? currentDir : "";
+      localDirSelect.value = desired;
+      currentDir = desired;
+    }
+
+    function renderFiles() {
+      if (!localFileList) return;
+      localFileList.innerHTML = "";
+      const filtered = currentDir
+        ? files.filter((f) => f.path.startsWith(`${currentDir}/`))
+        : files;
+      if (!filtered.length) {
+        const option = document.createElement("option");
+        option.disabled = true;
+        option.textContent = "No .bs files found yet";
+        localFileList.appendChild(option);
+        localFileList.disabled = true;
+        return;
+      }
+
+      localFileList.disabled = false;
+      filtered.forEach((file) => {
+        const option = document.createElement("option");
+        option.value = file.path;
+        const mtime = file.mtimeMs
+          ? new Date(file.mtimeMs).toLocaleString()
+          : "";
+        option.textContent = mtime ? `${file.path} · ${mtime}` : file.path;
+        localFileList.appendChild(option);
+      });
+      if (lastKnownPath) {
+        Array.from(localFileList.options).forEach((opt) => {
+          if (opt.value === lastKnownPath) opt.selected = true;
+        });
+      }
+      if (!localFileList.value && localFileList.options.length) {
+        localFileList.options[0].selected = true;
+      }
+    }
+
+    function highlightSourcePath(path) {
+      if (!available || !localFileList || !path) return;
+      const match = files.find((f) => f.path === path);
+      if (!match) return;
+      const dir = dirOfPath(path);
+      if (dir !== currentDir) {
+        currentDir = dir;
+        renderDirFilter();
+      }
+      renderFiles();
+      Array.from(localFileList.options).forEach((opt) => {
+        opt.selected = opt.value === path;
+      });
+      const selected = Array.from(localFileList.options).find(
+        (opt) => opt.value === path
+      );
+      if (selected?.scrollIntoView) {
+        selected.scrollIntoView({ block: "nearest" });
+      }
+      if (localSavePathInput) {
+        localSavePathInput.value = path;
+      }
+    }
+
+    function stopAutoReloadTimer() {
+      if (autoReloadTimer) {
+        clearInterval(autoReloadTimer);
+        autoReloadTimer = null;
+      }
+    }
+
+    function syncAutoReloadTimer() {
+      stopAutoReloadTimer();
+      if (!available || !autoReloadEnabled || isAutoReloadPaused()) return;
+      autoReloadTimer = setInterval(checkFileChanges, autoReloadIntervalMs);
+    }
+
+    function pauseAutoReload(reason) {
+      if (!reason) return;
+      const sizeBefore = autoReloadPauseReasons.size;
+      autoReloadPauseReasons.add(reason);
+      if (autoReloadPauseReasons.size !== sizeBefore) {
+        debug("Auto-reload paused", { reason });
+        syncAutoReloadTimer();
+      }
+    }
+
+    function resumeAutoReload(reason) {
+      if (!reason) return;
+      const removed = autoReloadPauseReasons.delete(reason);
+      if (removed) {
+        debug("Auto-reload resumed", { reason });
+        syncAutoReloadTimer();
+      }
+    }
+
+    async function reloadModelFromSource(path) {
+      const idx = models.findIndex((m) => m.sourcePath === path);
+      if (idx === -1) return;
+      try {
+        const resp = await fetch(
+          `/api/file?path=${encodeURIComponent(path)}`,
+          { cache: "no-store" }
+        );
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const payload = await resp.json();
+        const text = JSON.stringify(payload.data ?? payload, null, 2);
+        const entries = normalizeToModelsFromText(text, path, {
+          seriesTitleOverride: `${path} series`,
+        });
+        if (!entries.length) return;
+        const next = entries[0];
+        next.sourcePath = path;
+        ensureModelMetadata(next, {
+          titleHint: getModelTitle(models[idx]),
+          idHint: getModelId(models[idx]),
+        });
+        if (next.isSeries) {
+          const seriesTitle =
+            next.title || getModelTitle(next) || getModelTitle(models[idx]);
+          const forcedSlug = makeSeriesId(seriesTitle || "unknown");
+          applySeriesSlug(next, forcedSlug);
+          ensureSeriesId(next, {
+            seriesName: seriesTitle || "unknown",
+            fallbackTitle: "unknown",
+          });
+        }
+        models[idx] = {
+          ...models[idx],
+          ...next,
+          title: next.title || getModelTitle(next),
+          data: next.data,
+          sourcePath: path,
+        };
+        if (idx === activeIndex) {
+          loadActiveIntoEditor();
+          rebuildFromActive();
+        } else {
+          renderModelList();
+        }
+        console.log("[Blockscape] auto-reloaded model from", path);
+      } catch (err) {
+        console.warn("[Blockscape] auto-reload failed for", path, err);
+      }
+    }
+
+    async function checkFileChanges() {
+      if (
+        !available ||
+        !autoReloadEnabled ||
+        isAutoReloadPaused() ||
+        autoReloadInFlight
+      )
+        return;
+      autoReloadInFlight = true;
+      try {
+        const response = await fetch("/api/files", { cache: "no-store" });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const payload = await response.json();
+        const list = (payload.files || []).slice().sort((a, b) => {
+          const aTime = a?.mtimeMs || 0;
+          const bTime = b?.mtimeMs || 0;
+          if (aTime === bTime) return (a.path || "").localeCompare(b.path || "");
+          return bTime - aTime;
+        });
+        const newMap = new Map();
+        list.forEach((f) => newMap.set(f.path, f.mtimeMs || 0));
+        const pathsToCheck = models
+          .map((m, idx) => ({ path: m.sourcePath, idx }))
+          .filter((m) => m.path);
+        for (const entry of pathsToCheck) {
+          const prev = knownMtimes.get(entry.path) || 0;
+          const next = newMap.get(entry.path) || 0;
+          if (next > prev) {
+            await reloadModelFromSource(entry.path);
+          }
+        }
+        files = list;
+        const dirSet = new Set();
+        files.forEach((f) => dirSet.add(dirOfPath(f.path)));
+        dirs = Array.from(dirSet).filter((d) => d !== "").sort();
+        knownMtimes = newMap;
+        renderDirFilter();
+        renderFiles();
+      } catch (err) {
+        console.warn("[Blockscape] auto-reload check failed", err);
+      } finally {
+        autoReloadInFlight = false;
+      }
+    }
+
+    function startAutoReloadTimer() {
+      syncAutoReloadTimer();
+    }
+
+    function setAutoReloadEnabled(enabled) {
+      autoReloadEnabled = !!enabled;
+      persistAutoReloadEnabled(autoReloadEnabled);
+      syncAutoReloadTimer();
+    }
+
+    function setAutoReloadInterval(ms) {
+      autoReloadIntervalMs = clampAutoReloadInterval(ms);
+      persistAutoReloadInterval(autoReloadIntervalMs);
+      syncAutoReloadTimer();
+      return autoReloadIntervalMs;
+    }
+
+    function hidePanel(message) {
+      available = false;
+      files = [];
+      knownMtimes = new Map();
+      stopAutoReloadTimer();
+      renderFiles();
+      localBackendPanel.hidden = true;
+      if (message) setStatus(message, { error: true });
+      debug("Panel hidden", { message });
+    }
+
+    async function checkHealth({ silent = false } = {}) {
+      try {
+        debug("Health check start");
+        const resp = await fetch("/api/health", { cache: "no-store" });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const payload = await resp.json();
+        available = !!payload?.ok;
+        if (!available) throw new Error("Health check failed");
+        localBackendPanel.hidden = false;
+        if (!silent) {
+          setStatus(
+            payload.root
+              ? `Local server ready (root: ${payload.root})`
+              : "Local server ready"
+          );
+        }
+        debug("Health check ok", { payload });
+        return true;
+      } catch (err) {
+        if (!silent) {
+          console.log("[Blockscape] local backend health failed", err);
+        }
+        hidePanel("Local server unavailable");
+        return false;
+      }
+    }
+
+    async function refresh() {
+      if (!available) return;
+      if (!localFileList) return;
+      setStatus("Loading files…");
+      try {
+        const response = await fetch("/api/files", { cache: "no-store" });
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        const payload = await response.json();
+        files = (payload.files || []).slice().sort((a, b) => {
+          const aTime = a?.mtimeMs || 0;
+          const bTime = b?.mtimeMs || 0;
+          if (aTime === bTime) return (a.path || "").localeCompare(b.path || "");
+          return bTime - aTime; // newest first
+        });
+        const dirSet = new Set();
+        files.forEach((f) => {
+          dirSet.add(dirOfPath(f.path));
+        });
+        dirs = Array.from(dirSet).filter((d) => d !== "").sort();
+        if (currentDir && !dirSet.has(currentDir)) {
+          currentDir = "";
+        }
+        if (!currentDir && lastKnownPath) {
+          currentDir = dirOfPath(lastKnownPath);
+        }
+        knownMtimes = new Map(files.map((f) => [f.path, f.mtimeMs || 0]));
+        renderDirFilter();
+        renderFiles();
+        setStatus(
+          files.length
+            ? `Browsing ${files.length} file(s) in ~/blockscape`
+            : "No .bs files in ~/blockscape yet"
+        );
+      } catch (err) {
+        console.warn("[Blockscape] local backend refresh failed", err);
+        hidePanel("Local server unavailable");
+      }
+    }
+
+    async function detect() {
+      available = false;
+      hidePanel();
+      setStatus("Checking for local server…");
+      try {
+        debug("Detect start");
+        const healthy = await checkHealth();
+        if (!healthy) {
+          return false;
+        }
+        updateActiveSavePlaceholder();
+        await refresh();
+        syncAutoReloadTimer();
+        return true;
+      } catch (err) {
+        available = false;
+        console.log("[Blockscape] local backend not detected", err);
+        debug("Detect failed", { err });
+        return false;
+      }
+    }
+
+    async function loadSelected() {
+      if (!available || !localFileList) return;
+      const selectedPaths = Array.from(localFileList.selectedOptions || [])
+        .map((opt) => opt.value)
+        .filter(Boolean)
+        .sort((a, b) => a.localeCompare(b));
+      if (!selectedPaths.length) {
+        alert("Select one or more files to load from ~/blockscape.");
+        return;
+      }
+      let firstIndex = null;
+      for (const relPath of selectedPaths) {
+        try {
+          setStatus(`Loading ${relPath}…`);
+          const result = await importLocalBackendFile(relPath);
+          if (firstIndex == null) firstIndex = result?.firstIndex ?? null;
+          lastKnownPath = relPath;
+          updateUrlForServerPath(relPath);
+        } catch (err) {
+          console.error("[Blockscape] failed to load from local server", err);
+          alert(`Local load failed for ${relPath}: ${err.message}`);
+        }
+      }
+      if (firstIndex != null) setActive(firstIndex);
+      setStatus(`Loaded ${selectedPaths.length} file(s)`);
+      renderFiles();
+    }
+
+    async function saveActiveToPath(
+      desiredPath,
+      { statusPrefix = "Saved to", updateInput = true } = {}
+    ) {
+      if (!available) return;
+      if (activeIndex < 0) {
+        alert("No active model to save.");
+        return;
+      }
+      const target = models[activeIndex];
+      const { payload: savePayload, isSeries } = resolvePayloadForSave(target);
+      if (!savePayload) {
+        alert("No model data to save.");
+        return;
+      }
+      const normalized = normalizeSavePath(desiredPath);
+      if (!normalized) {
+        alert("Enter a relative path (no ..) to save under ~/blockscape.");
+        return;
+      }
+      try {
+        const body = JSON.stringify(savePayload, null, 2);
+        const savingLabel = isSeries ? "series" : "map";
+        setStatus(`Saving ${savingLabel} to ${normalized}…`);
+        const resp = await fetch(
+          `/api/file?path=${encodeURIComponent(normalized)}`,
+          {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body,
+          }
+        );
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const payload = await resp.json();
+        lastKnownPath = payload.path || normalized;
+        target.sourcePath = payload.path || normalized;
+        if (updateInput && localSavePathInput) {
+          localSavePathInput.value = payload.path || normalized;
+        }
+        updateUrlForServerPath(payload.path || normalized);
+        setStatus(`${statusPrefix} ${payload.path || normalized}`);
+        await refresh();
+      } catch (err) {
+        console.error("[Blockscape] local save failed", err);
+        alert(`Local save failed: ${err.message}`);
+        hidePanel("Local server unavailable");
+      }
+    }
+
+    async function saveActiveToFile() {
+      const desiredPath =
+        normalizeSavePath(localSavePathInput?.value) ||
+        normalizeSavePath(models[activeIndex]?.sourcePath) ||
+        defaultSaveName();
+      if (!desiredPath) {
+        alert("Enter a relative path (no ..) to save under ~/blockscape.");
+        return;
+      }
+      await saveActiveToPath(desiredPath, { statusPrefix: "Saved to" });
+    }
+
+    async function saveActiveAs() {
+      if (!available) return;
+      if (activeIndex < 0) {
+        alert("No active model to save.");
+        return;
+      }
+      if (typeof window === "undefined" || typeof window.prompt !== "function")
+        return;
+      const defaultPath =
+        normalizeSavePath(models[activeIndex]?.sourcePath) || defaultSaveName();
+      const response = window.prompt(
+        "Save active map as (under ~/blockscape):",
+        defaultPath
+      );
+      if (response == null) return;
+      const normalized = normalizeSavePath(response);
+      if (!normalized) {
+        alert("Enter a relative path (no ..) to save under ~/blockscape.");
+        return;
+      }
+      await saveActiveToPath(normalized, { statusPrefix: "Saved to" });
+    }
+
+    async function saveModelByIndex(
+      entryIndex,
+      desiredPath,
+      { refreshAfter = true, statusPrefix = "Saved to" } = {}
+    ) {
+      if (!available) return { ok: false, error: "Local server unavailable" };
+      if (!Number.isInteger(entryIndex) || entryIndex < 0) {
+        return { ok: false, error: "Invalid model index" };
+      }
+      const target = models[entryIndex];
+      const { payload: savePayload, isSeries } = resolvePayloadForSave(target);
+      if (!savePayload) return { ok: false, error: "Model has no data" };
+      const normalized =
+        normalizeSavePath(desiredPath) ||
+        normalizeSavePath(target?.sourcePath) ||
+        defaultSaveName();
+      if (!normalized) {
+        return {
+          ok: false,
+          error: "Enter a relative path (no ..) to save under ~/blockscape.",
+        };
+      }
+      try {
+        const body = JSON.stringify(savePayload, null, 2);
+        const savingLabel = isSeries ? "series" : "map";
+        setStatus(`Saving ${savingLabel} to ${normalized}…`);
+        const resp = await fetch(
+          `/api/file?path=${encodeURIComponent(normalized)}`,
+          {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body,
+          }
+        );
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const payload = await resp.json();
+        lastKnownPath = payload.path || normalized;
+        target.sourcePath = payload.path || normalized;
+        if (entryIndex === activeIndex) {
+          updateActiveSavePlaceholder();
+        }
+        setStatus(
+          `${statusPrefix} ${payload.path || normalized}`
+        );
+        if (refreshAfter) await refresh();
+        return { ok: true, path: payload.path || normalized };
+      } catch (err) {
+        console.error("[Blockscape] local save failed", err);
+        hidePanel("Local server unavailable");
+        return { ok: false, error: err.message };
+      }
+    }
+
+    if (refreshLocalFilesButton) {
+      refreshLocalFilesButton.onclick = () => refresh();
+    }
+    if (loadLocalFileButton) {
+      loadLocalFileButton.onclick = () => loadSelected();
+    }
+    if (saveLocalFileButton) {
+      saveLocalFileButton.onclick = () => saveActiveToFile();
+    }
+    if (saveLocalFileAsButton) {
+      saveLocalFileAsButton.onclick = () => saveActiveAs();
+    }
+    if (localFileList && localSavePathInput) {
+      localFileList.addEventListener("change", () => {
+        const first = Array.from(localFileList.selectedOptions || [])[0];
+        if (first?.value) {
+          localSavePathInput.value = first.value;
+        }
+      });
+      localFileList.addEventListener("dblclick", () => {
+        loadSelected();
+      });
+    }
+    if (localDirSelect) {
+      localDirSelect.addEventListener("change", () => {
+        currentDir = localDirSelect.value || "";
+        renderFiles();
+      });
+    }
+    if (localBackendPanel) {
+      const FOCUS_REASON = "local-files-panel-focus";
+      const POINTER_REASON = "local-files-panel-pointer";
+      let focusActive = false;
+      let pointerActive = false;
+
+      localBackendPanel.addEventListener("focusin", () => {
+        if (focusActive) return;
+        focusActive = true;
+        pauseAutoReload(FOCUS_REASON);
+      });
+
+      localBackendPanel.addEventListener("focusout", (event) => {
+        if (!focusActive) return;
+        const nextTarget = event.relatedTarget;
+        if (nextTarget && localBackendPanel.contains(nextTarget)) return;
+        focusActive = false;
+        resumeAutoReload(FOCUS_REASON);
+      });
+
+      localBackendPanel.addEventListener("pointerenter", () => {
+        if (pointerActive) return;
+        pointerActive = true;
+        pauseAutoReload(POINTER_REASON);
+      });
+
+      localBackendPanel.addEventListener("pointerleave", () => {
+        if (!pointerActive) return;
+        pointerActive = false;
+        resumeAutoReload(POINTER_REASON);
+      });
+    }
+
+    return {
+      detect,
+      refresh,
+      updateActiveSavePlaceholder,
+      isAvailable: () => available,
+      highlightSource: highlightSourcePath,
+      saveModelByIndex,
+      getAutoReloadConfig: () => ({
+        enabled: autoReloadEnabled,
+        intervalMs: autoReloadIntervalMs,
+        available,
+      }),
+      setAutoReloadEnabled,
+      setAutoReloadInterval,
+    };
+  }
+
+  async function importLocalBackendFile(
+    relPath,
+    { labelBase = relPath, seriesTitleOverride } = {}
+  ) {
+    if (!relPath) throw new Error("Missing path");
+    const resp = await fetch(`/api/file?path=${encodeURIComponent(relPath)}`, {
+      cache: "no-store",
+    });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const payload = await resp.json();
+    const text = JSON.stringify(payload.data ?? payload, null, 2);
+    const entries = normalizeToModelsFromText(text, relPath, {
+      seriesTitleOverride: seriesTitleOverride || `${relPath} series`,
+    });
+    if (!entries.length) throw new Error("No models found in file");
+    let firstIndex = null;
+    entries.forEach((entry, idx) => {
+      entry.sourcePath = relPath;
+      if (entry.isSeries && !entry.title) {
+        const leaf = relPath.split("/").filter(Boolean).pop() || relPath;
+        const stem = leaf.replace(/\.bs$/i, "");
+        entry.title = stem;
+      }
+      const idxResult = addModelEntry(entry, {
+        versionLabel: entries.length > 1 ? `${labelBase} #${idx + 1}` : labelBase,
+      });
+      if (firstIndex == null) firstIndex = idxResult;
+    });
+    return { firstIndex, total: entries.length };
   }
 
   async function writeTextToClipboard(text) {
@@ -228,6 +1366,103 @@ export function initBlockscape() {
     );
   }
 
+  function normalizeLocalSavePath(raw) {
+    const cleaned = (raw || "")
+      .trim()
+      .replace(/\\/g, "/")
+      .replace(/^\/+/, "");
+    if (!cleaned || cleaned.includes("..")) return null;
+    return cleaned.toLowerCase().endsWith(".bs") ? cleaned : `${cleaned}.bs`;
+  }
+
+  function getBsStem(savePath) {
+    const leaf = (savePath || "").split("/").filter(Boolean).pop() || "";
+    return leaf.replace(/\.bs$/i, "").trim();
+  }
+
+  function withNumericSuffix(savePath, suffixNumber) {
+    const normalized = normalizeLocalSavePath(savePath);
+    if (!normalized) return null;
+    const parts = normalized.split("/");
+    const leaf = parts.pop() || normalized;
+    const base = leaf.replace(/\.bs$/i, "");
+    const nextLeaf = `${base}-${suffixNumber}.bs`;
+    return [...parts, nextLeaf].filter(Boolean).join("/");
+  }
+
+  function makeTimestampSlug() {
+    const d = new Date();
+    const pad = (n) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(
+      d.getDate()
+    )}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+  }
+
+  async function isLocalBackendReady() {
+    try {
+      await initialBackendCheck;
+    } catch (_) {}
+    return typeof localBackend?.isAvailable === "function"
+      ? localBackend.isAvailable()
+      : false;
+  }
+
+  async function getExistingLocalBsPaths() {
+    try {
+      const resp = await fetch("/api/files", { cache: "no-store" });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const payload = await resp.json();
+      return new Set((payload.files || []).map((f) => f.path).filter(Boolean));
+    } catch (err) {
+      console.warn("[Blockscape] failed to list existing local files", err);
+      return new Set();
+    }
+  }
+
+  function pickUniqueLocalPath(desiredPath, takenPaths) {
+    const normalized = normalizeLocalSavePath(desiredPath);
+    if (!normalized) return null;
+    if (!takenPaths?.has(normalized)) return normalized;
+    const parts = normalized.split("/");
+    const leaf = parts.pop() || normalized;
+    const base = leaf.replace(/\.bs$/i, "");
+    for (let i = 2; i < 1000; i++) {
+      const candidateLeaf = `${base}-${i}.bs`;
+      const candidate = [...parts, candidateLeaf].filter(Boolean).join("/");
+      if (!takenPaths.has(candidate)) return candidate;
+    }
+    return null;
+  }
+
+  function suggestNewSavePathForEntry(entry, fallbackBase = "clipboard") {
+    const baseLabel =
+      getModelTitle(entry) ||
+      entry?.title ||
+      entry?.apicurioArtifactName ||
+      fallbackBase ||
+      "blockscape";
+    const slug = makeDownloadName(baseLabel);
+    const stamp = makeTimestampSlug();
+    return `${slug || "blockscape"}-${stamp}.bs`;
+  }
+
+  function applySeriesTitleFromFilename(entry, savePath) {
+    if (
+      !entry?.isSeries ||
+      !Array.isArray(entry?.apicurioVersions) ||
+      entry.apicurioVersions.length <= 1
+    )
+      return false;
+    const stem = getBsStem(savePath);
+    if (!stem) return false;
+    entry.title = stem;
+    entry.apicurioArtifactName = stem;
+    const forcedSlug = makeSeriesId(stem || "unknown");
+    applySeriesSlug(entry, forcedSlug);
+    ensureSeriesId(entry, { seriesName: stem, fallbackTitle: stem });
+    return true;
+  }
+
   function clampHoverScale(value) {
     if (!Number.isFinite(value)) return DEFAULT_TILE_HOVER_SCALE;
     return Math.min(
@@ -240,6 +1475,7 @@ export function initBlockscape() {
     if (!app) return;
     const hasSelection = !!selection || !!selectedCategoryId;
     app.classList.toggle("blockscape-has-selection", hasSelection);
+    app.classList.toggle("blockscape-has-item-selection", !!selection);
   }
 
   function applyTileHoverScale(scale) {
@@ -249,6 +1485,28 @@ export function initBlockscape() {
       tileHoverScale
     );
     return tileHoverScale;
+  }
+
+  function clampSelectionDimOpacity(value) {
+    if (!Number.isFinite(value)) return DEFAULT_SELECTION_DIM_OPACITY;
+    return Math.min(
+      MAX_SELECTION_DIM_OPACITY,
+      Math.max(MIN_SELECTION_DIM_OPACITY, value)
+    );
+  }
+
+  function applySelectionDimOpacity(value) {
+    selectionDimOpacity = clampSelectionDimOpacity(value);
+    document.documentElement.style.setProperty(
+      "--blockscape-selection-dim-opacity",
+      selectionDimOpacity
+    );
+    const appliedOpacity = selectionDimEnabled ? selectionDimOpacity : 1;
+    document.documentElement.style.setProperty(
+      "--blockscape-selection-dim-applied-opacity",
+      appliedOpacity
+    );
+    return selectionDimOpacity;
   }
 
   function clampTileCompactness(value) {
@@ -340,6 +1598,114 @@ export function initBlockscape() {
     } catch (error) {
       console.warn("[Blockscape] failed to read hover scale", error);
       return applyTileHoverScale(DEFAULT_TILE_HOVER_SCALE);
+    }
+  }
+
+  function persistSelectionDimOpacity(value) {
+    if (typeof window === "undefined" || !window.localStorage) return;
+    try {
+      window.localStorage.setItem(
+        SELECTION_DIM_OPACITY_STORAGE_KEY,
+        String(value)
+      );
+    } catch (error) {
+      console.warn("[Blockscape] failed to persist selection dimming", error);
+    }
+  }
+
+  function initializeSelectionDimOpacity() {
+    if (typeof window === "undefined" || !window.localStorage) {
+      return applySelectionDimOpacity(DEFAULT_SELECTION_DIM_OPACITY);
+    }
+    try {
+      const raw = window.localStorage.getItem(
+        SELECTION_DIM_OPACITY_STORAGE_KEY
+      );
+      if (!raw) return applySelectionDimOpacity(DEFAULT_SELECTION_DIM_OPACITY);
+      const parsed = parseFloat(raw);
+      return applySelectionDimOpacity(parsed);
+    } catch (error) {
+      console.warn("[Blockscape] failed to read selection dimming", error);
+      return applySelectionDimOpacity(DEFAULT_SELECTION_DIM_OPACITY);
+    }
+  }
+
+  function applySelectionDimEnabled(enabled) {
+    selectionDimEnabled = !!enabled;
+    const appliedOpacity = selectionDimEnabled ? selectionDimOpacity : 1;
+    document.documentElement.style.setProperty(
+      "--blockscape-selection-dim-applied-opacity",
+      appliedOpacity
+    );
+    if (app)
+      app.classList.toggle("blockscape-dimming-disabled", !selectionDimEnabled);
+    return selectionDimEnabled;
+  }
+
+  function persistSelectionDimEnabled(enabled) {
+    if (typeof window === "undefined" || !window.localStorage) return;
+    try {
+      window.localStorage.setItem(
+        SELECTION_DIM_ENABLED_STORAGE_KEY,
+        enabled ? "1" : "0"
+      );
+    } catch (error) {
+      console.warn(
+        "[Blockscape] failed to persist selection dim toggle",
+        error
+      );
+    }
+  }
+
+  function initializeSelectionDimEnabled() {
+    if (typeof window === "undefined" || !window.localStorage) {
+      return applySelectionDimEnabled(true);
+    }
+    try {
+      const raw = window.localStorage.getItem(
+        SELECTION_DIM_ENABLED_STORAGE_KEY
+      );
+      if (raw == null) return applySelectionDimEnabled(true);
+      return applySelectionDimEnabled(raw === "1");
+    } catch (error) {
+      console.warn("[Blockscape] failed to read selection dim toggle", error);
+      return applySelectionDimEnabled(true);
+    }
+  }
+
+  function applyAutoIdFromNameEnabled(enabled) {
+    autoIdFromNameEnabled = !!enabled;
+    return autoIdFromNameEnabled;
+  }
+
+  function persistAutoIdFromNameEnabled(enabled) {
+    if (typeof window === "undefined" || !window.localStorage) return;
+    try {
+      window.localStorage.setItem(
+        AUTO_ID_FROM_NAME_STORAGE_KEY,
+        enabled ? "1" : "0"
+      );
+    } catch (error) {
+      console.warn(
+        "[Blockscape] failed to persist auto-id toggle",
+        error
+      );
+    }
+  }
+
+  function initializeAutoIdFromNameEnabled() {
+    if (typeof window === "undefined" || !window.localStorage) {
+      return applyAutoIdFromNameEnabled(DEFAULT_AUTO_ID_FROM_NAME);
+    }
+    try {
+      const raw = window.localStorage.getItem(AUTO_ID_FROM_NAME_STORAGE_KEY);
+      if (raw == null) {
+        return applyAutoIdFromNameEnabled(DEFAULT_AUTO_ID_FROM_NAME);
+      }
+      return applyAutoIdFromNameEnabled(raw === "1");
+    } catch (error) {
+      console.warn("[Blockscape] failed to read auto-id toggle", error);
+      return applyAutoIdFromNameEnabled(DEFAULT_AUTO_ID_FROM_NAME);
     }
   }
 
@@ -469,6 +1835,81 @@ export function initBlockscape() {
   function applySeriesNavDoubleClickWait(value) {
     seriesNavDoubleClickWaitMs = clampSeriesNavDoubleClickWait(value);
     return seriesNavDoubleClickWaitMs;
+  }
+
+  function setShowSecondaryLinks(next) {
+    showSecondaryLinks = !!next;
+  }
+
+  function setShowReusedInMap(next) {
+    showReusedInMap = !!next;
+  }
+
+  function getCurrentSettingsState() {
+    return {
+      hoverScale: tileHoverScale,
+      selectionDimOpacity,
+      selectionDimEnabled,
+      tileCompactness,
+      titleWrapMode,
+      titleHoverWidthMultiplier,
+      titleHoverTextPortion,
+      obsidianLinksEnabled,
+      obsidianLinkMode,
+      obsidianVaultName,
+      autoIdFromNameEnabled,
+      seriesNavDoubleClickWaitMs,
+      showSecondaryLinks,
+      centerItems,
+      showReusedInMap,
+      theme,
+      colorPresets,
+    };
+  }
+
+  function applyImportedSettings(snapshot, { refreshObsidianLinks: obsidianRefresh } = {}) {
+    return applySettingsSnapshot(snapshot, {
+      applyTileHoverScale,
+      persistTileHoverScale,
+      applySelectionDimEnabled,
+      persistSelectionDimEnabled,
+      applySelectionDimOpacity,
+      persistSelectionDimOpacity,
+      applyTileCompactness,
+      persistTileCompactness,
+      applyTitleWrapMode,
+      persistTitleWrapMode,
+      applyTitleHoverWidthMultiplier,
+      persistTitleHoverWidthMultiplier,
+      applyTitleHoverTextPortion,
+      persistTitleHoverTextPortion,
+      applyObsidianLinksEnabled,
+      persistObsidianLinksEnabled,
+      applyObsidianLinkMode,
+      persistObsidianLinkMode,
+      applyObsidianVaultName,
+      persistObsidianVaultName,
+      applyAutoIdFromNameEnabled,
+      persistAutoIdFromNameEnabled,
+      applySeriesNavDoubleClickWait,
+      persistSeriesNavDoubleClickWait,
+      localBackend,
+      ui: settingsUi,
+      refreshObsidianLinks: obsidianRefresh,
+      scheduleOverlaySync,
+      selection,
+      select,
+      clearStyles,
+      drawLinks,
+      applyReusedHighlights,
+      setShowSecondaryLinks,
+      setShowReusedInMap,
+      applyTheme,
+      setColorPresets,
+      applyCenterItems,
+      persistCenterItems,
+      current: getCurrentSettingsState(),
+    });
   }
 
   function persistSeriesNavDoubleClickWait(value) {
@@ -604,6 +2045,7 @@ export function initBlockscape() {
       return applyObsidianVaultName("");
     }
   }
+
 
   function promptForSeriesTitle(defaultTitle) {
     if (typeof window === "undefined" || typeof window.prompt !== "function")
@@ -855,6 +2297,36 @@ export function initBlockscape() {
     return trimmed || null;
   }
 
+  function getModelSourceLabel(entry) {
+    if (!entry?.sourcePath) return null;
+    try {
+      const parts = entry.sourcePath.split("/").filter(Boolean);
+      const leaf = parts.length ? parts[parts.length - 1] : entry.sourcePath;
+      return leaf.replace(/\.bs$/i, "");
+    } catch (err) {
+      return entry.sourcePath.replace(/\.bs$/i, "");
+    }
+  }
+
+  function formatIdForDisplay(id) {
+    if (!id) return null;
+    return id.toString().replace(/-series$/i, "");
+  }
+
+  function findModelIndexByIdOrSource(id) {
+    if (!id) return -1;
+    const normalized = id.toString().trim().toLowerCase();
+    if (!normalized) return -1;
+    for (let i = 0; i < models.length; i++) {
+      const modelId = (getModelId(models[i]) || "").toLowerCase();
+      const sourceId = (getModelSourceLabel(models[i]) || "").toLowerCase();
+      if (normalized === modelId || normalized === sourceId) {
+        return i;
+      }
+    }
+    return -1;
+  }
+
   function persistActiveEdits(entryIndex) {
     if (entryIndex < 0 || entryIndex >= models.length) return true;
     if (!jsonBox) return true;
@@ -907,6 +2379,20 @@ export function initBlockscape() {
     return null;
   }
 
+  function setItemColor(itemId, color) {
+    const match = findItemAndCategoryById(itemId);
+    if (!match) return false;
+    if (color) {
+      match.item.color = color;
+    } else {
+      delete match.item.color;
+    }
+    loadActiveIntoEditor();
+    rebuildFromActive();
+    select(itemId);
+    return true;
+  }
+
   function makeUniqueItemId(base, modelData) {
     const ids = collectAllItemIds(modelData);
     let candidate = makeDownloadName(base || "item") || `item-${uid()}`;
@@ -945,6 +2431,8 @@ export function initBlockscape() {
       }
       if (lastDeletedItem?.item?.id === oldId) lastDeletedItem.item.id = newId;
     },
+    makeSlug: makeDownloadName,
+    isAutoIdFromNameEnabled: () => autoIdFromNameEnabled,
   });
 
   function createCategoryEditor({
@@ -959,6 +2447,8 @@ export function initBlockscape() {
       fields: {},
       categoryId: null,
       modelData: null,
+      idManuallyEdited: false,
+      autoSyncEnabled: true,
     };
 
     const setError = (message) => {
@@ -991,6 +2481,16 @@ export function initBlockscape() {
         state.fields.titleInput?.focus();
         state.fields.titleInput?.select();
       });
+    };
+
+    const syncCategoryIdFromTitle = ({ force } = {}) => {
+      if (!autoIdFromNameEnabled || !state.autoSyncEnabled) return;
+      if (!state.fields?.idInput || !state.fields?.titleInput) return;
+      if (!force && state.idManuallyEdited) return;
+      const slug = makeDownloadName(
+        state.fields.titleInput.value || state.categoryId || "category"
+      );
+      state.fields.idInput.value = slug;
     };
 
     const applyEdits = () => {
@@ -1111,6 +2611,22 @@ export function initBlockscape() {
         )
       );
 
+      const syncToggle = document.createElement("div");
+      syncToggle.className = "item-editor__checkbox";
+      const syncRow = document.createElement("label");
+      syncRow.className = "item-editor__checkbox-row";
+      const syncCheckbox = document.createElement("input");
+      syncCheckbox.type = "checkbox";
+      const syncLabel = document.createElement("span");
+      syncLabel.textContent = "Sync ID while editing title";
+      const syncHint = document.createElement("div");
+      syncHint.className = "item-editor__hint";
+      syncHint.textContent =
+        "Turn off to keep typing titles without changing the ID.";
+      syncRow.append(syncCheckbox, syncLabel);
+      syncToggle.append(syncRow, syncHint);
+      form.appendChild(syncToggle);
+
       const actions = document.createElement("div");
       actions.className = "item-editor__actions";
 
@@ -1135,6 +2651,17 @@ export function initBlockscape() {
       cancelBtn.addEventListener("click", hide);
       closeBtn.addEventListener("click", hide);
       backdrop.addEventListener("click", hide);
+      idInput.addEventListener("input", () => {
+        state.idManuallyEdited = true;
+      });
+      titleInput.addEventListener("input", () => syncCategoryIdFromTitle());
+      syncCheckbox.addEventListener("change", () => {
+        state.autoSyncEnabled = !!syncCheckbox.checked;
+        if (state.autoSyncEnabled) {
+          state.idManuallyEdited = false;
+          syncCategoryIdFromTitle({ force: true });
+        }
+      });
       wrapper.addEventListener("keydown", (event) => {
         if (event.key === "Escape") {
           event.preventDefault();
@@ -1150,6 +2677,7 @@ export function initBlockscape() {
         idInput,
         errorEl,
         metaLabel: meta.querySelector(".item-editor__meta-value"),
+        syncCheckbox,
       };
       return wrapper;
     };
@@ -1164,10 +2692,18 @@ export function initBlockscape() {
       if (!category) return false;
       state.categoryId = category.id;
       state.modelData = modelData;
+      state.idManuallyEdited = false;
+      const autoSyncAllowed = !!autoIdFromNameEnabled;
+      state.autoSyncEnabled = autoSyncAllowed;
       state.fields.metaLabel.textContent =
         category.title || category.id || "Category";
       state.fields.titleInput.value = category.title || category.id || "";
       state.fields.idInput.value = category.id || "";
+      state.fields.syncCheckbox.checked = state.autoSyncEnabled;
+      state.fields.syncCheckbox.disabled = !autoSyncAllowed;
+      if (!state.fields.idInput.value && autoSyncAllowed) {
+        syncCategoryIdFromTitle({ force: true });
+      }
       setError("");
       show();
       return true;
@@ -1191,6 +2727,27 @@ export function initBlockscape() {
         syncSelectionClass();
       }
     },
+  });
+
+  const {
+    handleTileContextMenu,
+    hidePreview,
+    handleDocumentClick: handleTileMenuDocumentClick,
+    handleWindowResize: handleTileMenuWindowResize,
+    handleWindowScroll: handleTileMenuWindowScroll,
+    updateColorPresets: updateTileMenuColors,
+  } = createTileContextMenu({
+    menuEl: document.getElementById("tileContextMenu"),
+    previewEl: preview,
+    previewTitleEl: previewTitle,
+    previewBodyEl: previewBody,
+    previewActionsEl: previewActions,
+    previewCloseEl: previewClose,
+    escapeHtml,
+    onEditItem: (id) => itemEditor.open(id),
+    onChangeColor: (id, color) => setItemColor(id, color),
+    selectItem: (id) => select(id),
+    colorPresets,
   });
 
   function ensureVersionContainer(
@@ -1227,10 +2784,70 @@ export function initBlockscape() {
     return entry;
   }
 
+  function buildBlankMapPayload({
+    seriesId = null,
+    mapTitle = "Blank map",
+  } = {}) {
+    const baseId = makeDownloadName(
+      `${seriesId || "blank"}-${makeTimestampSlug()}`
+    );
+    const payload = {
+      id: baseId,
+      title: mapTitle,
+      categories: [],
+      links: [],
+      abstract: "",
+    };
+    if (seriesId) payload.seriesId = seriesId;
+    ensureModelMetadata(payload, { titleHint: mapTitle, idHint: baseId });
+    return payload;
+  }
+
+  function createBlankSeriesEntry() {
+    const timestamp = makeTimestampSlug();
+    const seriesTitle = `Blank series ${timestamp}`;
+    const seriesId = makeSeriesId(seriesTitle, "blank-series");
+    const blankMap = buildBlankMapPayload({
+      seriesId,
+      mapTitle: "Blank map",
+    });
+    const entry = {
+      id: seriesId,
+      title: seriesTitle,
+      apicurioArtifactName: seriesTitle,
+      data: blankMap,
+      apicurioVersions: [
+        {
+          version: "1",
+          data: blankMap,
+          createdOn: new Date().toISOString(),
+        },
+      ],
+      apicurioActiveVersionIndex: 0,
+      isSeries: true,
+    };
+    applySeriesSlug(entry, seriesId);
+    ensureSeriesId(entry, {
+      seriesName: seriesTitle,
+      fallbackTitle: seriesTitle,
+    });
+    return entry;
+  }
+
+  function createAndActivateBlankSeries() {
+    const entry = createBlankSeriesEntry();
+    const idx = addModelEntry(entry, { versionLabel: "blank" });
+    setActive(idx);
+    closeNewPanel();
+    showNotice("Blank series created. Add categories and tiles to start.", 2600);
+    return idx;
+  }
+
   function addModelEntry(entry, { versionLabel, createdOn } = {}) {
     if (entry?.isSeries || entry?.apicurioVersions?.length > 1) {
       const name = entry.title || getModelTitle(entry);
       ensureSeriesId(entry, { seriesName: name, fallbackTitle: name });
+      syncCategoryViewVersions(entry);
     }
     const modelId = getModelId(entry);
     if (!modelId) {
@@ -1329,12 +2946,25 @@ export function initBlockscape() {
 
   function buildSeriesPayload(entry) {
     if (!entry) return null;
+    syncCategoryViewVersions(entry);
     const versions = entry.apicurioVersions;
     if (!Array.isArray(versions) || versions.length <= 1) return null;
     const seriesName =
       entry.title || entry.apicurioArtifactName || getModelTitle(entry);
     ensureSeriesId(entry, { seriesName, fallbackTitle: seriesName });
-    return versions.map((ver) => {
+    const filtered = versions.filter((ver, idx) => {
+      const versionId = (ver?.version ?? "").toString().trim();
+      const dataId = (ver?.data?.id ?? ver?.id ?? "").toString().trim();
+      if (ver?.isCategoryView || versionId.startsWith(CATEGORY_VIEW_VERSION_PREFIX)) {
+        console.log(
+          "[Blockscape] not saving computed map",
+          { versionIndex: idx, versionId, dataId }
+        );
+        return false;
+      }
+      return true;
+    });
+    return filtered.map((ver) => {
       if (ver && typeof ver === "object" && "data" in ver) return ver.data;
       return ver;
     });
@@ -1377,42 +3007,15 @@ export function initBlockscape() {
   }
 
   // --- NEW: letter → color mapping and helpers ---
-  // Letter → color mapping (tailwind-ish palette). G => green.
-  const LETTER_COLOR_MAP = {
-    A: "#0284c7",
-    B: "#3b82f6",
-    C: "#06b6d4",
-    D: "#a855f7",
-    E: "#f59e0b",
-    F: "#f97316",
-    G: "#22c55e",
-    H: "#84cc16",
-    I: "#10b981",
-    J: "#14b8a6",
-    K: "#0ea5e9",
-    L: "#60a5fa",
-    M: "#8b5cf6",
-    N: "#d946ef",
-    O: "#e879f9",
-    P: "#67e8f9",
-    Q: "#4ade80",
-    R: "#facc15",
-    S: "#eab308",
-    T: "#a3e635",
-    U: "#22d3ee",
-    V: "#38bdf8",
-    W: "#818cf8",
-    X: "#a78bfa",
-    Y: "#f472b6",
-    Z: "#fb7185",
-  };
+  const LETTER_COLOR_MAP = tokens.palette.letter;
+  const LETTER_COLOR_FALLBACK = tokens.palette.letterFallback;
 
   // Prefer explicit item.color (if present), else map by first letter.
   function getBadgeColor(text, explicit) {
     if (explicit && /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(explicit))
       return explicit;
     const ch = (text || "?").charAt(0).toUpperCase();
-    return LETTER_COLOR_MAP[ch] || "#9ca3af"; // fallback gray
+    return LETTER_COLOR_MAP[ch] || LETTER_COLOR_FALLBACK; // fallback gray
   }
 
   // Compute readable letter color (black/white) against bg
@@ -1434,7 +3037,7 @@ export function initBlockscape() {
       0.2126 * Math.pow(r / 255, 2.2) +
       0.7152 * Math.pow(g / 255, 2.2) +
       0.0722 * Math.pow(b / 255, 2.2);
-    return L > 0.35 ? "#111111" : "#ffffff";
+    return L > 0.35 ? tokens.color.ink : tokens.color.white;
   }
 
   function scrollPageToTop() {
@@ -1478,6 +3081,15 @@ export function initBlockscape() {
     clearNotice();
   }
 
+  function clearModelNavNotice() {
+    pendingModelNavigation = null;
+    if (pendingModelNavigationTimer) {
+      clearTimeout(pendingModelNavigationTimer);
+      pendingModelNavigationTimer = null;
+    }
+    clearNotice();
+  }
+
   function describeSeriesVersion(entry, versionIndex) {
     if (!entry?.apicurioVersions?.[versionIndex])
       return `version ${versionIndex + 1}`;
@@ -1498,6 +3110,23 @@ export function initBlockscape() {
     const label = describeSeriesVersion(entry, targetVersionIndex);
     showNotice(
       `Click again to open ${label} in this series.`,
+      seriesNavDoubleClickWaitMs
+    );
+  }
+
+  function showModelNavNotice(id, targetIndex) {
+    ensureNoticeElements();
+    pendingModelNavigation = { id, targetIndex };
+    if (pendingModelNavigationTimer) {
+      clearTimeout(pendingModelNavigationTimer);
+    }
+    pendingModelNavigationTimer = setTimeout(() => {
+      pendingModelNavigationTimer = null;
+      clearModelNavNotice();
+    }, seriesNavDoubleClickWaitMs);
+    const label = getModelDisplayTitle(models[targetIndex]);
+    showNotice(
+      `Click again to open "${label}".`,
       seriesNavDoubleClickWaitMs
     );
   }
@@ -1812,6 +3441,10 @@ export function initBlockscape() {
       "(index",
       i + " )"
     );
+    if (typeof localBackend?.highlightSource === "function") {
+      const targetPath = models[i]?.sourcePath || null;
+      localBackend.highlightSource(targetPath);
+    }
     syncDocumentTitle();
     renderModelList();
     loadActiveIntoEditor();
@@ -1819,7 +3452,9 @@ export function initBlockscape() {
     if (searchInput) {
       handleSearchInput(searchInput.value || "");
     }
+    localBackend.updateActiveSavePlaceholder();
     apicurio.updateAvailability();
+    updateServerUrlFromActive();
   }
 
   function renderModelList() {
@@ -1851,7 +3486,9 @@ export function initBlockscape() {
       titleSpan.textContent = getModelDisplayTitle(m);
       label.appendChild(titleSpan);
 
-      const dataId = getModelId(m);
+      const dataId = formatIdForDisplay(
+        getModelSourceLabel(m) || getModelId(m)
+      );
       if (dataId) {
         const idBadge = document.createElement("span");
         idBadge.className = "model-nav-id";
@@ -1905,6 +3542,184 @@ export function initBlockscape() {
     }
   }
 
+  function unwrapMarkdownCodeBlock(txt) {
+    if (typeof txt !== "string") return txt;
+    const match = txt.trim().match(/^```[a-zA-Z0-9_-]*\s*\r?\n([\s\S]*?)\r?\n```$/);
+    return match ? match[1] : txt;
+  }
+
+  function buildCategoryViewVersions(entry) {
+    const versions = (entry?.apicurioVersions || []).filter(
+      (ver) => !ver?.isCategoryView
+    );
+    if (versions.length < 2) return [];
+
+    const categoriesById = new Map();
+    versions.forEach((ver, idx) => {
+      const data = ver?.data;
+      if (!data || !Array.isArray(data.categories)) return;
+      const mapTitle = getModelTitle(data, `Map ${idx + 1}`);
+      const mapId =
+        (data.id ?? "").toString().trim() ||
+        makeDownloadName(mapTitle || `map-${idx + 1}`);
+      const mapSlug = makeDownloadName(mapId || mapTitle || `map-${idx + 1}`);
+      data.categories.forEach((cat) => {
+        const catId = (cat?.id ?? "").toString().trim();
+        if (!catId) return;
+        if (!categoriesById.has(catId)) {
+          categoriesById.set(catId, {
+            catTitle: cat.title || catId,
+            sources: [],
+          });
+        }
+        const record = categoriesById.get(catId);
+        if (!record.catTitle && (cat.title || catId)) {
+          record.catTitle = cat.title || catId;
+        }
+        record.sources.push({
+          category: cat,
+          mapId,
+          mapTitle,
+          mapSlug,
+          versionIndex: idx,
+        });
+      });
+    });
+
+    const seriesId = getSeriesId(entry) || null;
+    const seriesTitle =
+      entry?.title ||
+      entry?.apicurioArtifactName ||
+      getModelTitle(entry, "Series");
+    const derived = [];
+
+    categoriesById.forEach((info, catId) => {
+      if ((info.sources?.length || 0) < 2) return;
+      const catTitle = info.catTitle || catId;
+      const usedCategoryIds = new Set();
+
+      const categories = info.sources.map((source) => {
+        const baseCatId =
+          source.mapSlug ||
+          makeDownloadName(source.mapTitle || source.mapId) ||
+          `map-${source.versionIndex + 1}`;
+        let categoryId = baseCatId;
+        if (usedCategoryIds.has(categoryId)) {
+          categoryId = `${categoryId}-${source.versionIndex + 1}`;
+        }
+        usedCategoryIds.add(categoryId);
+
+        const idMap = new Map();
+        const items = (source.category?.items || []).map((item, itemIdx) => {
+          const originalId =
+            (item?.id ?? "").toString().trim() || `item-${itemIdx + 1}`;
+          const nextId = `${categoryId}-${originalId}`;
+          idMap.set(originalId, nextId);
+          const clone = { ...item, id: nextId };
+          clone.deps = Array.isArray(item?.deps) ? [...item.deps] : [];
+          return clone;
+        });
+
+        items.forEach((clone) => {
+          clone.deps = (clone.deps || [])
+            .map((dep) => idMap.get(dep))
+            .filter(Boolean);
+        });
+
+        return {
+          id: categoryId,
+          title:
+            source.mapTitle ||
+            source.mapId ||
+            `Map ${source.versionIndex + 1}`,
+          items,
+        };
+      });
+
+      const viewData = {
+        id: makeDownloadName(`${catId}-category-view`),
+        title: catTitle,
+        abstract: `Items from "${catTitle}" across ${
+          info.sources.length
+        } maps in this series${seriesTitle ? ` (${seriesTitle})` : ""}.`,
+        categories,
+        links: [],
+      };
+      if (seriesId) viewData.seriesId = seriesId;
+
+      ensureModelMetadata(viewData, {
+        titleHint: catTitle,
+        idHint: `${seriesId || "series"}-${catId}`,
+      });
+
+      derived.push({
+        version: `${CATEGORY_VIEW_VERSION_PREFIX}${catId}`,
+        data: viewData,
+        isCategoryView: true,
+        categoryViewKey: catId,
+      });
+    });
+
+    return derived;
+  }
+
+  function getVersionViewKey(version) {
+    if (!version) return null;
+    if (version.isCategoryView && version.categoryViewKey) {
+      return `${CATEGORY_VIEW_VERSION_PREFIX}${version.categoryViewKey}`;
+    }
+    const dataId = (version.data?.id ?? version.id ?? "")
+      .toString()
+      .trim();
+    if (dataId) return dataId;
+    const label = (version.version ?? "").toString().trim();
+    return label || null;
+  }
+
+  function syncCategoryViewVersions(entry) {
+    if (!entry?.apicurioVersions?.length) return entry;
+    const prevKey = getVersionViewKey(
+      entry.apicurioVersions[entry.apicurioActiveVersionIndex]
+    );
+    const baseVersions = entry.apicurioVersions.filter(
+      (ver) => !ver?.isCategoryView
+    );
+    if (!baseVersions.length) return entry;
+    if (baseVersions.length < 2) {
+      entry.apicurioVersions = baseVersions;
+      entry.apicurioActiveVersionIndex = Math.max(
+        0,
+        Math.min(
+          getActiveApicurioVersionIndex(entry),
+          entry.apicurioVersions.length - 1
+        )
+      );
+      const active =
+        entry.apicurioVersions[entry.apicurioActiveVersionIndex];
+      if (active?.data) entry.data = active.data;
+      return entry;
+    }
+    const derived = buildCategoryViewVersions({
+      ...entry,
+      apicurioVersions: baseVersions,
+    });
+    entry.apicurioVersions = [...baseVersions, ...derived];
+    let nextActiveIdx = entry.apicurioVersions.findIndex(
+      (ver) => getVersionViewKey(ver) === prevKey
+    );
+    if (nextActiveIdx === -1) {
+      nextActiveIdx = Math.min(
+        entry.apicurioActiveVersionIndex || 0,
+        entry.apicurioVersions.length - 1
+      );
+    }
+    entry.apicurioActiveVersionIndex = Math.max(nextActiveIdx, 0);
+    const active =
+      entry.apicurioVersions[entry.apicurioActiveVersionIndex];
+    if (active?.data) entry.data = active.data;
+    return entry;
+  }
+
   function buildSeriesEntry(list, titleBase = "Pasted", options = {}) {
     const array = Array.isArray(list) ? list : [];
     if (!array.length) return [];
@@ -1942,6 +3757,7 @@ export function initBlockscape() {
       fallbackTitle: seriesTitle,
     });
     if (seriesId) entry.id = seriesId;
+    syncCategoryViewVersions(entry);
     return [entry];
   }
 
@@ -1966,7 +3782,8 @@ export function initBlockscape() {
 
   // Accept 1) object, 2) array-of-objects, 3) '---' or '%%%' separated objects
   function normalizeToModelsFromText(txt, titleBase = "Pasted", options = {}) {
-    const trimmed = (txt || "").trim();
+    const defenced = unwrapMarkdownCodeBlock(typeof txt === "string" ? txt : "");
+    const trimmed = (defenced || "").trim();
     if (!trimmed) return [];
     const parsed = tryParseJson(trimmed);
     if (parsed) {
@@ -2022,7 +3839,8 @@ export function initBlockscape() {
 
   function looksLikeModelJson(text) {
     if (!text) return false;
-    const start = text.trimStart();
+    const defenced = unwrapMarkdownCodeBlock(text) || "";
+    const start = defenced.trimStart();
     return /^\s*(\{|\[|---|%%%)/.test(start);
   }
 
@@ -2175,6 +3993,39 @@ export function initBlockscape() {
     return firstIndex;
   }
 
+  async function consumeServerPathLoad() {
+    const serverPath = extractServerFilePathFromUrl();
+    if (!serverPath?.path) return null;
+    const { path: relPath, modelId, itemId } = serverPath;
+    try {
+      const backendReady = await isLocalBackendReady();
+      if (!backendReady) {
+        console.log(
+          "[Blockscape] local backend not ready; skipping server-path autoload"
+        );
+        return null;
+      }
+      const result = await importLocalBackendFile(relPath);
+      if (typeof result?.firstIndex === "number") {
+        if (typeof localBackend?.highlightSource === "function") {
+          localBackend.highlightSource(relPath);
+        }
+        let modelIndex = result.firstIndex;
+        if (modelId) {
+          const found = findModelIndexByIdOrSource(modelId);
+          if (found !== -1) {
+            modelIndex = found;
+          }
+        }
+        return { modelIndex, itemId: itemId || null, modelId: modelId || null };
+      }
+      return null;
+    } catch (err) {
+      console.warn("[Blockscape] server-path autoload failed", err);
+      return null;
+    }
+  }
+
   async function consumeLoadParam() {
     const hash = window.location.hash || "";
     let target = null;
@@ -2286,6 +4137,16 @@ export function initBlockscape() {
     return versionEntry?.version ?? null;
   }
 
+  function getThumbScrollKey(entry, fallback = "active") {
+    return (
+      getSeriesId(entry) ||
+      getModelId(entry) ||
+      entry?.apicurioArtifactId ||
+      entry?.id ||
+      fallback
+    );
+  }
+
   function buildModelIdToVersionIndex(entry) {
     const map = new Map();
     (entry?.apicurioVersions || []).forEach((ver, idx) => {
@@ -2295,6 +4156,32 @@ export function initBlockscape() {
       if (seriesId && !map.has(seriesId)) map.set(seriesId, idx);
     });
     return map;
+  }
+
+  function resolveVersionIndexFromCategory(cat, seriesIdLookup) {
+    if (!cat || !seriesIdLookup) return null;
+    const candidates = new Set();
+    const addCandidate = (value) => {
+      const trimmed = (value ?? "").toString().trim();
+      if (!trimmed) return;
+      candidates.add(trimmed);
+      candidates.add(trimmed.toLowerCase());
+      candidates.add(makeDownloadName(trimmed));
+    };
+    addCandidate(cat.id);
+    addCandidate(cat.title);
+
+    for (const cand of candidates) {
+      if (seriesIdLookup.has(cand)) return seriesIdLookup.get(cand);
+    }
+
+    for (const cand of candidates) {
+      const lower = cand.toLowerCase();
+      for (const [key, idx] of seriesIdLookup.entries()) {
+        if (key.toLowerCase() === lower) return idx;
+      }
+    }
+    return null;
   }
 
   const thumbnailCache = new WeakMap();
@@ -2307,30 +4194,47 @@ export function initBlockscape() {
     if (cached && cached.fingerprint === fp) return cached.dataUrl;
 
     const width = 160;
-    const height = 90;
+    const height = 160;
     const canvas = document.createElement("canvas");
     canvas.width = width;
     canvas.height = height;
     const ctx = canvas.getContext("2d");
-    ctx.fillStyle = "#f8fafc";
+    const canvasBg =
+      getCssVarValue("--color-surface-ghost") || tokens.color.surfaceGhost;
+    const canvasBorder =
+      getCssVarValue("--color-border-muted") || tokens.color.borderMuted;
+    ctx.fillStyle = canvasBg;
     ctx.fillRect(0, 0, width, height);
-    ctx.strokeStyle = "#e5e7eb";
+    ctx.strokeStyle = canvasBorder;
     ctx.strokeRect(0.5, 0.5, width - 1, height - 1);
 
-    const cats = Array.isArray(payload?.categories) ? payload.categories : [];
-    const catCount = Math.max(cats.length, 1);
-    const colWidth = width / catCount;
     const topPad = 8;
     const bottomPad = 8;
     const dotRadius = 4;
+    const cats = Array.isArray(payload?.categories) ? payload.categories : [];
+    const catCount = Math.max(cats.length, 1);
+    const usableWidth = width - dotRadius * 2;
+    const desiredColGap = dotRadius * 3; // diameter + extra radius for breathing room
+    const colGap =
+      catCount > 1
+        ? Math.min(desiredColGap, usableWidth / (catCount - 1))
+        : 0;
+    const colStart =
+      catCount > 1
+        ? (width - colGap * (catCount - 1)) / 2
+        : width / 2;
 
     cats.forEach((cat, cIdx) => {
-      const xCenter = cIdx * colWidth + colWidth / 2;
+      const xCenter = colStart + cIdx * colGap;
       const items = Array.isArray(cat.items) ? cat.items : [];
       const itemCount = Math.max(items.length, 1);
+      const availableHeight = height - topPad - bottomPad - dotRadius * 2;
+      const gap =
+        itemCount > 1
+          ? Math.min(dotRadius * 3, availableHeight / (itemCount - 1))
+          : 0;
       items.forEach((it, iIdx) => {
-        const y =
-          topPad + (iIdx + 0.5) * ((height - topPad - bottomPad) / itemCount);
+        const y = height - bottomPad - dotRadius - iIdx * gap;
         ctx.beginPath();
         ctx.arc(xCenter, y, dotRadius, 0, Math.PI * 2);
         const fill = getBadgeColor(it.name || it.id || "", it.color);
@@ -2416,6 +4320,8 @@ export function initBlockscape() {
 
   function renderVersionNavigator(entry) {
     if (!entry?.apicurioVersions || !entry.apicurioVersions.length) return null;
+    const minVersions = Math.max(1, features.seriesNavMinVersions || 1);
+    if (entry.apicurioVersions.length < minVersions) return null;
     const nav = document.createElement("div");
     nav.className = "version-nav";
 
@@ -2473,6 +4379,7 @@ export function initBlockscape() {
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "version-nav__thumb";
+      if (ver?.isCategoryView) btn.classList.add("version-nav__thumb--category");
       if (idx === activeIdx) btn.classList.add("is-active");
       const thumbUrl = getSeriesThumbnail(entry, idx);
       if (thumbUrl) {
@@ -2486,14 +4393,22 @@ export function initBlockscape() {
       const lblText = document.createElement("span");
       lblText.className = "version-nav__thumb-label-text";
       const fullId = (ver?.data?.id ?? ver?.id ?? "").toString().trim();
-      const labelValue =
+      let labelValue =
         fullId || (ver?.version ? `v${ver.version}` : `${idx + 1}`);
+      let labelTitle = fullId || labelValue;
+      if (ver?.isCategoryView) {
+        const catLabel =
+          ver.data?.title || ver.categoryViewKey || labelValue || "Category";
+        labelValue = catLabel;
+        labelTitle = `Category view: ${catLabel}`;
+        btn.dataset.computed = "true";
+      }
       lblText.textContent = labelValue;
-      lbl.title = fullId || labelValue;
+      lbl.title = labelTitle;
       lbl.appendChild(lblText);
       btn.appendChild(lbl);
       registerThumbLabel(lbl, lblText);
-      if (entry.apicurioVersions.length > 1) {
+      if (entry.apicurioVersions.length > 1 && !ver?.isCategoryView) {
         const removeBtn = document.createElement("span");
         removeBtn.className = "version-nav__thumb-remove";
         removeBtn.title = `Remove ${labelValue} from this series`;
@@ -2542,12 +4457,33 @@ export function initBlockscape() {
 
     nav.appendChild(thumbs);
 
+    const scrollKey = getThumbScrollKey(entry, "active");
+    const savedScroll = versionThumbScroll.get(scrollKey);
+    if (typeof savedScroll === "number" && !Number.isNaN(savedScroll)) {
+      requestAnimationFrame(() => {
+        thumbs.scrollLeft = savedScroll;
+      });
+    }
+    thumbs.addEventListener("scroll", () => {
+      versionThumbScroll.set(scrollKey, thumbs.scrollLeft);
+    });
+
     return nav;
   }
 
   // ===== Render =====
   function render() {
     if (!model) return;
+    const activeModelEntry =
+      activeIndex >= 0 && models[activeIndex] ? models[activeIndex] : null;
+    const prevThumbs =
+      app && app.querySelector
+        ? app.querySelector(".version-nav__thumbs")
+        : null;
+    if (prevThumbs && activeModelEntry) {
+      const key = getThumbScrollKey(activeModelEntry, activeIndex);
+      versionThumbScroll.set(key, prevThumbs.scrollLeft);
+    }
     hideTabTooltip();
     if (!Array.isArray(model.m.categories)) {
       model.m.categories = [];
@@ -2634,10 +4570,19 @@ export function initBlockscape() {
     const tabsWrapper = document.createElement("div");
     tabsWrapper.className = "blockscape-tabs";
 
+    const tabHeader = document.createElement("div");
+    tabHeader.className = "blockscape-tabrow";
+
     const tabList = document.createElement("div");
     tabList.className = "blockscape-tablist";
     tabList.setAttribute("role", "tablist");
-    tabsWrapper.appendChild(tabList);
+    tabHeader.appendChild(tabList);
+
+    const tabActions = document.createElement("div");
+    tabActions.className = "blockscape-tabactions";
+    tabHeader.appendChild(tabActions);
+
+    tabsWrapper.appendChild(tabHeader);
 
     const panelsWrapper = document.createElement("div");
     panelsWrapper.className = "blockscape-tabpanels";
@@ -2652,8 +4597,22 @@ export function initBlockscape() {
     const activeSeriesIndex = getActiveApicurioVersionIndex(
       models[activeIndex]
     );
+    const activeVersionEntry =
+      models[activeIndex]?.apicurioVersions?.[activeSeriesIndex] || null;
+    const activeIsCategoryView =
+      (activeViewIsCategory = Boolean(
+        activeVersionEntry?.isCategoryView ||
+          (activeVersionEntry?.version || "").startsWith(
+            CATEGORY_VIEW_VERSION_PREFIX
+          )
+      ));
     infoTabButton = null;
     activeInfoTooltipHtml = "";
+
+    const appendTitleLine = (el, text) => {
+      if (!el || !text) return;
+      el.title = el.title ? `${el.title}\n${text}` : text;
+    };
 
     const tabDefs = [
       { id: "map", label: "Map", panel: mapPanel },
@@ -2814,10 +4773,250 @@ export function initBlockscape() {
     sourceWrapper.className = "blockscape-source-panel";
     const settingsPanel = document.createElement("div");
     settingsPanel.className = "blockscape-settings-panel";
+
+    const syncThemeSwitches = (isDark) => {
+      if (settingsUi.themeToggle) settingsUi.themeToggle.checked = isDark;
+      if (settingsUi.tabThemeToggle) settingsUi.tabThemeToggle.checked = isDark;
+    };
+
+    const setThemePreference = (isDark) => {
+      syncThemeSwitches(isDark);
+      applyTheme(isDark ? THEME_DARK : THEME_LIGHT);
+    };
+
+    const syncCenterSwitches = (checked) => {
+      if (settingsUi.tabCenterToggle) {
+        settingsUi.tabCenterToggle.checked = checked;
+      }
+    };
+
+    const applyCenterPreference = (checked) => {
+      const applied = applyCenterItems(checked);
+      syncCenterSwitches(applied);
+      persistCenterItems(applied);
+    };
+
+    const syncSecondaryLinkSwitches = (checked) => {
+      if (settingsUi.secondaryLinksToggle)
+        settingsUi.secondaryLinksToggle.checked = checked;
+      if (settingsUi.tabSecondaryLinksToggle)
+        settingsUi.tabSecondaryLinksToggle.checked = checked;
+    };
+
+    const applySecondaryLinkVisibility = (checked) => {
+      const next = !!checked;
+      syncSecondaryLinkSwitches(next);
+      showSecondaryLinks = next;
+      if (selection) {
+        select(selection);
+      } else {
+        clearStyles();
+        drawLinks();
+      }
+    };
+
+    const createTabToggle = ({ id, label, checked, onChange }) => {
+      const row = document.createElement("label");
+      row.className = "blockscape-tab-toggle";
+      row.setAttribute("for", id);
+      const input = document.createElement("input");
+      input.type = "checkbox";
+      input.id = id;
+      input.checked = checked;
+      if (typeof onChange === "function") {
+        input.addEventListener("change", () => onChange(input.checked));
+      }
+      const text = document.createElement("span");
+      text.className = "blockscape-tab-toggle__label";
+      text.textContent = label;
+      row.append(input, text);
+      return { row, input };
+    };
+
     const settingsHeading = document.createElement("p");
     settingsHeading.className = "blockscape-settings-panel__title";
     settingsHeading.textContent = "Feature toggles";
     settingsPanel.appendChild(settingsHeading);
+    const themeRow = document.createElement("label");
+    themeRow.className = "settings-toggle";
+    const themeInput = document.createElement("input");
+    themeInput.type = "checkbox";
+    themeInput.checked = theme === THEME_DARK;
+    const themeText = document.createElement("span");
+    themeText.className = "settings-toggle__text";
+    const themeLabel = document.createElement("span");
+    themeLabel.className = "settings-toggle__label";
+    themeLabel.textContent = "Dark mode";
+    const themeHint = document.createElement("span");
+    themeHint.className = "settings-toggle__hint";
+    themeHint.textContent = "Switch Blockscape UI to dark colors.";
+    themeText.append(themeLabel, themeHint);
+    themeRow.append(themeInput, themeText);
+    themeInput.addEventListener("change", () => {
+      setThemePreference(themeInput.checked);
+    });
+    settingsPanel.appendChild(themeRow);
+    settingsUi.themeToggle = themeInput;
+
+    const { row: tabThemeToggleRow, input: tabThemeToggleInput } = createTabToggle({
+      id: "tabToggleTheme",
+      label: "Dark mode",
+      checked: theme === THEME_DARK,
+      onChange: (checked) => setThemePreference(checked),
+    });
+    tabActions.appendChild(tabThemeToggleRow);
+    settingsUi.tabThemeToggle = tabThemeToggleInput;
+
+    const { row: tabSecondaryToggleRow, input: tabSecondaryToggleInput } = createTabToggle({
+      id: "tabToggleSecondaryLinks",
+      label: "Show indirect links",
+      checked: showSecondaryLinks,
+      onChange: (checked) => applySecondaryLinkVisibility(checked),
+    });
+    tabActions.appendChild(tabSecondaryToggleRow);
+    settingsUi.tabSecondaryLinksToggle = tabSecondaryToggleInput;
+
+    const { row: tabCenterToggleRow, input: tabCenterToggleInput } = createTabToggle({
+      id: "tabToggleCenterItems",
+      label: "Center",
+      checked: centerItems,
+      onChange: (checked) => applyCenterPreference(checked),
+    });
+    tabActions.appendChild(tabCenterToggleRow);
+    settingsUi.tabCenterToggle = tabCenterToggleInput;
+
+    const settingsActions = document.createElement("div");
+    settingsActions.className = "settings-actions";
+    const settingsFileInput = document.createElement("input");
+    settingsFileInput.type = "file";
+    settingsFileInput.accept = "application/json";
+    settingsFileInput.hidden = true;
+    const loadSettingsBtn = document.createElement("button");
+    loadSettingsBtn.type = "button";
+    loadSettingsBtn.className = "pf-v5-c-button pf-m-secondary";
+    loadSettingsBtn.textContent = "Load settings";
+    loadSettingsBtn.addEventListener("click", () => settingsFileInput.click());
+    settingsFileInput.addEventListener("change", async () => {
+      const file = settingsFileInput.files?.[0];
+      if (!file) return;
+      try {
+        const raw = await file.text();
+        const parsed = JSON.parse(raw);
+        const snapshot = parsed?.settings || parsed;
+        const result = applyImportedSettings(snapshot || {}, { refreshObsidianLinks });
+        const appliedCount = result.applied?.length || 0;
+        showNotice(
+          appliedCount
+            ? `Loaded ${appliedCount} setting${appliedCount === 1 ? "" : "s"} from ${file.name}.`
+            : `No matching settings found in ${file.name}.`,
+          2200
+        );
+      } catch (error) {
+        console.warn("[Blockscape] failed to load settings.json", error);
+        showNotice("Invalid settings file.", 2400);
+      } finally {
+        settingsFileInput.value = "";
+      }
+    });
+
+    const saveSettingsBtn = document.createElement("button");
+    saveSettingsBtn.type = "button";
+    saveSettingsBtn.className = "pf-v5-c-button pf-m-tertiary";
+    saveSettingsBtn.textContent = "Download settings";
+    saveSettingsBtn.addEventListener("click", () => {
+      const payload = {
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        settings: buildSettingsSnapshot(getCurrentSettingsState(), {
+          localBackend,
+        }),
+      };
+      download("settings.json", JSON.stringify(payload, null, 2));
+      showNotice("Settings downloaded.", 2000);
+    });
+
+    settingsActions.append(loadSettingsBtn, saveSettingsBtn, settingsFileInput);
+    settingsPanel.appendChild(settingsActions);
+    const colorPresetSection = document.createElement("div");
+    colorPresetSection.className = "color-presets";
+    const colorPresetTitle = document.createElement("div");
+    colorPresetTitle.className = "settings-text__label";
+    colorPresetTitle.textContent = "Color presets";
+    const colorPresetHint = document.createElement("div");
+    colorPresetHint.className = "settings-text__hint";
+    colorPresetHint.textContent =
+      "Shown in tile context menu for quick coloring.";
+    colorPresetSection.append(colorPresetTitle, colorPresetHint);
+    const colorPresetList = document.createElement("div");
+    colorPresetList.className = "color-presets__list";
+    const addRow = document.createElement("div");
+    addRow.className = "color-presets__add";
+    const addName = document.createElement("input");
+    addName.type = "text";
+    addName.placeholder = "Name";
+    addName.className = "settings-text__input";
+    const addColor = document.createElement("input");
+    addColor.type = "color";
+    addColor.value = "#2563eb";
+    addColor.className = "settings-color-input";
+    const addBtn = document.createElement("button");
+    addBtn.type = "button";
+    addBtn.className = "pf-v5-c-button pf-m-primary";
+    addBtn.textContent = "Add preset";
+    addBtn.addEventListener("click", () => {
+      const name = addName.value.trim() || "Custom";
+      const value = addColor.value;
+      const next = [...colorPresets, { name, value }];
+      setColorPresets(next);
+      updateTileMenuColors(colorPresets);
+      addName.value = "";
+    });
+    addRow.append(addName, addColor, addBtn);
+    colorPresetSection.append(colorPresetList, addRow);
+    settingsPanel.appendChild(colorPresetSection);
+    settingsUi.colorPresetList = colorPresetList;
+    renderColorPresetsUI = () => {
+      colorPresetList.innerHTML = "";
+      colorPresets.forEach((preset, idx) => {
+        const row = document.createElement("div");
+        row.className = "color-presets__row";
+        const nameInput = document.createElement("input");
+        nameInput.type = "text";
+        nameInput.className = "settings-text__input";
+        nameInput.value = preset.name || "";
+        nameInput.placeholder = "Name";
+        nameInput.addEventListener("input", () => {
+          const next = [...colorPresets];
+          next[idx] = { ...next[idx], name: nameInput.value };
+          setColorPresets(next);
+          updateTileMenuColors(colorPresets);
+        });
+        const colorInput = document.createElement("input");
+        colorInput.type = "color";
+        colorInput.className = "settings-color-input";
+        colorInput.value = preset.value;
+        colorInput.addEventListener("input", () => {
+          const next = [...colorPresets];
+          next[idx] = { ...next[idx], value: colorInput.value };
+          setColorPresets(next);
+          updateTileMenuColors(colorPresets);
+        });
+        const removeBtn = document.createElement("button");
+        removeBtn.type = "button";
+        removeBtn.className = "pf-v5-c-button pf-m-plain";
+        removeBtn.textContent = "✕";
+        removeBtn.title = "Remove preset";
+        removeBtn.addEventListener("click", () => {
+          const next = colorPresets.filter((_, i) => i !== idx);
+          setColorPresets(next);
+          updateTileMenuColors(colorPresets);
+          renderColorPresetsUI();
+        });
+        row.append(nameInput, colorInput, removeBtn);
+        colorPresetList.appendChild(row);
+      });
+    };
+    renderColorPresetsUI();
     const createSettingsToggle = ({
       id,
       label,
@@ -2872,19 +5071,12 @@ export function initBlockscape() {
         label: "Show indirect links",
         checked: showSecondaryLinks,
         className: "map-controls__toggle",
-        onChange: (checked) => {
-          showSecondaryLinks = checked;
-          if (selection) {
-            select(selection);
-          } else {
-            clearStyles();
-            drawLinks();
-          }
-        },
+        onChange: (checked) => applySecondaryLinkVisibility(checked),
       });
     settingsPanel.appendChild(secondaryToggleRow);
+    settingsUi.secondaryLinksToggle = secondaryToggleInput;
 
-    const { row: reusedToggleRow } = createSettingsToggle({
+    const { row: reusedToggleRow, input: reusedToggleInput } = createSettingsToggle({
       id: "toggleReusedInMap",
       label: "Display reused in map view",
       hint: "Show markers for nodes used multiple times.",
@@ -2896,9 +5088,24 @@ export function initBlockscape() {
       },
     });
     settingsPanel.appendChild(reusedToggleRow);
+    settingsUi.reusedToggle = reusedToggleInput;
+
+    const { row: autoIdToggleRow, input: autoIdToggleInput } = createSettingsToggle({
+      id: "toggleAutoIdFromName",
+      label: "Auto-fill IDs from titles",
+      hint: "Keep ID in sync while editing name/title (can be overridden manually).",
+      checked: autoIdFromNameEnabled,
+      className: "map-controls__toggle",
+      onChange: (checked) => {
+        const applied = applyAutoIdFromNameEnabled(checked);
+        persistAutoIdFromNameEnabled(applied);
+      },
+    });
+    settingsPanel.appendChild(autoIdToggleRow);
+    settingsUi.autoIdToggle = autoIdToggleInput;
 
     const obsidianModeInputs = [];
-    const { row: obsidianToggleRow } = createSettingsToggle({
+    const { row: obsidianToggleRow, input: obsidianToggleInput } = createSettingsToggle({
       id: "toggleObsidianLinks",
       label: "Obsidian",
       hint: "Make tiles open Obsidian when no external URL exists.",
@@ -2914,6 +5121,72 @@ export function initBlockscape() {
       },
     });
     settingsPanel.appendChild(obsidianToggleRow);
+    settingsUi.obsidianToggle = obsidianToggleInput;
+
+    const hasLocalBackend =
+      typeof localBackend?.isAvailable === "function" &&
+      localBackend.isAvailable() &&
+      typeof localBackend?.getAutoReloadConfig === "function";
+    if (hasLocalBackend) {
+      const { enabled: autoEnabled, intervalMs: autoInterval } =
+        localBackend.getAutoReloadConfig();
+      let autoReloadSlider = null;
+      const { row: autoReloadToggle, input: autoReloadInput } =
+        createSettingsToggle({
+          id: "toggleAutoReload",
+          label: "Auto-reload local files",
+          hint: "Poll the local backend for file changes and refresh matching models.",
+          checked: autoEnabled,
+          className: "map-controls__toggle",
+          onChange: (checked) => {
+            localBackend.setAutoReloadEnabled(checked);
+            if (autoReloadSlider) autoReloadSlider.disabled = !checked;
+        },
+      });
+      settingsPanel.appendChild(autoReloadToggle);
+      settingsUi.autoReloadToggle = autoReloadInput;
+
+      const formatAutoReloadInterval = (ms) =>
+        `${(ms / 1000).toFixed(2)}s`;
+      const autoReloadRow = document.createElement("label");
+      autoReloadRow.className = "settings-slider";
+      autoReloadRow.setAttribute("for", "autoReloadInterval");
+      const autoReloadText = document.createElement("div");
+      autoReloadText.className = "settings-slider__text";
+      const autoReloadLabel = document.createElement("span");
+      autoReloadLabel.className = "settings-slider__label";
+      autoReloadLabel.textContent = "Auto-reload interval";
+      const autoReloadHint = document.createElement("span");
+      autoReloadHint.className = "settings-slider__hint";
+      autoReloadHint.textContent = "Adjust how often to poll for file changes.";
+      autoReloadText.append(autoReloadLabel, autoReloadHint);
+      const autoReloadValue = document.createElement("span");
+      autoReloadValue.className = "settings-slider__value";
+      autoReloadValue.textContent = formatAutoReloadInterval(autoInterval);
+      autoReloadSlider = document.createElement("input");
+      autoReloadSlider.type = "range";
+      autoReloadSlider.id = "autoReloadInterval";
+      autoReloadSlider.className = "settings-slider__input";
+      autoReloadSlider.min = String(MIN_AUTO_RELOAD_INTERVAL_MS);
+      autoReloadSlider.max = String(MAX_AUTO_RELOAD_INTERVAL_MS);
+      autoReloadSlider.step = "100";
+      autoReloadSlider.value = String(autoInterval);
+      autoReloadSlider.disabled = !autoEnabled;
+      autoReloadSlider.setAttribute(
+        "aria-label",
+        "Set auto-reload polling interval"
+      );
+      autoReloadSlider.addEventListener("input", () => {
+        const applied = localBackend.setAutoReloadInterval(
+          parseInt(autoReloadSlider.value, 10)
+        );
+        autoReloadValue.textContent = formatAutoReloadInterval(applied);
+      });
+      autoReloadRow.append(autoReloadText, autoReloadValue, autoReloadSlider);
+      settingsPanel.appendChild(autoReloadRow);
+      settingsUi.autoReloadInput = autoReloadSlider;
+      settingsUi.autoReloadValue = autoReloadValue;
+    }
 
     const obsidianModeRow = document.createElement("div");
     obsidianModeRow.className = "settings-radio";
@@ -2957,6 +5230,7 @@ export function initBlockscape() {
       obsidianModeHint
     );
     settingsPanel.appendChild(obsidianModeRow);
+    settingsUi.obsidianModeInputs = obsidianModeInputs;
 
     const obsidianVaultRow = document.createElement("label");
     obsidianVaultRow.className = "settings-text";
@@ -2984,6 +5258,7 @@ export function initBlockscape() {
     });
     obsidianVaultRow.append(obsidianVaultText, obsidianVaultInput);
     settingsPanel.appendChild(obsidianVaultRow);
+    settingsUi.obsidianVaultInput = obsidianVaultInput;
 
     const obsidianPluginNote = document.createElement("p");
     obsidianPluginNote.className = "settings-note";
@@ -3039,6 +5314,8 @@ export function initBlockscape() {
       seriesNavWaitInput
     );
     settingsPanel.appendChild(seriesNavWaitRow);
+    settingsUi.seriesNavInput = seriesNavWaitInput;
+    settingsUi.seriesNavValue = seriesNavWaitValue;
 
     const formatHoverScale = (value) => `${Math.round((value - 1) * 100)}%`;
     const hoverScaleRow = document.createElement("label");
@@ -3077,6 +5354,78 @@ export function initBlockscape() {
 
     hoverScaleRow.append(hoverScaleText, hoverScaleValue, hoverScaleInput);
     settingsPanel.appendChild(hoverScaleRow);
+    settingsUi.hoverScaleInput = hoverScaleInput;
+    settingsUi.hoverScaleValue = hoverScaleValue;
+
+    let dimInput = null;
+    let dimValue = null;
+    const formatSelectionDimming = (opacity) => {
+      const dimPercent = Math.round((1 - opacity) * 100);
+      return dimPercent === 0 ? "Off" : `${dimPercent}% dim`;
+    };
+    const { row: dimToggleRow, input: dimToggleInput } = createSettingsToggle({
+      id: "toggleSelectionDimming",
+      label: "Dim unrelated tiles",
+      hint: "When selecting a tile, fade everything except linked tiles.",
+      checked: selectionDimEnabled,
+      className: "map-controls__toggle",
+      onChange: (checked) => {
+        const applied = applySelectionDimEnabled(checked);
+        persistSelectionDimEnabled(applied);
+        if (dimInput) dimInput.disabled = !applied;
+        if (dimValue) {
+          dimValue.textContent = formatSelectionDimming(
+            applied ? selectionDimOpacity : 1
+          );
+        }
+      },
+    });
+    settingsPanel.appendChild(dimToggleRow);
+    settingsUi.selectionDimToggle = dimToggleInput;
+    const dimRow = document.createElement("label");
+    dimRow.className = "settings-slider";
+    dimRow.setAttribute("for", "selectionDimmingSlider");
+
+    const dimText = document.createElement("div");
+    dimText.className = "settings-slider__text";
+    const dimLabel = document.createElement("span");
+    dimLabel.className = "settings-slider__label";
+    dimLabel.textContent = "Dimming strength";
+    const dimHint = document.createElement("span");
+    dimHint.className = "settings-slider__hint";
+    dimHint.textContent =
+      "Adjust how much unrelated tiles fade when dimming is on.";
+    dimText.append(dimLabel, dimHint);
+
+    dimValue = document.createElement("span");
+    dimValue.className = "settings-slider__value";
+    dimValue.textContent = formatSelectionDimming(
+      selectionDimEnabled ? selectionDimOpacity : 1
+    );
+
+    dimInput = document.createElement("input");
+    dimInput.type = "range";
+    dimInput.id = "selectionDimmingSlider";
+    dimInput.className = "settings-slider__input";
+    dimInput.min = String(MIN_SELECTION_DIM_OPACITY);
+    dimInput.max = String(MAX_SELECTION_DIM_OPACITY);
+    dimInput.step = "0.05";
+    dimInput.value = String(selectionDimOpacity);
+    dimInput.disabled = !selectionDimEnabled;
+    dimInput.setAttribute(
+      "aria-label",
+      "Adjust how much unrelated tiles dim on selection"
+    );
+    dimInput.addEventListener("input", () => {
+      const applied = applySelectionDimOpacity(parseFloat(dimInput.value));
+      dimValue.textContent = formatSelectionDimming(applied);
+      persistSelectionDimOpacity(applied);
+    });
+
+    dimRow.append(dimText, dimValue, dimInput);
+    settingsPanel.appendChild(dimRow);
+    settingsUi.selectionDimInput = dimInput;
+    settingsUi.selectionDimValue = dimValue;
 
     const formatCompactness = (value) =>
       value === 1 ? "Default" : `${Math.round(value * 100)}%`;
@@ -3117,6 +5466,8 @@ export function initBlockscape() {
 
     compactRow.append(compactText, compactValue, compactInput);
     settingsPanel.appendChild(compactRow);
+    settingsUi.tileCompactnessInput = compactInput;
+    settingsUi.tileCompactnessValue = compactValue;
 
     const { row: titleWrapRow, input: titleWrapInput } = createSettingsToggle({
       id: "titleWrapToggle",
@@ -3131,6 +5482,7 @@ export function initBlockscape() {
       },
     });
     settingsPanel.appendChild(titleWrapRow);
+    settingsUi.titleWrapInput = titleWrapInput;
 
     const formatTitleWidth = (value) =>
       `${Math.round((value - 1) * 100)}% extra`;
@@ -3174,6 +5526,8 @@ export function initBlockscape() {
 
     titleWidthRow.append(titleWidthText, titleWidthValue, titleWidthInput);
     settingsPanel.appendChild(titleWidthRow);
+    settingsUi.titleWidthInput = titleWidthInput;
+    settingsUi.titleWidthValue = titleWidthValue;
 
     const formatTitleZoomPortion = (value) =>
       `${Math.round(value * 100)}% of hover zoom`;
@@ -3218,6 +5572,8 @@ export function initBlockscape() {
 
     titleZoomRow.append(titleZoomText, titleZoomValue, titleZoomInput);
     settingsPanel.appendChild(titleZoomRow);
+    settingsUi.titleZoomInput = titleZoomInput;
+    settingsUi.titleZoomValue = titleZoomValue;
 
     const apicurioEnabled =
       typeof apicurio.isEnabled === "function" ? apicurio.isEnabled() : false;
@@ -3255,23 +5611,58 @@ export function initBlockscape() {
       const section = document.createElement("section");
       section.className = "category";
       section.dataset.cat = cat.id;
+      const categorySeriesVersionIndex = activeIsCategoryView
+        ? resolveVersionIndexFromCategory(cat, seriesIdLookup)
+        : null;
 
       const head = document.createElement("div");
       head.className = "cat-head";
       head.dataset.cat = cat.id;
       head.tabIndex = 0;
-      head.title = "Select category";
+      if (
+        activeIsCategoryView &&
+        Number.isInteger(categorySeriesVersionIndex)
+      ) {
+        head.dataset.seriesVersionIndex = String(categorySeriesVersionIndex);
+        head.title = "Open this category's map in the series";
+        head.classList.add("cat-head--series-link");
+      } else {
+        head.title = "Select category";
+      }
       head.innerHTML = `<div class="cat-title">${escapeHtml(
         cat.title || cat.id
       )}</div>
                           <div class="muted cat-count">${
                             (cat.items || []).length
                           } items</div>`;
-      head.addEventListener("click", () => selectCategory(cat.id));
+      head.addEventListener("click", () => {
+        const targetSeriesIndex =
+          head.dataset.seriesVersionIndex != null
+            ? parseInt(head.dataset.seriesVersionIndex, 10)
+            : null;
+        const activeEntry = models[activeIndex];
+        const currentSeriesIndex = activeEntry
+          ? getActiveApicurioVersionIndex(activeEntry)
+          : -1;
+        const canNavigateToSeries =
+          activeIsCategoryView &&
+          activeEntry?.apicurioVersions?.length > 1 &&
+          Number.isInteger(targetSeriesIndex) &&
+          targetSeriesIndex !== currentSeriesIndex;
+        if (canNavigateToSeries) {
+          const changed = setActiveApicurioVersion(
+            activeIndex,
+            targetSeriesIndex
+          );
+          if (changed) return;
+        }
+
+        selectCategory(cat.id);
+      });
       head.addEventListener("keydown", (event) => {
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
-          selectCategory(cat.id);
+          head.click();
         }
       });
       head.addEventListener("focus", () =>
@@ -3280,7 +5671,7 @@ export function initBlockscape() {
       section.appendChild(head);
 
       const grid = document.createElement("div");
-      grid.className = "grid";
+      grid.className = "grid" + (centerItems ? " is-centered" : "");
       section.appendChild(grid);
 
       (cat.items || []).forEach((it) => {
@@ -3298,18 +5689,31 @@ export function initBlockscape() {
         if (externalMeta.url) {
           tile.dataset.externalUrl = externalMeta.url;
         }
-        if (seriesIdLookup.has(it.id)) {
-          const targetIdx = seriesIdLookup.get(it.id);
-          tile.dataset.seriesVersionIndex = String(targetIdx);
-          tile.classList.add("tile--series-link");
-          const label =
-            targetIdx === activeSeriesIndex
-              ? "Current map in this series"
-              : `Open version ${targetIdx + 1} in this series`;
-          tile.title = label;
+        if (!activeIsCategoryView) {
+          let targetSeriesIndex = null;
+          if (seriesIdLookup.has(it.id)) {
+            targetSeriesIndex = seriesIdLookup.get(it.id);
+          }
+          if (Number.isInteger(targetSeriesIndex)) {
+            tile.dataset.seriesVersionIndex = String(targetSeriesIndex);
+            tile.classList.add("tile--series-link");
+            const label =
+              targetSeriesIndex === activeSeriesIndex
+                ? "Current map in this series"
+                : `Open version ${targetSeriesIndex + 1} in this series`;
+            appendTitleLine(tile, label);
+          }
         }
         if (obsidianUrl) {
           tile.dataset.obsidianUrl = obsidianUrl;
+        }
+
+        if (!activeIsCategoryView) {
+          const navTargetIndex = findModelIndexByIdOrSource(it.id);
+          if (navTargetIndex !== -1 && navTargetIndex !== activeIndex) {
+            tile.classList.add("tile--series-link");
+            tile.dataset.navTargetIndex = String(navTargetIndex);
+          }
         }
 
         const img = document.createElement("img");
@@ -3335,21 +5739,24 @@ export function initBlockscape() {
         badge.className = "badge";
         badge.textContent = "reused";
 
-        const deleteBtn = document.createElement("button");
-        deleteBtn.type = "button";
-        deleteBtn.className = "tile-delete";
-        deleteBtn.setAttribute("aria-label", `Delete ${it.name || it.id}`);
-        deleteBtn.textContent = "×";
-        deleteBtn.addEventListener("click", (event) => {
-          event.stopPropagation();
-          deleteItemById(it.id);
-        });
+        let deleteBtn = null;
+        if (!activeIsCategoryView) {
+          deleteBtn = document.createElement("button");
+          deleteBtn.type = "button";
+          deleteBtn.className = "tile-delete";
+          deleteBtn.setAttribute("aria-label", `Delete ${it.name || it.id}`);
+          deleteBtn.textContent = "×";
+          deleteBtn.addEventListener("click", (event) => {
+            event.stopPropagation();
+            deleteItemById(it.id);
+          });
+        }
 
         if (externalMeta.url) {
           tile.appendChild(createExternalLinkButton(externalMeta.url));
         }
         applyObsidianLinkToTile(tile, obsidianUrl);
-        tile.appendChild(deleteBtn);
+        if (deleteBtn) tile.appendChild(deleteBtn);
         tile.appendChild(img);
         tile.appendChild(nm);
         tile.appendChild(idLine);
@@ -3362,22 +5769,29 @@ export function initBlockscape() {
       renderHost.appendChild(section);
       categoryIndex.set(cat.id, { el: section, headEl: head });
 
-      const addTile = document.createElement("button");
-      addTile.type = "button";
-      addTile.className = "tile-add";
-      addTile.innerHTML =
-        '<span class="tile-add__icon" aria-hidden="true">+</span><span class="tile-add__label"></span>';
-      addTile.addEventListener("click", () => addItemToCategory(cat.id));
-      grid.appendChild(addTile);
+      if (!activeIsCategoryView) {
+        const addTile = document.createElement("button");
+        addTile.type = "button";
+        addTile.className = "tile-add";
+        addTile.innerHTML =
+          '<span class="tile-add__icon" aria-hidden="true">+</span><span class="tile-add__label"></span>';
+        addTile.hidden = centerItems;
+        addTile.tabIndex = centerItems ? -1 : 0;
+        addTile.setAttribute("aria-hidden", centerItems ? "true" : "false");
+        addTile.addEventListener("click", () => addItemToCategory(cat.id));
+        grid.appendChild(addTile);
+      }
     });
 
-    const addCategoryButton = document.createElement("button");
-    addCategoryButton.type = "button";
-    addCategoryButton.className = "category-add";
-    addCategoryButton.innerHTML =
-      '<span class="category-add__icon" aria-hidden="true">+</span><span class="category-add__label">Add category</span><span class="category-add__hint">(Insert)</span>';
-    addCategoryButton.addEventListener("click", () => addCategoryAtEnd());
-    renderHost.appendChild(addCategoryButton);
+    if (!activeIsCategoryView) {
+      const addCategoryButton = document.createElement("button");
+      addCategoryButton.type = "button";
+      addCategoryButton.className = "category-add";
+      addCategoryButton.innerHTML =
+        '<span class="category-add__icon" aria-hidden="true">+</span><span class="category-add__label">Add category</span><span class="category-add__hint">(Insert)</span>';
+      addCategoryButton.addEventListener("click", () => addCategoryAtEnd());
+      renderHost.appendChild(addCategoryButton);
+    }
 
     applyReusedHighlights();
 
@@ -3402,6 +5816,10 @@ export function initBlockscape() {
           t.dataset.globalIndex != null
             ? parseInt(t.dataset.globalIndex, 10)
             : null;
+        const targetModelIndex =
+          t.dataset.navTargetIndex != null
+            ? parseInt(t.dataset.navTargetIndex, 10)
+            : null;
         const activeEntry = models[activeIndex];
         const currentSeriesIndex = activeEntry
           ? getActiveApicurioVersionIndex(activeEntry)
@@ -3410,13 +5828,25 @@ export function initBlockscape() {
           activeEntry?.apicurioVersions?.length > 1 &&
           Number.isInteger(targetSeriesIndex) &&
           targetSeriesIndex !== currentSeriesIndex;
+        const canNavigateToModel =
+          Number.isInteger(targetModelIndex) &&
+          targetModelIndex !== activeIndex &&
+          targetModelIndex >= 0 &&
+          targetModelIndex < models.length;
         const pendingMatch =
           pendingSeriesNavigation &&
           pendingSeriesNavigation.id === id &&
           pendingSeriesNavigation.targetVersionIndex === targetSeriesIndex;
+        const pendingModelMatch =
+          pendingModelNavigation &&
+          pendingModelNavigation.id === id &&
+          pendingModelNavigation.targetIndex === targetModelIndex;
 
         if (pendingSeriesNavigation && !pendingMatch) {
           clearSeriesNavNotice();
+        }
+        if (pendingModelNavigation && !pendingModelMatch) {
+          clearModelNavNotice();
         }
 
         if (canNavigateToSeries) {
@@ -3430,6 +5860,13 @@ export function initBlockscape() {
           } else {
             showSeriesNavNotice(id, targetSeriesIndex, activeEntry);
           }
+        } else if (canNavigateToModel) {
+          if (pendingModelMatch) {
+            clearModelNavNotice();
+            setActive(targetModelIndex);
+            return;
+          }
+          showModelNavNotice(id, targetModelIndex);
         } else if (
           Number.isInteger(globalIndex) &&
           globalIndex > 0 &&
@@ -3440,11 +5877,26 @@ export function initBlockscape() {
           );
         }
         console.log("[Blockscape] click", id);
-        if (selection === id && !(canNavigateToSeries && pendingMatch)) {
+        if (
+          selection === id &&
+          !(canNavigateToSeries && pendingMatch) &&
+          !(canNavigateToModel && pendingModelMatch)
+        ) {
           clearSelection();
           return;
         }
         select(id);
+      });
+      t.addEventListener("dblclick", (event) => {
+        event.preventDefault();
+        const id = t.dataset.id;
+        const targetIndex =
+          t.dataset.navTargetIndex != null
+            ? parseInt(t.dataset.navTargetIndex, 10)
+            : findModelIndexByIdOrSource(id);
+        if (targetIndex !== -1 && targetIndex !== activeIndex) {
+          setActive(targetIndex);
+        }
       });
       t.addEventListener("keydown", (e) => {
         if (e.key === "Enter" || e.key === " ") {
@@ -3476,6 +5928,16 @@ export function initBlockscape() {
       window.addEventListener("resize", scheduleOverlaySync);
       window.addEventListener("scroll", scheduleOverlaySync, { passive: true });
       window.addEventListener("resize", scheduleThumbLabelMeasure);
+      document.addEventListener("click", (event) => {
+        if (!selection && !selectedCategoryId) return;
+        if (typeof event.button === "number" && event.button !== 0) return;
+        const target = event.target;
+        const clickedTile = target?.closest?.(".tile");
+        const clickedCategoryHead = target?.closest?.(".cat-head");
+        const clickedTileMenu = target?.closest?.(".tile-context-menu");
+        if (clickedTile || clickedCategoryHead || clickedTileMenu) return;
+        clearSelection();
+      });
     }
     document.getElementById("clear").onclick = () => clearSelection();
   }
@@ -3578,6 +6040,7 @@ export function initBlockscape() {
     if (externalUrl) {
       showNotice("This item has link to", NOTICE_TIMEOUT_MS, externalUrl);
     }
+    updateServerUrlFromActive();
   }
 
   function selectCategory(
@@ -3648,6 +6111,7 @@ export function initBlockscape() {
     selectionRelations = null;
     clearStyles();
     drawLinks();
+    updateServerUrlFromActive({ itemId: null });
   }
 
   function clearCategorySelection() {
@@ -4027,152 +6491,6 @@ export function initBlockscape() {
   window.addEventListener("scroll", hideTabTooltip, true);
   window.addEventListener("resize", hideTabTooltip);
 
-  function hidePreview() {
-    if (!preview) return;
-    preview.classList.remove(
-      "is-visible",
-      "item-preview--has-frame",
-      "item-preview--expanded"
-    );
-    preview.setAttribute("aria-hidden", "true");
-    preview.hidden = true;
-    setPreviewActions([]);
-  }
-
-  function showPreviewAt(x, y) {
-    if (!preview) return;
-    previewAnchor = { x, y };
-    preview.hidden = false;
-    preview.setAttribute("aria-hidden", "false");
-    preview.classList.add("is-visible");
-    positionPreview(x, y);
-  }
-
-  function positionPreview(x, y) {
-    if (!preview) return;
-    const margin = 12;
-    preview.style.left = `${x + margin}px`;
-    preview.style.top = `${y + margin}px`;
-    const rect = preview.getBoundingClientRect();
-    let left = rect.left;
-    let top = rect.top;
-    if (rect.right > window.innerWidth - margin) {
-      left = Math.max(margin, window.innerWidth - rect.width - margin);
-    }
-    if (rect.bottom > window.innerHeight - margin) {
-      top = Math.max(margin, window.innerHeight - rect.height - margin);
-    }
-    preview.style.left = `${left}px`;
-    preview.style.top = `${top}px`;
-  }
-
-  function setPreviewActions(actions = []) {
-    if (!previewActions) return;
-    previewActions.innerHTML = "";
-    actions.forEach((actionDef) => {
-      const action = document.createElement("button");
-      action.type = "button";
-      action.className = "item-preview__action";
-      action.textContent = actionDef.label || "Action";
-      if (actionDef.title) action.title = actionDef.title;
-      action.addEventListener("click", (event) => {
-        event.stopPropagation();
-        if (typeof actionDef.onClick === "function") {
-          actionDef.onClick(event);
-        }
-      });
-      previewActions.appendChild(action);
-    });
-    previewActions.hidden = actions.length === 0;
-  }
-
-  async function handleTileContextMenu(event, tile) {
-    if (!preview) return;
-    event.stopPropagation();
-    event.preventDefault();
-    const id = tile.dataset.id;
-    const displayName =
-      tile.querySelector(".name")?.textContent || id || "Preview";
-    const filename = id ? `${id}.html` : "";
-    const filepath = filename ? `items/${filename}` : "";
-    const requestId = ++previewRequestId;
-    const externalUrl = tile.dataset.externalUrl || "";
-    const obsidianUrl = tile.dataset.obsidianUrl || "";
-    const actionList = [
-      {
-        label: "Edit",
-        title: "Edit this item",
-        onClick: () => {
-          hidePreview();
-          itemEditor.open(id);
-        },
-      },
-    ];
-    if (externalUrl) {
-      actionList.push({
-        label: "Open link ↗",
-        title: externalUrl,
-        onClick: () => window.open(externalUrl, "_blank", "noopener"),
-      });
-    }
-    if (obsidianUrl) {
-      actionList.push({
-        label: "Open in Obsidian",
-        title: obsidianUrl,
-        onClick: () => window.open(obsidianUrl, "_blank", "noopener"),
-      });
-    }
-    setPreviewActions(actionList);
-    if (id) select(id);
-
-    previewTitle.textContent = displayName;
-    previewBody.innerHTML = '<div class="item-preview__status">Loading…</div>';
-    preview.classList.remove("item-preview--has-frame");
-    preview.classList.add("item-preview--expanded");
-    showPreviewAt(event.clientX, event.clientY);
-
-    if (!filepath) {
-      previewBody.innerHTML =
-        '<div class="item-preview__status">Preview unavailable for this item.</div>';
-      positionPreview(previewAnchor.x, previewAnchor.y);
-      return;
-    }
-
-    try {
-      const response = await fetch(filepath, { cache: "no-cache" });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const html = await response.text();
-      if (requestId !== previewRequestId) return;
-      const trimmed = html.trim();
-      if (!trimmed) {
-        previewBody.innerHTML = `<div class="item-preview__status">No content in <code>${escapeHtml(
-          filename
-        )}</code>.</div>`;
-        positionPreview(previewAnchor.x, previewAnchor.y);
-        return;
-      }
-      const frame = document.createElement("iframe");
-      frame.className = "item-preview__frame";
-      frame.title = `${displayName} details`;
-      frame.srcdoc = html;
-      previewBody.innerHTML = "";
-      previewBody.appendChild(frame);
-      preview.classList.add("item-preview--has-frame");
-      positionPreview(previewAnchor.x, previewAnchor.y);
-    } catch (error) {
-      if (requestId !== previewRequestId) return;
-      previewBody.innerHTML = `<div class="item-preview__status">No preview available for <strong>${escapeHtml(
-        displayName
-      )}</strong>.</div>`;
-      console.warn(`[Blockscape] preview unavailable for ${filepath}`, error);
-      positionPreview(previewAnchor.x, previewAnchor.y);
-    }
-  }
-
-  if (previewClose) {
-    previewClose.addEventListener("click", hidePreview);
-  }
-
   if (helpButton) {
     helpButton.addEventListener("click", () => {
       openShortcutHelp();
@@ -4182,6 +6500,18 @@ export function initBlockscape() {
   if (newPanelButton) {
     newPanelButton.addEventListener("click", () => {
       openNewPanel();
+    });
+  }
+
+  if (newBlankButton) {
+    newBlankButton.addEventListener("click", () => {
+      try {
+        scrollPageToTop();
+        createAndActivateBlankSeries();
+      } catch (error) {
+        console.error("[Blockscape] failed to create blank series", error);
+        alert(error?.message || "Unable to create a blank map right now.");
+      }
     });
   }
 
@@ -4204,6 +6534,7 @@ export function initBlockscape() {
   if (app) {
     app.addEventListener("contextmenu", (event) => {
       const tile = event.target.closest(".tile");
+      if (activeViewIsCategory) return;
       if (!tile || !app.contains(tile)) return;
       handleTileContextMenu(event, tile);
     });
@@ -4211,9 +6542,7 @@ export function initBlockscape() {
 
   document.addEventListener("click", (event) => {
     if (typeof event.button === "number" && event.button !== 0) return;
-    if (!preview || preview.hidden) return;
-    if (preview.contains(event.target)) return;
-    hidePreview();
+    handleTileMenuDocumentClick(event);
   });
 
   if (downloadButton) {
@@ -4378,6 +6707,7 @@ export function initBlockscape() {
     if (isEditingItem) {
       return;
     }
+    const isCategoryView = activeViewIsCategory;
 
     if ((event.ctrlKey || event.metaKey) && event.code === "KeyS") {
       event.preventDefault();
@@ -4418,6 +6748,7 @@ export function initBlockscape() {
     }
 
     if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+      if (isCategoryView) return;
       if (!shouldHandleGlobalPaste()) return;
       const step = event.key === "ArrowLeft" ? -1 : 1;
       if (event.altKey) return;
@@ -4447,6 +6778,7 @@ export function initBlockscape() {
     }
 
     if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+      if (isCategoryView) return;
       if (!shouldHandleGlobalPaste()) return;
       const step = event.key === "ArrowUp" ? -1 : 1;
       if ((event.ctrlKey || event.metaKey) && !event.altKey) {
@@ -4483,6 +6815,7 @@ export function initBlockscape() {
     }
 
     if (event.key === "Delete") {
+      if (isCategoryView) return;
       if (!shouldHandleGlobalPaste()) return;
       if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey)
         return;
@@ -4496,6 +6829,7 @@ export function initBlockscape() {
     }
 
     if (event.key === "F2") {
+      if (isCategoryView) return;
       if (!shouldHandleGlobalPaste()) return;
       const targetCategoryId =
         (selectedCategoryId && !selection && selectedCategoryId) ||
@@ -4518,6 +6852,7 @@ export function initBlockscape() {
     }
 
     if (event.key === "Insert") {
+      if (isCategoryView) return;
       if (!shouldHandleGlobalPaste()) return;
       if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey)
         return;
@@ -4529,24 +6864,20 @@ export function initBlockscape() {
   });
 
   window.addEventListener("resize", () => {
-    if (!preview || preview.hidden) return;
-    positionPreview(previewAnchor.x, previewAnchor.y);
+    handleTileMenuWindowResize();
   });
 
-  window.addEventListener(
-    "scroll",
-    () => {
-      if (!preview || preview.hidden) return;
-      hidePreview();
-    },
-    true
-  );
+  window.addEventListener("scroll", () => handleTileMenuWindowScroll(), true);
 
   // ===== Drag and drop reorder (per model) =====
   let draggedItemId = null;
   let draggedCategoryId = null;
 
   function handleDragStart(e) {
+    if (activeViewIsCategory) {
+      e.preventDefault();
+      return;
+    }
     hidePreview();
     draggedItemId = e.target.dataset.id;
     draggedCategoryId = e.target.closest(".category").dataset.cat;
@@ -5205,10 +7536,11 @@ export function initBlockscape() {
   }
 
   // Append models from textarea
-  document.getElementById("appendFromBox").onclick = () => {
+  document.getElementById("appendFromBox").onclick = async () => {
     try {
+      const autoSave = await isLocalBackendReady();
       const appended = normalizeToModelsFromText(jsonBox.value, "Pasted", {
-        promptForSeriesName: true,
+        promptForSeriesName: !autoSave,
       });
       if (!appended.length) {
         alert("No valid JSON found to append.");
@@ -5216,15 +7548,22 @@ export function initBlockscape() {
       }
       console.log("[Blockscape] appending", appended.length, "model(s)");
       let firstIndex = null;
+      const addedIndices = [];
       appended.forEach((entry, idx) => {
         const idxResult = addModelEntry(entry, {
           versionLabel: appended.length > 1 ? `paste #${idx + 1}` : "paste",
         });
         if (firstIndex == null) firstIndex = idxResult;
+        addedIndices.push(idxResult);
       });
       if (activeIndex === -1 && firstIndex != null) setActive(firstIndex);
       else {
         renderModelList();
+      }
+      if (autoSave) {
+        await autoSaveNewLocalFilesForModels(addedIndices, {
+          origin: "append",
+        });
       }
     } catch (e) {
       console.error("[Blockscape] append error:", e);
@@ -5337,7 +7676,7 @@ export function initBlockscape() {
   // Paste JSON anywhere to append new models
   document.addEventListener("paste", handleClipboardPaste);
 
-  function handleClipboardPaste(event) {
+  async function handleClipboardPaste(event) {
     if (!shouldHandleGlobalPaste()) return;
     const text =
       event.clipboardData?.getData("text/plain") ||
@@ -5346,8 +7685,9 @@ export function initBlockscape() {
     if (!looksLikeModelJson(text)) return;
     let entries = [];
     try {
+      const autoSave = await isLocalBackendReady();
       entries = normalizeToModelsFromText(text, "Clipboard", {
-        promptForSeriesName: true,
+        promptForSeriesName: !autoSave,
       });
     } catch (err) {
       console.warn("[Blockscape] clipboard paste ignored (invalid JSON)", err);
@@ -5356,16 +7696,100 @@ export function initBlockscape() {
     if (!entries.length) return;
     event.preventDefault();
     let firstIndex = null;
+    const addedIndices = [];
     entries.forEach((entry, idx) => {
       const idxResult = addModelEntry(entry, {
         versionLabel: entries.length > 1 ? `paste #${idx + 1}` : "paste",
       });
       if (firstIndex == null) firstIndex = idxResult;
+      addedIndices.push(idxResult);
     });
     console.log(
       `[Blockscape] pasted ${entries.length} model(s) from clipboard`
     );
     if (firstIndex != null) setActive(firstIndex);
+    if (await isLocalBackendReady()) {
+      await autoSaveNewLocalFilesForModels(addedIndices, {
+        origin: "clipboard",
+      });
+    }
+  }
+
+  async function autoSaveNewLocalFilesForModels(
+    indices,
+    { origin = "clipboard" } = {}
+  ) {
+    if (!(await isLocalBackendReady())) return;
+    if (typeof localBackend?.saveModelByIndex !== "function") return;
+    const allIndices = Array.isArray(indices) ? indices : [];
+    const eligible = allIndices.filter((idx) => {
+      const entry = models[idx];
+      return entry && !entry.sourcePath;
+    });
+    if (!eligible.length) return;
+
+    const modelsLabel = eligible.length === 1 ? "model" : "models";
+    const firstEntry = models[eligible[0]];
+    const defaultPath = suggestNewSavePathForEntry(
+      firstEntry,
+      origin === "append" ? "pasted" : "clipboard"
+    );
+    if (typeof window === "undefined" || typeof window.prompt !== "function")
+      return;
+    const response = window.prompt(
+      `Save pasted ${modelsLabel} as a new .bs file (under ~/blockscape):`,
+      defaultPath
+    );
+    if (response == null) return;
+    const basePath = normalizeLocalSavePath(response);
+    if (!basePath) {
+      alert("Enter a relative filename (no ..) to save under ~/blockscape.");
+      return;
+    }
+
+    const existing = await getExistingLocalBsPaths();
+    const targets = [];
+    for (let i = 0; i < eligible.length; i++) {
+      const desired =
+        eligible.length === 1
+          ? basePath
+          : withNumericSuffix(basePath, i + 1);
+      const unique = pickUniqueLocalPath(desired, existing);
+      if (!unique) {
+        alert("Could not find a unique filename to save.");
+        return;
+      }
+      existing.add(unique);
+      targets.push(unique);
+    }
+
+    let firstSavedPath = null;
+    for (let i = 0; i < eligible.length; i++) {
+      const idx = eligible[i];
+      const targetPath = targets[i];
+      const entry = models[idx];
+      if (!entry) continue;
+      if (eligible.length === 1) {
+        applySeriesTitleFromFilename(entry, targetPath);
+      }
+      const saved = await localBackend.saveModelByIndex(idx, targetPath, {
+        refreshAfter: false,
+        statusPrefix: "Auto-saved to",
+      });
+      if (!saved?.ok) {
+        alert(`Local auto-save failed: ${saved?.error || "unknown error"}`);
+        return;
+      }
+      if (firstSavedPath == null) firstSavedPath = targetPath;
+    }
+
+    if (firstSavedPath) {
+      updateUrlForServerPath(firstSavedPath);
+    }
+
+    await localBackend.refresh();
+    renderModelList();
+    showNotice(`Saved ${eligible.length} ${modelsLabel}.`, 2500);
   }
 
   // Switch active model from sidebar
@@ -5374,7 +7798,6 @@ export function initBlockscape() {
     if (!button) return;
     const i = parseInt(button.dataset.index, 10);
     if (!Number.isInteger(i)) return;
-    scrollPageToTop();
     setActive(i);
   });
 
@@ -5472,6 +7895,7 @@ export function initBlockscape() {
   function rebuildFromActive() {
     if (activeIndex < 0) return;
     try {
+      syncCategoryViewVersions(models[activeIndex]);
       const parsed = parse(models[activeIndex].data);
       model = parsed;
       render();
@@ -5769,16 +8193,27 @@ export function initBlockscape() {
       if (firstSeedIndex == null) firstSeedIndex = idx;
     });
 
-    // Try to load JSON files from same directory
-    await loadJsonFiles();
+    const hasLocalBackend = await initialBackendCheck;
+
+    // Try to load JSON files from same directory only when no local backend
+    if (!hasLocalBackend && features.autoLoadFromDir) {
+      await loadJsonFiles();
+    }
 
     // Load explicit model from URL hash/search (?load= or #load=)
+    const serverPathResult = await consumeServerPathLoad();
+    const serverPathIndex =
+      typeof serverPathResult?.modelIndex === "number"
+        ? serverPathResult.modelIndex
+        : null;
     const loadIndex = await consumeLoadParam();
     const editorResult = consumeEditorPayload();
     const editorIndex = editorResult?.index;
     const shareIndex = consumeShareLink();
     const initialIndex =
-      typeof loadIndex === "number"
+      typeof serverPathIndex === "number"
+        ? serverPathIndex
+        : typeof loadIndex === "number"
         ? loadIndex
         : typeof shareIndex === "number"
         ? shareIndex
@@ -5786,5 +8221,23 @@ export function initBlockscape() {
         ? editorIndex
         : firstSeedIndex ?? 0;
     setActive(initialIndex);
+    if (
+      serverPathResult?.itemId &&
+      typeof serverPathResult.modelIndex === "number" &&
+      serverPathResult.modelIndex === initialIndex
+    ) {
+      requestAnimationFrame(() => {
+        if (activeIndex !== serverPathResult.modelIndex) return;
+        const tile = index.get(serverPathResult.itemId)?.el;
+        if (!tile) return;
+        select(serverPathResult.itemId);
+        tile.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+          inline: "center",
+        });
+        tile.focus({ preventScroll: true });
+      });
+    }
   })();
 }

@@ -1,7 +1,20 @@
+import { tokens } from "./generated/tokens";
+
 function assertFn(fn, name) {
   if (typeof fn !== 'function') {
     throw new Error(`[itemEditor] expected ${name} to be a function`);
   }
+}
+
+function defaultMakeSlug(base) {
+  return (
+    (base || 'item')
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9._-]+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '') || 'item'
+  );
 }
 
 export function collectAllItemIds(modelData) {
@@ -48,7 +61,9 @@ export function createItemEditor({
   loadActiveIntoEditor,
   rebuildFromActive,
   select,
-  onSelectionRenamed
+  onSelectionRenamed,
+  makeSlug = defaultMakeSlug,
+  isAutoIdFromNameEnabled = () => true
 } = {}) {
   assertFn(findItemAndCategoryById, 'findItemAndCategoryById');
   assertFn(collectAllItemIds, 'collectAllItemIds');
@@ -56,6 +71,8 @@ export function createItemEditor({
   assertFn(loadActiveIntoEditor, 'loadActiveIntoEditor');
   assertFn(rebuildFromActive, 'rebuildFromActive');
   assertFn(select, 'select');
+  assertFn(makeSlug, 'makeSlug');
+  assertFn(isAutoIdFromNameEnabled, 'isAutoIdFromNameEnabled');
 
   /** @type {{wrapper:HTMLElement|null, fields:any, categoryId?:string, itemId?:string, modelData?:any}} */
   const state = {
@@ -63,7 +80,9 @@ export function createItemEditor({
     fields: {},
     categoryId: null,
     itemId: null,
-    modelData: null
+    modelData: null,
+    autoIdManuallyEdited: false,
+    autoSyncEnabled: true
   };
 
   function setError(message) {
@@ -97,6 +116,14 @@ export function createItemEditor({
       state.fields.nameInput?.focus();
       state.fields.nameInput?.select();
     });
+  }
+
+  function syncIdFromName({ force } = {}) {
+    if (!state.fields?.idInput || !state.fields?.nameInput) return;
+    if (!state.autoSyncEnabled || !isAutoIdFromNameEnabled()) return;
+    if (!force && state.autoIdManuallyEdited) return;
+    const slug = makeSlug(state.fields.nameInput.value || state.itemId || 'item');
+    state.fields.idInput.value = slug;
   }
 
   function applyItemEdits(payload) {
@@ -273,13 +300,30 @@ export function createItemEditor({
 
     const colorInput = document.createElement('input');
     colorInput.type = 'text';
-    colorInput.placeholder = '#2563eb';
+    colorInput.placeholder = tokens.color.primary;
     form.appendChild(makeField('Color', colorInput, 'Optional badge color (hex or CSS color).'));
 
     const depsInput = document.createElement('textarea');
     depsInput.rows = 2;
     depsInput.placeholder = 'Comma or space separated ids';
     form.appendChild(makeField('Dependencies', depsInput, 'Use item IDs, separated by commas or spaces.'));
+
+    const syncToggle = document.createElement('div');
+    syncToggle.className = 'item-editor__checkbox';
+    const syncRow = document.createElement('label');
+    syncRow.className = 'item-editor__checkbox-row';
+    const syncCheckbox = document.createElement('input');
+    syncCheckbox.type = 'checkbox';
+    const syncLabel = document.createElement('span');
+    syncLabel.textContent = 'Sync ID while editing name';
+    const syncHint = document.createElement('div');
+    syncHint.className = 'item-editor__hint';
+    syncHint.textContent = 'Turn off to keep typing names without changing the ID.';
+    syncRow.appendChild(syncCheckbox);
+    syncRow.appendChild(syncLabel);
+    syncToggle.appendChild(syncRow);
+    syncToggle.appendChild(syncHint);
+    form.appendChild(syncToggle);
 
     const actions = document.createElement('div');
     actions.className = 'item-editor__actions';
@@ -304,6 +348,7 @@ export function createItemEditor({
       externalFlagInput,
       colorInput,
       depsInput,
+      syncCheckbox,
       categoryValue: meta.querySelector('.item-editor__meta-value'),
       errorEl
     };
@@ -311,6 +356,17 @@ export function createItemEditor({
     cancelBtn.addEventListener('click', hide);
     closeBtn.addEventListener('click', hide);
     backdrop.addEventListener('click', hide);
+    idInput.addEventListener('input', () => {
+      state.autoIdManuallyEdited = true;
+    });
+    nameInput.addEventListener('input', syncIdFromName);
+      syncCheckbox.addEventListener('change', () => {
+        state.autoSyncEnabled = !!syncCheckbox.checked;
+        if (state.autoSyncEnabled) {
+          state.autoIdManuallyEdited = false;
+          syncIdFromName({ force: true });
+        }
+      });
     form.addEventListener('submit', (event) => {
       event.preventDefault();
       saveItemEdits();
@@ -334,6 +390,9 @@ export function createItemEditor({
     state.categoryId = hit.category.id;
     state.itemId = hit.item.id;
     state.modelData = hit.modelData;
+    state.autoIdManuallyEdited = false;
+    const autoSyncAllowed = !!isAutoIdFromNameEnabled();
+    state.autoSyncEnabled = autoSyncAllowed;
     state.fields.categoryValue.textContent = hit.category.title || hit.category.id;
     state.fields.idInput.value = hit.item.id || '';
     state.fields.nameInput.value = hit.item.name || '';
@@ -342,6 +401,11 @@ export function createItemEditor({
     state.fields.externalFlagInput.checked = hit.item.external === true;
     state.fields.colorInput.value = hit.item.color || '';
     state.fields.depsInput.value = Array.isArray(hit.item.deps) ? hit.item.deps.join(', ') : '';
+    state.fields.syncCheckbox.checked = state.autoSyncEnabled;
+    state.fields.syncCheckbox.disabled = !autoSyncAllowed;
+    if (!state.fields.idInput.value && autoSyncAllowed) {
+      syncIdFromName({ force: true });
+    }
     setError('');
     select(hit.item.id);
     show();

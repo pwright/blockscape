@@ -4,9 +4,14 @@
   "private": true,
   "scripts": {
     "serve": "http-server -c-1 -p 4173 dist",
+    "predev": "npm run build:tokens",
     "dev": "vite",
-    "build": "vite build",
+    "build:tokens": "node scripts/build-tokens.js",
+    "build": "npm run build:tokens && npm run clean-docs && vite build",
+    "export": "npm run build:tokens && vite build --config vite.config.export.mjs && cp svelte/src/mount.js documentation/docs/site_assets/blockscape/mount.js",
+    "clean-docs": "node scripts/clean-docs.js",
     "preview": "vite preview",
+    "server": "node server.js",
     "cypress:open": "cypress open",
     "cypress:run": "cypress run",
     "cypress:report": "ELECTRON_RUN_AS_NODE= ELECTRON_NO_ATTACH_CONSOLE= cypress run --reporter json > cypress/results/report.json"
