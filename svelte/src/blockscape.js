@@ -27,6 +27,8 @@ export function initBlockscape(featureOverrides = {}) {
     autoLoadFromDir: true,
     showHeader: true,
     showSidebar: true,
+    showFooter: true,
+    showModelMeta: true,
     seriesNavMinVersions: 1,
     initialSettings: null,
     initialSettingsUrl: null,
