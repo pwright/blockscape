@@ -6338,9 +6338,28 @@ export function initBlockscape(featureOverrides = {}) {
           return { isExternal: false, url: "" };
         return { isExternal: true, url: url.toString() };
       } catch (error) {
-        console.warn("[Blockscape] invalid external url skipped", value, error);
-        return { isExternal: false, url: "" };
+        // Continue to relative resolution below.
       }
+      if (!/^[a-z][a-z0-9+.-]*:/i.test(trimmed)) {
+        // Treat bare/relative paths as external links, resolving against the current page when possible.
+        try {
+          const base =
+            typeof window !== "undefined" && window.location?.href
+              ? window.location.href
+              : undefined;
+          const resolved = base ? new URL(trimmed, base).toString() : trimmed;
+          return { isExternal: true, url: resolved };
+        } catch (error) {
+          console.warn(
+            "[Blockscape] invalid external url skipped",
+            value,
+            error
+          );
+          return { isExternal: false, url: "" };
+        }
+      }
+      console.warn("[Blockscape] invalid external url skipped", value);
+      return { isExternal: false, url: "" };
     }
     if (value === true) {
       return { isExternal: true, url: "" };

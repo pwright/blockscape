@@ -53,7 +53,7 @@
           fileOpen: false,
           fileSave: false,
           autoLoadFromDir: false,
-          showHeader: true,
+          showHeader: false,
           showSidebar: false,
           showFooter: false,
           showModelMeta: false,

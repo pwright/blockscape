@@ -8182,6 +8182,7 @@ ${text2}` : text2;
     return buildObsidianUrl(targetText);
   }
   function resolveExternalMeta(value) {
+    var _a;
     if (typeof value === "string") {
       const trimmed = value.trim();
       if (!trimmed) return { isExternal: false, url: "" };
@@ -8191,9 +8192,23 @@ ${text2}` : text2;
           return { isExternal: false, url: "" };
         return { isExternal: true, url: url.toString() };
       } catch (error) {
-        console.warn("[Blockscape] invalid external url skipped", value, error);
-        return { isExternal: false, url: "" };
       }
+      if (!/^[a-z][a-z0-9+.-]*:/i.test(trimmed)) {
+        try {
+          const base = typeof window !== "undefined" && ((_a = window.location) == null ? void 0 : _a.href) ? window.location.href : void 0;
+          const resolved = base ? new URL(trimmed, base).toString() : trimmed;
+          return { isExternal: true, url: resolved };
+        } catch (error) {
+          console.warn(
+            "[Blockscape] invalid external url skipped",
+            value,
+            error
+          );
+          return { isExternal: false, url: "" };
+        }
+      }
+      console.warn("[Blockscape] invalid external url skipped", value);
+      return { isExternal: false, url: "" };
     }
     if (value === true) {
       return { isExternal: true, url: "" };
