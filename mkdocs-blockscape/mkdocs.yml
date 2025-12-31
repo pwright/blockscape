@@ -1,6 +1,7 @@
 site_name: Blockscape Docs
 
 docs_dir: docs
+site_dir: ../docs/documentation
 
 markdown_extensions:
   - mkdocs_blockscape.extension
