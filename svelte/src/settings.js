@@ -15,6 +15,7 @@ export const STORAGE_KEYS = {
   autoReloadIntervalMs: "blockscape:autoReloadIntervalMs",
   autoIdFromName: "blockscape:autoIdFromName",
   seriesNavDoubleClickMs: "blockscape:seriesNavDoubleClickMs",
+  centerItems: "blockscape:centerItems",
 };
 
 export const DEFAULTS = {
@@ -46,6 +47,7 @@ export const DEFAULTS = {
   seriesNavDoubleClickMs: 900,
   seriesNavDoubleClickMin: 300,
   seriesNavDoubleClickMax: 4000,
+  centerItems: false,
 };
 
 export const formatSettings = {
@@ -110,6 +112,7 @@ export function buildSettingsSnapshot(current, { localBackend } = {}) {
     autoIdFromName: current.autoIdFromNameEnabled,
     seriesNavDoubleClickMs: current.seriesNavDoubleClickWaitMs,
     showSecondaryLinks: current.showSecondaryLinks,
+    centerItems: current.centerItems,
     showReusedInMap: current.showReusedInMap,
     colorPresets: current.colorPresets,
   };
@@ -149,6 +152,8 @@ export function applySettingsSnapshot(snapshot = {}, ctx) {
     persistAutoIdFromNameEnabled,
     applySeriesNavDoubleClickWait,
     persistSeriesNavDoubleClickWait,
+    applyCenterItems,
+    persistCenterItems,
     localBackend,
     ui,
     refreshObsidianLinks,
@@ -162,9 +167,13 @@ export function applySettingsSnapshot(snapshot = {}, ctx) {
   } = ctx;
 
   if (snapshot.theme) {
-    applyTheme?.(snapshot.theme);
+    const appliedTheme = applyTheme?.(snapshot.theme);
+    const isDark = (appliedTheme || snapshot.theme) === "dark";
     if (ctx.ui?.themeToggle) {
-      ctx.ui.themeToggle.checked = snapshot.theme === "dark";
+      ctx.ui.themeToggle.checked = isDark;
+    }
+    if (ctx.ui?.tabThemeToggle) {
+      ctx.ui.tabThemeToggle.checked = isDark;
     }
     appliedKeys.push("theme");
   }
@@ -330,6 +339,13 @@ export function applySettingsSnapshot(snapshot = {}, ctx) {
     appliedKeys.push("autoReloadIntervalMs");
   }
 
+  if (snapshot.centerItems != null) {
+    const applied = applyCenterItems?.(asBool(snapshot.centerItems));
+    persistCenterItems?.(applied);
+    if (ui?.tabCenterToggle) ui.tabCenterToggle.checked = applied;
+    appliedKeys.push("centerItems");
+  }
+
   if (snapshot.showSecondaryLinks != null) {
     const next = asBool(snapshot.showSecondaryLinks);
     if (typeof ctx.setShowSecondaryLinks === "function") {
@@ -338,6 +354,7 @@ export function applySettingsSnapshot(snapshot = {}, ctx) {
       ctx.showSecondaryLinks = next;
     }
     if (ui?.secondaryLinksToggle) ui.secondaryLinksToggle.checked = next;
+    if (ui?.tabSecondaryLinksToggle) ui.tabSecondaryLinksToggle.checked = next;
     if (selection) {
       select(selection);
     } else {

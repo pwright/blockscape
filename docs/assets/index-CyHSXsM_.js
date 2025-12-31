@@ -2443,6 +2443,7 @@ function buildSettingsSnapshot(current, { localBackend } = {}) {
     autoIdFromName: current.autoIdFromNameEnabled,
     seriesNavDoubleClickMs: current.seriesNavDoubleClickWaitMs,
     showSecondaryLinks: current.showSecondaryLinks,
+    centerItems: current.centerItems,
     showReusedInMap: current.showReusedInMap,
     colorPresets: current.colorPresets
   };
@@ -2453,7 +2454,7 @@ function buildSettingsSnapshot(current, { localBackend } = {}) {
   return snapshot;
 }
 function applySettingsSnapshot(snapshot = {}, ctx) {
-  var _a, _b, _c;
+  var _a, _b, _c, _d;
   if (!snapshot || typeof snapshot !== "object") return { applied: [] };
   const appliedKeys = [];
   const {
@@ -2482,6 +2483,8 @@ function applySettingsSnapshot(snapshot = {}, ctx) {
     persistAutoIdFromNameEnabled,
     applySeriesNavDoubleClickWait,
     persistSeriesNavDoubleClickWait,
+    applyCenterItems,
+    persistCenterItems,
     localBackend,
     ui,
     refreshObsidianLinks,
@@ -2494,9 +2497,13 @@ function applySettingsSnapshot(snapshot = {}, ctx) {
     current
   } = ctx;
   if (snapshot.theme) {
-    applyTheme == null ? void 0 : applyTheme(snapshot.theme);
+    const appliedTheme = applyTheme == null ? void 0 : applyTheme(snapshot.theme);
+    const isDark = (appliedTheme || snapshot.theme) === "dark";
     if ((_a = ctx.ui) == null ? void 0 : _a.themeToggle) {
-      ctx.ui.themeToggle.checked = snapshot.theme === "dark";
+      ctx.ui.themeToggle.checked = isDark;
+    }
+    if ((_b = ctx.ui) == null ? void 0 : _b.tabThemeToggle) {
+      ctx.ui.tabThemeToggle.checked = isDark;
     }
     appliedKeys.push("theme");
   }
@@ -2571,7 +2578,7 @@ function applySettingsSnapshot(snapshot = {}, ctx) {
     );
     persistObsidianLinksEnabled(applied);
     if (ui == null ? void 0 : ui.obsidianToggle) ui.obsidianToggle.checked = applied;
-    (_b = ui == null ? void 0 : ui.obsidianModeInputs) == null ? void 0 : _b.forEach((input) => {
+    (_c = ui == null ? void 0 : ui.obsidianModeInputs) == null ? void 0 : _c.forEach((input) => {
       input.disabled = !applied;
     });
     if (ui == null ? void 0 : ui.obsidianVaultInput) ui.obsidianVaultInput.disabled = !applied;
@@ -2581,7 +2588,7 @@ function applySettingsSnapshot(snapshot = {}, ctx) {
   if (snapshot.obsidianLinkMode) {
     const applied = applyObsidianLinkMode(snapshot.obsidianLinkMode);
     persistObsidianLinkMode(applied);
-    (_c = ui == null ? void 0 : ui.obsidianModeInputs) == null ? void 0 : _c.forEach((input) => {
+    (_d = ui == null ? void 0 : ui.obsidianModeInputs) == null ? void 0 : _d.forEach((input) => {
       input.checked = input.value === applied;
     });
     refreshObsidianLinks == null ? void 0 : refreshObsidianLinks();
@@ -2630,6 +2637,12 @@ function applySettingsSnapshot(snapshot = {}, ctx) {
     (ui == null ? void 0 : ui.autoReloadValue) && (ui.autoReloadValue.textContent = formatSettings.autoReloadInterval(applied));
     appliedKeys.push("autoReloadIntervalMs");
   }
+  if (snapshot.centerItems != null) {
+    const applied = applyCenterItems == null ? void 0 : applyCenterItems(asBool(snapshot.centerItems));
+    persistCenterItems == null ? void 0 : persistCenterItems(applied);
+    if (ui == null ? void 0 : ui.tabCenterToggle) ui.tabCenterToggle.checked = applied;
+    appliedKeys.push("centerItems");
+  }
   if (snapshot.showSecondaryLinks != null) {
     const next = asBool(snapshot.showSecondaryLinks);
     if (typeof ctx.setShowSecondaryLinks === "function") {
@@ -2638,6 +2651,7 @@ function applySettingsSnapshot(snapshot = {}, ctx) {
       ctx.showSecondaryLinks = next;
     }
     if (ui == null ? void 0 : ui.secondaryLinksToggle) ui.secondaryLinksToggle.checked = next;
+    if (ui == null ? void 0 : ui.tabSecondaryLinksToggle) ui.tabSecondaryLinksToggle.checked = next;
     if (selection) {
       select(selection);
     } else {
@@ -2804,10 +2818,12 @@ function initBlockscape() {
   const AUTO_ID_FROM_NAME_STORAGE_KEY = "blockscape:autoIdFromName";
   const DEFAULT_AUTO_ID_FROM_NAME = true;
   const COLOR_PRESETS_STORAGE_KEY = "blockscape:colorPresets";
+  const CENTER_ITEMS_STORAGE_KEY = "blockscape:centerItems";
   const THEME_STORAGE_KEY = "blockscape:theme";
   const THEME_LIGHT = "light";
   const THEME_DARK = "dark";
   const CATEGORY_VIEW_VERSION_PREFIX = "cat:";
+  const DEFAULT_CENTER_ITEMS = false;
   let tileHoverScale = DEFAULT_TILE_HOVER_SCALE;
   let selectionDimOpacity = DEFAULT_SELECTION_DIM_OPACITY;
   let selectionDimEnabled = true;
@@ -2821,6 +2837,7 @@ function initBlockscape() {
   let autoIdFromNameEnabled = DEFAULT_AUTO_ID_FROM_NAME;
   let theme = THEME_LIGHT;
   let colorPresets = [];
+  let centerItems = DEFAULT_CENTER_ITEMS;
   let renderColorPresetsUI = null;
   const SERIES_NAV_DOUBLE_CLICK_STORAGE_KEY = "blockscape:seriesNavDoubleClickMs";
   const DEFAULT_SERIES_NAV_DOUBLE_CLICK_MS = 900;
@@ -2852,6 +2869,9 @@ function initBlockscape() {
     secondaryLinksToggle: null,
     reusedToggle: null,
     themeToggle: null,
+    tabThemeToggle: null,
+    tabSecondaryLinksToggle: null,
+    tabCenterToggle: null,
     colorPresetList: null
   };
   const localBackend = createLocalBackend();
@@ -2871,6 +2891,7 @@ function initBlockscape() {
   initializeObsidianVaultName();
   initializeSelectionDimEnabled();
   initializeAutoIdFromNameEnabled();
+  initializeCenterItems();
   syncSelectionClass();
   function uid() {
     return Math.random().toString(36).slice(2, 10);
@@ -2927,6 +2948,49 @@ function initBlockscape() {
     }
     persistTheme(normalized);
     return theme;
+  }
+  function persistCenterItems(enabled) {
+    if (typeof window === "undefined" || !window.localStorage) return;
+    try {
+      window.localStorage.setItem(
+        CENTER_ITEMS_STORAGE_KEY,
+        enabled ? "true" : "false"
+      );
+    } catch (error) {
+      console.warn("[Blockscape] failed to persist center items", error);
+    }
+  }
+  function applyCenterItems(enabled) {
+    centerItems = !!enabled;
+    if (app) {
+      app.classList.toggle("is-center-mode", centerItems);
+      app.querySelectorAll(".grid").forEach((grid) => {
+        grid.classList.toggle("is-centered", centerItems);
+      });
+      app.querySelectorAll(".tile-add").forEach((btn) => {
+        btn.hidden = centerItems;
+        btn.tabIndex = centerItems ? -1 : 0;
+        btn.setAttribute("aria-hidden", centerItems ? "true" : "false");
+      });
+    }
+    if (model) {
+      reflowRects();
+      drawLinks();
+    }
+    return centerItems;
+  }
+  function initializeCenterItems() {
+    if (typeof window === "undefined" || !window.localStorage) {
+      return applyCenterItems(DEFAULT_CENTER_ITEMS);
+    }
+    try {
+      const stored = window.localStorage.getItem(CENTER_ITEMS_STORAGE_KEY);
+      if (stored == null) return applyCenterItems(DEFAULT_CENTER_ITEMS);
+      return applyCenterItems(stored === "true" || stored === "1");
+    } catch (error) {
+      console.warn("[Blockscape] failed to read center items pref", error);
+      return applyCenterItems(DEFAULT_CENTER_ITEMS);
+    }
   }
   function getCssVarValue(varName) {
     if (typeof window === "undefined") return "";
@@ -4216,6 +4280,7 @@ function initBlockscape() {
       autoIdFromNameEnabled,
       seriesNavDoubleClickWaitMs,
       showSecondaryLinks,
+      centerItems,
       showReusedInMap,
       theme,
       colorPresets
@@ -4260,6 +4325,8 @@ function initBlockscape() {
       setShowReusedInMap,
       applyTheme,
       setColorPresets,
+      applyCenterItems,
+      persistCenterItems,
       current: getCurrentSettingsState()
     });
   }
@@ -6536,10 +6603,16 @@ function initBlockscape() {
     app.appendChild(meta);
     const tabsWrapper = document.createElement("div");
     tabsWrapper.className = "blockscape-tabs";
+    const tabHeader = document.createElement("div");
+    tabHeader.className = "blockscape-tabrow";
     const tabList = document.createElement("div");
     tabList.className = "blockscape-tablist";
     tabList.setAttribute("role", "tablist");
-    tabsWrapper.appendChild(tabList);
+    tabHeader.appendChild(tabList);
+    const tabActions = document.createElement("div");
+    tabActions.className = "blockscape-tabactions";
+    tabHeader.appendChild(tabActions);
+    tabsWrapper.appendChild(tabHeader);
     const panelsWrapper = document.createElement("div");
     panelsWrapper.className = "blockscape-tabpanels";
     tabsWrapper.appendChild(panelsWrapper);
@@ -6713,6 +6786,58 @@ ${text2}` : text2;
     sourceWrapper.className = "blockscape-source-panel";
     const settingsPanel = document.createElement("div");
     settingsPanel.className = "blockscape-settings-panel";
+    const syncThemeSwitches = (isDark) => {
+      if (settingsUi.themeToggle) settingsUi.themeToggle.checked = isDark;
+      if (settingsUi.tabThemeToggle) settingsUi.tabThemeToggle.checked = isDark;
+    };
+    const setThemePreference = (isDark) => {
+      syncThemeSwitches(isDark);
+      applyTheme(isDark ? THEME_DARK : THEME_LIGHT);
+    };
+    const syncCenterSwitches = (checked) => {
+      if (settingsUi.tabCenterToggle) {
+        settingsUi.tabCenterToggle.checked = checked;
+      }
+    };
+    const applyCenterPreference = (checked) => {
+      const applied = applyCenterItems(checked);
+      syncCenterSwitches(applied);
+      persistCenterItems(applied);
+    };
+    const syncSecondaryLinkSwitches = (checked) => {
+      if (settingsUi.secondaryLinksToggle)
+        settingsUi.secondaryLinksToggle.checked = checked;
+      if (settingsUi.tabSecondaryLinksToggle)
+        settingsUi.tabSecondaryLinksToggle.checked = checked;
+    };
+    const applySecondaryLinkVisibility = (checked) => {
+      const next = !!checked;
+      syncSecondaryLinkSwitches(next);
+      showSecondaryLinks = next;
+      if (selection) {
+        select(selection);
+      } else {
+        clearStyles();
+        drawLinks();
+      }
+    };
+    const createTabToggle = ({ id, label, checked, onChange }) => {
+      const row = document.createElement("label");
+      row.className = "blockscape-tab-toggle";
+      row.setAttribute("for", id);
+      const input = document.createElement("input");
+      input.type = "checkbox";
+      input.id = id;
+      input.checked = checked;
+      if (typeof onChange === "function") {
+        input.addEventListener("change", () => onChange(input.checked));
+      }
+      const text2 = document.createElement("span");
+      text2.className = "blockscape-tab-toggle__label";
+      text2.textContent = label;
+      row.append(input, text2);
+      return { row, input };
+    };
     const settingsHeading = document.createElement("p");
     settingsHeading.className = "blockscape-settings-panel__title";
     settingsHeading.textContent = "Feature toggles";
@@ -6733,10 +6858,34 @@ ${text2}` : text2;
     themeText.append(themeLabel, themeHint);
     themeRow.append(themeInput, themeText);
     themeInput.addEventListener("change", () => {
-      applyTheme(themeInput.checked ? THEME_DARK : THEME_LIGHT);
+      setThemePreference(themeInput.checked);
     });
     settingsPanel.appendChild(themeRow);
     settingsUi.themeToggle = themeInput;
+    const { row: tabThemeToggleRow, input: tabThemeToggleInput } = createTabToggle({
+      id: "tabToggleTheme",
+      label: "Dark mode",
+      checked: theme === THEME_DARK,
+      onChange: (checked) => setThemePreference(checked)
+    });
+    tabActions.appendChild(tabThemeToggleRow);
+    settingsUi.tabThemeToggle = tabThemeToggleInput;
+    const { row: tabSecondaryToggleRow, input: tabSecondaryToggleInput } = createTabToggle({
+      id: "tabToggleSecondaryLinks",
+      label: "Show indirect links",
+      checked: showSecondaryLinks,
+      onChange: (checked) => applySecondaryLinkVisibility(checked)
+    });
+    tabActions.appendChild(tabSecondaryToggleRow);
+    settingsUi.tabSecondaryLinksToggle = tabSecondaryToggleInput;
+    const { row: tabCenterToggleRow, input: tabCenterToggleInput } = createTabToggle({
+      id: "tabToggleCenterItems",
+      label: "Center",
+      checked: centerItems,
+      onChange: (checked) => applyCenterPreference(checked)
+    });
+    tabActions.appendChild(tabCenterToggleRow);
+    settingsUi.tabCenterToggle = tabCenterToggleInput;
     const settingsActions = document.createElement("div");
     settingsActions.className = "settings-actions";
     const settingsFileInput = document.createElement("input");
@@ -6916,15 +7065,7 @@ ${text2}` : text2;
       label: "Show indirect links",
       checked: showSecondaryLinks,
       className: "map-controls__toggle",
-      onChange: (checked) => {
-        showSecondaryLinks = checked;
-        if (selection) {
-          select(selection);
-        } else {
-          clearStyles();
-          drawLinks();
-        }
-      }
+      onChange: (checked) => applySecondaryLinkVisibility(checked)
     });
     settingsPanel.appendChild(secondaryToggleRow);
     settingsUi.secondaryLinksToggle = secondaryToggleInput;
@@ -7446,7 +7587,7 @@ ${text2}` : text2;
       );
       section.appendChild(head);
       const grid = document.createElement("div");
-      grid.className = "grid";
+      grid.className = "grid" + (centerItems ? " is-centered" : "");
       section.appendChild(grid);
       (cat.items || []).forEach((it) => {
         tileCounter += 1;
@@ -7535,6 +7676,9 @@ ${text2}` : text2;
         addTile.type = "button";
         addTile.className = "tile-add";
         addTile.innerHTML = '<span class="tile-add__icon" aria-hidden="true">+</span><span class="tile-add__label"></span>';
+        addTile.hidden = centerItems;
+        addTile.tabIndex = centerItems ? -1 : 0;
+        addTile.setAttribute("aria-hidden", centerItems ? "true" : "false");
         addTile.addEventListener("click", () => addItemToCategory(cat.id));
         grid.appendChild(addTile);
       }
