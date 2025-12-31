@@ -12,7 +12,7 @@ export default defineConfig({
   publicDir: false,
   plugins: [svelte()],
   build: {
-    outDir: '../mkdocs-blockscape/docs/site_assets/blockscape',
+    outDir: '../documentation/docs/site_assets/blockscape',
     emptyOutDir: true,
     lib: {
       entry: resolveSrc('Blockscape.svelte'),

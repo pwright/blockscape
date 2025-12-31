@@ -5,7 +5,7 @@ This folder contains a working MkDocs project that renders Blockscape maps from 
 To use the extension in another repo:
 
 1) Copy `mkdocs_blockscape/` into your MkDocs project (any path is fine as long as Python can import it).
-2) Copy the built assets from this repo’s `mkdocs-blockscape/docs/site_assets/blockscape/` into your project’s `docs/site_assets/blockscape/` (or another folder you reference in `mkdocs.yml`).
+2) Copy the built assets from this repo’s `documentation/docs/site_assets/blockscape/` into your project’s `docs/site_assets/blockscape/` (or another folder you reference in `mkdocs.yml`).
 3) Update your `mkdocs.yml`:
    - Add the extension: `markdown_extensions: [ ..., mkdocs_blockscape.extension ]`
    - Include the assets: 
@@ -34,13 +34,13 @@ npm install        # first time only
 npm run export     # writes docs/site_assets/blockscape/{blockscape.js,blockscape.css,mount.js}
 ```
 
-The `export` script builds the Svelte bundle as a library (no HTML) and drops the three files directly into `mkdocs-blockscape/docs/site_assets/blockscape/`. Keeping assets under `docs/` lets `mkdocs serve` and `mkdocs build` include them automatically.
+The `export` script builds the Svelte bundle as a library (no HTML) and drops the three files directly into `documentation/docs/site_assets/blockscape/`. Keeping assets under `docs/` lets `mkdocs serve` and `mkdocs build` include them automatically.
 
 ## Run the example site locally
 
 ```sh
-cd mkdocs-blockscape
-PYTHONPATH=mkdocs-blockscape mkdocs serve
+cd documentation
+PYTHONPATH=documentation mkdocs serve
 ```
 
 Open the served URL (usually http://127.0.0.1:8000/). The config in `mkdocs.yml` already wires in the CSS/JS from `site_assets/blockscape/`.
