@@ -46,12 +46,6 @@ export function updateItemReferences(modelData, oldId, newId) {
       }
     });
   });
-  if (Array.isArray(modelData?.links)) {
-    modelData.links.forEach(link => {
-      if (link.from === oldId) link.from = newId;
-      if (link.to === oldId) link.to = newId;
-    });
-  }
 }
 
 export function createItemEditor({
@@ -263,7 +257,7 @@ export function createItemEditor({
     const idInput = document.createElement('input');
     idInput.type = 'text';
     idInput.required = true;
-    form.appendChild(makeField('ID', idInput, 'Unique identifier used for links and dependencies.'));
+    form.appendChild(makeField('ID', idInput, 'Unique identifier used for dependencies.'));
 
     const nameInput = document.createElement('input');
     nameInput.type = 'text';

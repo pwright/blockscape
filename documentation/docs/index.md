@@ -56,20 +56,9 @@ This is a blockscape map:
         }
       ]
     }
-  ],
-  "links": [
-    {
-      "from": "differentiation",
-      "to": "productized"
-    },
-    {
-      "from": "genesis-bottom-left",
-      "to": "utility-bottom-right"
-    }
   ]
 }
 ```
 
 Clicking around might help. 
 If not, try **Next**.
-

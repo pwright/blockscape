@@ -44,5 +44,3 @@ Blockscape uses a simple JSON schema to define landscape models:
     - **deps**: Array of item IDs this component depends on
     - **logo**: Optional path to logo image
     - **external**: Optional URL for an external reference (docs, gists, etc.). When present the tile gains a dashed border and a launch icon that opens the link in a new tab.
-- **links**: Optional array of additional dependency links
-

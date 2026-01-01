@@ -2934,7 +2934,6 @@ export function initBlockscape(featureOverrides = {}) {
       id: baseId,
       title: mapTitle,
       categories: [],
-      links: [],
       abstract: "",
     };
     if (seriesId) payload.seriesId = seriesId;
@@ -3786,7 +3785,6 @@ export function initBlockscape(featureOverrides = {}) {
           info.sources.length
         } maps in this series${seriesTitle ? ` (${seriesTitle})` : ""}.`,
         categories,
-        links: [],
       };
       if (seriesId) viewData.seriesId = seriesId;
 
@@ -4213,9 +4211,6 @@ export function initBlockscape(featureOverrides = {}) {
       (c.items || []).forEach((it) => {
         seen.add(it.id);
         const deps = new Set(it.deps || []);
-        (mObj.links || []).forEach((l) => {
-          if (l.from === it.id) deps.add(l.to);
-        });
         fwd.set(it.id, deps);
         deps.forEach((d) => {
           if (!rev.has(d)) rev.set(d, new Set());

@@ -1734,12 +1734,6 @@ function updateItemReferences(modelData, oldId, newId) {
       }
     });
   });
-  if (Array.isArray(modelData == null ? void 0 : modelData.links)) {
-    modelData.links.forEach((link) => {
-      if (link.from === oldId) link.from = newId;
-      if (link.to === oldId) link.to = newId;
-    });
-  }
 }
 function createItemEditor({
   findItemAndCategoryById,
@@ -1931,7 +1925,7 @@ function createItemEditor({
     const idInput = document.createElement("input");
     idInput.type = "text";
     idInput.required = true;
-    form.appendChild(makeField("ID", idInput, "Unique identifier used for links and dependencies."));
+    form.appendChild(makeField("ID", idInput, "Unique identifier used for dependencies."));
     const nameInput = document.createElement("input");
     nameInput.type = "text";
     form.appendChild(makeField("Name", nameInput, "Visible label shown on the tile."));
@@ -5272,7 +5266,6 @@ function initBlockscape(featureOverrides = {}) {
       id: baseId,
       title: mapTitle,
       categories: [],
-      links: [],
       abstract: ""
     };
     if (seriesId) payload.seriesId = seriesId;
@@ -6008,8 +6001,7 @@ function initBlockscape(featureOverrides = {}) {
         id: makeDownloadName(`${catId}-category-view`),
         title: catTitle,
         abstract: `Items from "${catTitle}" across ${info.sources.length} maps in this series${seriesTitle ? ` (${seriesTitle})` : ""}.`,
-        categories,
-        links: []
+        categories
       };
       if (seriesId) viewData.seriesId = seriesId;
       ensureModelMetadata(viewData, {
@@ -6355,9 +6347,6 @@ function initBlockscape(featureOverrides = {}) {
       (c) => (c.items || []).forEach((it) => {
         seen.add(it.id);
         const deps = new Set(it.deps || []);
-        (mObj.links || []).forEach((l) => {
-          if (l.from === it.id) deps.add(l.to);
-        });
         fwd.set(it.id, deps);
         deps.forEach((d) => {
           if (!rev.has(d)) rev.set(d, /* @__PURE__ */ new Set());
