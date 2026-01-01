@@ -16,6 +16,7 @@ export const STORAGE_KEYS = {
   autoIdFromName: "blockscape:autoIdFromName",
   seriesNavDoubleClickMs: "blockscape:seriesNavDoubleClickMs",
   centerItems: "blockscape:centerItems",
+  linkThickness: "blockscape:linkThickness",
 };
 
 export const DEFAULTS = {
@@ -48,6 +49,7 @@ export const DEFAULTS = {
   seriesNavDoubleClickMin: 300,
   seriesNavDoubleClickMax: 4000,
   centerItems: false,
+  linkThickness: "m",
 };
 
 export const formatSettings = {
@@ -115,6 +117,9 @@ export function buildSettingsSnapshot(current, { localBackend } = {}) {
     centerItems: current.centerItems,
     showReusedInMap: current.showReusedInMap,
     colorPresets: current.colorPresets,
+    depColor: current.depColor,
+    revdepColor: current.revdepColor,
+    linkThickness: current.linkThickness,
   };
   if (autoReloadConfig) {
     snapshot.autoReloadEnabled = !!autoReloadConfig.enabled;
@@ -142,6 +147,12 @@ export function applySettingsSnapshot(snapshot = {}, ctx) {
     persistTitleHoverWidthMultiplier,
     applyTitleHoverTextPortion,
     persistTitleHoverTextPortion,
+    applyLinkThickness,
+    persistLinkThickness,
+    applyDepColor,
+    persistDepColor,
+    applyRevdepColor,
+    persistRevdepColor,
     applyObsidianLinksEnabled,
     persistObsidianLinksEnabled,
     applyObsidianLinkMode,
@@ -293,6 +304,33 @@ export function applySettingsSnapshot(snapshot = {}, ctx) {
       ctx.setColorPresets(snapshot.colorPresets);
     }
     appliedKeys.push("colorPresets");
+  }
+
+  if (snapshot.linkThickness) {
+    const applied = applyLinkThickness?.(snapshot.linkThickness);
+    if (applied) {
+      persistLinkThickness?.(applied);
+      if (ui?.linkThicknessInput) ui.linkThicknessInput.value = applied;
+      appliedKeys.push("linkThickness");
+    }
+  }
+
+  if (snapshot.depColor) {
+    const applied = applyDepColor?.(snapshot.depColor);
+    if (applied) {
+      persistDepColor?.(applied);
+      if (ui?.depColorInput) ui.depColorInput.value = applied;
+      appliedKeys.push("depColor");
+    }
+  }
+
+  if (snapshot.revdepColor) {
+    const applied = applyRevdepColor?.(snapshot.revdepColor);
+    if (applied) {
+      persistRevdepColor?.(applied);
+      if (ui?.revdepColorInput) ui.revdepColorInput.value = applied;
+      appliedKeys.push("revdepColor");
+    }
   }
 
   if (snapshot.autoIdFromName != null) {

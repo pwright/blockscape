@@ -411,6 +411,17 @@ a {
       font-size: var(--font-size-xs);
       color: var(--color-muted);
     }
+.settings-text__row {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+    }
+.settings-text__row .settings-text__text {
+      flex: 1;
+    }
+.settings-text__row select.settings-text__input {
+      max-width: 10rem;
+    }
 .settings-text__input {
       width: 100%;
       padding: var(--space-xs) var(--space-sm);
@@ -1092,6 +1103,27 @@ a {
       grid-template-columns: 1fr auto auto;
       gap: var(--space-xs);
       align-items: center;
+    }
+.settings-color-rows {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2xs);
+      margin-top: var(--space-2xs);
+    }
+.settings-color-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-sm);
+    }
+.settings-color-row__label {
+      display: flex;
+      flex-direction: column;
+      font-size: var(--font-size-sm);
+    }
+.settings-color-row__hint {
+      font-size: var(--font-size-xs);
+      color: var(--color-muted);
     }
 .settings-color-input {
       width: 3rem;

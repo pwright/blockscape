@@ -2439,7 +2439,10 @@ function buildSettingsSnapshot(current, { localBackend } = {}) {
     showSecondaryLinks: current.showSecondaryLinks,
     centerItems: current.centerItems,
     showReusedInMap: current.showReusedInMap,
-    colorPresets: current.colorPresets
+    colorPresets: current.colorPresets,
+    depColor: current.depColor,
+    revdepColor: current.revdepColor,
+    linkThickness: current.linkThickness
   };
   if (autoReloadConfig) {
     snapshot.autoReloadEnabled = !!autoReloadConfig.enabled;
@@ -2467,6 +2470,12 @@ function applySettingsSnapshot(snapshot = {}, ctx) {
     persistTitleHoverWidthMultiplier,
     applyTitleHoverTextPortion,
     persistTitleHoverTextPortion,
+    applyLinkThickness,
+    persistLinkThickness,
+    applyDepColor,
+    persistDepColor,
+    applyRevdepColor,
+    persistRevdepColor,
     applyObsidianLinksEnabled,
     persistObsidianLinksEnabled,
     applyObsidianLinkMode,
@@ -2600,6 +2609,30 @@ function applySettingsSnapshot(snapshot = {}, ctx) {
       ctx.setColorPresets(snapshot.colorPresets);
     }
     appliedKeys.push("colorPresets");
+  }
+  if (snapshot.linkThickness) {
+    const applied = applyLinkThickness == null ? void 0 : applyLinkThickness(snapshot.linkThickness);
+    if (applied) {
+      persistLinkThickness == null ? void 0 : persistLinkThickness(applied);
+      if (ui == null ? void 0 : ui.linkThicknessInput) ui.linkThicknessInput.value = applied;
+      appliedKeys.push("linkThickness");
+    }
+  }
+  if (snapshot.depColor) {
+    const applied = applyDepColor == null ? void 0 : applyDepColor(snapshot.depColor);
+    if (applied) {
+      persistDepColor == null ? void 0 : persistDepColor(applied);
+      if (ui == null ? void 0 : ui.depColorInput) ui.depColorInput.value = applied;
+      appliedKeys.push("depColor");
+    }
+  }
+  if (snapshot.revdepColor) {
+    const applied = applyRevdepColor == null ? void 0 : applyRevdepColor(snapshot.revdepColor);
+    if (applied) {
+      persistRevdepColor == null ? void 0 : persistRevdepColor(applied);
+      if (ui == null ? void 0 : ui.revdepColorInput) ui.revdepColorInput.value = applied;
+      appliedKeys.push("revdepColor");
+    }
   }
   if (snapshot.autoIdFromName != null) {
     const applied = applyAutoIdFromNameEnabled(asBool(snapshot.autoIdFromName));
@@ -2841,6 +2874,14 @@ function initBlockscape(featureOverrides = {}) {
   const THEME_DARK = "dark";
   const CATEGORY_VIEW_VERSION_PREFIX = "cat:";
   const DEFAULT_CENTER_ITEMS = false;
+  const DEP_COLOR_STORAGE_KEY = "blockscape:depColor";
+  const REVDEP_COLOR_STORAGE_KEY = "blockscape:revdepColor";
+  const LINK_THICKNESS_STORAGE_KEY = "blockscape:linkThickness";
+  const LINK_THICKNESS = {
+    s: { primary: 1.5, secondary: 1 },
+    m: { primary: 3, secondary: 2.25 },
+    l: { primary: 6, secondary: 4.5 }
+  };
   let tileHoverScale = DEFAULT_TILE_HOVER_SCALE;
   let selectionDimOpacity = DEFAULT_SELECTION_DIM_OPACITY;
   let selectionDimEnabled = true;
@@ -2855,6 +2896,9 @@ function initBlockscape(featureOverrides = {}) {
   let theme = THEME_LIGHT;
   let colorPresets = [];
   let centerItems = DEFAULT_CENTER_ITEMS;
+  let depColor = "";
+  let revdepColor = "";
+  let linkThickness = "m";
   let renderColorPresetsUI = null;
   const SERIES_NAV_DOUBLE_CLICK_STORAGE_KEY = "blockscape:seriesNavDoubleClickMs";
   const DEFAULT_SERIES_NAV_DOUBLE_CLICK_MS = 900;
@@ -2889,7 +2933,10 @@ function initBlockscape(featureOverrides = {}) {
     tabThemeToggle: null,
     tabSecondaryLinksToggle: null,
     tabCenterToggle: null,
-    colorPresetList: null
+    colorPresetList: null,
+    depColorInput: null,
+    revdepColorInput: null,
+    linkThicknessInput: null
   };
   const disabledLocalBackend = {
     detect: async () => false,
@@ -2915,6 +2962,9 @@ function initBlockscape(featureOverrides = {}) {
   apicurio.hydrateConfig();
   applyTheme(readStoredTheme());
   setColorPresets(loadColorPresets(), { silent: true });
+  initializeDepColor();
+  initializeRevdepColor();
+  initializeLinkThickness();
   initializeTileHoverScale();
   initializeSelectionDimOpacity();
   initializeTileCompactness();
@@ -3107,6 +3157,129 @@ function initBlockscape(featureOverrides = {}) {
     if (typeof window === "undefined") return "";
     const styles = getComputedStyle(document.documentElement);
     return styles.getPropertyValue(varName).trim();
+  }
+  function setCssVarValue(varName, value) {
+    if (typeof document === "undefined") return;
+    document.documentElement.style.setProperty(varName, value);
+  }
+  function normalizeHexColor(value, fallback) {
+    const raw = (value || "").toString().trim();
+    const match = raw.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+    if (!match) return fallback;
+    if (raw.length === 4) {
+      return "#" + raw.slice(1).split("").map((ch) => ch + ch).join("");
+    }
+    return raw.toLowerCase();
+  }
+  function resolveColor(value, { fallbackVar, fallbackColor }) {
+    const raw = (value || "").toString().trim();
+    const varMatch = raw.match(/^var\((--[^)]+)\)$/);
+    if (varMatch) {
+      const resolved = getCssVarValue(varMatch[1]);
+      if (resolved) return normalizeHexColor(resolved, fallbackColor);
+      if (fallbackVar) {
+        const fallbackResolved = getCssVarValue(fallbackVar);
+        if (fallbackResolved)
+          return normalizeHexColor(fallbackResolved, fallbackColor);
+      }
+    }
+    return normalizeHexColor(raw, fallbackColor);
+  }
+  function readStoredColor(key) {
+    if (typeof window === "undefined" || !window.localStorage) return "";
+    try {
+      return window.localStorage.getItem(key) || "";
+    } catch (error) {
+      console.warn("[Blockscape] failed to read stored color", key, error);
+      return "";
+    }
+  }
+  function persistDepColor(next) {
+    if (typeof window === "undefined" || !window.localStorage) return;
+    try {
+      window.localStorage.setItem(DEP_COLOR_STORAGE_KEY, next);
+    } catch (error) {
+      console.warn("[Blockscape] failed to persist dep color", error);
+    }
+  }
+  function persistRevdepColor(next) {
+    if (typeof window === "undefined" || !window.localStorage) return;
+    try {
+      window.localStorage.setItem(REVDEP_COLOR_STORAGE_KEY, next);
+    } catch (error) {
+      console.warn("[Blockscape] failed to persist revdep color", error);
+    }
+  }
+  function applyDepColor(next) {
+    const applied = resolveColor(next, {
+      fallbackVar: "--color-primary",
+      fallbackColor: tokens.color.primary
+    });
+    depColor = applied;
+    setCssVarValue("--blockscape-dep", applied);
+    if (overlay) drawLinks();
+    return depColor;
+  }
+  function applyRevdepColor(next) {
+    const applied = resolveColor(next, {
+      fallbackVar: "--color-danger",
+      fallbackColor: tokens.blockscape.revdep
+    });
+    revdepColor = applied;
+    setCssVarValue("--blockscape-revdep", applied);
+    if (overlay) drawLinks();
+    return revdepColor;
+  }
+  function initializeDepColor() {
+    const stored = readStoredColor(DEP_COLOR_STORAGE_KEY);
+    const applied = applyDepColor(
+      stored || getCssVarValue("--blockscape-dep") || tokens.color.primary
+    );
+    persistDepColor(applied);
+    return applied;
+  }
+  function initializeRevdepColor() {
+    const stored = readStoredColor(REVDEP_COLOR_STORAGE_KEY);
+    const applied = applyRevdepColor(
+      stored || getCssVarValue("--blockscape-revdep") || tokens.blockscape.revdep
+    );
+    persistRevdepColor(applied);
+    return applied;
+  }
+  function normalizeLinkThickness(value) {
+    const next = (value || "").toString().toLowerCase();
+    if (next === "s" || next === "l") return next;
+    return "m";
+  }
+  function getLinkStrokeWidths() {
+    return LINK_THICKNESS[linkThickness] || LINK_THICKNESS.m;
+  }
+  function applyLinkThickness(next) {
+    linkThickness = normalizeLinkThickness(next);
+    drawLinks();
+    return linkThickness;
+  }
+  function persistLinkThickness(value) {
+    if (typeof window === "undefined" || !window.localStorage) return;
+    try {
+      window.localStorage.setItem(LINK_THICKNESS_STORAGE_KEY, value);
+    } catch (error) {
+      console.warn("[Blockscape] failed to persist link thickness", error);
+    }
+  }
+  function initializeLinkThickness() {
+    if (typeof window === "undefined" || !window.localStorage) {
+      return applyLinkThickness("m");
+    }
+    try {
+      const stored = window.localStorage.getItem(LINK_THICKNESS_STORAGE_KEY);
+      const applied = applyLinkThickness(stored || "m");
+      persistLinkThickness(applied);
+      return applied;
+    } catch (error) {
+      console.warn("[Blockscape] failed to read link thickness", error);
+      return applyLinkThickness("m");
+    }
   }
   function normalizeColorPresets(list) {
     const isHex = (val) => /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(val || "");
@@ -4394,7 +4567,10 @@ function initBlockscape(featureOverrides = {}) {
       centerItems,
       showReusedInMap,
       theme,
-      colorPresets
+      colorPresets,
+      depColor,
+      revdepColor,
+      linkThickness
     };
   }
   function applyImportedSettings(snapshot, { refreshObsidianLinks: obsidianRefresh } = {}) {
@@ -4434,6 +4610,12 @@ function initBlockscape(featureOverrides = {}) {
       applyReusedHighlights,
       setShowSecondaryLinks,
       setShowReusedInMap,
+      applyDepColor,
+      persistDepColor,
+      applyRevdepColor,
+      persistRevdepColor,
+      applyLinkThickness,
+      persistLinkThickness,
       applyTheme,
       setColorPresets,
       applyCenterItems,
@@ -7193,6 +7375,100 @@ ${text2}` : text2;
       });
     };
     renderColorPresetsUI();
+    const linkColorSection = document.createElement("div");
+    linkColorSection.className = "settings-text";
+    const linkColorTitle = document.createElement("div");
+    linkColorTitle.className = "settings-text__label";
+    linkColorTitle.textContent = "Link colors";
+    const linkColorHint = document.createElement("div");
+    linkColorHint.className = "settings-text__hint";
+    linkColorHint.textContent = "Adjust the colors used when highlighting enables/dependents.";
+    const linkColorRows = document.createElement("div");
+    linkColorRows.className = "settings-color-rows";
+    const createColorRow = ({ id, label, hint, value, onChange }) => {
+      const row = document.createElement("label");
+      row.className = "settings-color-row";
+      row.setAttribute("for", id);
+      const text2 = document.createElement("span");
+      text2.className = "settings-color-row__label";
+      text2.textContent = label;
+      if (hint) {
+        const hintEl = document.createElement("span");
+        hintEl.className = "settings-color-row__hint";
+        hintEl.textContent = hint;
+        text2.appendChild(hintEl);
+      }
+      const input = document.createElement("input");
+      input.type = "color";
+      input.id = id;
+      input.className = "settings-color-input";
+      input.value = value;
+      if (typeof onChange === "function") {
+        const handler = () => onChange(input.value);
+        input.addEventListener("input", handler);
+        input.addEventListener("change", handler);
+      }
+      row.append(text2, input);
+      linkColorRows.appendChild(row);
+      return input;
+    };
+    settingsUi.depColorInput = createColorRow({
+      id: "depColor",
+      label: "Enables",
+      hint: "Outgoing links from the selected item.",
+      value: depColor,
+      onChange: (val) => {
+        const applied = applyDepColor(val);
+        persistDepColor(applied);
+      }
+    });
+    settingsUi.revdepColorInput = createColorRow({
+      id: "revdepColor",
+      label: "Dependents",
+      hint: "Incoming links to the selected item.",
+      value: revdepColor,
+      onChange: (val) => {
+        const applied = applyRevdepColor(val);
+        persistRevdepColor(applied);
+      }
+    });
+    linkColorSection.append(linkColorTitle, linkColorHint, linkColorRows);
+    settingsPanel.appendChild(linkColorSection);
+    const linkThicknessSection = document.createElement("div");
+    linkThicknessSection.className = "settings-text";
+    const linkThicknessText = document.createElement("div");
+    linkThicknessText.className = "settings-text__text";
+    const linkThicknessLabel = document.createElement("div");
+    linkThicknessLabel.className = "settings-text__label";
+    linkThicknessLabel.textContent = "Link thickness";
+    const linkThicknessHint = document.createElement("div");
+    linkThicknessHint.className = "settings-text__hint";
+    linkThicknessHint.textContent = "Adjust stroke width for enables/dependents lines.";
+    linkThicknessText.append(linkThicknessLabel, linkThicknessHint);
+    const linkThicknessSelect = document.createElement("select");
+    linkThicknessSelect.id = "linkThickness";
+    linkThicknessSelect.className = "settings-text__input";
+    [
+      { value: "s", label: "Small" },
+      { value: "m", label: "Medium" },
+      { value: "l", label: "Large" }
+    ].forEach(({ value, label }) => {
+      const option = document.createElement("option");
+      option.value = value;
+      option.textContent = label;
+      if (value === linkThickness) option.selected = true;
+      linkThicknessSelect.appendChild(option);
+    });
+    linkThicknessSelect.addEventListener("change", () => {
+      const applied = applyLinkThickness(linkThicknessSelect.value);
+      persistLinkThickness(applied);
+    });
+    const linkThicknessWrapper = document.createElement("div");
+    linkThicknessWrapper.className = "settings-text__row";
+    linkThicknessWrapper.append(linkThicknessText, linkThicknessSelect);
+    linkThicknessSection.appendChild(linkThicknessWrapper);
+    settingsPanel.appendChild(linkThicknessSection);
+    settingsUi.linkThicknessInput = linkThicknessSelect;
     const createSettingsToggle = ({
       id,
       label,
@@ -8161,6 +8437,7 @@ ${text2}` : text2;
     if (!selection || overlay.hidden) return;
     selectionRelations = getSelectionRelations(selection);
     const relations = selectionRelations;
+    const { primary, secondary } = getLinkStrokeWidths();
     relations.edges.forEach((edge) => {
       var _a, _b;
       const fromRect = (_a = index.get(edge.from)) == null ? void 0 : _a.rect;
@@ -8184,7 +8461,7 @@ ${text2}` : text2;
         edge.type === "dep" ? "var(--blockscape-dep)" : "var(--blockscape-revdep)"
       );
       path.setAttribute("stroke-opacity", edge.depth === 1 ? "0.45" : "0.22");
-      path.setAttribute("stroke-width", edge.depth === 1 ? "2" : "1.5");
+      path.setAttribute("stroke-width", edge.depth === 1 ? primary : secondary);
       if (edge.depth > 1) path.setAttribute("stroke-dasharray", "4 3");
       path.setAttribute("vector-effect", "non-scaling-stroke");
       overlay.appendChild(path);
