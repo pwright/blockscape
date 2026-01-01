@@ -1,7 +1,23 @@
-site_name: Blockscape Docs
+site_name: Blockscape
+site_url: https://pwright.github.io/blockscape/
 
 docs_dir: docs
 site_dir: ../docs/documentation
+
+nav:
+  - Home: https://pwright.github.io/blockscape/
+  - Maps:
+      - Blockscape Example: maps/blockscape-example.md
+      - Series Example: maps/series-example.md
+  - Documentation:
+      - Overview: documentation/maps.md
+      - Series: documentation/series.md
+      - Models: documentation/models.md
+      - Docker for local editor: documentation/docker.md
+      - Apicurio as backend: documentation/apicurio.md
+      - Local usage on Linux: documentation/bs-opener.md
+  
+  - TOC: toc.md
 
 markdown_extensions:
   - mkdocs_blockscape.extension

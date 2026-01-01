@@ -19,6 +19,7 @@
       
       <ul class="shortcut-help__tips">
         <li>Play around with the example maps.</li>
+        <li>Open the <a href="./documentation/">documentation</a>.</li>
         <li>Read about <a href="https://www.wardleymaps.com" target="_blank" rel="noreferrer noopener">Wardley Maps</a>.</li>
         <li>Copy this URL and use &quot;Load URL&quot;: <a href="https://gist.githubusercontent.com/pwright/86dbb074b35d6d17671bf17ecbf1a824/raw/git.bs" target="_blank" rel="noreferrer noopener">https://gist.githubusercontent.com/pwright/86dbb074b35d6d17671bf17ecbf1a824/raw/git.bs</a></li>
         <li>Edit maps by moving items with Shift + Arrow keys.</li>
