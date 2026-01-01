@@ -6,15 +6,22 @@ This is a blockscape map:
 {
   "id": "wardley-minimap",
   "title": "Wardley-Inspired Knowledge Schema",
-  "abstract": "A useful Wardley-inspired map for quick conversations is: <br><br>Y-axis = user visibility/value (top = directly user-facing, bottom = back-end/enabling), <br><br>X-axis = evolution/maturity (left = novel/custom, right = commodity/standard). <br><br>This helps teams decide where to differentiate (top-left), where to productize (top-right), where to industrialize (bottom-right), and where to build enabling capabilities (bottom-left).",
+  "abstract": "A useful Wardley-inspired map for quick conversations is: <br><br>Y-axis = user visibility/value (top = directly user-facing, bottom = back-end/enabling), <br><br>X-axis = evolution/maturity (left = novel/custom, right = commodity/standard). <br><br>This helps teams decide where to build enabling capabilities (bottom-left).",
   "categories": [
     {
       "id": "user-facing",
-      "title": "User-Facing Capabilities",
+      "title": "User",
       "items": [
         {
+          "id": "idea",
+          "name": "Idea",
+          "deps": [
+            "experiments-learning"
+          ]
+        },
+        {
           "id": "differentiation",
-          "name": "Different",
+          "name": "Proof of concept",
           "deps": [
             "experiments-learning",
             "custom-build"
@@ -26,6 +33,13 @@ This is a blockscape map:
           "deps": [
             "standard-components",
             "managed-service"
+          ]
+        },
+        {
+          "id": "service",
+          "name": "Service",
+          "deps": [
+            "productized"
           ]
         }
       ]
@@ -47,11 +61,6 @@ This is a blockscape map:
         {
           "id": "standard-components",
           "name": "Standard Components",
-          "deps": []
-        },
-        {
-          "id": "managed-service",
-          "name": "Managed Services",
           "deps": []
         }
       ]
