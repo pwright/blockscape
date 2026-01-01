@@ -200,6 +200,7 @@ export function initBlockscape(featureOverrides = {}) {
   const DEP_COLOR_STORAGE_KEY = "blockscape:depColor";
   const REVDEP_COLOR_STORAGE_KEY = "blockscape:revdepColor";
   const LINK_THICKNESS_STORAGE_KEY = "blockscape:linkThickness";
+  const LINK_EDGE_INSET_PX = 6;
   const LINK_THICKNESS = {
     s: { primary: 1.5, secondary: 1 },
     m: { primary: 3, secondary: 2.25 },
@@ -6586,17 +6587,22 @@ export function initBlockscape(featureOverrides = {}) {
       if (!fromRect || !toRect) return;
       const a = center(fromRect);
       const b = center(toRect);
+      const start =
+        insetPoint(clipToRect(fromRect, b) || a, fromRect, LINK_EDGE_INSET_PX) ||
+        a;
+      const end =
+        insetPoint(clipToRect(toRect, a) || b, toRect, LINK_EDGE_INSET_PX) || b;
       const path = document.createElementNS(
         "http://www.w3.org/2000/svg",
         "path"
       );
-      const c1x = (a.x + b.x) / 2,
-        c1y = a.y;
-      const c2x = (a.x + b.x) / 2,
-        c2y = b.y;
+      const c1x = (start.x + end.x) / 2,
+        c1y = start.y;
+      const c2x = (start.x + end.x) / 2,
+        c2y = end.y;
       path.setAttribute(
         "d",
-        `M ${a.x},${a.y} C ${c1x},${c1y} ${c2x},${c2y} ${b.x},${b.y}`
+        `M ${start.x},${start.y} C ${c1x},${c1y} ${c2x},${c2y} ${end.x},${end.y}`
       );
       path.setAttribute("fill", "none");
       path.setAttribute(
@@ -6615,6 +6621,39 @@ export function initBlockscape(featureOverrides = {}) {
 
   function center(r) {
     return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+  }
+
+  function clipToRect(rect, target) {
+    if (!rect || !target) return null;
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const dx = target.x - cx;
+    const dy = target.y - cy;
+    if (dx === 0 && dy === 0) return { x: cx, y: cy };
+    const halfW = rect.width / 2;
+    const halfH = rect.height / 2;
+    const candidates = [];
+    if (dx !== 0) {
+      candidates.push((dx > 0 ? halfW : -halfW) / dx);
+    }
+    if (dy !== 0) {
+      candidates.push((dy > 0 ? halfH : -halfH) / dy);
+    }
+    const t = Math.min(...candidates.filter((v) => v > 0));
+    const mult = Number.isFinite(t) ? t : 0;
+    return { x: cx + dx * mult, y: cy + dy * mult };
+  }
+
+  function insetPoint(point, rect, inset = 0) {
+    if (!point || !rect || inset <= 0) return point;
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const dx = cx - point.x;
+    const dy = cy - point.y;
+    const len = Math.hypot(dx, dy);
+    if (!len) return point;
+    const step = Math.min(inset, len / 2) / len;
+    return { x: point.x + dx * step, y: point.y + dy * step };
   }
   function escapeHtml(s) {
     return s.replace(
