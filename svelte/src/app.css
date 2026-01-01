@@ -24,7 +24,8 @@
     }
 
     .blockscape-root {
-      --blockscape-name-offset: -25px;
+      --blockscape-logo-offset: -25px;
+      --blockscape-name-offset: -45px;
     }
 
     a {
@@ -1873,6 +1874,7 @@
       height: calc(var(--blockscape-logo-size) * var(--blockscape-tile-compactness));
       object-fit: contain;
       opacity: .95;
+      transform: translateY(var(--blockscape-logo-offset, 0));
     }
 
     .name {
