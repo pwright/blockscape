@@ -4748,6 +4748,48 @@ function initBlockscape(featureOverrides = {}) {
     }
     return data;
   }
+  function deriveNextModelIdForVersion(entry) {
+    var _a, _b;
+    const parseId = (value) => {
+      const str = (value ?? "").toString().trim();
+      if (!str) return { base: "", suffix: null };
+      const match = str.match(/^(.*?)-(\d+)$/);
+      return {
+        base: match ? match[1] : str,
+        suffix: match ? Number.parseInt(match[2], 10) : null
+      };
+    };
+    const versions = Array.isArray(entry == null ? void 0 : entry.apicurioVersions) ? entry.apicurioVersions : [];
+    const activeId = (((_a = entry == null ? void 0 : entry.data) == null ? void 0 : _a.id) ?? "").toString().trim();
+    let base = parseId(activeId).base;
+    if (!base) {
+      for (const ver of versions) {
+        if (ver == null ? void 0 : ver.isCategoryView) continue;
+        const parsed = parseId(((_b = ver == null ? void 0 : ver.data) == null ? void 0 : _b.id) ?? (ver == null ? void 0 : ver.id) ?? "");
+        if (parsed.base) {
+          base = parsed.base;
+          break;
+        }
+      }
+    }
+    if (!base) {
+      const fallback = makeDownloadName(
+        getSeriesId(entry) || getModelSourceLabel(entry) || getModelTitle(entry, "model")
+      );
+      base = fallback;
+    }
+    let maxSuffix = 0;
+    versions.forEach((ver) => {
+      var _a2;
+      if (ver == null ? void 0 : ver.isCategoryView) return;
+      const parsed = parseId(((_a2 = ver == null ? void 0 : ver.data) == null ? void 0 : _a2.id) ?? (ver == null ? void 0 : ver.id) ?? "");
+      if (parsed.base !== base) return;
+      if (Number.isFinite(parsed.suffix) && parsed.suffix > maxSuffix) {
+        maxSuffix = parsed.suffix;
+      }
+    });
+    return `${base}-${String(maxSuffix + 1).padStart(2, "0")}`;
+  }
   function cloneModelData(data) {
     return JSON.parse(JSON.stringify(data));
   }
@@ -5337,6 +5379,7 @@ function initBlockscape(featureOverrides = {}) {
     }
     const target2 = models[activeIndex];
     ensureVersionContainer(target2, { versionLabel: "1" });
+    const nextId = deriveNextModelIdForVersion(target2);
     let copy;
     try {
       copy = cloneModelData(target2.data);
@@ -5346,6 +5389,9 @@ function initBlockscape(featureOverrides = {}) {
         error
       );
       throw new Error("Could not copy the current model.");
+    }
+    if (nextId) {
+      copy.id = nextId;
     }
     ensureModelMetadata(copy, {
       titleHint: getModelTitle(target2),

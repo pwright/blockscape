@@ -2351,6 +2351,56 @@ export function initBlockscape(featureOverrides = {}) {
     return data;
   }
 
+  function deriveNextModelIdForVersion(entry) {
+    const parseId = (value) => {
+      const str = (value ?? "").toString().trim();
+      if (!str) return { base: "", suffix: null };
+      const match = str.match(/^(.*?)-(\d+)$/);
+      return {
+        base: match ? match[1] : str,
+        suffix: match ? Number.parseInt(match[2], 10) : null,
+      };
+    };
+
+    const versions = Array.isArray(entry?.apicurioVersions)
+      ? entry.apicurioVersions
+      : [];
+    const activeId = (entry?.data?.id ?? "").toString().trim();
+
+    let base = parseId(activeId).base;
+    if (!base) {
+      for (const ver of versions) {
+        if (ver?.isCategoryView) continue;
+        const parsed = parseId(ver?.data?.id ?? ver?.id ?? "");
+        if (parsed.base) {
+          base = parsed.base;
+          break;
+        }
+      }
+    }
+
+    if (!base) {
+      const fallback = makeDownloadName(
+        getSeriesId(entry) ||
+          getModelSourceLabel(entry) ||
+          getModelTitle(entry, "model")
+      );
+      base = fallback;
+    }
+
+    let maxSuffix = 0;
+    versions.forEach((ver) => {
+      if (ver?.isCategoryView) return;
+      const parsed = parseId(ver?.data?.id ?? ver?.id ?? "");
+      if (parsed.base !== base) return;
+      if (Number.isFinite(parsed.suffix) && parsed.suffix > maxSuffix) {
+        maxSuffix = parsed.suffix;
+      }
+    });
+
+    return `${base}-${String(maxSuffix + 1).padStart(2, "0")}`;
+  }
+
   function cloneModelData(data) {
     return JSON.parse(JSON.stringify(data));
   }
@@ -2996,6 +3046,7 @@ export function initBlockscape(featureOverrides = {}) {
     }
     const target = models[activeIndex];
     ensureVersionContainer(target, { versionLabel: "1" });
+    const nextId = deriveNextModelIdForVersion(target);
     let copy;
     try {
       copy = cloneModelData(target.data);
@@ -3005,6 +3056,9 @@ export function initBlockscape(featureOverrides = {}) {
         error
       );
       throw new Error("Could not copy the current model.");
+    }
+    if (nextId) {
+      copy.id = nextId;
     }
     ensureModelMetadata(copy, {
       titleHint: getModelTitle(target),
