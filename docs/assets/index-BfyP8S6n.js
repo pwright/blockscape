@@ -2690,6 +2690,7 @@ function initBlockscape(featureOverrides = {}) {
     fileOpen: true,
     fileSave: true,
     autoLoadFromDir: true,
+    showModelMeta: true,
     seriesNavMinVersions: 1,
     initialSettings: null,
     initialSettingsUrl: null,
@@ -6648,7 +6649,7 @@ function initBlockscape(featureOverrides = {}) {
     return nav;
   }
   function render() {
-    var _a, _b, _c, _d, _e;
+    var _a, _b;
     if (!model) return;
     const activeModelEntry = activeIndex >= 0 && models[activeIndex] ? models[activeIndex] : null;
     const prevThumbs = app && app.querySelector ? app.querySelector(".version-nav__thumbs") : null;
@@ -6681,44 +6682,52 @@ function initBlockscape(featureOverrides = {}) {
     }
     overlay.setAttribute("width", window.innerWidth);
     overlay.setAttribute("height", window.innerHeight);
-    const meta = document.createElement("div");
-    meta.className = "blockscape-model-meta";
-    const titleEl = document.createElement("div");
-    titleEl.className = "blockscape-model-title";
-    titleEl.textContent = model.m.title && model.m.title.trim() || getModelTitle(models[activeIndex]);
-    meta.appendChild(titleEl);
-    if (((_a = models[activeIndex]) == null ? void 0 : _a.isSeries) || ((_c = (_b = models[activeIndex]) == null ? void 0 : _b.apicurioVersions) == null ? void 0 : _c.length)) {
-      ensureSeriesId(models[activeIndex], {
-        seriesName: models[activeIndex].title || model.m.title || getModelTitle(models[activeIndex])
-      });
-    }
-    const activeVersionLabel = getActiveApicurioVersionLabel(
-      models[activeIndex]
-    );
-    const seriesId = getSeriesId(models[activeIndex]);
-    const modelId = (model.m.id ?? "").toString().trim();
-    const detailsRow = document.createElement("div");
-    detailsRow.className = "blockscape-model-meta__details";
-    const addMetaDetail = (label, value) => {
-      if (!value) return;
-      const wrapper = document.createElement("div");
-      wrapper.className = "blockscape-model-id";
-      const labelSpan = document.createElement("span");
-      labelSpan.className = "blockscape-model-id__label";
-      labelSpan.textContent = label;
-      const valueSpan = document.createElement("span");
-      valueSpan.className = "blockscape-model-id__value";
-      valueSpan.textContent = value;
-      wrapper.append(labelSpan, valueSpan);
-      detailsRow.appendChild(wrapper);
+    const buildModelMeta = () => {
+      var _a2, _b2, _c;
+      const meta = document.createElement("div");
+      meta.className = "blockscape-model-meta";
+      const titleEl = document.createElement("div");
+      titleEl.className = "blockscape-model-title";
+      titleEl.textContent = model.m.title && model.m.title.trim() || getModelTitle(models[activeIndex]);
+      meta.appendChild(titleEl);
+      if (((_a2 = models[activeIndex]) == null ? void 0 : _a2.isSeries) || ((_c = (_b2 = models[activeIndex]) == null ? void 0 : _b2.apicurioVersions) == null ? void 0 : _c.length)) {
+        ensureSeriesId(models[activeIndex], {
+          seriesName: models[activeIndex].title || model.m.title || getModelTitle(models[activeIndex])
+        });
+      }
+      const activeVersionLabel = getActiveApicurioVersionLabel(
+        models[activeIndex]
+      );
+      const seriesId = getSeriesId(models[activeIndex]);
+      const modelId = (model.m.id ?? "").toString().trim();
+      const detailsRow = document.createElement("div");
+      detailsRow.className = "blockscape-model-meta__details";
+      const addMetaDetail = (label, value) => {
+        if (!value) return;
+        const wrapper = document.createElement("div");
+        wrapper.className = "blockscape-model-id";
+        const labelSpan = document.createElement("span");
+        labelSpan.className = "blockscape-model-id__label";
+        labelSpan.textContent = label;
+        const valueSpan = document.createElement("span");
+        valueSpan.className = "blockscape-model-id__value";
+        valueSpan.textContent = value;
+        wrapper.append(labelSpan, valueSpan);
+        detailsRow.appendChild(wrapper);
+      };
+      addMetaDetail("Series ID", seriesId);
+      addMetaDetail("Model ID", modelId);
+      addMetaDetail("No. in series", activeVersionLabel);
+      if (detailsRow.childElementCount) {
+        meta.appendChild(detailsRow);
+      }
+      return meta;
     };
-    addMetaDetail("Series ID", seriesId);
-    addMetaDetail("Model ID", modelId);
-    addMetaDetail("No. in series", activeVersionLabel);
-    if (detailsRow.childElementCount) {
-      meta.appendChild(detailsRow);
+    const modelMeta = buildModelMeta();
+    const showModelMeta = features.showModelMeta !== false;
+    if (showModelMeta) {
+      app.appendChild(modelMeta.cloneNode(true));
     }
-    app.appendChild(meta);
     const tabsWrapper = document.createElement("div");
     tabsWrapper.className = "blockscape-tabs";
     const tabHeader = document.createElement("div");
@@ -6743,7 +6752,7 @@ function initBlockscape(featureOverrides = {}) {
     const activeSeriesIndex = getActiveApicurioVersionIndex(
       models[activeIndex]
     );
-    const activeVersionEntry = ((_e = (_d = models[activeIndex]) == null ? void 0 : _d.apicurioVersions) == null ? void 0 : _e[activeSeriesIndex]) || null;
+    const activeVersionEntry = ((_b = (_a = models[activeIndex]) == null ? void 0 : _a.apicurioVersions) == null ? void 0 : _b[activeSeriesIndex]) || null;
     const activeIsCategoryView = activeViewIsCategory = Boolean(
       (activeVersionEntry == null ? void 0 : activeVersionEntry.isCategoryView) || ((activeVersionEntry == null ? void 0 : activeVersionEntry.version) || "").startsWith(
         CATEGORY_VIEW_VERSION_PREFIX
@@ -6882,6 +6891,7 @@ ${text2}` : text2;
     mapPanel.appendChild(renderHost);
     const abstractWrapper = document.createElement("div");
     abstractWrapper.className = "blockscape-abstract-panel";
+    abstractPanel.appendChild(modelMeta.cloneNode(true));
     if (model.m.abstract) {
       console.log("[Blockscape] Rendering abstract content");
       const abstractDiv = document.createElement("div");
@@ -10616,10 +10626,12 @@ function create_fragment$1(ctx) {
   let div23;
   let t92;
   let footer;
+  let div25;
+  let footer_hidden_value;
   let t94;
   let html_tag;
   let raw_value = `<script id="seed" type="application/json">${/*seedText*/
-  ctx[3]}<\/script>`;
+  ctx[4]}<\/script>`;
   let t95;
   let svg1;
   let t96;
@@ -10729,7 +10741,8 @@ function create_fragment$1(ctx) {
                 JSON</button> <button id="createVersion" class="pf-v5-c-button pf-m-secondary" type="button" title="Create a new version from the current map">New version</button></div></div></section> <section class="pf-v5-c-page__main-section blockscape-main-section"><div id="app" aria-live="polite"></div></section>`;
       t92 = space();
       footer = element("footer");
-      footer.innerHTML = `<div class="blockscape-footer__inner"><a href="https://pwright.github.io/backscape/" target="_blank" rel="noreferrer noopener">Old versions</a></div>`;
+      div25 = element("div");
+      div25.innerHTML = `<a href="https://pwright.github.io/backscape/" target="_blank" rel="noreferrer noopener">Old versions</a>`;
       t94 = space();
       html_tag = new HtmlTag(false);
       t95 = space();
@@ -10801,7 +10814,7 @@ function create_fragment$1(ctx) {
       attr(div10, "class", "pf-v5-c-masthead pf-m-display-inline blockscape-masthead");
       attr(header, "class", "pf-v5-c-page__header");
       header.hidden = header_hidden_value = !/*showHeader*/
-      ctx[2];
+      ctx[3];
       attr(div11, "class", "sidebar-heading");
       attr(ul, "id", "modelList");
       attr(ul, "class", "model-nav-list");
@@ -10832,11 +10845,14 @@ function create_fragment$1(ctx) {
       attr(aside, "class", "blockscape-sidebar");
       attr(aside, "aria-label", "Models");
       aside.hidden = aside_hidden_value = !/*showSidebar*/
-      ctx[1];
+      ctx[2];
       attr(div23, "class", "blockscape-main");
       attr(div24, "class", "blockscape-content");
       attr(main, "class", "pf-v5-c-page__main");
+      attr(div25, "class", "blockscape-footer__inner");
       attr(footer, "class", "pf-v5-c-page__footer blockscape-footer");
+      footer.hidden = footer_hidden_value = !/*showFooter*/
+      ctx[1];
       attr(div26, "class", "pf-v5-c-page");
       html_tag.a = t95;
       attr(svg1, "id", "overlay");
@@ -10920,6 +10936,7 @@ function create_fragment$1(ctx) {
       append(div24, div23);
       append(div26, t92);
       append(div26, footer);
+      append(footer, div25);
       insert(target2, t94, anchor);
       html_tag.m(raw_value, target2, anchor);
       insert(target2, t95, anchor);
@@ -10940,7 +10957,7 @@ function create_fragment$1(ctx) {
           button0,
           "click",
           /*toggleHeaderExpanded*/
-          ctx[4]
+          ctx[5]
         );
         mounted = true;
       }
@@ -10971,14 +10988,19 @@ function create_fragment$1(ctx) {
         attr(div6, "data-expanded", div6_data_expanded_value);
       }
       if (!current || dirty & /*showHeader*/
-      4 && header_hidden_value !== (header_hidden_value = !/*showHeader*/
-      ctx2[2])) {
+      8 && header_hidden_value !== (header_hidden_value = !/*showHeader*/
+      ctx2[3])) {
         header.hidden = header_hidden_value;
       }
       if (!current || dirty & /*showSidebar*/
-      2 && aside_hidden_value !== (aside_hidden_value = !/*showSidebar*/
-      ctx2[1])) {
+      4 && aside_hidden_value !== (aside_hidden_value = !/*showSidebar*/
+      ctx2[2])) {
         aside.hidden = aside_hidden_value;
+      }
+      if (!current || dirty & /*showFooter*/
+      2 && footer_hidden_value !== (footer_hidden_value = !/*showFooter*/
+      ctx2[1])) {
+        footer.hidden = footer_hidden_value;
       }
     },
     i(local) {
@@ -11020,6 +11042,7 @@ function create_fragment$1(ctx) {
 function instance$1($$self, $$props, $$invalidate) {
   let showHeader;
   let showSidebar;
+  let showFooter;
   let { seed } = $$props;
   let { features = {} } = $$props;
   const defaultSeedText = `
@@ -11181,21 +11204,26 @@ function instance$1($$self, $$props, $$invalidate) {
     initBlockscape(features);
   });
   $$self.$$set = ($$props2) => {
-    if ("seed" in $$props2) $$invalidate(5, seed = $$props2.seed);
-    if ("features" in $$props2) $$invalidate(6, features = $$props2.features);
+    if ("seed" in $$props2) $$invalidate(6, seed = $$props2.seed);
+    if ("features" in $$props2) $$invalidate(7, features = $$props2.features);
   };
   $$self.$$.update = () => {
     if ($$self.$$.dirty & /*features*/
-    64) {
-      $$invalidate(2, showHeader = features.showHeader !== false);
+    128) {
+      $$invalidate(3, showHeader = features.showHeader !== false);
     }
     if ($$self.$$.dirty & /*features*/
-    64) {
-      $$invalidate(1, showSidebar = features.showSidebar !== false);
+    128) {
+      $$invalidate(2, showSidebar = features.showSidebar !== false);
+    }
+    if ($$self.$$.dirty & /*features*/
+    128) {
+      $$invalidate(1, showFooter = features.showFooter !== false);
     }
   };
   return [
     headerExpanded,
+    showFooter,
     showSidebar,
     showHeader,
     seedText,
@@ -11207,7 +11235,7 @@ function instance$1($$self, $$props, $$invalidate) {
 class App extends SvelteComponent {
   constructor(options) {
     super();
-    init(this, options, instance$1, create_fragment$1, safe_not_equal, { seed: 5, features: 6 });
+    init(this, options, instance$1, create_fragment$1, safe_not_equal, { seed: 6, features: 7 });
   }
 }
 function create_fragment(ctx) {

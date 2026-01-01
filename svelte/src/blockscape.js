@@ -4601,61 +4601,69 @@ export function initBlockscape(featureOverrides = {}) {
     overlay.setAttribute("width", window.innerWidth);
     overlay.setAttribute("height", window.innerHeight);
 
-    const meta = document.createElement("div");
-    meta.className = "blockscape-model-meta";
+    const buildModelMeta = () => {
+      const meta = document.createElement("div");
+      meta.className = "blockscape-model-meta";
 
-    const titleEl = document.createElement("div");
-    titleEl.className = "blockscape-model-title";
-    titleEl.textContent =
-      (model.m.title && model.m.title.trim()) ||
-      getModelTitle(models[activeIndex]);
-    meta.appendChild(titleEl);
+      const titleEl = document.createElement("div");
+      titleEl.className = "blockscape-model-title";
+      titleEl.textContent =
+        (model.m.title && model.m.title.trim()) ||
+        getModelTitle(models[activeIndex]);
+      meta.appendChild(titleEl);
 
-    // Ensure series ID is present for display if this entry is a series.
-    if (
-      models[activeIndex]?.isSeries ||
-      models[activeIndex]?.apicurioVersions?.length
-    ) {
-      ensureSeriesId(models[activeIndex], {
-        seriesName:
-          models[activeIndex].title ||
-          model.m.title ||
-          getModelTitle(models[activeIndex]),
-      });
-    }
+      // Ensure series ID is present for display if this entry is a series.
+      if (
+        models[activeIndex]?.isSeries ||
+        models[activeIndex]?.apicurioVersions?.length
+      ) {
+        ensureSeriesId(models[activeIndex], {
+          seriesName:
+            models[activeIndex].title ||
+            model.m.title ||
+            getModelTitle(models[activeIndex]),
+        });
+      }
 
-    const activeVersionLabel = getActiveApicurioVersionLabel(
-      models[activeIndex]
-    );
-    const seriesId = getSeriesId(models[activeIndex]);
-    const modelId = (model.m.id ?? "").toString().trim();
+      const activeVersionLabel = getActiveApicurioVersionLabel(
+        models[activeIndex]
+      );
+      const seriesId = getSeriesId(models[activeIndex]);
+      const modelId = (model.m.id ?? "").toString().trim();
 
-    const detailsRow = document.createElement("div");
-    detailsRow.className = "blockscape-model-meta__details";
+      const detailsRow = document.createElement("div");
+      detailsRow.className = "blockscape-model-meta__details";
 
-    const addMetaDetail = (label, value) => {
-      if (!value) return;
-      const wrapper = document.createElement("div");
-      wrapper.className = "blockscape-model-id";
-      const labelSpan = document.createElement("span");
-      labelSpan.className = "blockscape-model-id__label";
-      labelSpan.textContent = label;
-      const valueSpan = document.createElement("span");
-      valueSpan.className = "blockscape-model-id__value";
-      valueSpan.textContent = value;
-      wrapper.append(labelSpan, valueSpan);
-      detailsRow.appendChild(wrapper);
+      const addMetaDetail = (label, value) => {
+        if (!value) return;
+        const wrapper = document.createElement("div");
+        wrapper.className = "blockscape-model-id";
+        const labelSpan = document.createElement("span");
+        labelSpan.className = "blockscape-model-id__label";
+        labelSpan.textContent = label;
+        const valueSpan = document.createElement("span");
+        valueSpan.className = "blockscape-model-id__value";
+        valueSpan.textContent = value;
+        wrapper.append(labelSpan, valueSpan);
+        detailsRow.appendChild(wrapper);
+      };
+
+      addMetaDetail("Series ID", seriesId);
+      addMetaDetail("Model ID", modelId);
+      addMetaDetail("No. in series", activeVersionLabel);
+
+      if (detailsRow.childElementCount) {
+        meta.appendChild(detailsRow);
+      }
+
+      return meta;
     };
 
-    addMetaDetail("Series ID", seriesId);
-    addMetaDetail("Model ID", modelId);
-    addMetaDetail("No. in series", activeVersionLabel);
-
-    if (detailsRow.childElementCount) {
-      meta.appendChild(detailsRow);
+    const modelMeta = buildModelMeta();
+    const showModelMeta = features.showModelMeta !== false;
+    if (showModelMeta) {
+      app.appendChild(modelMeta.cloneNode(true));
     }
-
-    app.appendChild(meta);
     const tabsWrapper = document.createElement("div");
     tabsWrapper.className = "blockscape-tabs";
 
@@ -4839,6 +4847,7 @@ export function initBlockscape(featureOverrides = {}) {
 
     const abstractWrapper = document.createElement("div");
     abstractWrapper.className = "blockscape-abstract-panel";
+    abstractPanel.appendChild(modelMeta.cloneNode(true));
     if (model.m.abstract) {
       console.log("[Blockscape] Rendering abstract content");
       const abstractDiv = document.createElement("div");

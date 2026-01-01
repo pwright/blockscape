@@ -153,6 +153,7 @@
   const seedText = seed ? JSON.stringify(seed, null, 2) : defaultSeedText;
   $: showHeader = features.showHeader !== false;
   $: showSidebar = features.showSidebar !== false;
+  $: showFooter = features.showFooter !== false;
 
   let headerExpanded = false;
 
@@ -321,7 +322,7 @@
       </div>
     </div>
   </main>
-  <footer class="pf-v5-c-page__footer blockscape-footer">
+  <footer class="pf-v5-c-page__footer blockscape-footer" hidden={!showFooter}>
     <div class="blockscape-footer__inner">
       <a href="https://pwright.github.io/backscape/" target="_blank" rel="noreferrer noopener">Old versions</a>
     </div>
