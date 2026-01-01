@@ -3,6 +3,16 @@ FROM node:20-bookworm-slim AS build
 WORKDIR /workspace
 
 COPY package*.json ./
+COPY documentation/requirements.txt documentation/requirements.txt
+
+RUN apt-get update \
+    && apt-get install -y python3 python3-pip python3-venv \
+    && python3 -m venv /opt/venv \
+    && /opt/venv/bin/pip install --no-cache-dir -r documentation/requirements.txt \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV PATH="/opt/venv/bin:${PATH}"
+
 RUN npm ci
 
 COPY . .

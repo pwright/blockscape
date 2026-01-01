@@ -14,6 +14,7 @@ A simple, interactive web application for creating and visualizing landscape-sty
 5. Click `Edit` to manually change the currently selected tile (or whole map).
 
 To ship a static bundle: `npm run build` then serve the generated `docs/` folder (`npm run preview` for a local check).
+The build also renders the MkDocs site; install Python + MkDocs once via `pip install -r documentation/requirements.txt`.
 Legacy `index.html` remains checked in for reference; the Svelte build is now the primary entry.
 
 On startup the app auto-loads `blockscape.bs` and `planets.bs` from the public assets so you have data to explore immediately.

@@ -23,7 +23,7 @@ When you need updated assets, run `npm run export` in this repo and re-copy the 
 ## Prerequisites
 
 - Node 18+ (for building the Svelte bundle)
-- Python + `mkdocs` (e.g., `pip install mkdocs`)
+- Python + `mkdocs` (install via `pip install -r documentation/requirements.txt`)
 
 ## Build the Svelte assets into MkDocs
 
