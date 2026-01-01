@@ -1,8 +1,98 @@
 # Blockscape maps
 
 A map is the visual representation of a model, ie analogous to a paper map of a City. 
-You can create one in blockscape by <tbd>.
 
+```blockscape
+{
+  "id": "blockscape-map-to-decision",
+  "title": "From Seeing to Deciding",
+  "abstract": "A map is a shared picture that turns uncertainty into something visible. By showing what people notice, what supports it underneath, and how clear or unclear things are, a map creates common ground. Once everyone sees the same terrain, options can be explored, assumptions challenged, and decisions made with context instead of opinion.",
+  "categories": [
+    {
+      "id": "what-people-see",
+      "title": "What People See",
+      "items": [
+        {
+          "id": "rough-ideas",
+          "name": "Rough Ideas",
+          "deps": [
+            "exploring"
+          ]
+        },
+        {
+          "id": "familiar-things",
+          "name": "Familiar Things",
+          "deps": [
+            "established-ways"
+          ]
+        },
+        {
+          "id": "choice",
+          "name": "Choice",
+          "deps": [
+            "options"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "clarity-and-change",
+      "title": "Clarity Over Time",
+      "items": [
+        {
+          "id": "unclear",
+          "name": "Unclear",
+          "deps": [
+            "exploring"
+          ]
+        },
+        {
+          "id": "taking-shape",
+          "name": "Taking Shape",
+          "deps": [
+            "sense-making"
+          ]
+        },
+        {
+          "id": "clear",
+          "name": "Clear",
+          "deps": [
+            "established-ways"
+          ]
+        },
+        {
+          "id": "options",
+          "name": "Options",
+          "deps": [
+            "sense-making"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "support-and-decision",
+      "title": "Support & Decision",
+      "items": [
+        {
+          "id": "exploring",
+          "name": "Exploring",
+          "deps": []
+        },
+        {
+          "id": "sense-making",
+          "name": "Making Sense",
+          "deps": []
+        },
+        {
+          "id": "established-ways",
+          "name": "Established Ways",
+          "deps": []
+        }
+      ]
+    }
+  ]
+}
+```
 
 
 ## Ptolemy's maps

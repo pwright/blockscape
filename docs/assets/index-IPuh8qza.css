@@ -1742,18 +1742,6 @@ a {
       .tile.revdep-indirect {
       opacity: 1;
     }
-.tile.dragging {
-      opacity: 0.5;
-      cursor: grabbing;
-      transform: rotate(4deg);
-    }
-.tile.drag-over {
-      border-color: var(--blockscape-dep);
-      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
-    }
-.grid.drag-active {
-      background: var(--color-primary-soft);
-    }
 .logo {
       width: calc(var(--blockscape-logo-size) * var(--blockscape-tile-compactness));
       height: calc(var(--blockscape-logo-size) * var(--blockscape-tile-compactness));

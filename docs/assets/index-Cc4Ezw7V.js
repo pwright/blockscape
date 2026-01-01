@@ -7945,15 +7945,6 @@ ${text2}` : text2;
       t.addEventListener("pointerleave", syncHoverOverlay);
       t.addEventListener("focus", syncHoverOverlay);
       t.addEventListener("blur", syncHoverOverlay);
-      t.draggable = true;
-      t.addEventListener("dragstart", handleDragStart);
-      t.addEventListener("dragend", handleDragEnd);
-    });
-    app.querySelectorAll(".grid").forEach((grid) => {
-      grid.addEventListener("dragover", handleDragOver);
-      grid.addEventListener("drop", handleDrop);
-      grid.addEventListener("dragenter", handleDragEnter);
-      grid.addEventListener("dragleave", handleDragLeave);
     });
     if (!globalEventsBound) {
       globalEventsBound = true;
@@ -8815,86 +8806,6 @@ ${text2}` : text2;
     handleTileMenuWindowResize();
   });
   window.addEventListener("scroll", () => handleTileMenuWindowScroll(), true);
-  let draggedItemId = null;
-  let draggedCategoryId = null;
-  function handleDragStart(e) {
-    if (activeViewIsCategory) {
-      e.preventDefault();
-      return;
-    }
-    hidePreview();
-    draggedItemId = e.target.dataset.id;
-    draggedCategoryId = e.target.closest(".category").dataset.cat;
-    e.target.classList.add("dragging");
-    e.dataTransfer.effectAllowed = "move";
-    e.dataTransfer.setData(
-      "text/plain",
-      JSON.stringify({
-        itemId: draggedItemId,
-        categoryId: draggedCategoryId
-      })
-    );
-    const category = e.target.closest(".category");
-    const grid = category.querySelector(".grid");
-    grid.classList.add("drag-active");
-    console.log(
-      "[Blockscape] drag start",
-      draggedItemId,
-      "from",
-      draggedCategoryId
-    );
-  }
-  function handleDragEnd(e) {
-    e.target.classList.remove("dragging");
-    app.querySelectorAll(".grid").forEach((grid) => grid.classList.remove("drag-active"));
-    app.querySelectorAll(".tile").forEach((tile) => tile.classList.remove("drag-over"));
-    draggedItemId = null;
-    draggedCategoryId = null;
-  }
-  function handleDragOver(e) {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
-  }
-  function handleDragEnter(e) {
-    e.preventDefault();
-    const grid = e.target.closest(".grid");
-    if (grid) grid.classList.add("drag-active");
-  }
-  function handleDragLeave(e) {
-    const grid = e.target.closest(".grid");
-    if (grid && !grid.contains(e.relatedTarget))
-      grid.classList.remove("drag-active");
-  }
-  function handleDrop(e) {
-    e.preventDefault();
-    const targetGrid = e.target.closest(".grid");
-    if (!targetGrid) return;
-    const targetCategory = targetGrid.closest(".category");
-    if (!targetCategory) return;
-    const targetCategoryId = targetCategory.dataset.cat;
-    if (!draggedItemId || !targetCategoryId) return;
-    const tiles = Array.from(targetGrid.querySelectorAll(".tile")).filter(
-      (tile) => tile.dataset.id !== draggedItemId
-    );
-    const targetTile = tiles.find((tile) => {
-      const rect = tile.getBoundingClientRect();
-      return e.clientY < rect.top + rect.height / 2;
-    });
-    reorderItem(
-      draggedItemId,
-      targetTile ? targetTile.dataset.id : null,
-      targetCategoryId
-    );
-    render();
-    console.log(
-      "[Blockscape] drop completed",
-      draggedItemId,
-      "from",
-      draggedCategoryId,
-      "to",
-      targetCategoryId
-    );
-  }
   function reorderItem(itemId, targetItemId, targetCategoryId) {
     if (activeIndex < 0) return;
     const mobj = models[activeIndex].data;
