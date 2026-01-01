@@ -6,6 +6,7 @@ site_dir: ../docs/documentation
 
 nav:
   - Home: https://pwright.github.io/blockscape/
+  - Hello: index.md
   - Maps:
       - Blockscape Example: maps/blockscape-example.md
       - Series Example: maps/series-example.md
@@ -16,7 +17,8 @@ nav:
       - Models: documentation/models.md
       - Docker for local editor: documentation/docker.md
       - Apicurio as backend: documentation/apicurio.md
-      - Local usage on Linux: documentation/bs-opener.md
+      - Local usage on Linux: documentation/bs-opener-linux.md
+      - Local usage on Mac: documentation/bs-opener-mac.md
   
   - TOC: toc.md
 

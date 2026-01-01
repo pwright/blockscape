@@ -6,9 +6,9 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         
         
-        <link rel="canonical" href="https://pwright.github.io/blockscape/documentation/models/">
+        <link rel="canonical" href="https://pwright.github.io/blockscape/documentation/bs-opener-linux/">
         <link rel="shortcut icon" href="../../img/favicon.ico">
-        <title>Models - Blockscape</title>
+        <title>Local usage on Linux - Blockscape</title>
         <link href="../../css/bootstrap.min.css" rel="stylesheet">
         <link href="../../css/fontawesome.min.css" rel="stylesheet">
         <link href="../../css/brands.min.css" rel="stylesheet">
@@ -71,7 +71,7 @@
 </li>
                                     
 <li>
-    <a href="./" class="dropdown-item active" aria-current="page">Models</a>
+    <a href="../models/" class="dropdown-item">Models</a>
 </li>
                                     
 <li>
@@ -83,7 +83,7 @@
 </li>
                                     
 <li>
-    <a href="../bs-opener-linux/" class="dropdown-item">Local usage on Linux</a>
+    <a href="./" class="dropdown-item active" aria-current="page">Local usage on Linux</a>
 </li>
                                     
 <li>
@@ -103,12 +103,12 @@
                             </a>
                         </li>
                             <li class="nav-item">
-                                <a rel="prev" href="../series/" class="nav-link">
+                                <a rel="prev" href="../apicurio/" class="nav-link">
                                     <i class="fa fa-arrow-left"></i> Previous
                                 </a>
                             </li>
                             <li class="nav-item">
-                                <a rel="next" href="../docker/" class="nav-link">
+                                <a rel="next" href="../bs-opener-mac/" class="nav-link">
                                     Next <i class="fa fa-arrow-right"></i>
                                 </a>
                             </li>
@@ -130,9 +130,13 @@
     <div id="toc-collapse" class="navbar-collapse collapse card bg-body-tertiary">
         <ul class="nav flex-column">
             
-            <li class="nav-item" data-bs-level="1"><a href="#blockscape-models" class="nav-link">Blockscape models</a>
+            <li class="nav-item" data-bs-level="1"><a href="#bs-file-opener-for-fedora" class="nav-link">BS File Opener for Fedora</a>
               <ul class="nav flex-column">
-            <li class="nav-item" data-bs-level="2"><a href="#json-schema" class="nav-link">JSON Schema</a>
+            <li class="nav-item" data-bs-level="2"><a href="#prerequisites" class="nav-link">Prerequisites</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#installation" class="nav-link">Installation</a>
               <ul class="nav flex-column">
               </ul>
             </li>
@@ -143,48 +147,54 @@
 </div></div>
                     <div class="col-md-9" role="main">
 
-<h1 id="blockscape-models">Blockscape models</h1>
-<p>A Model is the json data used to create a map.</p>
-<h2 id="json-schema">JSON Schema</h2>
-<p>Blockscape uses a simple JSON schema to define landscape models:</p>
-<pre><code class="language-json">{
-  &quot;id&quot;: &quot;model-id&quot;,
-  &quot;title&quot;: &quot;Model Title&quot;,
-  &quot;abstract&quot;: &quot;Optional HTML string describing map&quot;,
-  &quot;categories&quot;: [
-    {
-      &quot;id&quot;: &quot;category-id&quot;,
-      &quot;title&quot;: &quot;Category Title&quot;,
-      &quot;items&quot;: [
-        {
-          &quot;id&quot;: &quot;item-id&quot;,
-          &quot;name&quot;: &quot;Item Name&quot;,
-          &quot;deps&quot;: [&quot;dependency-id-1&quot;, &quot;dependency-id-2&quot;],
-          &quot;logo&quot;: &quot;path/to/logo.svg&quot;,
-          &quot;external&quot;: &quot;https://example.com/docs/component&quot;
-        }
-      ]
-    }
-  ]
-}
-</code></pre>
-<h3 id="schema-fields">Schema Fields</h3>
+<h1 id="bs-file-opener-for-fedora">BS File Opener for Fedora</h1>
+<p>This package configures Fedora (GNOME/Wayland) to automatically open <code>.bs</code> files using the <code>encode-bs-share.py</code> Python script.</p>
+<h2 id="prerequisites">Prerequisites</h2>
 <ul>
-<li><strong>id</strong>: Required. Canonical identifier for the model (lowercase, hyphen/underscore ok)</li>
-<li><strong>title</strong>: Required. Human-friendly title shown in pickers and share links</li>
-<li><strong>abstract</strong>: Optional but recommended. Short HTML/textual description rendered ahead of the categories</li>
-<li><strong>categories</strong>: Array of category objects</li>
-<li><strong>id</strong>: Short, unique identifier (lowercase, hyphenated)</li>
-<li><strong>title</strong>: Human-friendly category name</li>
-<li><strong>items</strong>: Array of component objects<ul>
-<li><strong>id</strong>: Short, unique identifier across all categories</li>
-<li><strong>name</strong>: Human-friendly component name</li>
-<li><strong>deps</strong>: Array of item IDs this component depends on</li>
-<li><strong>logo</strong>: Optional path to logo image</li>
-<li><strong>external</strong>: Optional URL for an external reference (docs, gists, etc.). When present the tile gains a dashed border and a launch icon that opens the link in a new tab.</li>
+<li>Linux (standard GNOME environment)</li>
+<li>Python 3 installed</li>
+<li>The <code>encode-bs-share.py</code> script</li>
 </ul>
-</li>
-</ul></div>
+<h2 id="installation">Installation</h2>
+<p>You can install this manually or use the quick setup commands below.</p>
+<p>Open a terminal in the folder containing <code>encode-bs-share.py</code> (directory above this). Run the following block of commands. </p>
+<p>This will automatically register the file type and create the shortcut with the correct path.</p>
+<pre><code class="language-bash"># 1. Make the script executable
+chmod +x encode-bs-share.py
+
+# 2. Create the MIME type (File association)
+mkdir -p ~/.local/share/mime/packages
+cat &lt;&lt;EOF &gt; ~/.local/share/mime/packages/application-x-bs-file.xml
+&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;
+&lt;mime-info xmlns=&quot;[http://www.freedesktop.org/standards/shared-mime-info](http://www.freedesktop.org/standards/shared-mime-info)&quot;&gt;
+  &lt;mime-type type=&quot;application/x-bs-file&quot;&gt;
+    &lt;comment&gt;BS Script File&lt;/comment&gt;
+    &lt;glob pattern=&quot;*.bs&quot;/&gt;
+  &lt;/mime-type&gt;
+&lt;/mime-info&gt;
+EOF
+
+# 3. Create the Desktop Entry
+# We use $PWD to get the full path of the current folder automatically
+mkdir -p ~/.local/share/applications
+cat &lt;&lt;EOF &gt; ~/.local/share/applications/bs-opener.desktop
+[Desktop Entry]
+Type=Application
+Name=BS Encoder Share
+Comment=Process .bs files with encode-bs-share.py
+Exec=$PWD/encode-bs-share.py %f
+Icon=text-x-script
+Terminal=true
+MimeType=application/x-bs-file;
+EOF
+
+# 4. Update System Databases
+update-mime-database ~/.local/share/mime
+update-desktop-database ~/.local/share/applications
+xdg-mime default bs-opener.desktop application/x-bs-file
+
+echo &quot;Installation Complete! You can now double-click .bs files.&quot;
+</code></pre></div>
             </div>
         </div>
 

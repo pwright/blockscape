@@ -52,3 +52,4 @@ update-desktop-database ~/.local/share/applications
 xdg-mime default bs-opener.desktop application/x-bs-file
 
 echo "Installation Complete! You can now double-click .bs files."
+```
