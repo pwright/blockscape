@@ -11,7 +11,7 @@ Blockscape uses a simple JSON schema to define landscape models:
 {
   "id": "model-id",
   "title": "Model Title",
-  "abstract": "Optional HTML/markdown string shown above the grid",
+  "abstract": "Optional HTML string describing map",
   "categories": [
     {
       "id": "category-id",
