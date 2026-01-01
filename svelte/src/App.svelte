@@ -187,40 +187,29 @@
             <h1 class="sr-only">Blockscape</h1>
             <img class="blockscape-brand__logo" src="logos/blockscape-logo.svg"
               alt="Blockscape — landscape tile explorer" decoding="async" />
-            <a href="https://github.com/pwright/blockscape" target="_blank"
-              class="pf-v5-c-button pf-m-plain" title="View on GitHub" aria-label="View Blockscape on GitHub">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                <path
-                  d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
-              </svg>
-            </a>
           </div>
           <div class="blockscape-toolbar__controls" data-expanded={headerExpanded ? 'true' : 'false'}>
             <div class="blockscape-toolbar__primary">
               <button
-                class="pf-v5-c-button pf-m-plain blockscape-toolbar__toggle"
+                class="pf-v5-c-button pf-m-secondary blockscape-toolbar__toggle"
                 type="button"
                 aria-expanded={headerExpanded}
                 aria-controls="blockscapeHeaderExtras"
+                aria-label={headerExpanded ? 'Hide tools' : 'Show tools'}
                 on:click={toggleHeaderExpanded}
               >
-                <span class="sr-only">Toggle search and edit tools</span>
+                <span class="blockscape-toolbar__toggle-label">
+                  {headerExpanded ? 'Hide tools' : 'Show tools'}
+                </span>
                 <span class="blockscape-toolbar__toggle-icon" aria-hidden="true">▾</span>
               </button>
               <button id="newPanelButton" class="pf-v5-c-button pf-m-primary" type="button" title="Create something new">New</button>
-              <form id="urlForm" class="blockscape-url-form" autocomplete="on" novalidate>
-                <label class="sr-only" for="urlInput">Load JSON from URL</label>
-                <input id="urlInput" name="modelUrl" class="pf-v5-c-form-control is-url" type="url"
-                  placeholder="Load JSON from URL…" autocomplete="additional-name" />
-                <button id="loadUrl" class="pf-v5-c-button pf-m-primary" type="submit">Load URL</button>
-                <div id="urlHint" class="url-hint" aria-live="polite"></div>
-              </form>
-               
               <label class="pf-v5-c-button pf-m-primary blockscape-file">
                 <span>Open</span>
                 <input id="file" type="file" accept=".bs,.json,.txt" multiple />
               </label>
 
+              <button id="shareModel" class="pf-v5-c-button pf-m-secondary" type="button" title="Copy a shareable URL for this model">Share</button>
               <button id="helpButton" class="pf-v5-c-button pf-m-primary" type="button" title="Show keyboard shortcuts">Help</button>
             </div>
 
@@ -235,16 +224,23 @@
                 <input id="search" class="pf-v5-c-form-control" type="text" placeholder="Search…" />
                 <div id="searchResults" class="search-results" role="listbox" aria-label="Search across all models" hidden></div>
               </div>
+              <form id="urlForm" class="blockscape-url-form" autocomplete="on" novalidate>
+                <label class="sr-only" for="urlInput">Load JSON from URL</label>
+                <input id="urlInput" name="modelUrl" class="pf-v5-c-form-control is-url" type="url"
+                  placeholder="Load JSON from URL…" autocomplete="additional-name" />
+                <button id="loadUrl" class="pf-v5-c-button pf-m-primary" type="submit">Load URL</button>
+                <div id="urlHint" class="url-hint" aria-live="polite"></div>
+              </form>
               <button id="openInEditor" class="pf-v5-c-button pf-m-secondary" type="button" title="Open current JSON in the editor">Edit</button>
-              <button id="shareModel" class="pf-v5-c-button pf-m-secondary" type="button" title="Copy a shareable URL for this model">Share</button>
             </div>
           </div>
-          <div class="blockscape-legend" role="presentation">
-            <span class="legend-entry"><span class="legend-dot legend-dot--dep"></span> enables</span>
-            <span class="legend-entry"><span class="legend-dot legend-dot--revdep"></span> dependents</span>
-            <span class="legend-entry"><span class="legend-dot legend-dot--reused"></span> reused</span>
-            <span class="legend-entry"><span class="legend-dot legend-dot--external"></span> external link</span>
-          </div>
+          <a href="https://github.com/pwright/blockscape" target="_blank"
+            class="pf-v5-c-button pf-m-plain blockscape-toolbar__github" title="View on GitHub" aria-label="View Blockscape on GitHub">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+              <path
+                d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
+            </svg>
+          </a>
         </div>
       </div>
     </div>

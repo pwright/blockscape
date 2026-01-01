@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "serve": "http-server -c-1 -p 4173 dist",
+    "serve": "http-server -c-1 -p 4173 docs",
     "predev": "npm run build:tokens",
     "dev": "vite",
     "build:tokens": "node scripts/build-tokens.js",

@@ -210,6 +210,15 @@ a {
       width: min(1180px, 100%);
       margin: 0 auto;
     }
+.blockscape-toolbar__github {
+      margin-left: auto;
+      border-radius: var(--radius-lg);
+      color: var(--color-muted);
+    }
+.blockscape-toolbar__github:hover {
+      background: var(--color-surface-muted);
+      color: var(--blockscape-foreground);
+    }
 .blockscape-brand {
       display: inline-flex;
       align-items: center;
@@ -246,15 +255,22 @@ a {
 .blockscape-toolbar__toggle {
       display: inline-flex;
       align-items: center;
-      gap: var(--space-2xs);
-      font-weight: var(--font-weight-medium);
+      gap: var(--space-xs);
+      font-weight: var(--font-weight-semibold);
       white-space: nowrap;
-      width: 2.5rem;
-      justify-content: center;
-      transition: transform 0.2s ease;
+      min-width: 9.5rem;
+      justify-content: space-between;
+      padding: 0.65rem 1rem;
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-sm);
+    }
+.blockscape-toolbar__toggle-label {
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      font-size: var(--font-size-xs);
     }
 .blockscape-toolbar__toggle-icon {
-      font-size: 1.1em;
+      font-size: 1.35em;
       line-height: 1;
       display: inline-block;
       transition: transform 0.2s ease;
@@ -262,9 +278,15 @@ a {
 .blockscape-toolbar__controls[data-expanded="true"] .blockscape-toolbar__toggle-icon {
       transform: rotate(180deg);
     }
+.blockscape-toolbar__controls[data-expanded="true"] .blockscape-toolbar__toggle {
+      border-color: var(--color-primary);
+      box-shadow: var(--shadow-md);
+      background: var(--color-surface);
+    }
 .blockscape-toolbar__extras {
       display: flex;
       align-items: center;
+      flex-wrap: wrap;
       gap: var(--space-sm);
       flex: 1 1 100%;
       width: 100%;
@@ -750,7 +772,6 @@ a {
       font-size: var(--font-size-sm);
     }
 .blockscape-legend {
-      margin-left: auto;
       display: flex;
       align-items: center;
       gap: var(--space-md);
@@ -758,6 +779,18 @@ a {
       color: var(--blockscape-muted);
       font-weight: var(--font-weight-medium);
       flex-wrap: wrap;
+    }
+.blockscape-map-legend {
+      display: flex;
+      justify-content: flex-end;
+      margin-bottom: var(--space-sm);
+    }
+.blockscape-map-legend .blockscape-legend {
+      padding: var(--space-xs) var(--space-sm);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      background: var(--color-surface-muted);
+      box-shadow: var(--shadow-sm);
     }
 .legend-entry {
       display: inline-flex;
