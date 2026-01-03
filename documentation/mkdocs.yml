@@ -17,9 +17,12 @@ nav:
       - Models: documentation/models.md
       - Docker for local editor: documentation/docker.md
       - Apicurio as backend: documentation/apicurio.md
+      - MkDocs usage: documentation/mkdocs.md
+      - LLM generation: documentation/llm-generation.md
+      - Share links: documentation/share-links.md
       - Local usage on Linux: documentation/bs-opener-linux.md
       - Local usage on Mac: documentation/bs-opener-mac.md
-  
+      - Local backend server: documentation/server.md
   - TOC: toc.md
 
 markdown_extensions:

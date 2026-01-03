@@ -10,7 +10,7 @@ Welcome to Blockscape! This page walks through what the project does and how to 
 
 ## Core map experience
 
-- **Visual grid:** Categories run top-to-bottom (more visible value at the top); items flow left-to-right (left = more mature/commodity, right = novel/custom).
+- **Visual grid:** Categories run top-to-bottom (more visible value at the top); items flow left-to-right (left = novel/custom, right = commodity/standard).
 - **Tile interactions:** Click to highlight dependencies; right-click shows a preview panel (used in Cypress tests); dashed border + ↗ indicates an external link; orange badge means the item is reused multiple times.
 - **Keyboard + mouse:** Arrow keys walk the tiles; `Shift+←/→` reorders inside a category; `Shift+↑/↓` moves an item between categories; drag-and-drop works too. `Del` removes the selected item (undo with your browser’s undo).
 - **Logos and links:** Add `logo` paths for inline icons and `external` URLs to launch docs, ADRs, repos, or APIs from the map.
@@ -26,7 +26,7 @@ Welcome to Blockscape! This page walks through what the project does and how to 
 - **Add JSON files:** Use the UI button to load one or more `.json`/`.bs` files; new models are appended to your list.
 - **Paste JSON:** Paste directly into the JSON editor (top of the page) and click **Append model(s)**.
 - **Jump between models:** Use the model selector to flip between maps without reloading the page.
-- **LLM generation:** `map-generation-prompt.md` holds a ready-made prompt you can feed an LLM to draft a model for your domain.
+- **LLM generation:** Use [Generate maps with an LLM](llm-generation.md) for the ready-made prompt that drafts models from your domain notes.
 
 ## Editing tools
 
@@ -37,7 +37,7 @@ Welcome to Blockscape! This page walks through what the project does and how to 
 ## Sharing and collaboration
 
 - **Download/share files:** Because everything is JSON, you can version `.bs` files in git, send them over chat, or drop them in docs.
-- **Share links:** `encode-bs-share.py` wraps a `.bs` file into a Base64 token and builds a shareable URL; `decode-bs-share.py` reverses it.
+- **Share links:** See [Share Blockscape maps via encoded links](share-links.md) for wrapping `.bs` files into URLs and decoding them later.
 - **External references:** Attach documentation, RFCs, or dashboards via the `external` field so each tile doubles as a launch point.
 
 ## Running the app
@@ -47,6 +47,7 @@ Welcome to Blockscape! This page walks through what the project does and how to 
 - **Local backend (optional):** `npm run server` serves the built app and a file API rooted at `~/blockscape` (override with `BLOCKSCAPE_ROOT`). You can auto-load a local file via `http://127.0.0.1:4173/server/path/to/file.bs`.
 - **Docker:** Pull `docker.io/pwrightrd/blockscape:latest` and run it to serve the static build plus the optional file API.
 - **Apicurio (optional backend):** Use `documentation/apicurio.md` if you want to back maps with Apicurio Registry.
+- **Docs/MkDocs:** Follow [MkDocs usage](mkdocs.md) to serve the bundled docs or embed Blockscape maps in other MkDocs sites.
 
 ## Quality and tests
 

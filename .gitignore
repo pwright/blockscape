@@ -6,4 +6,5 @@ blockscape-data/
 *.log
 .DS_Store
 site/
+.site-test/
 #mkdocs-blockscape/

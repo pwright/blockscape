@@ -14,28 +14,31 @@
         {
           "id": "gestalt",
           "name": "Visualise to understand",
-          "logo": "./logos/block-mind-blown.gif",
+          "external": "../documentation/gestalt/",
           "deps": []
         },
         {
           "id": "value-chain",
-          "name": "Visible value chain (y-axis)",
+          "name": "Visible value ↑↓",
+          "external": "../documentation/value-chain/",
           "deps": []
         },
         {
           "id": "evolution",
-          "name": "Evolution and maturity (x-axis)",
+          "name": "Evolution maturity ← →",
+          "external": "../documentation/evolution/",
           "deps": []
         },
         {
           "id": "relational-awareness",
           "name": "Relations",
-          "logo": "./logos/relations.png",
+          "external": "../documentation/relational-awareness/",
           "deps": []
         },
         {
           "id": "icons",
           "name": "Icons",
+          "external": "../documentation/icons/",
           "deps": []
         }
       ]
@@ -47,6 +50,7 @@
         {
           "id": "paste-bs-file",
           "name": "Paste (cmd-v)",
+          "external": "../documentation/paste/",
           "deps": [
             "bs-format-simple"
           ]
@@ -54,6 +58,7 @@
         {
           "id": "load-multidoc-file",
           "name": "Series",
+          "external": "../documentation/series/",
           "deps": [
             "bs-format-simple"
           ]
@@ -61,6 +66,7 @@
         {
           "id": "create-gist-multidoc",
           "name": "Gist",
+          "external": "../documentation/gists/",
           "deps": [
             "gists",
             "bs-format-simple"
@@ -69,6 +75,7 @@
         {
           "id": "abstract-gist-loading",
           "name": "Links",
+          "external": "../documentation/gists/",
           "deps": [
             "gists",
             "bs-format-simple"
@@ -77,6 +84,7 @@
         {
           "id": "model-collection",
           "name": "Portfolio",
+          "external": "../documentation/portfolio/",
           "deps": [
             "apicurio",
             "bs-format-simple"
@@ -91,20 +99,22 @@
         {
           "id": "bs-format-simple",
           "name": "BS Schema",
+          "external": "../documentation/models/",
           "deps": []
         },
         {
           "id": "editor-human-terms",
           "name": "Edit",
+          "external": "../documentation/editor/",
           "deps": [
             "bs-format-simple",
             "gestalt"
           ]
         },
         {
-          "id": "llm-generate-bs",
+          "id": "../documentation/llm-generation/",
           "name": "LLM generates BS",
-          "external": "https://github.com/pwright/blockscape/blob/main/map-generation-prompt.md",
+          "external": "../documentation/llm-generation/",
           "deps": [
             "bs-format-simple"
           ]
@@ -112,14 +122,15 @@
         {
           "id": "llm-consume-bs",
           "name": "LLM consumes BS",
+          "external": "../documentation/llm-consume/",
           "deps": [
             "bs-format-simple"
           ]
         },
         {
           "id": "move-items",
-          "name": "Move (shift - arrow keys)",
-          "logo": "./logos/block-swap.gif",
+          "name": "Move: Shift ←↑↓→",
+          "external": "../documentation/navigation/",
           "deps": []
         }
       ]
@@ -132,13 +143,26 @@
           "id": "gists",
           "name": "Gist",
           "logo": "https://favicon.im/github.com",
+          "external": "../documentation/gists/",
           "deps": []
         },
         {
-          "id": "apicurio",
+          "id": "../documentation/apicurio/",
           "name": "Apicurio",
           "logo": "https://www.google.com/s2/favicons?domain=apicur.io&sz=96",
-          "external": "../apicurio/", 
+          "external": "../documentation/apicurio/", 
+          "deps": []
+        },
+        {
+          "id": "../documentation/mkdocs/",
+          "name": "MkDocs usage",
+          "external": "../documentation/mkdocs/",
+          "deps": []
+        },
+        {
+          "id": "../documentation/share-links/",
+          "name": "Share links",
+          "external": "../documentation/share-links/",
           "deps": []
         }
       ]
