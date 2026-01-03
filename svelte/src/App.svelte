@@ -195,12 +195,10 @@
                 type="button"
                 aria-expanded={headerExpanded}
                 aria-controls="blockscapeHeaderExtras"
-                aria-label={headerExpanded ? 'Hide tools' : 'Show tools'}
+                aria-label={headerExpanded ? 'Hide advanced tools' : 'Show advanced tools'}
                 on:click={toggleHeaderExpanded}
               >
-                <span class="blockscape-toolbar__toggle-label">
-                  {headerExpanded ? 'Hide tools' : 'Show tools'}
-                </span>
+                <span class="blockscape-toolbar__toggle-label">Advanced</span>
                 <span class="blockscape-toolbar__toggle-icon" aria-hidden="true">▾</span>
               </button>
               <button id="newPanelButton" class="pf-v5-c-button pf-m-primary" type="button" title="Create something new">New</button>

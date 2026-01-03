@@ -204,7 +204,7 @@ a {
     }
 .blockscape-toolbar {
       display: flex;
-      align-items: center;
+      align-items: flex-start;
       flex-wrap: wrap;
       gap: var(--space-md);
       padding: var(--space-sm) var(--space-lg);
@@ -222,7 +222,7 @@ a {
     }
 .blockscape-brand {
       display: inline-flex;
-      align-items: center;
+      align-items: flex-start;
       gap: var(--space-sm);
       font-weight: var(--font-weight-bold);
       font-size: var(--font-size-lg);
@@ -256,22 +256,23 @@ a {
 .blockscape-toolbar__toggle {
       display: inline-flex;
       align-items: center;
-      gap: var(--space-xs);
-      font-weight: var(--font-weight-semibold);
+      gap: var(--space-2xs);
+      font-weight: var(--font-weight-medium);
       white-space: nowrap;
-      min-width: 9.5rem;
-      justify-content: space-between;
-      padding: 0.65rem 1rem;
-      border-radius: var(--radius-lg);
+      min-width: 0;
+      justify-content: center;
+      padding: var(--space-2xs) var(--space-sm);
+      border-radius: var(--radius-md);
       box-shadow: var(--shadow-sm);
-    }
-.blockscape-toolbar__toggle-label {
-      letter-spacing: 0.03em;
-      text-transform: uppercase;
       font-size: var(--font-size-xs);
     }
+.blockscape-toolbar__toggle-label {
+      letter-spacing: 0.02em;
+      text-transform: none;
+      font-size: inherit;
+    }
 .blockscape-toolbar__toggle-icon {
-      font-size: 1.35em;
+      font-size: 1em;
       line-height: 1;
       display: inline-block;
       transition: transform 0.2s ease;
@@ -298,6 +299,9 @@ a {
     }
 .blockscape-toolbar__extras[hidden] {
       display: none;
+    }
+.blockscape-toolbar__github {
+      align-self: flex-start;
     }
 .blockscape-search {
       position: relative;

@@ -10855,11 +10855,6 @@ function create_fragment$1(ctx) {
   let div1;
   let button0;
   let span0;
-  let t4_value = (
-    /*headerExpanded*/
-    ctx[0] ? "Hide tools" : "Show tools"
-  );
-  let t4;
   let t5;
   let span1;
   let button0_aria_label_value;
@@ -10957,7 +10952,7 @@ function create_fragment$1(ctx) {
       div1 = element("div");
       button0 = element("button");
       span0 = element("span");
-      t4 = text(t4_value);
+      span0.textContent = "Advanced";
       t5 = space();
       span1 = element("span");
       span1.textContent = "▾";
@@ -11068,7 +11063,7 @@ function create_fragment$1(ctx) {
       );
       attr(button0, "aria-controls", "blockscapeHeaderExtras");
       attr(button0, "aria-label", button0_aria_label_value = /*headerExpanded*/
-      ctx[0] ? "Hide tools" : "Show tools");
+      ctx[0] ? "Hide advanced tools" : "Show advanced tools");
       attr(button1, "id", "newPanelButton");
       attr(button1, "class", "pf-v5-c-button pf-m-primary");
       attr(button1, "type", "button");
@@ -11181,7 +11176,6 @@ function create_fragment$1(ctx) {
       append(div6, div1);
       append(div1, button0);
       append(button0, span0);
-      append(span0, t4);
       append(button0, t5);
       append(button0, span1);
       append(div1, t7);
@@ -11261,9 +11255,6 @@ function create_fragment$1(ctx) {
       }
     },
     p(ctx2, [dirty]) {
-      if ((!current || dirty & /*headerExpanded*/
-      1) && t4_value !== (t4_value = /*headerExpanded*/
-      ctx2[0] ? "Hide tools" : "Show tools")) set_data(t4, t4_value);
       if (!current || dirty & /*headerExpanded*/
       1) {
         attr(
@@ -11275,7 +11266,7 @@ function create_fragment$1(ctx) {
       }
       if (!current || dirty & /*headerExpanded*/
       1 && button0_aria_label_value !== (button0_aria_label_value = /*headerExpanded*/
-      ctx2[0] ? "Hide tools" : "Show tools")) {
+      ctx2[0] ? "Hide advanced tools" : "Show advanced tools")) {
         attr(button0, "aria-label", button0_aria_label_value);
       }
       if (!current || dirty & /*headerExpanded*/
