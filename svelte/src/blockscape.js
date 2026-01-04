@@ -193,6 +193,9 @@ export function initBlockscape(featureOverrides = {}) {
   const COLOR_PRESETS_STORAGE_KEY = "blockscape:colorPresets";
   const CENTER_ITEMS_STORAGE_KEY = "blockscape:centerItems";
   const THEME_STORAGE_KEY = "blockscape:theme";
+  const STAGE_COLUMN_COUNT = 4;
+  const STAGE_MIN = 1;
+  const STAGE_MAX = 4;
   const THEME_LIGHT = "light";
   const THEME_DARK = "dark";
   const CATEGORY_VIEW_VERSION_PREFIX = "cat:";
@@ -483,6 +486,7 @@ export function initBlockscape(featureOverrides = {}) {
         btn.setAttribute("aria-hidden", centerItems ? "true" : "false");
       });
     }
+    applyStageLayout();
     if (model) {
       reflowRects();
       drawLinks();
@@ -502,6 +506,80 @@ export function initBlockscape(featureOverrides = {}) {
       console.warn("[Blockscape] failed to read center items pref", error);
       return applyCenterItems(DEFAULT_CENTER_ITEMS);
     }
+  }
+
+  function normalizeStageValue(stage) {
+    if (stage == null) return null;
+    const num = Number(stage);
+    if (!Number.isFinite(num)) return null;
+    const rounded = Math.round(num);
+    if (rounded < STAGE_MIN || rounded > STAGE_MAX) return null;
+    return rounded;
+  }
+
+  function applyStageLayout() {
+    if (!app) return;
+    const template = `repeat(${STAGE_COLUMN_COUNT}, minmax(var(--blockscape-tile), var(--blockscape-tile)))`;
+    app.querySelectorAll(".grid").forEach((grid) => {
+      const stagedTiles = Array.from(
+        grid.querySelectorAll(".tile[data-stage]")
+      ).map((tile, idx) => ({
+        tile,
+        stage: normalizeStageValue(tile.dataset.stage),
+        order: idx,
+      }));
+      const enableStaging =
+        centerItems && stagedTiles.some((entry) => entry.stage);
+      if (enableStaging) {
+        grid.style.gridTemplateColumns = template;
+        grid.style.gridAutoFlow = "row";
+      } else {
+        grid.style.removeProperty("grid-template-columns");
+        grid.style.removeProperty("grid-auto-flow");
+      }
+      const resetTilePlacement = (tile) => {
+        tile.style.removeProperty("grid-column");
+        tile.style.removeProperty("grid-row");
+      };
+      grid.querySelectorAll(".tile").forEach(resetTilePlacement);
+      if (!enableStaging) return;
+
+      const staged = stagedTiles
+        .filter((entry) => entry.stage)
+        .sort((a, b) => {
+          if (a.stage !== b.stage) return a.stage - b.stage;
+          return a.order - b.order;
+        });
+
+      const takeColumn = (preferred, used) => {
+        const maxDelta = STAGE_COLUMN_COUNT - 1;
+        for (let delta = 0; delta <= maxDelta; delta += 1) {
+          const candidates = [];
+          if (preferred - delta >= STAGE_MIN) candidates.push(preferred - delta);
+          if (delta !== 0 && preferred + delta <= STAGE_MAX)
+            candidates.push(preferred + delta);
+          for (const col of candidates) {
+            if (!used.has(col)) return col;
+          }
+        }
+        return null;
+      };
+
+      let currentRow = 1;
+      let usedColumns = new Set();
+      staged.forEach(({ tile, stage }) => {
+        let col = takeColumn(stage, usedColumns);
+        if (col == null) {
+          currentRow += 1;
+          usedColumns = new Set();
+          col = takeColumn(stage, usedColumns);
+        }
+        if (col == null) return;
+        usedColumns.add(col);
+        tile.style.gridColumn = String(col);
+        tile.style.gridRow = String(currentRow);
+      });
+    });
   }
 
   function getCssVarValue(varName) {
@@ -2444,14 +2522,16 @@ export function initBlockscape(featureOverrides = {}) {
         ["Shift", "Arrow Left"],
         ["Shift", "Arrow Right"],
       ],
-      description: "Reorder the selected item inside its category.",
+      description:
+        "Reorder the selected item inside its category (cycles item.stage in Center view).",
     },
     {
       keys: [
         ["Shift", "Arrow Up"],
         ["Shift", "Arrow Down"],
       ],
-      description: "Move the selected item to the previous or next category.",
+      description:
+        "Move the selected item to the previous or next category (cycles item.stage in Center view).",
     },
 
     // --- VIEW & UI CONTROL ---
@@ -2698,6 +2778,42 @@ export function initBlockscape(featureOverrides = {}) {
     } else {
       delete match.item.color;
     }
+    loadActiveIntoEditor();
+    rebuildFromActive();
+    select(itemId);
+    return true;
+  }
+
+  function clearCategoryStages(catId) {
+    if (activeIndex < 0 || !catId) return false;
+    const mobj = models[activeIndex].data;
+    const categories = mobj?.categories || [];
+    const category = categories.find((cat) => cat.id === catId);
+    if (!category) return false;
+    let changed = false;
+    (category.items || []).forEach((item) => {
+      if (normalizeStageValue(item.stage) != null) {
+        delete item.stage;
+        changed = true;
+      }
+    });
+    if (!changed) return false;
+    loadActiveIntoEditor();
+    rebuildFromActive();
+    if (selection) select(selection);
+    return true;
+  }
+
+  function cycleItemStage(itemId, step) {
+    if (!itemId || !step || activeIndex < 0) return false;
+    const match = findItemAndCategoryById(itemId);
+    if (!match) return false;
+    const current = normalizeStageValue(match.item.stage);
+    const base = current == null ? (step > 0 ? STAGE_MIN : STAGE_MAX) : current;
+    const span = STAGE_MAX - STAGE_MIN + 1;
+    const offset = ((base - STAGE_MIN + step) % span + span) % span;
+    const next = STAGE_MIN + offset;
+    match.item.stage = next;
     loadActiveIntoEditor();
     rebuildFromActive();
     select(itemId);
@@ -6046,6 +6162,9 @@ export function initBlockscape(featureOverrides = {}) {
         ? resolveVersionIndexFromCategory(cat, seriesIdLookup)
         : null;
 
+      const hasStage = (cat.items || []).some((it) =>
+        normalizeStageValue(it.stage)
+      );
       const head = document.createElement("div");
       head.className = "cat-head";
       head.dataset.cat = cat.id;
@@ -6063,6 +6182,12 @@ export function initBlockscape(featureOverrides = {}) {
       head.innerHTML = `<div class="cat-title">${escapeHtml(
         cat.title || cat.id
       )}</div>
+                          ${
+                            hasStage
+                              ? `<span class="cat-stage-indicator" title="Contains staged items">Stage</span>
+                                 <button type="button" class="cat-stage-clear" title="Clear all stages in this category" aria-label="Clear all stages">×</button>`
+                              : ""
+                          }
                           <div class="muted cat-count">${
                             (cat.items || []).length
                           } items</div>`;
@@ -6096,6 +6221,17 @@ export function initBlockscape(featureOverrides = {}) {
           head.click();
         }
       });
+      const clearStageBtn = head.querySelector(".cat-stage-clear");
+      if (clearStageBtn) {
+        clearStageBtn.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          const cleared = clearCategoryStages(cat.id);
+          if (cleared) {
+            showNotice("Cleared stages for this category.", 1400);
+          }
+        });
+      }
       head.addEventListener("focus", () =>
         selectCategory(cat.id, { scrollIntoView: false })
       );
@@ -6137,6 +6273,14 @@ export function initBlockscape(featureOverrides = {}) {
         }
         if (obsidianUrl) {
           tile.dataset.obsidianUrl = obsidianUrl;
+        }
+
+        const stage = normalizeStageValue(it.stage);
+        if (stage) {
+          tile.dataset.stage = String(stage);
+          if (centerItems) {
+            tile.style.gridColumn = String(stage);
+          }
         }
 
         if (!activeIsCategoryView) {
@@ -6224,6 +6368,7 @@ export function initBlockscape(featureOverrides = {}) {
       renderHost.appendChild(addCategoryButton);
     }
 
+    applyStageLayout();
     applyReusedHighlights();
 
     wireEvents();
@@ -7231,6 +7376,19 @@ export function initBlockscape(featureOverrides = {}) {
       if (!shouldHandleGlobalPaste()) return;
       const step = event.key === "ArrowLeft" ? -1 : 1;
       if (event.altKey) return;
+      if (
+        centerItems &&
+        event.shiftKey &&
+        selection &&
+        !event.ctrlKey &&
+        !event.metaKey
+      ) {
+        const cycled = cycleItemStage(selection, step);
+        if (cycled) {
+          event.preventDefault();
+          return;
+        }
+      }
       if ((event.ctrlKey || event.metaKey) && !event.shiftKey) {
         const navigated = stepApicurioVersion(step);
         if (navigated) {
@@ -7268,6 +7426,19 @@ export function initBlockscape(featureOverrides = {}) {
         return;
       }
       if (event.altKey) return;
+      if (
+        centerItems &&
+        event.shiftKey &&
+        selection &&
+        !event.ctrlKey &&
+        !event.metaKey
+      ) {
+        const cycled = cycleItemStage(selection, step);
+        if (cycled) {
+          event.preventDefault();
+          return;
+        }
+      }
       if (selectedCategoryId && !selection && !event.shiftKey) {
         const entered = enterSelectedCategoryItems(step);
         if (entered) {

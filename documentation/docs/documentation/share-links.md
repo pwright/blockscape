@@ -2,13 +2,14 @@
 
 You can bundle a `.bs` file into a shareable URL token and decode it later with two helper scripts in the repo root.
 
-## Encode a `.bs` file into a URL
 
-```sh
-python encode-bs-share.py path/to/model.bs
-```
+## Quick share
 
-The script prints a full URL containing a Base64 token. Open it in a browser to load the map without uploading a file. You can also copy just the token if you need to embed it elsewhere.
+You're looking at a map, you might even have edited it, eg Shift left arrow to move an item left.
+
+Click **Share** in top menu to create, copy, and navigate to a URL that encodes current map.
+Bookmark it or send that url to anyone to share.
+
 
 ## Decode a token back to JSON
 
@@ -17,6 +18,15 @@ python decode-bs-share.py 'PASTE_TOKEN_HERE'
 ```
 
 The script writes the decoded JSON to stdout so you can save it to a `.bs` file or pipe it into other tools.
+
+## Encode a `.bs` file into a URL
+
+```sh
+python encode-bs-share.py path/to/model.bs
+```
+
+The script prints a full URL containing a Base64 token. Open it in a browser to load the map without uploading a file. You can also copy just the token if you need to embed it elsewhere.
+
 
 ## Tips and caveats
 

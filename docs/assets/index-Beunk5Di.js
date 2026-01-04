@@ -1714,6 +1714,16 @@ function assertFn(fn, name) {
 function defaultMakeSlug(base) {
   return (base || "item").trim().toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "") || "item";
 }
+const STAGE_MIN = 1;
+const STAGE_MAX = 4;
+function normalizeStageValue(stage) {
+  if (stage == null) return null;
+  const num = Number(stage);
+  if (!Number.isFinite(num)) return null;
+  const rounded = Math.round(num);
+  if (rounded < STAGE_MIN || rounded > STAGE_MAX) return null;
+  return rounded;
+}
 function normalizeDepsInput(value, { excludeId } = {}) {
   if (!value) return [];
   const parts = value.split(/[\s,]+/).map((v) => v.trim()).filter(Boolean);
@@ -1835,6 +1845,9 @@ function createItemEditor({
     const color = (payload.color || "").trim();
     if (color) item.color = color;
     else delete item.color;
+    const stage = normalizeStageValue(payload.stage);
+    if (stage != null) item.stage = stage;
+    else delete item.stage;
     item.deps = Array.isArray(payload.deps) ? payload.deps : [];
     if (item.id !== payload.originalId && typeof onSelectionRenamed === "function") {
       onSelectionRenamed(payload.originalId, item.id);
@@ -1856,6 +1869,7 @@ function createItemEditor({
       external: state.fields.externalInput.value || "",
       externalFlag: state.fields.externalFlagInput.checked,
       color: state.fields.colorInput.value || "",
+      stage: state.fields.stageInput.value,
       deps: normalizeDepsInput(state.fields.depsInput.value, { excludeId: idVal })
     };
     try {
@@ -1959,6 +1973,13 @@ function createItemEditor({
     colorInput.type = "text";
     colorInput.placeholder = tokens.color.primary;
     form.appendChild(makeField("Color", colorInput, "Optional badge color (hex or CSS color)."));
+    const stageInput = document.createElement("input");
+    stageInput.type = "number";
+    stageInput.min = String(STAGE_MIN);
+    stageInput.max = String(STAGE_MAX);
+    stageInput.inputMode = "numeric";
+    stageInput.placeholder = `${STAGE_MIN}-${STAGE_MAX}`;
+    form.appendChild(makeField("Stage", stageInput, "Optional 1 (far left) to 4 (far right) when Center view is on."));
     const depsInput = document.createElement("textarea");
     depsInput.rows = 2;
     depsInput.placeholder = "Comma or space separated ids";
@@ -2000,6 +2021,7 @@ function createItemEditor({
       externalInput,
       externalFlagInput,
       colorInput,
+      stageInput,
       depsInput,
       syncCheckbox,
       categoryValue: meta.querySelector(".item-editor__meta-value"),
@@ -2050,6 +2072,7 @@ function createItemEditor({
     state.fields.externalInput.value = typeof hit.item.external === "string" ? hit.item.external : "";
     state.fields.externalFlagInput.checked = hit.item.external === true;
     state.fields.colorInput.value = hit.item.color || "";
+    state.fields.stageInput.value = hit.item.stage ?? "";
     state.fields.depsInput.value = Array.isArray(hit.item.deps) ? hit.item.deps.join(", ") : "";
     state.fields.syncCheckbox.checked = state.autoSyncEnabled;
     state.fields.syncCheckbox.disabled = !autoSyncAllowed;
@@ -2870,6 +2893,9 @@ function initBlockscape(featureOverrides = {}) {
   const COLOR_PRESETS_STORAGE_KEY = "blockscape:colorPresets";
   const CENTER_ITEMS_STORAGE_KEY = "blockscape:centerItems";
   const THEME_STORAGE_KEY = "blockscape:theme";
+  const STAGE_COLUMN_COUNT = 4;
+  const STAGE_MIN2 = 1;
+  const STAGE_MAX2 = 4;
   const THEME_LIGHT = "light";
   const THEME_DARK = "dark";
   const CATEGORY_VIEW_VERSION_PREFIX = "cat:";
@@ -3135,6 +3161,7 @@ function initBlockscape(featureOverrides = {}) {
         btn.setAttribute("aria-hidden", centerItems ? "true" : "false");
       });
     }
+    applyStageLayout();
     if (model) {
       reflowRects();
       drawLinks();
@@ -3153,6 +3180,72 @@ function initBlockscape(featureOverrides = {}) {
       console.warn("[Blockscape] failed to read center items pref", error);
       return applyCenterItems(DEFAULT_CENTER_ITEMS);
     }
+  }
+  function normalizeStageValue2(stage) {
+    if (stage == null) return null;
+    const num = Number(stage);
+    if (!Number.isFinite(num)) return null;
+    const rounded = Math.round(num);
+    if (rounded < STAGE_MIN2 || rounded > STAGE_MAX2) return null;
+    return rounded;
+  }
+  function applyStageLayout() {
+    if (!app) return;
+    const template = `repeat(${STAGE_COLUMN_COUNT}, minmax(var(--blockscape-tile), var(--blockscape-tile)))`;
+    app.querySelectorAll(".grid").forEach((grid) => {
+      const stagedTiles = Array.from(
+        grid.querySelectorAll(".tile[data-stage]")
+      ).map((tile, idx) => ({
+        tile,
+        stage: normalizeStageValue2(tile.dataset.stage),
+        order: idx
+      }));
+      const enableStaging = centerItems && stagedTiles.some((entry) => entry.stage);
+      if (enableStaging) {
+        grid.style.gridTemplateColumns = template;
+        grid.style.gridAutoFlow = "row";
+      } else {
+        grid.style.removeProperty("grid-template-columns");
+        grid.style.removeProperty("grid-auto-flow");
+      }
+      const resetTilePlacement = (tile) => {
+        tile.style.removeProperty("grid-column");
+        tile.style.removeProperty("grid-row");
+      };
+      grid.querySelectorAll(".tile").forEach(resetTilePlacement);
+      if (!enableStaging) return;
+      const staged = stagedTiles.filter((entry) => entry.stage).sort((a, b) => {
+        if (a.stage !== b.stage) return a.stage - b.stage;
+        return a.order - b.order;
+      });
+      const takeColumn = (preferred, used) => {
+        const maxDelta = STAGE_COLUMN_COUNT - 1;
+        for (let delta = 0; delta <= maxDelta; delta += 1) {
+          const candidates = [];
+          if (preferred - delta >= STAGE_MIN2) candidates.push(preferred - delta);
+          if (delta !== 0 && preferred + delta <= STAGE_MAX2)
+            candidates.push(preferred + delta);
+          for (const col of candidates) {
+            if (!used.has(col)) return col;
+          }
+        }
+        return null;
+      };
+      let currentRow = 1;
+      let usedColumns = /* @__PURE__ */ new Set();
+      staged.forEach(({ tile, stage }) => {
+        let col = takeColumn(stage, usedColumns);
+        if (col == null) {
+          currentRow += 1;
+          usedColumns = /* @__PURE__ */ new Set();
+          col = takeColumn(stage, usedColumns);
+        }
+        if (col == null) return;
+        usedColumns.add(col);
+        tile.style.gridColumn = String(col);
+        tile.style.gridRow = String(currentRow);
+      });
+    });
   }
   function getCssVarValue(varName) {
     if (typeof window === "undefined") return "";
@@ -4859,14 +4952,14 @@ function initBlockscape(featureOverrides = {}) {
         ["Shift", "Arrow Left"],
         ["Shift", "Arrow Right"]
       ],
-      description: "Reorder the selected item inside its category."
+      description: "Reorder the selected item inside its category (cycles item.stage in Center view)."
     },
     {
       keys: [
         ["Shift", "Arrow Up"],
         ["Shift", "Arrow Down"]
       ],
-      description: "Move the selected item to the previous or next category."
+      description: "Move the selected item to the previous or next category (cycles item.stage in Center view)."
     },
     // --- VIEW & UI CONTROL ---
     {
@@ -5082,6 +5175,40 @@ function initBlockscape(featureOverrides = {}) {
     } else {
       delete match.item.color;
     }
+    loadActiveIntoEditor();
+    rebuildFromActive();
+    select(itemId);
+    return true;
+  }
+  function clearCategoryStages(catId) {
+    if (activeIndex < 0 || !catId) return false;
+    const mobj = models[activeIndex].data;
+    const categories = (mobj == null ? void 0 : mobj.categories) || [];
+    const category = categories.find((cat) => cat.id === catId);
+    if (!category) return false;
+    let changed = false;
+    (category.items || []).forEach((item) => {
+      if (normalizeStageValue2(item.stage) != null) {
+        delete item.stage;
+        changed = true;
+      }
+    });
+    if (!changed) return false;
+    loadActiveIntoEditor();
+    rebuildFromActive();
+    if (selection) select(selection);
+    return true;
+  }
+  function cycleItemStage(itemId, step) {
+    if (!itemId || !step || activeIndex < 0) return false;
+    const match = findItemAndCategoryById(itemId);
+    if (!match) return false;
+    const current = normalizeStageValue2(match.item.stage);
+    const base = current == null ? step > 0 ? STAGE_MIN2 : STAGE_MAX2 : current;
+    const span = STAGE_MAX2 - STAGE_MIN2 + 1;
+    const offset = ((base - STAGE_MIN2 + step) % span + span) % span;
+    const next = STAGE_MIN2 + offset;
+    match.item.stage = next;
     loadActiveIntoEditor();
     rebuildFromActive();
     select(itemId);
@@ -8001,6 +8128,9 @@ ${text2}` : text2;
       section.className = "category";
       section.dataset.cat = cat.id;
       const categorySeriesVersionIndex = activeIsCategoryView ? resolveVersionIndexFromCategory(cat, seriesIdLookup) : null;
+      const hasStage = (cat.items || []).some(
+        (it) => normalizeStageValue2(it.stage)
+      );
       const head = document.createElement("div");
       head.className = "cat-head";
       head.dataset.cat = cat.id;
@@ -8015,6 +8145,8 @@ ${text2}` : text2;
       head.innerHTML = `<div class="cat-title">${escapeHtml(
         cat.title || cat.id
       )}</div>
+                          ${hasStage ? `<span class="cat-stage-indicator" title="Contains staged items">Stage</span>
+                                 <button type="button" class="cat-stage-clear" title="Clear all stages in this category" aria-label="Clear all stages">×</button>` : ""}
                           <div class="muted cat-count">${(cat.items || []).length} items</div>`;
       head.addEventListener("click", () => {
         var _a2;
@@ -8037,6 +8169,17 @@ ${text2}` : text2;
           head.click();
         }
       });
+      const clearStageBtn = head.querySelector(".cat-stage-clear");
+      if (clearStageBtn) {
+        clearStageBtn.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          const cleared = clearCategoryStages(cat.id);
+          if (cleared) {
+            showNotice("Cleared stages for this category.", 1400);
+          }
+        });
+      }
       head.addEventListener(
         "focus",
         () => selectCategory(cat.id, { scrollIntoView: false })
@@ -8074,6 +8217,13 @@ ${text2}` : text2;
         }
         if (obsidianUrl) {
           tile.dataset.obsidianUrl = obsidianUrl;
+        }
+        const stage = normalizeStageValue2(it.stage);
+        if (stage) {
+          tile.dataset.stage = String(stage);
+          if (centerItems) {
+            tile.style.gridColumn = String(stage);
+          }
         }
         if (!activeIsCategoryView) {
           const navTargetIndex = findModelIndexByIdOrSource(it.id);
@@ -8147,6 +8297,7 @@ ${text2}` : text2;
       addCategoryButton.addEventListener("click", () => addCategoryAtEnd());
       renderHost.appendChild(addCategoryButton);
     }
+    applyStageLayout();
     applyReusedHighlights();
     wireEvents();
     reflowRects();
@@ -9019,6 +9170,13 @@ ${text2}` : text2;
       if (!shouldHandleGlobalPaste()) return;
       const step = event.key === "ArrowLeft" ? -1 : 1;
       if (event.altKey) return;
+      if (centerItems && event.shiftKey && selection && !event.ctrlKey && !event.metaKey) {
+        const cycled = cycleItemStage(selection, step);
+        if (cycled) {
+          event.preventDefault();
+          return;
+        }
+      }
       if ((event.ctrlKey || event.metaKey) && !event.shiftKey) {
         const navigated = stepApicurioVersion(step);
         if (navigated) {
@@ -9055,6 +9213,13 @@ ${text2}` : text2;
         return;
       }
       if (event.altKey) return;
+      if (centerItems && event.shiftKey && selection && !event.ctrlKey && !event.metaKey) {
+        const cycled = cycleItemStage(selection, step);
+        if (cycled) {
+          event.preventDefault();
+          return;
+        }
+      }
       if (selectedCategoryId && !selection && !event.shiftKey) {
         const entered = enterSelectedCategoryItems(step);
         if (entered) {
@@ -11021,7 +11186,7 @@ function create_fragment$1(ctx) {
       div17.innerHTML = `<label for="localSavePath">Save active map to ~/blockscape</label> <input id="localSavePath" class="pf-v5-c-form-control" type="text" placeholder="my-map.bs"/> <div class="local-backend__save-actions"><button id="saveLocalFile" class="pf-v5-c-button pf-m-primary" type="button">Save</button> <button id="saveLocalFileAs" class="pf-v5-c-button pf-m-secondary" type="button">Save as</button></div>`;
       t58 = space();
       div22 = element("div");
-      div22.innerHTML = `<section class="pf-v5-c-page__main-section blockscape-json-panel" hidden="" aria-label="Model source JSON editor"><p class="blockscape-json-panel__title">Paste / edit JSON for the <b>active</b> model (schema below)</p> <div class="muted">Schema: <code>{ id, title, abstract?, categories:[{id,title,items:[{id,name,deps?:[],logo?,external?:url,color?,...}}], ... }</code><br/>
+      div22.innerHTML = `<section class="pf-v5-c-page__main-section blockscape-json-panel" hidden="" aria-label="Model source JSON editor"><p class="blockscape-json-panel__title">Paste / edit JSON for the <b>active</b> model (schema below)</p> <div class="muted">Schema: <code>{ id, title, abstract?, categories:[{id,title,items:[{id,name,deps?:[],logo?,external?:url,color?,stage?:1-4,...}}], ... }</code><br/>
             You can paste multiple objects separated by <code>---</code> or <code>%%%</code>, or a JSON array of models, to append several models.
             A single object replaces only when you click “Replace active with JSON”. Tip: with no input focused, press
             Cmd/Ctrl+V anywhere on the page to append clipboard JSON instantly.</div> <div class="blockscape-json-controls"><textarea id="jsonBox" class="pf-v5-c-form-control" aria-label="JSON editor for the active model"></textarea> <div class="blockscape-json-actions"><button id="copyJson" class="pf-v5-c-button pf-m-tertiary" type="button" title="Copy the current JSON to your clipboard">Copy</button> <button id="copySeries" class="pf-v5-c-button pf-m-tertiary" type="button" title="Copy every version in this series as an array">Copy series</button> <button id="pasteJson" class="pf-v5-c-button pf-m-tertiary" type="button" title="Paste clipboard JSON to replace the editor contents">Paste</button> <button id="appendFromBox" class="pf-v5-c-button pf-m-primary" type="button">Append model(s)</button> <button id="replaceActive" class="pf-v5-c-button pf-m-secondary" type="button">Replace active with

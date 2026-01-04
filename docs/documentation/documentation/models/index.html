@@ -176,6 +176,7 @@
           &quot;id&quot;: &quot;item-id&quot;,
           &quot;name&quot;: &quot;Item Name&quot;,
           &quot;deps&quot;: [&quot;dependency-id-1&quot;, &quot;dependency-id-2&quot;],
+          &quot;stage&quot;: 2,
           &quot;logo&quot;: &quot;path/to/logo.svg&quot;,
           &quot;external&quot;: &quot;https://example.com/docs/component&quot;
         }
@@ -196,6 +197,7 @@
 <li><strong>id</strong>: Short, unique identifier across all categories</li>
 <li><strong>name</strong>: Human-friendly component name</li>
 <li><strong>deps</strong>: Array of item IDs this component depends on</li>
+<li><strong>stage</strong>: Optional integer (1-4) used in Center view to pull the tile toward a horizontal stage (1=far left, 4=far right)</li>
 <li><strong>logo</strong>: Optional path to logo image</li>
 <li><strong>external</strong>: Optional URL for an external reference (docs, gists, etc.). When present the tile gains a dashed border and a launch icon that opens the link in a new tab.</li>
 </ul>

@@ -1661,6 +1661,46 @@ a {
       gap: var(--space-sm);
       margin-bottom: var(--space-sm);
     }
+.cat-stage-indicator {
+      display: inline-flex;
+      align-items: center;
+      padding: 0 var(--space-2xs);
+      height: 1.1rem;
+      min-width: 2.8rem;
+      justify-content: center;
+      border-radius: var(--radius-sm);
+      background: var(--color-primary-soft);
+      color: var(--color-primary-strong);
+      font-size: var(--font-size-3xs);
+      font-weight: var(--font-weight-semibold);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      line-height: 1;
+    }
+.cat-stage-clear {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 1.3rem;
+      height: 1.1rem;
+      padding: 0;
+      border: 1px solid var(--color-border-muted);
+      border-radius: var(--radius-sm);
+      background: var(--color-surface);
+      color: var(--color-muted-strong);
+      font-size: var(--font-size-sm);
+      line-height: 1;
+      cursor: pointer;
+      transition: color var(--transition), border-color var(--transition),
+        background var(--transition);
+    }
+.cat-stage-clear:hover,
+    .cat-stage-clear:focus-visible {
+      background: var(--color-surface-strong);
+      border-color: var(--color-primary);
+      color: var(--color-primary-strong);
+      outline: none;
+    }
 .cat-head--series-link {
       cursor: pointer;
       padding: var(--space-2xs) var(--space-xs);

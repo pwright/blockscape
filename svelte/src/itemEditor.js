@@ -17,6 +17,18 @@ function defaultMakeSlug(base) {
   );
 }
 
+const STAGE_MIN = 1;
+const STAGE_MAX = 4;
+
+function normalizeStageValue(stage) {
+  if (stage == null) return null;
+  const num = Number(stage);
+  if (!Number.isFinite(num)) return null;
+  const rounded = Math.round(num);
+  if (rounded < STAGE_MIN || rounded > STAGE_MAX) return null;
+  return rounded;
+}
+
 export function collectAllItemIds(modelData) {
   const ids = new Set();
   (modelData?.categories || []).forEach(cat => (cat.items || []).forEach(it => {
@@ -155,6 +167,9 @@ export function createItemEditor({
     const color = (payload.color || '').trim();
     if (color) item.color = color; else delete item.color;
 
+    const stage = normalizeStageValue(payload.stage);
+    if (stage != null) item.stage = stage; else delete item.stage;
+
     item.deps = Array.isArray(payload.deps) ? payload.deps : [];
 
     if (item.id !== payload.originalId && typeof onSelectionRenamed === 'function') {
@@ -178,6 +193,7 @@ export function createItemEditor({
       external: state.fields.externalInput.value || '',
       externalFlag: state.fields.externalFlagInput.checked,
       color: state.fields.colorInput.value || '',
+      stage: state.fields.stageInput.value,
       deps: normalizeDepsInput(state.fields.depsInput.value, { excludeId: idVal })
     };
     try {
@@ -297,6 +313,14 @@ export function createItemEditor({
     colorInput.placeholder = tokens.color.primary;
     form.appendChild(makeField('Color', colorInput, 'Optional badge color (hex or CSS color).'));
 
+    const stageInput = document.createElement('input');
+    stageInput.type = 'number';
+    stageInput.min = String(STAGE_MIN);
+    stageInput.max = String(STAGE_MAX);
+    stageInput.inputMode = 'numeric';
+    stageInput.placeholder = `${STAGE_MIN}-${STAGE_MAX}`;
+    form.appendChild(makeField('Stage', stageInput, 'Optional 1 (far left) to 4 (far right) when Center view is on.'));
+
     const depsInput = document.createElement('textarea');
     depsInput.rows = 2;
     depsInput.placeholder = 'Comma or space separated ids';
@@ -341,6 +365,7 @@ export function createItemEditor({
       externalInput,
       externalFlagInput,
       colorInput,
+      stageInput,
       depsInput,
       syncCheckbox,
       categoryValue: meta.querySelector('.item-editor__meta-value'),
@@ -394,6 +419,7 @@ export function createItemEditor({
     state.fields.externalInput.value = typeof hit.item.external === 'string' ? hit.item.external : '';
     state.fields.externalFlagInput.checked = hit.item.external === true;
     state.fields.colorInput.value = hit.item.color || '';
+    state.fields.stageInput.value = hit.item.stage ?? '';
     state.fields.depsInput.value = Array.isArray(hit.item.deps) ? hit.item.deps.join(', ') : '';
     state.fields.syncCheckbox.checked = state.autoSyncEnabled;
     state.fields.syncCheckbox.disabled = !autoSyncAllowed;

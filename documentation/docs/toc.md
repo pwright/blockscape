@@ -103,6 +103,14 @@
           "deps": []
         },
         {
+          "id": "stages",
+          "name": "Center stages",
+          "external": "../documentation/stages/",
+          "deps": [
+            "bs-format-simple"
+          ]
+        },
+        {
           "id": "editor-human-terms",
           "name": "Edit",
           "external": "../documentation/editor/",
