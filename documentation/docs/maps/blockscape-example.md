@@ -2,8 +2,8 @@
 
 ```blockscape
 {
-  "id": "wardley-minimap",
-  "title": "Wardley-Inspired Minimal Value-Chain Map (with Maturity)",
+  "id": "minimap",
+  "title": "Wardley-Inspired Minimal Value-Chain Map",
   "abstract": "Users want to quickly understand a system’s value chain (from user needs down to enabling components) and how maturity/evolution affects decisions. This minimal Wardley-inspired model adds one explicit maturity signal per layer to show how value becomes more standardized and predictable as it moves down the stack.",
   "categories": [
     {

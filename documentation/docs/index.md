@@ -70,4 +70,4 @@ This is a blockscape map:
 ```
 
 Clicking around might help. 
-If not, try **Next**.
+If not, try **Next** in top menu.

@@ -2896,6 +2896,7 @@ function initBlockscape(featureOverrides = {}) {
   const STAGE_COLUMN_COUNT = 4;
   const STAGE_MIN2 = 1;
   const STAGE_MAX2 = 4;
+  const STAGE_ITEM_GAP = "0.2rem";
   const THEME_LIGHT = "light";
   const THEME_DARK = "dark";
   const CATEGORY_VIEW_VERSION_PREFIX = "cat:";
@@ -3191,7 +3192,7 @@ function initBlockscape(featureOverrides = {}) {
   }
   function applyStageLayout() {
     if (!app) return;
-    const template = `repeat(${STAGE_COLUMN_COUNT}, minmax(var(--blockscape-tile), var(--blockscape-tile)))`;
+    const template = `repeat(${STAGE_COLUMN_COUNT}, minmax(var(--blockscape-tile), 1fr))`;
     app.querySelectorAll(".grid").forEach((grid) => {
       const stagedTiles = Array.from(
         grid.querySelectorAll(".tile[data-stage]")
@@ -3204,9 +3205,17 @@ function initBlockscape(featureOverrides = {}) {
       if (enableStaging) {
         grid.style.gridTemplateColumns = template;
         grid.style.gridAutoFlow = "row";
+        grid.style.justifyContent = "space-between";
+        grid.style.justifyItems = "start";
+        grid.style.columnGap = STAGE_ITEM_GAP;
+        grid.style.rowGap = STAGE_ITEM_GAP;
       } else {
         grid.style.removeProperty("grid-template-columns");
         grid.style.removeProperty("grid-auto-flow");
+        grid.style.removeProperty("justify-content");
+        grid.style.removeProperty("justify-items");
+        grid.style.removeProperty("column-gap");
+        grid.style.removeProperty("row-gap");
       }
       const resetTilePlacement = (tile) => {
         tile.style.removeProperty("grid-column");
@@ -3218,7 +3227,13 @@ function initBlockscape(featureOverrides = {}) {
         if (a.stage !== b.stage) return a.stage - b.stage;
         return a.order - b.order;
       });
-      const takeColumn = (preferred, used) => {
+      const takeColumn = (preferred, usedMap, stageValue) => {
+        if (usedMap.has(preferred)) {
+          const existingStage = usedMap.get(preferred);
+          if (existingStage === stageValue) {
+            return { col: preferred, needsNewRow: true };
+          }
+        }
         const maxDelta = STAGE_COLUMN_COUNT - 1;
         for (let delta = 0; delta <= maxDelta; delta += 1) {
           const candidates = [];
@@ -3226,23 +3241,23 @@ function initBlockscape(featureOverrides = {}) {
           if (delta !== 0 && preferred + delta <= STAGE_MAX2)
             candidates.push(preferred + delta);
           for (const col of candidates) {
-            if (!used.has(col)) return col;
+            if (!usedMap.has(col)) return { col, needsNewRow: false };
           }
         }
-        return null;
+        return { col: null, needsNewRow: false };
       };
       let currentRow = 1;
-      let usedColumns = /* @__PURE__ */ new Set();
+      let usedColumns = /* @__PURE__ */ new Map();
       staged.forEach(({ tile, stage }) => {
-        let col = takeColumn(stage, usedColumns);
-        if (col == null) {
+        let attempt = takeColumn(stage, usedColumns, stage);
+        if (attempt.needsNewRow) {
           currentRow += 1;
-          usedColumns = /* @__PURE__ */ new Set();
-          col = takeColumn(stage, usedColumns);
+          usedColumns = /* @__PURE__ */ new Map();
+          attempt = takeColumn(stage, usedColumns, stage);
         }
-        if (col == null) return;
-        usedColumns.add(col);
-        tile.style.gridColumn = String(col);
+        if (attempt.col == null) return;
+        usedColumns.set(attempt.col, stage);
+        tile.style.gridColumn = String(attempt.col);
         tile.style.gridRow = String(currentRow);
       });
     });
@@ -4959,7 +4974,7 @@ function initBlockscape(featureOverrides = {}) {
         ["Shift", "Arrow Up"],
         ["Shift", "Arrow Down"]
       ],
-      description: "Move the selected item to the previous or next category (cycles item.stage in Center view)."
+      description: "Move the selected item to the previous or next category."
     },
     // --- VIEW & UI CONTROL ---
     {
@@ -7369,7 +7384,7 @@ ${text2}` : text2;
     settingsUi.tabSecondaryLinksToggle = tabSecondaryToggleInput;
     const { row: tabCenterToggleRow, input: tabCenterToggleInput } = createTabToggle({
       id: "tabToggleCenterItems",
-      label: "Center",
+      label: "Wardley",
       checked: centerItems,
       onChange: (checked) => applyCenterPreference(checked)
     });
@@ -8248,6 +8263,12 @@ ${text2}` : text2;
         const idLine = document.createElement("div");
         idLine.className = "tile-id";
         idLine.textContent = it.id || "";
+        let stageLabel = null;
+        if (stage) {
+          stageLabel = document.createElement("div");
+          stageLabel.className = "tile-stage";
+          stageLabel.textContent = String(stage);
+        }
         const badge = document.createElement("div");
         badge.className = "badge";
         badge.textContent = "reused";
@@ -8271,6 +8292,7 @@ ${text2}` : text2;
         tile.appendChild(img);
         tile.appendChild(nm);
         tile.appendChild(idLine);
+        if (stageLabel) tile.appendChild(stageLabel);
         tile.appendChild(badge);
         grid.appendChild(tile);
         index.set(it.id, { el: tile, catId: cat.id, rect: null });
@@ -9213,13 +9235,6 @@ ${text2}` : text2;
         return;
       }
       if (event.altKey) return;
-      if (centerItems && event.shiftKey && selection && !event.ctrlKey && !event.metaKey) {
-        const cycled = cycleItemStage(selection, step);
-        if (cycled) {
-          event.preventDefault();
-          return;
-        }
-      }
       if (selectedCategoryId && !selection && !event.shiftKey) {
         const entered = enterSelectedCategoryItems(step);
         if (entered) {

@@ -6,9 +6,9 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         
         
-        <link rel="canonical" href="https://pwright.github.io/blockscape/documentation/gestalt/">
+        <link rel="canonical" href="https://pwright.github.io/blockscape/maps/wardley-example/">
         <link rel="shortcut icon" href="../../img/favicon.ico">
-        <title>Visualising to understand - Blockscape</title>
+        <title>Wardley Example - Blockscape</title>
         <link href="../../css/bootstrap.min.css" rel="stylesheet">
         <link href="../../css/fontawesome.min.css" rel="stylesheet">
         <link href="../../css/brands.min.css" rel="stylesheet">
@@ -42,19 +42,19 @@
                                 <a href="../.." class="nav-link">Hello</a>
                             </li>
                             <li class="nav-item dropdown">
-                                <a href="#" class="nav-link dropdown-toggle" role="button" data-bs-toggle="dropdown"  aria-expanded="false">Maps</a>
+                                <a href="#" class="nav-link dropdown-toggle active" aria-current="page" role="button" data-bs-toggle="dropdown"  aria-expanded="false">Maps</a>
                                 <ul class="dropdown-menu">
                                     
 <li>
-    <a href="../../maps/blockscape-example/" class="dropdown-item">Blockscape Example</a>
+    <a href="../blockscape-example/" class="dropdown-item">Blockscape Example</a>
 </li>
                                     
 <li>
-    <a href="../../maps/wardley-example/" class="dropdown-item">Wardley Example</a>
+    <a href="./" class="dropdown-item active" aria-current="page">Wardley Example</a>
 </li>
                                     
 <li>
-    <a href="../../maps/series-example/" class="dropdown-item">Series Example</a>
+    <a href="../series-example/" class="dropdown-item">Series Example</a>
 </li>
                                 </ul>
                             </li>
@@ -63,51 +63,51 @@
                                 <ul class="dropdown-menu">
                                     
 <li>
-    <a href="../maps/" class="dropdown-item">Overview</a>
+    <a href="../../documentation/maps/" class="dropdown-item">Overview</a>
 </li>
                                     
 <li>
-    <a href="../features/" class="dropdown-item">Features</a>
+    <a href="../../documentation/features/" class="dropdown-item">Features</a>
 </li>
                                     
 <li>
-    <a href="../series/" class="dropdown-item">Series</a>
+    <a href="../../documentation/series/" class="dropdown-item">Series</a>
 </li>
                                     
 <li>
-    <a href="../models/" class="dropdown-item">Models</a>
+    <a href="../../documentation/models/" class="dropdown-item">Models</a>
 </li>
                                     
 <li>
-    <a href="../docker/" class="dropdown-item">Docker for local editor</a>
+    <a href="../../documentation/docker/" class="dropdown-item">Docker for local editor</a>
 </li>
                                     
 <li>
-    <a href="../apicurio/" class="dropdown-item">Apicurio as backend</a>
+    <a href="../../documentation/apicurio/" class="dropdown-item">Apicurio as backend</a>
 </li>
                                     
 <li>
-    <a href="../mkdocs/" class="dropdown-item">MkDocs usage</a>
+    <a href="../../documentation/mkdocs/" class="dropdown-item">MkDocs usage</a>
 </li>
                                     
 <li>
-    <a href="../llm-generation/" class="dropdown-item">LLM generation</a>
+    <a href="../../documentation/llm-generation/" class="dropdown-item">LLM generation</a>
 </li>
                                     
 <li>
-    <a href="../share-links/" class="dropdown-item">Share links</a>
+    <a href="../../documentation/share-links/" class="dropdown-item">Share links</a>
 </li>
                                     
 <li>
-    <a href="../bs-opener-linux/" class="dropdown-item">Local usage on Linux</a>
+    <a href="../../documentation/bs-opener-linux/" class="dropdown-item">Local usage on Linux</a>
 </li>
                                     
 <li>
-    <a href="../bs-opener-mac/" class="dropdown-item">Local usage on Mac</a>
+    <a href="../../documentation/bs-opener-mac/" class="dropdown-item">Local usage on Mac</a>
 </li>
                                     
 <li>
-    <a href="../server/" class="dropdown-item">Local backend server</a>
+    <a href="../../documentation/server/" class="dropdown-item">Local backend server</a>
 </li>
                                 </ul>
                             </li>
@@ -122,6 +122,16 @@
                                 <i class="fa fa-search"></i> Search
                             </a>
                         </li>
+                            <li class="nav-item">
+                                <a rel="prev" href="../blockscape-example/" class="nav-link">
+                                    <i class="fa fa-arrow-left"></i> Previous
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a rel="next" href="../series-example/" class="nav-link">
+                                    Next <i class="fa fa-arrow-right"></i>
+                                </a>
+                            </li>
                     </ul>
                 </div>
             </div>
@@ -140,7 +150,7 @@
     <div id="toc-collapse" class="navbar-collapse collapse card bg-body-tertiary">
         <ul class="nav flex-column">
             
-            <li class="nav-item" data-bs-level="1"><a href="#visualising-to-understand" class="nav-link">Visualising to understand</a>
+            <li class="nav-item" data-bs-level="1"><a href="#wardley-example" class="nav-link">Wardley example</a>
               <ul class="nav flex-column">
               </ul>
             </li>
@@ -149,13 +159,93 @@
 </div></div>
                     <div class="col-md-9" role="main">
 
-<h1 id="visualising-to-understand">Visualising to understand</h1>
-<p>Gestalt is about perceiving the whole rather than isolated parts—patterns, relationships, and context matter more than individual tiles. Blockscape leans on this: the map format emphasizes relationships and evolution so teams share the same mental model before debating solutions.</p>
-<ul>
-<li>Show component categories top-to-bottom to reflect visibility/value.</li>
-<li>Place components/items left-to-right to express maturity (novel → commodity).</li>
-<li>Short abstracts that define the domain, not components. Dependencies and positioning stay readable.</li>
-</ul></div>
+<h1 id="wardley-example">Wardley example</h1>
+<p>This is a wardley map, the only difference being that an item can be associated with a development stage, 1=genesis, 2=custom, 3=product, 4=service. See example map at <a href="https://onlinewardleymaps.com/">https://onlinewardleymaps.com/</a>.</p>
+<div class="blockscape-root">
+  <script type="application/json" class="blockscape-seed">
+{
+  "id": "tea-shop",
+  "title": "Tea Shop",
+  "abstract": "A simple tea shop value chain: the business and public value a cup of tea, which depends on a cup, tea leaves, and hot water. Hot water depends on water and a kettle, and the kettle depends on power. The kettle is a limiting factor for hot water production.",
+  "categories": [
+    {
+      "id": "experience",
+      "title": "Experience",
+      "items": [
+        {
+          "id": "cup-of-tea",
+          "name": "Cup of Tea",
+          "deps": [
+            "cup",
+            "tea",
+            "hot-water"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "inputs",
+      "title": "Inputs & Enablers",
+      "items": [
+        {
+          "id": "cup",
+          "name": "Cup",
+          "deps": [],
+          "stage": 2
+        },
+        {
+          "id": "tea",
+          "name": "Tea",
+          "deps": [],
+          "stage": 3
+        },
+        {
+          "id": "hot-water",
+          "name": "Hot Water",
+          "deps": [
+            "water",
+            "kettle"
+          ],
+          "stage": 3
+        }
+      ]
+    },
+    {
+      "id": "in-house-hardware",
+      "title": "In house hardware",
+      "items": [
+        {
+          "id": "kettle",
+          "name": "Kettle",
+          "deps": [
+            "power"
+          ],
+          "stage": 2
+        }
+      ]
+    },
+    {
+      "id": "infrastructure-supplied",
+      "title": "Infrastructure supplied",
+      "items": [
+        {
+          "id": "water",
+          "name": "Water",
+          "deps": [],
+          "stage": 4
+        },
+        {
+          "id": "power",
+          "name": "Power",
+          "deps": [],
+          "stage": 4
+        }
+      ]
+    }
+  ]
+}
+  </script>
+</div></div>
             </div>
         </div>
 

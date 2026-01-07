@@ -22,4 +22,4 @@ Tiles try to sit in their requested stage column when Center is on; when multipl
 ```
 
 ## Shortcuts
-- Center view on + `Shift` + `Arrow` cycles through stages 1→4 (wrapping around) without moving the tile.
+- Center view on + `Shift` + `Arrow Left/Right` cycles stages 1→4 (wrapping around) without moving the tile.

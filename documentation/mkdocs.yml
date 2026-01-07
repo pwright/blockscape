@@ -9,6 +9,7 @@ nav:
   - Hello: index.md
   - Maps:
       - Blockscape Example: maps/blockscape-example.md
+      - Wardley Example: maps/wardley-example.md
       - Series Example: maps/series-example.md
   - Documentation:
       - Overview: documentation/maps.md
