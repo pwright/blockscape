@@ -74,10 +74,11 @@ ${O}`:O)},Ue=[{id:"map",label:"Map",panel:k},{id:"abstract",label:"Info",panel:V
         * optional \`external\` (string URL) pointing to external documentation or reference material for that item
         * optional \`color\` (hex string) for tile tint
         * optional \`deps\`: array of item \`id\`s this item **depends on** (when present, must reference defined items only)
+        * optional \`stage\`: integer 1–4 for Wardley maps only (1=genesis, 2=custom, 3=product, 4=commodity/service). Include only when the user explicitly asks for a Wardley model/series.
 * Use **3–6/7 categories** and **2–6/7 items per category**. Prefer clarity over exhaustiveness.
 * Order categories roughly from **abstract to concrete**.
 * Model **visible user value** via **vertical position** (things closer to the user are higher). Ensure \`deps\` reflect a flow from higher‑value items to their underlying enablers.
-* (Optional) You may imply **horizontal evolution/maturity** via category naming or item grouping, but do not add extra fields for it.
+* (Optional) You may imply **horizontal evolution/maturity** via category naming or item grouping. Only include the \`stage\` field when explicitly asked for a Wardley map/series.
 * Keep all identifiers **ASCII**, hyphen‑separated where needed.
 
 ### Domain Guidance

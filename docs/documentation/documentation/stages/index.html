@@ -109,6 +109,10 @@
 <li>
     <a href="../server/" class="dropdown-item">Local backend server</a>
 </li>
+                                    
+<li>
+    <a href="../rise-and-fall-json/" class="dropdown-item">JSON prompting</a>
+</li>
                                 </ul>
                             </li>
                             <li class="nav-item">
@@ -162,7 +166,7 @@
                     <div class="col-md-9" role="main">
 
 <h1 id="stages-in-center-view">Stages in Center view</h1>
-<p><code>stage</code> is an optional field on each item that nudges tiles to a horizontal position when Center view is enabled.</p>
+<p><code>stage</code> is an optional field on each item that nudges tiles to a horizontal position when Center view is enabled. It is most often used for Wardley-style maps.</p>
 <h2 id="values">Values</h2>
 <ul>
 <li><code>1</code>: far left</li>
@@ -171,6 +175,11 @@
 <li><code>4</code>: far right</li>
 </ul>
 <p>Tiles try to sit in their requested stage column when Center is on; when multiple items want the same stage, Blockscape fills the nearest free horizontal columns (wrapping to a new row only after all four columns are taken). With Center off, or when <code>stage</code> is omitted, items flow normally.</p>
+<p>Wardley interpretation:
+- <code>1</code> → genesis
+- <code>2</code> → custom-built
+- <code>3</code> → product/rental
+- <code>4</code> → commodity/service</p>
 <h2 id="example">Example</h2>
 <pre><code class="language-json">{
   &quot;id&quot;: &quot;my-item&quot;,

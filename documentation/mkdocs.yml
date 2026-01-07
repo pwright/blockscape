@@ -24,6 +24,7 @@ nav:
       - Local usage on Linux: documentation/bs-opener-linux.md
       - Local usage on Mac: documentation/bs-opener-mac.md
       - Local backend server: documentation/server.md
+      - JSON prompting: documentation/rise-and-fall-json.md
   - TOC: toc.md
 
 markdown_extensions:
