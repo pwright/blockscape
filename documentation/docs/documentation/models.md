@@ -43,6 +43,6 @@ Blockscape uses a simple JSON schema to define landscape models:
     - **id**: Short, unique identifier across all categories
     - **name**: Human-friendly component name
     - **deps**: Array of item IDs this component depends on
-    - **stage**: Optional integer (1-4) used in Center view to pull the tile toward a horizontal stage (1=far left, 4=far right)
+    - **stage**: Optional integer (1-4) used in Center view to pull the tile toward a horizontal stage (1=far left, 4=far right). Primarily for Wardley-style maps (1=genesis, 2=custom, 3=product, 4=commodity/service).
     - **logo**: Optional path to logo image
     - **external**: Optional URL for an external reference (docs, gists, etc.). When present the tile gains a dashed border and a launch icon that opens the link in a new tab.
