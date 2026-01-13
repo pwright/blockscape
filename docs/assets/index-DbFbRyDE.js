@@ -2928,6 +2928,7 @@ function initBlockscape(featureOverrides = {}) {
   let revdepColor = "";
   let linkThickness = "m";
   let renderColorPresetsUI = null;
+  let stageGuidesOverlay = null;
   const SERIES_NAV_DOUBLE_CLICK_STORAGE_KEY = "blockscape:seriesNavDoubleClickMs";
   const DEFAULT_SERIES_NAV_DOUBLE_CLICK_MS = 900;
   const MIN_SERIES_NAV_DOUBLE_CLICK_MS = 300;
@@ -3161,7 +3162,13 @@ function initBlockscape(featureOverrides = {}) {
         btn.tabIndex = centerItems ? -1 : 0;
         btn.setAttribute("aria-hidden", centerItems ? "true" : "false");
       });
+      app.querySelectorAll(".category-add").forEach((btn) => {
+        btn.hidden = centerItems;
+        btn.tabIndex = centerItems ? -1 : 0;
+        btn.setAttribute("aria-hidden", centerItems ? "true" : "false");
+      });
     }
+    syncStageGuidesVisibility();
     applyStageLayout();
     if (model) {
       reflowRects();
@@ -3201,7 +3208,8 @@ function initBlockscape(featureOverrides = {}) {
         stage: normalizeStageValue2(tile.dataset.stage),
         order: idx
       }));
-      const enableStaging = centerItems && stagedTiles.some((entry) => entry.stage);
+      const hasStagedItems = stagedTiles.some((entry) => entry.stage);
+      const enableStaging = centerItems && hasStagedItems;
       if (enableStaging) {
         grid.style.gridTemplateColumns = template;
         grid.style.gridAutoFlow = "row";
@@ -3261,6 +3269,11 @@ function initBlockscape(featureOverrides = {}) {
         tile.style.gridRow = String(currentRow);
       });
     });
+    syncStageGuidesVisibility();
+  }
+  function syncStageGuidesVisibility() {
+    if (!stageGuidesOverlay) return;
+    stageGuidesOverlay.hidden = !centerItems;
   }
   function getCssVarValue(varName) {
     if (typeof window === "undefined") return "";
@@ -7264,6 +7277,26 @@ ${text2}` : text2;
     mapPanel.appendChild(createLegend());
     const renderHost = document.createElement("div");
     renderHost.className = "blockscape-render";
+    const stageGuides = document.createElement("div");
+    stageGuides.className = "stage-guides";
+    stageGuides.hidden = !centerItems;
+    stageGuides.setAttribute("aria-hidden", "true");
+    const stageLabels = document.createElement("div");
+    stageLabels.className = "stage-guide-labels";
+    [
+      "Genesis / Inception",
+      "Custom",
+      "Product / Rental",
+      "Service / Commodity"
+    ].forEach((label) => {
+      const span = document.createElement("span");
+      span.className = "stage-guide-labels__item";
+      span.textContent = label;
+      stageLabels.appendChild(span);
+    });
+    stageGuides.appendChild(stageLabels);
+    renderHost.appendChild(stageGuides);
+    stageGuidesOverlay = stageGuides;
     mapPanel.appendChild(renderHost);
     const abstractWrapper = document.createElement("div");
     abstractWrapper.className = "blockscape-abstract-panel";
@@ -8311,13 +8344,19 @@ ${text2}` : text2;
         grid.appendChild(addTile);
       }
     });
+    let addCategoryButton = null;
     if (!activeIsCategoryView) {
-      const addCategoryButton = document.createElement("button");
+      addCategoryButton = document.createElement("button");
       addCategoryButton.type = "button";
       addCategoryButton.className = "category-add";
       addCategoryButton.innerHTML = '<span class="category-add__icon" aria-hidden="true">+</span><span class="category-add__label">Add category</span><span class="category-add__hint">(Insert)</span>';
       addCategoryButton.addEventListener("click", () => addCategoryAtEnd());
       renderHost.appendChild(addCategoryButton);
+    }
+    if (addCategoryButton && centerItems) {
+      addCategoryButton.hidden = true;
+      addCategoryButton.tabIndex = -1;
+      addCategoryButton.setAttribute("aria-hidden", "true");
     }
     applyStageLayout();
     applyReusedHighlights();

@@ -1665,10 +1665,13 @@
     }
 
     .category {
-      margin: var(--space-lg) 0;
+      margin: var(--space-md) 0;
     }
 
     .blockscape-render {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-lg);
       position: relative;
     }
 
@@ -1878,6 +1881,8 @@
         minmax(var(--blockscape-tile), var(--blockscape-tile))
       );
       justify-items: center;
+      position: relative;
+      z-index: 0;
     }
 
     .grid.is-centered .tile {
@@ -1888,6 +1893,68 @@
     .is-center-mode .tile-add,
     .grid.is-centered .tile-add {
       display: none;
+    }
+
+    .stage-guides {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background-image:
+        repeating-linear-gradient(
+          to bottom,
+          rgba(100, 116, 139, 0.25) 0,
+          rgba(100, 116, 139, 0.25) 8px,
+          transparent 8px,
+          transparent 16px
+        ),
+        repeating-linear-gradient(
+          to bottom,
+          rgba(100, 116, 139, 0.25) 0,
+          rgba(100, 116, 139, 0.25) 8px,
+          transparent 8px,
+          transparent 16px
+        ),
+        repeating-linear-gradient(
+          to bottom,
+          rgba(100, 116, 139, 0.25) 0,
+          rgba(100, 116, 139, 0.25) 8px,
+          transparent 8px,
+          transparent 16px
+        ),
+        repeating-linear-gradient(
+          to bottom,
+          rgba(100, 116, 139, 0.25) 0,
+          rgba(100, 116, 139, 0.25) 8px,
+          transparent 8px,
+          transparent 16px
+        );
+      background-size: 1px 100%, 1px 100%, 1px 100%, 1px 100%;
+      background-repeat: no-repeat;
+      background-position: 0 0, 25% 0, 50% 0, 75% 0;
+      opacity: 1;
+      z-index: 0;
+    }
+
+    .stage-guide-labels {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: var(--space-xs);
+      display: flex;
+      gap: var(--space-sm);
+      justify-content: space-between;
+      padding: 0 var(--space-md);
+      font-size: 10px;
+      color: var(--color-muted);
+      text-transform: none;
+      pointer-events: none;
+      mix-blend-mode: multiply;
+    }
+
+    .stage-guide-labels__item {
+      flex: 1 1 0;
+      text-align: center;
+      white-space: nowrap;
     }
 
     .tile {
@@ -1914,7 +1981,7 @@
       transform: translateY(0) scale(1);
       transform-origin: center;
       will-change: transform;
-      z-index: 1;
+      z-index: 3;
     }
 
     .tile-stage {
@@ -2331,6 +2398,10 @@
       box-shadow: 0 12px 32px -16px rgba(37, 99, 235, 0.35);
       transform: translateY(-1px);
       outline: none;
+    }
+
+    .is-center-mode .category-add {
+      display: none !important;
     }
 
     .muted {
