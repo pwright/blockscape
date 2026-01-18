@@ -74,11 +74,15 @@ export function initBlockscape(featureOverrides = {}) {
   const localDirSelect = document.getElementById("localDirSelect");
   const refreshLocalFilesButton = document.getElementById("refreshLocalFiles");
   const loadLocalFileButton = document.getElementById("loadLocalFile");
+  const deleteLocalFileButton = document.getElementById("deleteLocalFile");
+  const toggleServerSidebarButton =
+    document.getElementById("toggleServerSidebar");
   const saveLocalFileButton = document.getElementById("saveLocalFile");
   const saveLocalFileAsButton = document.getElementById("saveLocalFileAs");
   const localSavePathInput = document.getElementById("localSavePath");
   const EDITOR_TRANSFER_KEY = "blockscape:editorPayload";
   const EDITOR_TRANSFER_MESSAGE_TYPE = "blockscape:editorTransfer";
+  const SERVER_SIDEBAR_WIDE_STORAGE_KEY = "blockscape:serverSidebarWide";
   const defaultDocumentTitle = document.title;
 
   // Ensure local backend panel starts hidden; it will only unhide after a successful health check.
@@ -88,6 +92,7 @@ export function initBlockscape(featureOverrides = {}) {
     if (loadLocalFileButton) loadLocalFileButton.hidden = true;
     if (localDirSelect) localDirSelect.hidden = true;
     if (refreshLocalFilesButton) refreshLocalFilesButton.hidden = true;
+    if (deleteLocalFileButton) deleteLocalFileButton.hidden = true;
     if (localFileList) localFileList.hidden = true;
   }
   if (!features.fileSave) {
@@ -932,6 +937,59 @@ export function initBlockscape(featureOverrides = {}) {
     return host.endsWith("github.io");
   }
 
+  function readServerSidebarWide() {
+    if (typeof window === "undefined" || !window.localStorage) return true;
+    try {
+      const raw = window.localStorage.getItem(SERVER_SIDEBAR_WIDE_STORAGE_KEY);
+      if (raw == null) return true;
+      return raw === "true";
+    } catch (err) {
+      return true;
+    }
+  }
+
+  function persistServerSidebarWide(value) {
+    if (typeof window === "undefined" || !window.localStorage) return;
+    try {
+      window.localStorage.setItem(
+        SERVER_SIDEBAR_WIDE_STORAGE_KEY,
+        value ? "true" : "false"
+      );
+    } catch (err) {
+      console.warn("[Blockscape] failed to persist sidebar width", err);
+    }
+  }
+
+  function applyServerSidebarWide(value) {
+    if (typeof document === "undefined") return;
+    document.body?.classList.toggle(
+      "blockscape-server-sidebar-wide",
+      !!value
+    );
+    if (!toggleServerSidebarButton) return;
+    toggleServerSidebarButton.setAttribute(
+      "aria-pressed",
+      value ? "true" : "false"
+    );
+    toggleServerSidebarButton.textContent = value ? "<" : ">";
+    toggleServerSidebarButton.title = value
+      ? "Switch to thin menu"
+      : "Switch to wide menu";
+  }
+
+  function setupServerSidebarToggle(enabled) {
+    if (!toggleServerSidebarButton) return;
+    toggleServerSidebarButton.hidden = !enabled;
+    if (!enabled) return;
+    let isWide = readServerSidebarWide();
+    applyServerSidebarWide(isWide);
+    toggleServerSidebarButton.onclick = () => {
+      isWide = !isWide;
+      persistServerSidebarWide(isWide);
+      applyServerSidebarWide(isWide);
+    };
+  }
+
   function createLocalBackend() {
     const debugContext = () => {
       if (typeof window === "undefined" || !window.location) return {};
@@ -962,6 +1020,10 @@ export function initBlockscape(featureOverrides = {}) {
     }
 
     const optIn = isLocalBackendOptIn();
+    if (optIn && typeof document !== "undefined") {
+      document.body?.classList.add("blockscape-server-mode");
+    }
+    setupServerSidebarToggle(optIn);
     if (!optIn || !localBackendPanel || !localBackendStatus) {
       debug("Opt-in flag missing or panel unavailable");
       if (localBackendPanel) localBackendPanel.hidden = true;
@@ -1103,7 +1165,7 @@ export function initBlockscape(featureOverrides = {}) {
       localDirSelect.innerHTML = "";
       const rootOption = document.createElement("option");
       rootOption.value = "";
-      rootOption.textContent = "All (~/blockscape)";
+      rootOption.textContent = "Root (~/blockscape)";
       localDirSelect.appendChild(rootOption);
       dirs.forEach((dir) => {
         const opt = document.createElement("option");
@@ -1119,9 +1181,7 @@ export function initBlockscape(featureOverrides = {}) {
     function renderFiles() {
       if (!localFileList) return;
       localFileList.innerHTML = "";
-      const filtered = currentDir
-        ? files.filter((f) => f.path.startsWith(`${currentDir}/`))
-        : files;
+      const filtered = files.filter((f) => dirOfPath(f.path) === currentDir);
       if (!filtered.length) {
         const option = document.createElement("option");
         option.disabled = true;
@@ -1387,10 +1447,16 @@ export function initBlockscape(featureOverrides = {}) {
         knownMtimes = new Map(files.map((f) => [f.path, f.mtimeMs || 0]));
         renderDirFilter();
         renderFiles();
+        const visibleCount = files.filter(
+          (f) => dirOfPath(f.path) === currentDir
+        ).length;
+        const locationLabel = currentDir
+          ? `~/blockscape/${currentDir}`
+          : "~/blockscape";
         setStatus(
-          files.length
-            ? `Browsing ${files.length} file(s) in ~/blockscape`
-            : "No .bs files in ~/blockscape yet"
+          visibleCount
+            ? `Browsing ${visibleCount} file(s) in ${locationLabel}`
+            : `No .bs files in ${locationLabel} yet`
         );
       } catch (err) {
         console.warn("[Blockscape] local backend refresh failed", err);
@@ -1446,6 +1512,59 @@ export function initBlockscape(featureOverrides = {}) {
       if (firstIndex != null) setActive(firstIndex);
       setStatus(`Loaded ${selectedPaths.length} file(s)`);
       renderFiles();
+    }
+
+    async function deleteSelected() {
+      if (!available || !localFileList) return;
+      const selectedPaths = Array.from(localFileList.selectedOptions || [])
+        .map((opt) => opt.value)
+        .filter(Boolean)
+        .sort((a, b) => a.localeCompare(b));
+      if (!selectedPaths.length) {
+        alert("Select one or more files to delete from ~/blockscape.");
+        return;
+      }
+      const count = selectedPaths.length;
+      const targetLabel =
+        count === 1 ? selectedPaths[0] : `${count} file(s)`;
+      const confirmText =
+        count === 1
+          ? `Delete "${targetLabel}" from ~/blockscape? This cannot be undone.`
+          : `Delete ${targetLabel} from ~/blockscape? This cannot be undone.`;
+      if (!window.confirm(confirmText)) return;
+      const DELETE_REASON = "local-files-delete";
+      pauseAutoReload(DELETE_REASON);
+      const failures = [];
+      try {
+        setStatus(`Deleting ${targetLabel}…`);
+        for (const relPath of selectedPaths) {
+          try {
+            const resp = await fetch(
+              `/api/file?path=${encodeURIComponent(relPath)}`,
+              { method: "DELETE" }
+            );
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            if (relPath === lastKnownPath) lastKnownPath = "";
+            if (localSavePathInput?.value === relPath) {
+              localSavePathInput.value = "";
+            }
+          } catch (err) {
+            failures.push(relPath);
+            console.warn("[Blockscape] local delete failed", relPath, err);
+          }
+        }
+        await refresh();
+        if (failures.length) {
+          setStatus(
+            `Deleted ${count - failures.length} file(s), ${failures.length} failed`,
+            { error: true }
+          );
+        } else {
+          setStatus(`Deleted ${count} file(s)`);
+        }
+      } finally {
+        resumeAutoReload(DELETE_REASON);
+      }
     }
 
     async function saveActiveToPath(
@@ -1590,6 +1709,9 @@ export function initBlockscape(featureOverrides = {}) {
     }
     if (loadLocalFileButton) {
       loadLocalFileButton.onclick = () => loadSelected();
+    }
+    if (deleteLocalFileButton) {
+      deleteLocalFileButton.onclick = () => deleteSelected();
     }
     if (saveLocalFileButton) {
       saveLocalFileButton.onclick = () => saveActiveToFile();

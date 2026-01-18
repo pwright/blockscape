@@ -848,6 +848,18 @@
       overflow: hidden;
     }
 
+    @media (min-width: 1025px) {
+      .blockscape-server-mode.blockscape-server-sidebar-wide
+        .blockscape-content {
+        width: min(1800px, calc(100% - 2 * var(--space-lg)));
+      }
+
+      .blockscape-server-mode.blockscape-server-sidebar-wide
+        .blockscape-sidebar {
+        flex: 0 0 720px;
+      }
+    }
+
     .sidebar-heading {
       font-size: var(--font-size-xs);
       font-weight: var(--font-weight-semibold);
@@ -1014,11 +1026,12 @@
 
     .local-backend__actions {
       display: flex;
+      flex-wrap: wrap;
       gap: var(--space-xs);
     }
 
     .local-backend__actions .pf-v5-c-button {
-      flex: 1 1 50%;
+      flex: 1 1 120px;
     }
 
     .local-backend__save-actions {
@@ -1039,6 +1052,17 @@
     .local-backend__save label {
       font-size: var(--font-size-xs);
       color: var(--blockscape-muted);
+    }
+
+    .local-backend__header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-xs);
+    }
+
+    .local-backend__header .pf-v5-c-button {
+      white-space: nowrap;
     }
 
     .blockscape-main {

@@ -52,6 +52,10 @@ function sendText(res, status, text, contentType = "text/plain; charset=utf-8") 
 function safeRelativePath(rawPath) {
   const decoded = decodeURIComponent(rawPath || "").replace(/^[\\/]+/, "");
   const normalized = path.normalize(decoded).replace(/^(\.\.(\/|\\|$))+/, "");
+  const segments = normalized.split(/[\\/]+/).filter(Boolean);
+  if (segments.slice(0, -1).some((segment) => segment.startsWith("."))) {
+    throw new Error("Hidden directories are not allowed");
+  }
   const target = path.join(ROOT_DIR, normalized);
   if (!target.startsWith(ROOT_DIR)) {
     throw new Error("Invalid path");
@@ -66,6 +70,9 @@ async function listBsFiles(dir = ROOT_DIR, prefix = "") {
     const rel = path.join(prefix, item.name);
     const full = path.join(dir, item.name);
     if (item.isDirectory()) {
+      if (item.name.startsWith(".")) {
+        continue;
+      }
       entries = entries.concat(await listBsFiles(full, rel));
     } else if (item.isFile() && full.toLowerCase().endsWith(".bs")) {
       const stats = await fs.promises.stat(full);

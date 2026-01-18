@@ -2785,11 +2785,14 @@ function initBlockscape(featureOverrides = {}) {
   const localDirSelect = document.getElementById("localDirSelect");
   const refreshLocalFilesButton = document.getElementById("refreshLocalFiles");
   const loadLocalFileButton = document.getElementById("loadLocalFile");
+  const deleteLocalFileButton = document.getElementById("deleteLocalFile");
+  const toggleServerSidebarButton = document.getElementById("toggleServerSidebar");
   const saveLocalFileButton = document.getElementById("saveLocalFile");
   const saveLocalFileAsButton = document.getElementById("saveLocalFileAs");
   const localSavePathInput = document.getElementById("localSavePath");
   const EDITOR_TRANSFER_KEY = "blockscape:editorPayload";
   const EDITOR_TRANSFER_MESSAGE_TYPE = "blockscape:editorTransfer";
+  const SERVER_SIDEBAR_WIDE_STORAGE_KEY = "blockscape:serverSidebarWide";
   const defaultDocumentTitle = document.title;
   if (localBackendPanel) localBackendPanel.hidden = true;
   if (!features.localBackend && localBackendPanel) localBackendPanel.hidden = true;
@@ -2797,6 +2800,7 @@ function initBlockscape(featureOverrides = {}) {
     if (loadLocalFileButton) loadLocalFileButton.hidden = true;
     if (localDirSelect) localDirSelect.hidden = true;
     if (refreshLocalFilesButton) refreshLocalFilesButton.hidden = true;
+    if (deleteLocalFileButton) deleteLocalFileButton.hidden = true;
     if (localFileList) localFileList.hidden = true;
   }
   if (!features.fileSave) {
@@ -3540,7 +3544,56 @@ function initBlockscape(featureOverrides = {}) {
     const host = (window.location.hostname || "").toLowerCase();
     return host.endsWith("github.io");
   }
+  function readServerSidebarWide() {
+    if (typeof window === "undefined" || !window.localStorage) return true;
+    try {
+      const raw = window.localStorage.getItem(SERVER_SIDEBAR_WIDE_STORAGE_KEY);
+      if (raw == null) return true;
+      return raw === "true";
+    } catch (err) {
+      return true;
+    }
+  }
+  function persistServerSidebarWide(value) {
+    if (typeof window === "undefined" || !window.localStorage) return;
+    try {
+      window.localStorage.setItem(
+        SERVER_SIDEBAR_WIDE_STORAGE_KEY,
+        value ? "true" : "false"
+      );
+    } catch (err) {
+      console.warn("[Blockscape] failed to persist sidebar width", err);
+    }
+  }
+  function applyServerSidebarWide(value) {
+    var _a;
+    if (typeof document === "undefined") return;
+    (_a = document.body) == null ? void 0 : _a.classList.toggle(
+      "blockscape-server-sidebar-wide",
+      !!value
+    );
+    if (!toggleServerSidebarButton) return;
+    toggleServerSidebarButton.setAttribute(
+      "aria-pressed",
+      value ? "true" : "false"
+    );
+    toggleServerSidebarButton.textContent = value ? "<" : ">";
+    toggleServerSidebarButton.title = value ? "Switch to thin menu" : "Switch to wide menu";
+  }
+  function setupServerSidebarToggle(enabled) {
+    if (!toggleServerSidebarButton) return;
+    toggleServerSidebarButton.hidden = !enabled;
+    if (!enabled) return;
+    let isWide = readServerSidebarWide();
+    applyServerSidebarWide(isWide);
+    toggleServerSidebarButton.onclick = () => {
+      isWide = !isWide;
+      persistServerSidebarWide(isWide);
+      applyServerSidebarWide(isWide);
+    };
+  }
   function createLocalBackend() {
+    var _a;
     const debugContext = () => {
       if (typeof window === "undefined" || !window.location) return {};
       return {
@@ -3569,6 +3622,10 @@ function initBlockscape(featureOverrides = {}) {
       };
     }
     const optIn = isLocalBackendOptIn();
+    if (optIn && typeof document !== "undefined") {
+      (_a = document.body) == null ? void 0 : _a.classList.add("blockscape-server-mode");
+    }
+    setupServerSidebarToggle(optIn);
     if (!optIn || !localBackendPanel || !localBackendStatus) {
       debug("Opt-in flag missing or panel unavailable");
       if (localBackendPanel) localBackendPanel.hidden = true;
@@ -3680,8 +3737,8 @@ function initBlockscape(featureOverrides = {}) {
       return { payload: entry == null ? void 0 : entry.data, isSeries: false };
     }
     function defaultSaveName() {
-      var _a;
-      if (activeIndex >= 0 && ((_a = models[activeIndex]) == null ? void 0 : _a.sourcePath)) {
+      var _a2;
+      if (activeIndex >= 0 && ((_a2 = models[activeIndex]) == null ? void 0 : _a2.sourcePath)) {
         return models[activeIndex].sourcePath;
       }
       if (activeIndex < 0) return "blockscape.bs";
@@ -3689,10 +3746,10 @@ function initBlockscape(featureOverrides = {}) {
       return `${makeSeriesId(title, "blockscape")}.bs`;
     }
     function updateActiveSavePlaceholder() {
-      var _a;
+      var _a2;
       if (!localSavePathInput) return;
       localSavePathInput.placeholder = defaultSaveName();
-      if ((_a = models[activeIndex]) == null ? void 0 : _a.sourcePath) {
+      if ((_a2 = models[activeIndex]) == null ? void 0 : _a2.sourcePath) {
         localSavePathInput.value = models[activeIndex].sourcePath;
       }
     }
@@ -3701,7 +3758,7 @@ function initBlockscape(featureOverrides = {}) {
       localDirSelect.innerHTML = "";
       const rootOption = document.createElement("option");
       rootOption.value = "";
-      rootOption.textContent = "All (~/blockscape)";
+      rootOption.textContent = "Root (~/blockscape)";
       localDirSelect.appendChild(rootOption);
       dirs.forEach((dir) => {
         const opt = document.createElement("option");
@@ -3716,7 +3773,7 @@ function initBlockscape(featureOverrides = {}) {
     function renderFiles() {
       if (!localFileList) return;
       localFileList.innerHTML = "";
-      const filtered = currentDir ? files.filter((f) => f.path.startsWith(`${currentDir}/`)) : files;
+      const filtered = files.filter((f) => dirOfPath(f.path) === currentDir);
       if (!filtered.length) {
         const option = document.createElement("option");
         option.disabled = true;
@@ -3953,8 +4010,12 @@ function initBlockscape(featureOverrides = {}) {
         knownMtimes = new Map(files.map((f) => [f.path, f.mtimeMs || 0]));
         renderDirFilter();
         renderFiles();
+        const visibleCount = files.filter(
+          (f) => dirOfPath(f.path) === currentDir
+        ).length;
+        const locationLabel = currentDir ? `~/blockscape/${currentDir}` : "~/blockscape";
         setStatus(
-          files.length ? `Browsing ${files.length} file(s) in ~/blockscape` : "No .bs files in ~/blockscape yet"
+          visibleCount ? `Browsing ${visibleCount} file(s) in ${locationLabel}` : `No .bs files in ${locationLabel} yet`
         );
       } catch (err) {
         console.warn("[Blockscape] local backend refresh failed", err);
@@ -4006,6 +4067,51 @@ function initBlockscape(featureOverrides = {}) {
       setStatus(`Loaded ${selectedPaths.length} file(s)`);
       renderFiles();
     }
+    async function deleteSelected() {
+      if (!available || !localFileList) return;
+      const selectedPaths = Array.from(localFileList.selectedOptions || []).map((opt) => opt.value).filter(Boolean).sort((a, b) => a.localeCompare(b));
+      if (!selectedPaths.length) {
+        alert("Select one or more files to delete from ~/blockscape.");
+        return;
+      }
+      const count = selectedPaths.length;
+      const targetLabel = count === 1 ? selectedPaths[0] : `${count} file(s)`;
+      const confirmText = count === 1 ? `Delete "${targetLabel}" from ~/blockscape? This cannot be undone.` : `Delete ${targetLabel} from ~/blockscape? This cannot be undone.`;
+      if (!window.confirm(confirmText)) return;
+      const DELETE_REASON = "local-files-delete";
+      pauseAutoReload(DELETE_REASON);
+      const failures = [];
+      try {
+        setStatus(`Deleting ${targetLabel}…`);
+        for (const relPath of selectedPaths) {
+          try {
+            const resp = await fetch(
+              `/api/file?path=${encodeURIComponent(relPath)}`,
+              { method: "DELETE" }
+            );
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            if (relPath === lastKnownPath) lastKnownPath = "";
+            if ((localSavePathInput == null ? void 0 : localSavePathInput.value) === relPath) {
+              localSavePathInput.value = "";
+            }
+          } catch (err) {
+            failures.push(relPath);
+            console.warn("[Blockscape] local delete failed", relPath, err);
+          }
+        }
+        await refresh();
+        if (failures.length) {
+          setStatus(
+            `Deleted ${count - failures.length} file(s), ${failures.length} failed`,
+            { error: true }
+          );
+        } else {
+          setStatus(`Deleted ${count} file(s)`);
+        }
+      } finally {
+        resumeAutoReload(DELETE_REASON);
+      }
+    }
     async function saveActiveToPath(desiredPath, { statusPrefix = "Saved to", updateInput = true } = {}) {
       if (!available) return;
       if (activeIndex < 0) {
@@ -4052,8 +4158,8 @@ function initBlockscape(featureOverrides = {}) {
       }
     }
     async function saveActiveToFile() {
-      var _a;
-      const desiredPath = normalizeSavePath(localSavePathInput == null ? void 0 : localSavePathInput.value) || normalizeSavePath((_a = models[activeIndex]) == null ? void 0 : _a.sourcePath) || defaultSaveName();
+      var _a2;
+      const desiredPath = normalizeSavePath(localSavePathInput == null ? void 0 : localSavePathInput.value) || normalizeSavePath((_a2 = models[activeIndex]) == null ? void 0 : _a2.sourcePath) || defaultSaveName();
       if (!desiredPath) {
         alert("Enter a relative path (no ..) to save under ~/blockscape.");
         return;
@@ -4061,7 +4167,7 @@ function initBlockscape(featureOverrides = {}) {
       await saveActiveToPath(desiredPath, { statusPrefix: "Saved to" });
     }
     async function saveActiveAs() {
-      var _a;
+      var _a2;
       if (!available) return;
       if (activeIndex < 0) {
         alert("No active model to save.");
@@ -4069,7 +4175,7 @@ function initBlockscape(featureOverrides = {}) {
       }
       if (typeof window === "undefined" || typeof window.prompt !== "function")
         return;
-      const defaultPath = normalizeSavePath((_a = models[activeIndex]) == null ? void 0 : _a.sourcePath) || defaultSaveName();
+      const defaultPath = normalizeSavePath((_a2 = models[activeIndex]) == null ? void 0 : _a2.sourcePath) || defaultSaveName();
       const response = window.prompt(
         "Save active map as (under ~/blockscape):",
         defaultPath
@@ -4132,6 +4238,9 @@ function initBlockscape(featureOverrides = {}) {
     }
     if (loadLocalFileButton) {
       loadLocalFileButton.onclick = () => loadSelected();
+    }
+    if (deleteLocalFileButton) {
+      deleteLocalFileButton.onclick = () => deleteSelected();
     }
     if (saveLocalFileButton) {
       saveLocalFileButton.onclick = () => saveActiveToFile();
@@ -11063,7 +11172,7 @@ const { document: document_1 } = globals;
 function create_fragment$1(ctx) {
   let link;
   let t0;
-  let div25;
+  let div26;
   let header;
   let div9;
   let div8;
@@ -11100,7 +11209,7 @@ function create_fragment$1(ctx) {
   let header_hidden_value;
   let t29;
   let main;
-  let div23;
+  let div24;
   let aside;
   let div10;
   let t31;
@@ -11109,46 +11218,46 @@ function create_fragment$1(ctx) {
   let div11;
   let t36;
   let section0;
-  let div12;
-  let t38;
-  let p0;
-  let t40;
-  let div15;
-  let label3;
-  let t42;
   let div13;
-  let label4;
+  let t40;
+  let p0;
+  let t42;
+  let div16;
+  let label3;
   let t44;
+  let div14;
+  let label4;
+  let t46;
   let select0;
   let option;
-  let t46;
+  let t48;
   let select1;
-  let t47;
-  let div14;
-  let t51;
-  let div17;
+  let t49;
+  let div15;
+  let t55;
+  let div18;
   let aside_hidden_value;
-  let t58;
-  let div22;
-  let t84;
+  let t62;
+  let div23;
+  let t88;
   let footer;
-  let div24;
+  let div25;
   let footer_hidden_value;
-  let t86;
+  let t90;
   let html_tag;
   let raw_value = `<script id="seed" type="application/json">${/*seedText*/
   ctx[4]}<\/script>`;
-  let t87;
+  let t91;
   let svg1;
-  let t88;
-  let div26;
-  let t89;
+  let t92;
   let div27;
-  let t90;
-  let div32;
-  let t97;
+  let t93;
+  let div28;
+  let t94;
+  let div33;
+  let t101;
   let shortcuthelp;
-  let t98;
+  let t102;
   let newpanel;
   let current;
   let mounted;
@@ -11159,7 +11268,7 @@ function create_fragment$1(ctx) {
     c() {
       link = element("link");
       t0 = space();
-      div25 = element("div");
+      div26 = element("div");
       header = element("header");
       div9 = element("div");
       div8 = element("div");
@@ -11202,7 +11311,7 @@ function create_fragment$1(ctx) {
       a0.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"></path></svg>`;
       t29 = space();
       main = element("main");
-      div23 = element("div");
+      div24 = element("div");
       aside = element("aside");
       div10 = element("div");
       div10.textContent = "Models";
@@ -11213,56 +11322,56 @@ function create_fragment$1(ctx) {
       div11.innerHTML = `<button id="removeModel" class="pf-v5-c-button pf-m-tertiary" type="button" title="Remove selected model">Remove active</button> <button id="clear" class="pf-v5-c-button pf-m-tertiary" type="button">Clear selection</button>`;
       t36 = space();
       section0 = element("section");
-      div12 = element("div");
-      div12.textContent = "Local files";
-      t38 = space();
+      div13 = element("div");
+      div13.innerHTML = `<div class="sidebar-heading">Local files</div> <button id="toggleServerSidebar" class="pf-v5-c-button pf-m-tertiary" type="button" aria-pressed="false" hidden="">Wide menu</button>`;
+      t40 = space();
       p0 = element("p");
       p0.textContent = "Checking for local server…";
-      t40 = space();
-      div15 = element("div");
+      t42 = space();
+      div16 = element("div");
       label3 = element("label");
       label3.textContent = "Blockscape files under ~/blockscape";
-      t42 = space();
-      div13 = element("div");
+      t44 = space();
+      div14 = element("div");
       label4 = element("label");
       label4.textContent = "Folder";
-      t44 = space();
+      t46 = space();
       select0 = element("select");
       option = element("option");
-      option.textContent = "All (~/blockscape)";
-      t46 = space();
+      option.textContent = "Root (~/blockscape)";
+      t48 = space();
       select1 = element("select");
-      t47 = space();
-      div14 = element("div");
-      div14.innerHTML = `<button id="refreshLocalFiles" class="pf-v5-c-button pf-m-tertiary" type="button">Refresh</button> <button id="loadLocalFile" class="pf-v5-c-button pf-m-secondary" type="button">Load</button>`;
-      t51 = space();
-      div17 = element("div");
-      div17.innerHTML = `<label for="localSavePath">Save active map to ~/blockscape</label> <input id="localSavePath" class="pf-v5-c-form-control" type="text" placeholder="my-map.bs"/> <div class="local-backend__save-actions"><button id="saveLocalFile" class="pf-v5-c-button pf-m-primary" type="button">Save</button> <button id="saveLocalFileAs" class="pf-v5-c-button pf-m-secondary" type="button">Save as</button></div>`;
-      t58 = space();
-      div22 = element("div");
-      div22.innerHTML = `<section class="pf-v5-c-page__main-section blockscape-json-panel" hidden="" aria-label="Model source JSON editor"><p class="blockscape-json-panel__title">Paste / edit JSON for the <b>active</b> model (schema below)</p> <div class="muted">Schema: <code>{ id, title, abstract?, categories:[{id,title,items:[{id,name,deps?:[],logo?,external?:url,color?,stage?:1-4,...}}], ... }</code><br/>
+      t49 = space();
+      div15 = element("div");
+      div15.innerHTML = `<button id="refreshLocalFiles" class="pf-v5-c-button pf-m-tertiary" type="button">Refresh</button> <button id="loadLocalFile" class="pf-v5-c-button pf-m-secondary" type="button">Load</button> <button id="deleteLocalFile" class="pf-v5-c-button pf-m-danger" type="button">Delete</button>`;
+      t55 = space();
+      div18 = element("div");
+      div18.innerHTML = `<label for="localSavePath">Save active map to ~/blockscape</label> <input id="localSavePath" class="pf-v5-c-form-control" type="text" placeholder="my-map.bs"/> <div class="local-backend__save-actions"><button id="saveLocalFile" class="pf-v5-c-button pf-m-primary" type="button">Save</button> <button id="saveLocalFileAs" class="pf-v5-c-button pf-m-secondary" type="button">Save as</button></div>`;
+      t62 = space();
+      div23 = element("div");
+      div23.innerHTML = `<section class="pf-v5-c-page__main-section blockscape-json-panel" hidden="" aria-label="Model source JSON editor"><p class="blockscape-json-panel__title">Paste / edit JSON for the <b>active</b> model (schema below)</p> <div class="muted">Schema: <code>{ id, title, abstract?, categories:[{id,title,items:[{id,name,deps?:[],logo?,external?:url,color?,stage?:1-4,...}}], ... }</code><br/>
             You can paste multiple objects separated by <code>---</code> or <code>%%%</code>, or a JSON array of models, to append several models.
             A single object replaces only when you click “Replace active with JSON”. Tip: with no input focused, press
             Cmd/Ctrl+V anywhere on the page to append clipboard JSON instantly.</div> <div class="blockscape-json-controls"><textarea id="jsonBox" class="pf-v5-c-form-control" aria-label="JSON editor for the active model"></textarea> <div class="blockscape-json-actions"><button id="copyJson" class="pf-v5-c-button pf-m-tertiary" type="button" title="Copy the current JSON to your clipboard">Copy</button> <button id="copySeries" class="pf-v5-c-button pf-m-tertiary" type="button" title="Copy every version in this series as an array">Copy series</button> <button id="pasteJson" class="pf-v5-c-button pf-m-tertiary" type="button" title="Paste clipboard JSON to replace the editor contents">Paste</button> <button id="appendFromBox" class="pf-v5-c-button pf-m-primary" type="button">Append model(s)</button> <button id="replaceActive" class="pf-v5-c-button pf-m-secondary" type="button">Replace active with
                 JSON</button> <button id="createVersion" class="pf-v5-c-button pf-m-secondary" type="button" title="Create a new version from the current map">New version</button></div></div></section> <section class="pf-v5-c-page__main-section blockscape-main-section"><div id="app" aria-live="polite"></div></section>`;
-      t84 = space();
-      footer = element("footer");
-      div24 = element("div");
-      div24.innerHTML = `<a href="https://pwright.github.io/backscape/" target="_blank" rel="noreferrer noopener">Old versions</a>`;
-      t86 = space();
-      html_tag = new HtmlTag(false);
-      t87 = space();
-      svg1 = svg_element("svg");
       t88 = space();
-      div26 = element("div");
-      t89 = space();
-      div27 = element("div");
+      footer = element("footer");
+      div25 = element("div");
+      div25.innerHTML = `<a href="https://pwright.github.io/backscape/" target="_blank" rel="noreferrer noopener">Old versions</a>`;
       t90 = space();
-      div32 = element("div");
-      div32.innerHTML = `<div class="item-preview__header"><span class="item-preview__title">Preview</span> <div class="item-preview__actions" hidden=""></div> <button type="button" class="item-preview__close" aria-label="Close preview">×</button></div> <div class="item-preview__body"><div class="item-preview__status">Right-click a tile to see related notes.</div></div>`;
-      t97 = space();
+      html_tag = new HtmlTag(false);
+      t91 = space();
+      svg1 = svg_element("svg");
+      t92 = space();
+      div27 = element("div");
+      t93 = space();
+      div28 = element("div");
+      t94 = space();
+      div33 = element("div");
+      div33.innerHTML = `<div class="item-preview__header"><span class="item-preview__title">Preview</span> <div class="item-preview__actions" hidden=""></div> <button type="button" class="item-preview__close" aria-label="Close preview">×</button></div> <div class="item-preview__body"><div class="item-preview__status">Right-click a tile to see related notes.</div></div>`;
+      t101 = space();
       create_component(shortcuthelp.$$.fragment);
-      t98 = space();
+      t102 = space();
       create_component(newpanel.$$.fragment);
       document_1.title = "Blockscape — simple landscape-style tiles";
       attr(link, "rel", "icon");
@@ -11330,7 +11439,7 @@ function create_fragment$1(ctx) {
       attr(ul, "id", "modelList");
       attr(ul, "class", "model-nav-list");
       attr(div11, "class", "model-actions");
-      attr(div12, "class", "sidebar-heading");
+      attr(div13, "class", "local-backend__header");
       attr(p0, "id", "localBackendStatus");
       attr(p0, "class", "local-backend__status muted");
       attr(label3, "class", "sr-only");
@@ -11341,15 +11450,15 @@ function create_fragment$1(ctx) {
       attr(select0, "id", "localDirSelect");
       attr(select0, "class", "pf-v5-c-form-control");
       attr(select0, "aria-label", "Folder filter");
-      attr(div13, "class", "local-backend__dir");
+      attr(div14, "class", "local-backend__dir");
       attr(select1, "id", "localFileList");
       attr(select1, "class", "pf-v5-c-form-control");
       attr(select1, "size", "12");
       select1.multiple = true;
       attr(select1, "aria-label", "Blockscape files on local server");
-      attr(div14, "class", "local-backend__actions");
-      attr(div15, "class", "local-backend__list");
-      attr(div17, "class", "local-backend__save");
+      attr(div15, "class", "local-backend__actions");
+      attr(div16, "class", "local-backend__list");
+      attr(div18, "class", "local-backend__save");
       attr(section0, "id", "localBackendPanel");
       attr(section0, "class", "local-backend");
       section0.hidden = true;
@@ -11357,35 +11466,35 @@ function create_fragment$1(ctx) {
       attr(aside, "aria-label", "Models");
       aside.hidden = aside_hidden_value = !/*showSidebar*/
       ctx[2];
-      attr(div22, "class", "blockscape-main");
-      attr(div23, "class", "blockscape-content");
+      attr(div23, "class", "blockscape-main");
+      attr(div24, "class", "blockscape-content");
       attr(main, "class", "pf-v5-c-page__main");
-      attr(div24, "class", "blockscape-footer__inner");
+      attr(div25, "class", "blockscape-footer__inner");
       attr(footer, "class", "pf-v5-c-page__footer blockscape-footer");
       footer.hidden = footer_hidden_value = !/*showFooter*/
       ctx[1];
-      attr(div25, "class", "pf-v5-c-page");
-      html_tag.a = t87;
+      attr(div26, "class", "pf-v5-c-page");
+      html_tag.a = t91;
       attr(svg1, "id", "overlay");
       attr(svg1, "class", "svg-layer");
-      attr(div26, "id", "tabTooltip");
-      attr(div26, "class", "blockscape-tab-tooltip");
-      div26.hidden = true;
-      attr(div26, "aria-hidden", "true");
-      attr(div27, "id", "tileContextMenu");
-      attr(div27, "class", "tile-context-menu");
+      attr(div27, "id", "tabTooltip");
+      attr(div27, "class", "blockscape-tab-tooltip");
       div27.hidden = true;
       attr(div27, "aria-hidden", "true");
-      attr(div32, "id", "itemPreview");
-      attr(div32, "class", "item-preview");
-      div32.hidden = true;
-      attr(div32, "aria-hidden", "true");
+      attr(div28, "id", "tileContextMenu");
+      attr(div28, "class", "tile-context-menu");
+      div28.hidden = true;
+      attr(div28, "aria-hidden", "true");
+      attr(div33, "id", "itemPreview");
+      attr(div33, "class", "item-preview");
+      div33.hidden = true;
+      attr(div33, "aria-hidden", "true");
     },
     m(target2, anchor) {
       append(document_1.head, link);
       insert(target2, t0, anchor);
-      insert(target2, div25, anchor);
-      append(div25, header);
+      insert(target2, div26, anchor);
+      append(div26, header);
       append(header, div9);
       append(div9, div8);
       append(div8, div7);
@@ -11414,10 +11523,10 @@ function create_fragment$1(ctx) {
       append(div5, button5);
       append(div7, t28);
       append(div7, a0);
-      append(div25, t29);
-      append(div25, main);
-      append(main, div23);
-      append(div23, aside);
+      append(div26, t29);
+      append(div26, main);
+      append(main, div24);
+      append(div24, aside);
       append(aside, div10);
       append(aside, t31);
       append(aside, ul);
@@ -11425,42 +11534,42 @@ function create_fragment$1(ctx) {
       append(aside, div11);
       append(aside, t36);
       append(aside, section0);
-      append(section0, div12);
-      append(section0, t38);
-      append(section0, p0);
+      append(section0, div13);
       append(section0, t40);
-      append(section0, div15);
-      append(div15, label3);
-      append(div15, t42);
-      append(div15, div13);
-      append(div13, label4);
-      append(div13, t44);
-      append(div13, select0);
+      append(section0, p0);
+      append(section0, t42);
+      append(section0, div16);
+      append(div16, label3);
+      append(div16, t44);
+      append(div16, div14);
+      append(div14, label4);
+      append(div14, t46);
+      append(div14, select0);
       append(select0, option);
-      append(div15, t46);
-      append(div15, select1);
-      append(div15, t47);
-      append(div15, div14);
-      append(section0, t51);
-      append(section0, div17);
-      append(div23, t58);
-      append(div23, div22);
-      append(div25, t84);
-      append(div25, footer);
-      append(footer, div24);
-      insert(target2, t86, anchor);
-      html_tag.m(raw_value, target2, anchor);
-      insert(target2, t87, anchor);
-      insert(target2, svg1, anchor);
-      insert(target2, t88, anchor);
-      insert(target2, div26, anchor);
-      insert(target2, t89, anchor);
-      insert(target2, div27, anchor);
+      append(div16, t48);
+      append(div16, select1);
+      append(div16, t49);
+      append(div16, div15);
+      append(section0, t55);
+      append(section0, div18);
+      append(div24, t62);
+      append(div24, div23);
+      append(div26, t88);
+      append(div26, footer);
+      append(footer, div25);
       insert(target2, t90, anchor);
-      insert(target2, div32, anchor);
-      insert(target2, t97, anchor);
+      html_tag.m(raw_value, target2, anchor);
+      insert(target2, t91, anchor);
+      insert(target2, svg1, anchor);
+      insert(target2, t92, anchor);
+      insert(target2, div27, anchor);
+      insert(target2, t93, anchor);
+      insert(target2, div28, anchor);
+      insert(target2, t94, anchor);
+      insert(target2, div33, anchor);
+      insert(target2, t101, anchor);
       mount_component(shortcuthelp, target2, anchor);
-      insert(target2, t98, anchor);
+      insert(target2, t102, anchor);
       mount_component(newpanel, target2, anchor);
       current = true;
       if (!mounted) {
@@ -11533,19 +11642,19 @@ function create_fragment$1(ctx) {
     d(detaching) {
       if (detaching) {
         detach(t0);
-        detach(div25);
-        detach(t86);
-        html_tag.d();
-        detach(t87);
-        detach(svg1);
-        detach(t88);
         detach(div26);
-        detach(t89);
-        detach(div27);
         detach(t90);
-        detach(div32);
-        detach(t97);
-        detach(t98);
+        html_tag.d();
+        detach(t91);
+        detach(svg1);
+        detach(t92);
+        detach(div27);
+        detach(t93);
+        detach(div28);
+        detach(t94);
+        detach(div33);
+        detach(t101);
+        detach(t102);
       }
       detach(link);
       destroy_component(shortcuthelp, detaching);

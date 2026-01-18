@@ -255,14 +255,25 @@
           <button id="clear" class="pf-v5-c-button pf-m-tertiary" type="button">Clear selection</button>
         </div>
         <section id="localBackendPanel" class="local-backend" hidden>
-          <div class="sidebar-heading">Local files</div>
+          <div class="local-backend__header">
+            <div class="sidebar-heading">Local files</div>
+            <button
+              id="toggleServerSidebar"
+              class="pf-v5-c-button pf-m-tertiary"
+              type="button"
+              aria-pressed="false"
+              hidden
+            >
+              Wide menu
+            </button>
+          </div>
           <p id="localBackendStatus" class="local-backend__status muted">Checking for local server…</p>
           <div class="local-backend__list">
             <label class="sr-only" for="localFileList">Blockscape files under ~/blockscape</label>
             <div class="local-backend__dir">
               <label for="localDirSelect">Folder</label>
               <select id="localDirSelect" class="pf-v5-c-form-control" aria-label="Folder filter">
-                <option value="">All (~/blockscape)</option>
+                <option value="">Root (~/blockscape)</option>
               </select>
             </div>
             <select id="localFileList" class="pf-v5-c-form-control" size="12" multiple
@@ -270,6 +281,7 @@
             <div class="local-backend__actions">
               <button id="refreshLocalFiles" class="pf-v5-c-button pf-m-tertiary" type="button">Refresh</button>
               <button id="loadLocalFile" class="pf-v5-c-button pf-m-secondary" type="button">Load</button>
+              <button id="deleteLocalFile" class="pf-v5-c-button pf-m-danger" type="button">Delete</button>
             </div>
           </div>
           <div class="local-backend__save">
