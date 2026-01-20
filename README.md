@@ -178,6 +178,7 @@ NOTE: This process creates new tabs in your browser.
 - You can deep-link to a specific local model by appending its relative path: `http://127.0.0.1:4173/server/path/to/file.bs` will auto-load and auto-reload `~/blockscape/path/to/file.bs` on refresh. Append `/model-id/item-id` to jump straight to a particular model/item in that file (IDs are taken from the model JSON).
 - The JSON editor (`editor.html`) ships from `svelte/public/` and is emitted into `docs/` during the build, so the `Edit` button works in both dev and production.
 - Static legacy `index.html` remains for reference only; all active work should target the Svelte app.
+- Watch/validate models and extract from markdown: `node scripts/watch-models.js --dir <path> --out-dir <path>` (use `--once` for a single scan).
 
 ### Adding New Logos
 
