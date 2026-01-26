@@ -1,4 +1,8 @@
 # AGENTS.md
+
+**IMPORTANT**: before you do anything else, run the `beans prime` command and heed its output.
+
+
 ## Overview
 
 Svelte app in `svelte/`, rendered to static site in `docs/`, build will always overwrite `docs/`.
