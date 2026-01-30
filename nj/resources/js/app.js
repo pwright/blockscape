@@ -11,6 +11,7 @@
   const SETTINGS_DIR = ".blockscape";
   const SETTINGS_FILENAME = "settings.json";
   const SETTINGS_PERSIST_INTERVAL_MS = 2000;
+  const RECENT_FILES_LIMIT = 10;
 
   let currentPath =
     window.localStorage.getItem(STORAGE_KEYS.lastPath) || "";
@@ -28,6 +29,7 @@
   let settingsPathPromise = null;
   let lastSettingsPayload = "";
   let settingsLoaded = false;
+  let recentFiles = [];
 
   const getJsonBox = () => document.getElementById("jsonBox");
   const getJsonText = () => (getJsonBox()?.value || "").trim();
@@ -124,6 +126,8 @@
   const byId = (id) => document.getElementById(id);
   const filePathEl = byId("filePath");
   const newMapBtn = byId("newMapBtn");
+  const recentFilesListEl = byId("recentFilesList");
+  const recentFilesEmptyEl = byId("recentFilesEmpty");
 
   const getHomePath = async () => {
     if (homePathPromise) return homePathPromise;
@@ -252,12 +256,70 @@
 
   window.__blockscapeSettingsSaveToFile = async (payload) => {
     try {
-      await writeSettingsFile(payload);
+      const mergedPayload = {
+        ...payload,
+        recentFiles: [...recentFiles],
+      };
+      await writeSettingsFile(mergedPayload);
       return true;
     } catch (err) {
       console.warn("[Neutralino] settings save failed", err);
       return false;
     }
+  };
+
+  const normalizeRecentFiles = (entries) => {
+    if (!Array.isArray(entries)) return [];
+    return entries
+      .map((entry) => (typeof entry === "string" ? entry.trim() : ""))
+      .filter(Boolean);
+  };
+
+  const renderRecentFiles = () => {
+    if (!recentFilesListEl) return;
+    recentFilesListEl.innerHTML = "";
+    if (!recentFiles || recentFiles.length === 0) {
+      if (recentFilesEmptyEl) recentFilesEmptyEl.hidden = false;
+      return;
+    }
+    if (recentFilesEmptyEl) recentFilesEmptyEl.hidden = true;
+    recentFiles.forEach((entry) => {
+      const li = document.createElement("li");
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "recent-item";
+      const name = entry.split("/").pop() || entry;
+      btn.textContent = name;
+      const pathSpan = document.createElement("span");
+      pathSpan.className = "recent-item__path";
+      pathSpan.textContent = entry;
+      btn.appendChild(pathSpan);
+      btn.addEventListener("click", () =>
+        openFileAtPath(entry, { recordRecent: true })
+      );
+      li.appendChild(btn);
+      recentFilesListEl.appendChild(li);
+    });
+  };
+
+  const addRecentFile = (path) => {
+    if (!path) return;
+    const trimmed = String(path).trim();
+    if (!trimmed) return;
+    recentFiles = [trimmed, ...recentFiles.filter((entry) => entry !== trimmed)]
+      .slice(0, RECENT_FILES_LIMIT);
+    renderRecentFiles();
+  };
+
+  const buildSettingsPayload = (bridge) => {
+    const basePayload =
+      bridge && typeof bridge.exportPayload === "function"
+        ? bridge.exportPayload()
+        : { version: 1, exportedAt: new Date().toISOString(), settings: {} };
+    return {
+      ...basePayload,
+      recentFiles: [...recentFiles],
+    };
   };
 
   const persistState = () => {
@@ -408,6 +470,40 @@
     }
   };
 
+  const openFileAtPath = async (path, { recordRecent = false } = {}) => {
+    if (!path) return;
+    try {
+      console.log("[Neutralino] open file selected", path);
+      const { text, parsed } = await readFileText(path);
+      console.log("[Neutralino] open file decoded", {
+        path,
+        length: text?.length || 0,
+        parsed,
+      });
+      if (!parsed) {
+        console.warn(
+          "[Neutralino] file did not parse as JSON; attempting to import anyway",
+          path
+        );
+      }
+      if (!text || !text.trim()) {
+        alert("Opened file is empty or could not be decoded.");
+        return;
+      }
+      clearAllModels();
+      applyTextToViewer(text, { source: `open:${path}` });
+      currentPath = path;
+      lastSavedText = text;
+      autosavePendingDialog = false;
+      persistState();
+      updateFilePathDisplay();
+      if (recordRecent) addRecentFile(path);
+    } catch (err) {
+      console.warn("[Neutralino] failed to open file", err);
+      alert("Unable to open that file.");
+    }
+  };
+
   const openFile = async () => {
     const entries = await NL.os.showOpenDialog("Open Blockscape file", {
       filters: [
@@ -417,30 +513,7 @@
     });
     if (!entries || !entries.length) return;
     const path = entries[0];
-    console.log("[Neutralino] open file selected", path);
-    const { text, parsed } = await readFileText(path);
-    console.log("[Neutralino] open file decoded", {
-      path,
-      length: text?.length || 0,
-      parsed,
-    });
-    if (!parsed) {
-      console.warn(
-        "[Neutralino] file did not parse as JSON; attempting to import anyway",
-        path
-      );
-    }
-    if (!text || !text.trim()) {
-      alert("Opened file is empty or could not be decoded.");
-      return;
-    }
-    clearAllModels();
-    applyTextToViewer(text, { source: `open:${path}` });
-    currentPath = path;
-    lastSavedText = text;
-    autosavePendingDialog = false;
-    persistState();
-    updateFilePathDisplay();
+    await openFileAtPath(path, { recordRecent: true });
   };
 
   const saveToPath = async (path) => {
@@ -452,6 +525,7 @@
     autosavePendingDialog = false;
     persistState();
     updateFilePathDisplay();
+    addRecentFile(path);
   };
 
   const saveFileAs = async () => {
@@ -507,6 +581,9 @@
     const payload = await readSettingsFile();
     if (!payload) return false;
     try {
+      const nextRecent = normalizeRecentFiles(payload?.recentFiles);
+      recentFiles = nextRecent.slice(0, RECENT_FILES_LIMIT);
+      renderRecentFiles();
       bridge.applyPayload(payload);
       if (bridge.exportPayload) {
         lastSettingsPayload = JSON.stringify(bridge.exportPayload());
@@ -526,7 +603,7 @@
       const bridge = window.__blockscapeSettingsBridge;
       if (!bridge?.exportPayload) return;
       try {
-        const payload = bridge.exportPayload();
+        const payload = buildSettingsPayload(bridge);
         const nextPayload = JSON.stringify(payload);
         if (nextPayload === lastSettingsPayload) return;
         lastSettingsPayload = nextPayload;
@@ -542,7 +619,7 @@
     const bridge = await waitForSettingsBridge();
     if (!bridge?.exportPayload) return;
     try {
-      const payload = bridge.exportPayload();
+      const payload = buildSettingsPayload(bridge);
       lastSettingsPayload = JSON.stringify(payload);
       await writeSettingsFile(payload);
       console.log("[Neutralino] created ~/.blockscape/settings.json");
@@ -573,6 +650,7 @@
     await buildMenu();
     startAutosave();
     updateFilePathDisplay();
+    renderRecentFiles();
     settingsLoaded = await loadSettingsFromFile();
     await persistSettingsOnce();
     startSettingsPersist();
