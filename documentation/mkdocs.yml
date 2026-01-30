@@ -19,6 +19,7 @@ nav:
       - Docker for local editor: documentation/docker.md
       - Apicurio as backend: documentation/apicurio.md
       - MkDocs usage: documentation/mkdocs.md
+      - Neutralino app: neutralino-app.md
       - LLM generation: documentation/llm-generation.md
       - Share links: documentation/share-links.md
       - Local usage on Linux: documentation/bs-opener-linux.md

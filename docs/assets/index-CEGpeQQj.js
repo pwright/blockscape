@@ -6567,7 +6567,8 @@ function initBlockscape(featureOverrides = {}) {
   }
   function normalizeToModelsFromText(txt, titleBase = "Pasted", options = {}) {
     const defenced = unwrapMarkdownCodeBlock(typeof txt === "string" ? txt : "");
-    const trimmed = (defenced || "").trim();
+    const cleaned = (defenced || "").replace(/^\uFEFF/, "").replace(/\u0000/g, "");
+    const trimmed = cleaned.trim();
     if (!trimmed) return [];
     const parsed = tryParseJson(trimmed);
     if (parsed) {

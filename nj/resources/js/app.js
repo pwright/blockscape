@@ -27,8 +27,94 @@
     const box = getJsonBox();
     if (box) box.value = text;
   };
+  const EDITOR_TRANSFER_KEY = "blockscape:editorPayload";
+  const EDITOR_TRANSFER_MESSAGE_TYPE = "blockscape:editorTransfer";
+  const normalizeText = (text) =>
+    (typeof text === "string" ? text : String(text || ""))
+      .replace(/^\uFEFF/, "")
+      .replace(/\u0000/g, "");
+  const importViaEditorTransfer = (text, { title = "", source = "" } = {}) => {
+    try {
+      const payload = {
+        ts: Date.now(),
+        text,
+        source: "editor",
+      };
+      if (title) payload.title = title;
+      window.localStorage.setItem(EDITOR_TRANSFER_KEY, JSON.stringify(payload));
+      window.postMessage({ type: EDITOR_TRANSFER_MESSAGE_TYPE }, "*");
+      console.log("[Neutralino] dispatched editor transfer", { source, title });
+      return true;
+    } catch (err) {
+      console.warn("[Neutralino] editor transfer failed", { source, err });
+      return false;
+    }
+  };
+  const tryParseJsonText = (text) => {
+    const cleaned = normalizeText(text).trim();
+    if (!cleaned) return null;
+    try {
+      JSON.parse(cleaned);
+      return cleaned;
+    } catch {
+      return null;
+    }
+  };
+  const decodeBinary = (buffer) => {
+    const bytes =
+      buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer || []);
+    if (bytes.length >= 2) {
+      if (bytes[0] === 0xff && bytes[1] === 0xfe) {
+        return new TextDecoder("utf-16le").decode(bytes.subarray(2));
+      }
+      if (bytes[0] === 0xfe && bytes[1] === 0xff) {
+        return new TextDecoder("utf-16be").decode(bytes.subarray(2));
+      }
+    }
+    if (
+      bytes.length >= 3 &&
+      bytes[0] === 0xef &&
+      bytes[1] === 0xbb &&
+      bytes[2] === 0xbf
+    ) {
+      return new TextDecoder("utf-8").decode(bytes.subarray(3));
+    }
+    return new TextDecoder("utf-8").decode(bytes);
+  };
+  const readFileText = async (path) => {
+    let text = "";
+    try {
+      text = await NL.filesystem.readFile(path, { encoding: "utf8" });
+    } catch {
+      text = await NL.filesystem.readFile(path);
+    }
+    if (text && typeof text !== "string") {
+      if (text.data && typeof text.data === "string") {
+        text = text.data;
+      } else if (text instanceof ArrayBuffer) {
+        text = new TextDecoder("utf-8").decode(text);
+      } else if (ArrayBuffer.isView(text)) {
+        text = new TextDecoder("utf-8").decode(text);
+      } else {
+        text = String(text);
+      }
+    }
+    text = normalizeText(text);
+    const parsed = tryParseJsonText(text);
+    if (parsed) return { text: parsed, parsed: true };
+
+    try {
+      const binary = await NL.filesystem.readBinaryFile(path);
+      const buffer = binary?.data ?? binary;
+      const decoded = normalizeText(decodeBinary(buffer));
+      return { text: decoded, parsed: !!tryParseJsonText(decoded) };
+    } catch {
+      return { text, parsed: false };
+    }
+  };
   const click = (id) => document.getElementById(id)?.click();
   const byId = (id) => document.getElementById(id);
+  const filePathEl = byId("filePath");
 
   const persistState = () => {
     window.localStorage.setItem(
@@ -40,6 +126,13 @@
     } else {
       window.localStorage.removeItem(STORAGE_KEYS.lastPath);
     }
+  };
+
+  const updateFilePathDisplay = () => {
+    if (!filePathEl) return;
+    filePathEl.textContent = currentPath
+      ? `File: ${currentPath}`
+      : "No file loaded";
   };
 
   const buildMenu = async () => {
@@ -63,23 +156,62 @@
     await NL.window.setMainMenu(menu);
   };
 
-  const applyTextToViewer = (text) => {
-    const trimmed = (text || "").trim();
-    if (!trimmed) return;
+  const applyTextToViewer = (text, { source = "" } = {}) => {
+    const trimmed = normalizeText(text).trim();
+    if (!trimmed) {
+      console.warn("[Neutralino] empty text after normalize", { source });
+      return;
+    }
     setJsonText(trimmed);
+    const jsonBox = getJsonBox();
+    console.log("[Neutralino] jsonBox status", {
+      source,
+      exists: !!jsonBox,
+      length: jsonBox?.value?.length || 0,
+    });
     let parsed = null;
     try {
       parsed = JSON.parse(trimmed);
     } catch {
       parsed = null;
     }
+    if (!parsed) {
+      console.warn("[Neutralino] JSON parse failed for text", {
+        source,
+        length: trimmed.length,
+      });
+    }
     const canReplaceActive =
       parsed && !Array.isArray(parsed) && typeof parsed === "object";
-    if (canReplaceActive && document.querySelector(".model-nav-item")) {
+    const modelItemsBefore = document.querySelectorAll(".model-nav-item").length;
+    const titleHint = source.replace(/^open:/, "").split("/").pop() || "";
+    if (!jsonBox) {
+      importViaEditorTransfer(trimmed, { title: titleHint, source });
+    } else if (canReplaceActive && document.querySelector(".model-nav-item")) {
       click("replaceActive");
     } else {
-      click("appendFromBox");
+      const appendBtn = document.getElementById("appendFromBox");
+      console.log("[Neutralino] append button status", {
+        source,
+        exists: !!appendBtn,
+        hasOnClick: typeof appendBtn?.onclick === "function",
+      });
+      if (!appendBtn) {
+        console.warn("[Neutralino] append button not found", { source });
+        importViaEditorTransfer(trimmed, { title: titleHint, source });
+      } else {
+        appendBtn.click();
+      }
     }
+    setTimeout(() => {
+      const modelItemsAfter =
+        document.querySelectorAll(".model-nav-item").length;
+      console.log("[Neutralino] applyTextToViewer result", {
+        source,
+        modelItemsBefore,
+        modelItemsAfter,
+      });
+    }, 0);
   };
 
   const clearAllModels = () => {
@@ -107,29 +239,30 @@
     });
     if (!entries || !entries.length) return;
     const path = entries[0];
-    let text = "";
-    try {
-      text = await NL.filesystem.readFile(path, { encoding: "utf8" });
-    } catch {
-      text = await NL.filesystem.readFile(path);
+    console.log("[Neutralino] open file selected", path);
+    const { text, parsed } = await readFileText(path);
+    console.log("[Neutralino] open file decoded", {
+      path,
+      length: text?.length || 0,
+      parsed,
+    });
+    if (!parsed) {
+      console.warn(
+        "[Neutralino] file did not parse as JSON; attempting to import anyway",
+        path
+      );
     }
-    if (text && typeof text !== "string") {
-      if (text.data && typeof text.data === "string") {
-        text = text.data;
-      } else if (text instanceof ArrayBuffer) {
-        text = new TextDecoder("utf-8").decode(text);
-      } else if (ArrayBuffer.isView(text)) {
-        text = new TextDecoder("utf-8").decode(text);
-      } else {
-        text = String(text);
-      }
+    if (!text || !text.trim()) {
+      alert("Opened file is empty or could not be decoded.");
+      return;
     }
     clearAllModels();
-    applyTextToViewer(text);
+    applyTextToViewer(text, { source: `open:${path}` });
     currentPath = path;
     lastSavedText = text;
     autosavePendingDialog = false;
     persistState();
+    updateFilePathDisplay();
   };
 
   const saveToPath = async (path) => {
@@ -140,6 +273,7 @@
     lastSavedText = text;
     autosavePendingDialog = false;
     persistState();
+    updateFilePathDisplay();
   };
 
   const saveFileAs = async () => {
@@ -165,6 +299,7 @@
 
   const startAutosave = () => {
     if (autosaveTimer) clearInterval(autosaveTimer);
+    lastSavedText = getJsonText();
     autosaveTimer = setInterval(async () => {
       if (!autosaveEnabled || autosaveInFlight) return;
       const text = getJsonText();
@@ -209,6 +344,7 @@
   NL.events.on("ready", async () => {
     await buildMenu();
     startAutosave();
+    updateFilePathDisplay();
 
     const autosaveToggle = byId("fileAutosaveToggle");
     if (autosaveToggle) {
