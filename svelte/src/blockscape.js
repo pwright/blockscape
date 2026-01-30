@@ -2414,6 +2414,26 @@ export function initBlockscape(featureOverrides = {}) {
     });
   }
 
+  const exportSettingsPayload = () => ({
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    settings: buildSettingsSnapshot(getCurrentSettingsState(), {
+      localBackend,
+    }),
+  });
+
+  const applySettingsPayload = (payload) => {
+    const snapshot = normalizeSettingsPayload(payload);
+    return applyImportedSettings(snapshot || {});
+  };
+
+  if (typeof window !== "undefined") {
+    window.__blockscapeSettingsBridge = {
+      exportPayload: exportSettingsPayload,
+      applyPayload: applySettingsPayload,
+    };
+  }
+
   function persistSeriesNavDoubleClickWait(value) {
     if (typeof window === "undefined" || !window.localStorage) return;
     try {
@@ -5559,16 +5579,27 @@ export function initBlockscape(featureOverrides = {}) {
     saveSettingsBtn.type = "button";
     saveSettingsBtn.className = "pf-v5-c-button pf-m-tertiary";
     saveSettingsBtn.textContent = "Download settings";
-    saveSettingsBtn.addEventListener("click", () => {
-      const payload = {
-        version: 1,
-        exportedAt: new Date().toISOString(),
-        settings: buildSettingsSnapshot(getCurrentSettingsState(), {
-          localBackend,
-        }),
-      };
-      download("settings.json", JSON.stringify(payload, null, 2));
-      showNotice("Settings downloaded.", 2000);
+    saveSettingsBtn.addEventListener("click", async () => {
+      const payload = exportSettingsPayload();
+      if (
+        typeof window !== "undefined" &&
+        typeof window.__blockscapeSettingsSaveToFile === "function"
+      ) {
+        try {
+          const didSave = await window.__blockscapeSettingsSaveToFile(payload);
+          if (didSave) {
+            showNotice("Settings saved to ~/.blockscape/settings.json.", 2000);
+          } else {
+            showNotice("Settings save failed. Check logs.", 2400);
+          }
+        } catch (error) {
+          console.warn("[Blockscape] settings save failed", error);
+          showNotice("Settings save failed. Check logs.", 2400);
+        }
+      } else {
+        download("settings.json", JSON.stringify(payload, null, 2));
+        showNotice("Settings downloaded.", 2000);
+      }
     });
 
     settingsActions.append(loadSettingsBtn, saveSettingsBtn, settingsFileInput);

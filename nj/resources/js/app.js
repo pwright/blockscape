@@ -8,6 +8,9 @@
   };
   const DEFAULT_AUTOSAVE = true;
   const AUTOSAVE_INTERVAL_MS = 2000;
+  const SETTINGS_DIR = ".blockscape";
+  const SETTINGS_FILENAME = "settings.json";
+  const SETTINGS_PERSIST_INTERVAL_MS = 2000;
 
   let currentPath =
     window.localStorage.getItem(STORAGE_KEYS.lastPath) || "";
@@ -20,7 +23,11 @@
   let autosaveInFlight = false;
   let autosavePendingDialog = false;
   let autosaveTimer = null;
+  let settingsPersistTimer = null;
   let homePathPromise = null;
+  let settingsPathPromise = null;
+  let lastSettingsPayload = "";
+  let settingsLoaded = false;
 
   const getJsonBox = () => document.getElementById("jsonBox");
   const getJsonText = () => (getJsonBox()?.value || "").trim();
@@ -126,7 +133,35 @@
         console.warn("[Neutralino] failed to resolve home path", err);
         return "";
       })
-      .then((value) => value || "");
+      .then(async (value) => {
+        if (value) {
+          console.log("[Neutralino] resolved home path via getPath", value);
+          return value;
+        }
+        try {
+          const homeEnv = await NL.os.getEnv("HOME");
+          if (homeEnv) {
+            console.log("[Neutralino] resolved home path via HOME", homeEnv);
+            return homeEnv;
+          }
+        } catch (err) {
+          console.warn("[Neutralino] failed to resolve HOME env", err);
+        }
+        try {
+          const userProfile = await NL.os.getEnv("USERPROFILE");
+          if (userProfile) {
+            console.log(
+              "[Neutralino] resolved home path via USERPROFILE",
+              userProfile
+            );
+            return userProfile;
+          }
+        } catch (err) {
+          console.warn("[Neutralino] failed to resolve USERPROFILE env", err);
+        }
+        console.warn("[Neutralino] unable to resolve home path");
+        return "";
+      });
     return homePathPromise;
   };
 
@@ -136,11 +171,93 @@
     return `${base.replace(/\/+$/, "")}/${next.replace(/^\/+/, "")}`;
   };
 
+  const resolveSettingsDir = async () => {
+    const home = await getHomePath();
+    if (!home) return "";
+    return joinPath(home, SETTINGS_DIR);
+  };
+
+  const resolveSettingsPath = async () => {
+    if (settingsPathPromise) return settingsPathPromise;
+    settingsPathPromise = resolveSettingsDir().then((dir) =>
+      dir ? joinPath(dir, SETTINGS_FILENAME) : ""
+    );
+    return settingsPathPromise;
+  };
+
+  const ensureSettingsDir = async () => {
+    const dir = await resolveSettingsDir();
+    if (!dir) return "";
+    try {
+      await NL.filesystem.createDirectory(dir);
+    } catch (err) {
+      // Ignore errors (directory may already exist or be unavailable).
+    }
+    return dir;
+  };
+
   const resolveNeutralinoSavePath = async (relPath) => {
     if (!relPath) return relPath;
     const home = await getHomePath();
     if (!home) return relPath;
     return joinPath(joinPath(home, "blockscape"), relPath);
+  };
+
+  const waitForSettingsBridge = async (timeoutMs = 5000) => {
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      const bridge = window.__blockscapeSettingsBridge;
+      if (bridge?.applyPayload && bridge?.exportPayload) return bridge;
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    return null;
+  };
+
+  const readSettingsFile = async () => {
+    const path = await resolveSettingsPath();
+    if (!path) return null;
+    try {
+      const raw = await NL.filesystem.readFile(path, { encoding: "utf8" });
+      const text =
+        typeof raw === "string" ? raw : raw?.data ?? String(raw || "");
+      const trimmed = text.trim();
+      if (!trimmed) return null;
+      return JSON.parse(trimmed);
+    } catch (err) {
+      return null;
+    }
+  };
+
+  const settingsFileExists = async () => {
+    const path = await resolveSettingsPath();
+    if (!path) return false;
+    try {
+      await NL.filesystem.getStats(path);
+      return true;
+    } catch (err) {
+      return false;
+    }
+  };
+
+  const writeSettingsFile = async (payload) => {
+    if (!payload) return;
+    const dir = await ensureSettingsDir();
+    const path = await resolveSettingsPath();
+    if (!dir || !path) {
+      throw new Error("Settings path unavailable");
+    }
+    const text = JSON.stringify(payload, null, 2);
+    await NL.filesystem.writeFile(path, text);
+  };
+
+  window.__blockscapeSettingsSaveToFile = async (payload) => {
+    try {
+      await writeSettingsFile(payload);
+      return true;
+    } catch (err) {
+      console.warn("[Neutralino] settings save failed", err);
+      return false;
+    }
   };
 
   const persistState = () => {
@@ -384,6 +501,56 @@
     }, AUTOSAVE_INTERVAL_MS);
   };
 
+  const loadSettingsFromFile = async () => {
+    const bridge = await waitForSettingsBridge();
+    if (!bridge) return false;
+    const payload = await readSettingsFile();
+    if (!payload) return false;
+    try {
+      bridge.applyPayload(payload);
+      if (bridge.exportPayload) {
+        lastSettingsPayload = JSON.stringify(bridge.exportPayload());
+      }
+      settingsLoaded = true;
+      console.log("[Neutralino] settings loaded from ~/.blockscape/settings.json");
+      return true;
+    } catch (err) {
+      console.warn("[Neutralino] settings apply failed", err);
+      return false;
+    }
+  };
+
+  const startSettingsPersist = () => {
+    if (settingsPersistTimer) clearInterval(settingsPersistTimer);
+    settingsPersistTimer = setInterval(async () => {
+      const bridge = window.__blockscapeSettingsBridge;
+      if (!bridge?.exportPayload) return;
+      try {
+        const payload = bridge.exportPayload();
+        const nextPayload = JSON.stringify(payload);
+        if (nextPayload === lastSettingsPayload) return;
+        lastSettingsPayload = nextPayload;
+        await writeSettingsFile(payload);
+      } catch (err) {
+        console.warn("[Neutralino] settings persist failed", err);
+      }
+    }, SETTINGS_PERSIST_INTERVAL_MS);
+  };
+
+  const persistSettingsOnce = async () => {
+    if (await settingsFileExists()) return;
+    const bridge = await waitForSettingsBridge();
+    if (!bridge?.exportPayload) return;
+    try {
+      const payload = bridge.exportPayload();
+      lastSettingsPayload = JSON.stringify(payload);
+      await writeSettingsFile(payload);
+      console.log("[Neutralino] created ~/.blockscape/settings.json");
+    } catch (err) {
+      console.warn("[Neutralino] initial settings persist failed", err);
+    }
+  };
+
   NL.init();
   NL.events.on("mainMenuItemClicked", async (evt) => {
     const id = evt?.detail?.id;
@@ -406,6 +573,9 @@
     await buildMenu();
     startAutosave();
     updateFilePathDisplay();
+    settingsLoaded = await loadSettingsFromFile();
+    await persistSettingsOnce();
+    startSettingsPersist();
 
     const autosaveToggle = byId("fileAutosaveToggle");
     if (autosaveToggle) {
