@@ -20,6 +20,7 @@
   let autosaveInFlight = false;
   let autosavePendingDialog = false;
   let autosaveTimer = null;
+  let homePathPromise = null;
 
   const getJsonBox = () => document.getElementById("jsonBox");
   const getJsonText = () => (getJsonBox()?.value || "").trim();
@@ -115,6 +116,32 @@
   const click = (id) => document.getElementById(id)?.click();
   const byId = (id) => document.getElementById(id);
   const filePathEl = byId("filePath");
+  const newMapBtn = byId("newMapBtn");
+
+  const getHomePath = async () => {
+    if (homePathPromise) return homePathPromise;
+    homePathPromise = NL.os
+      .getPath("home")
+      .catch((err) => {
+        console.warn("[Neutralino] failed to resolve home path", err);
+        return "";
+      })
+      .then((value) => value || "");
+    return homePathPromise;
+  };
+
+  const joinPath = (base, next) => {
+    if (!base) return next || "";
+    if (!next) return base;
+    return `${base.replace(/\/+$/, "")}/${next.replace(/^\/+/, "")}`;
+  };
+
+  const resolveNeutralinoSavePath = async (relPath) => {
+    if (!relPath) return relPath;
+    const home = await getHomePath();
+    if (!home) return relPath;
+    return joinPath(joinPath(home, "blockscape"), relPath);
+  };
 
   const persistState = () => {
     window.localStorage.setItem(
@@ -134,6 +161,40 @@
       ? `File: ${currentPath}`
       : "No file loaded";
   };
+
+  const triggerNewPanel = () => {
+    const button = document.getElementById("newPanelButton");
+    if (!button) return;
+    button.click();
+  };
+
+  window.addEventListener("blockscape:local-save-path", async (event) => {
+    const relPath = event?.detail?.path;
+    if (!relPath) return;
+    currentPath = await resolveNeutralinoSavePath(relPath);
+    lastSavedText = getJsonText();
+    autosavePendingDialog = false;
+    persistState();
+    updateFilePathDisplay();
+  });
+
+  const hasUnsavedChanges = () => {
+    const text = getJsonText();
+    if (!text) return false;
+    return text !== lastSavedText;
+  };
+
+  const confirmSaveBeforeNew = async () => {
+    if (autosaveEnabled || !hasUnsavedChanges()) return true;
+    const shouldSave = window.confirm(
+      "Autosave is disabled. Save the current file before creating a new map?"
+    );
+    if (!shouldSave) return false;
+    const text = getJsonText();
+    await saveFile();
+    return text === lastSavedText;
+  };
+
 
   const buildMenu = async () => {
     const menu = [
@@ -359,5 +420,9 @@
     byId("fileOpenBtn")?.addEventListener("click", () => openFile());
     byId("fileSaveBtn")?.addEventListener("click", () => saveFile());
     byId("fileSaveAsBtn")?.addEventListener("click", () => saveFileAs());
+    newMapBtn?.addEventListener("click", async () => {
+      if (!(await confirmSaveBeforeNew())) return;
+      triggerNewPanel();
+    });
   });
 })();

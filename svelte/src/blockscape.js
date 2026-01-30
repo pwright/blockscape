@@ -888,6 +888,19 @@ export function initBlockscape(featureOverrides = {}) {
     }
   }
 
+  function notifyLocalSavePath(path, { origin } = {}) {
+    if (typeof window === "undefined" || !path) return;
+    try {
+      window.dispatchEvent(
+        new CustomEvent("blockscape:local-save-path", {
+          detail: { path, origin },
+        })
+      );
+    } catch (err) {
+      console.warn("[Blockscape] failed to notify local save path", err);
+    }
+  }
+
   function extractServerFilePathFromUrl() {
     if (typeof window === "undefined" || !window.location) return null;
     const url = new URL(window.location.href);
@@ -8513,6 +8526,7 @@ export function initBlockscape(featureOverrides = {}) {
 
     if (firstSavedPath) {
       updateUrlForServerPath(firstSavedPath);
+      notifyLocalSavePath(firstSavedPath, { origin });
     }
 
     await localBackend.refresh();

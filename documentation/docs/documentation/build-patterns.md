@@ -40,9 +40,22 @@ Net effect: docs content renders normally, and only explicitly fenced maps becom
 - **Build output:** `vite.config.export.nj.mjs` writes `blockscape.js`/`blockscape.css` into `nj/resources/site_assets/blockscape/`.
 - **Shell HTML:** `nj/resources/index.html` loads the Svelte bundle and provides a custom header + file controls.
 - **Runtime shim:** `nj/resources/js/app.js` bridges Neutralino APIs to the web app (open/save, autosave, file tracking).
+- **Paste/import behavior:** when content is pasted into the Neutralino app, prompt to create a new file instead of overwriting the current file.
 - **CSS shim:** `nj/resources/index.html` includes overrides that hide header/sidebar/footer, JSON panel, context menus, and related UI.
 
 Net effect: the core app runs locally, but the shell narrows the surface to a viewer/editor workflow with desktop file access.
+
+## Example: expose “New” from Svelte to Neutralino
+
+If you want the desktop shell to expose the same **New** workflow as the web app, follow this process:
+
+1. **Find the “New” entry points in Svelte.** The button lives in `svelte/src/App.svelte` (id `newPanelButton`), and the panel markup is in `svelte/src/components/NewPanel.svelte` (id `newPanel`).
+2. **Verify the wiring in the runtime controller.** `svelte/src/blockscape.js` binds click handlers for `newPanelButton` and `newBlankButton` and toggles the panel via `openNewPanel()`/`closeNewPanel()`. This is the logic you want visible in the shell.
+3. **Check desktop shell overrides.** `nj/resources/index.html` includes CSS that hides `#newPanel` (and other UI) to keep a map-only layout. Remove or narrow that rule so the New panel can render while leaving the Svelte header hidden.
+4. **Expose a trigger in the desktop layout.** Add a Neutralino-specific button in the desktop header (next to Open/Save) and wire it to click `#newPanelButton` in `nj/resources/js/app.js`. This keeps the desktop shell’s header while still using the Svelte New panel.
+5. **Rebuild the Neutralino assets.** Run `npm run export:nj` so the updated UI/CSS lands in `nj/resources/site_assets/blockscape/`, then run `neu build` if you package the app.
+
+This pattern keeps the UI logic in Svelte while the Neutralino shell decides what to surface.
 
 ## Summary pattern
 

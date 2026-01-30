@@ -6,9 +6,9 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         
         
-        <link rel="canonical" href="https://pwright.github.io/blockscape/documentation/navigation/">
+        <link rel="canonical" href="https://pwright.github.io/blockscape/documentation/build-patterns/">
         <link rel="shortcut icon" href="../../img/favicon.ico">
-        <title>Navigation - Blockscape</title>
+        <title>Build patterns - Blockscape</title>
         <link href="../../css/bootstrap.min.css" rel="stylesheet">
         <link href="../../css/fontawesome.min.css" rel="stylesheet">
         <link href="../../css/brands.min.css" rel="stylesheet">
@@ -91,7 +91,7 @@
 </li>
                                     
 <li>
-    <a href="../build-patterns/" class="dropdown-item">Build patterns</a>
+    <a href="./" class="dropdown-item active" aria-current="page">Build patterns</a>
 </li>
                                     
 <li>
@@ -147,7 +147,7 @@
 </li>
                                     
 <li>
-    <a href="./" class="dropdown-item active" aria-current="page">Navigation</a>
+    <a href="../navigation/" class="dropdown-item">Navigation</a>
 </li>
                                     
 <li>
@@ -187,12 +187,12 @@
                             </a>
                         </li>
                             <li class="nav-item">
-                                <a rel="prev" href="../llm-consume/" class="nav-link">
+                                <a rel="prev" href="../mkdocs/" class="nav-link">
                                     <i class="fa fa-arrow-left"></i> Previous
                                 </a>
                             </li>
                             <li class="nav-item">
-                                <a rel="next" href="../paste/" class="nav-link">
+                                <a rel="next" href="../../neutralino-app/" class="nav-link">
                                     Next <i class="fa fa-arrow-right"></i>
                                 </a>
                             </li>
@@ -214,8 +214,32 @@
     <div id="toc-collapse" class="navbar-collapse collapse card bg-body-tertiary">
         <ul class="nav flex-column">
             
-            <li class="nav-item" data-bs-level="1"><a href="#moving-items-on-the-map" class="nav-link">Moving items on the map</a>
+            <li class="nav-item" data-bs-level="1"><a href="#build-targets-and-rendering-patterns" class="nav-link">Build Targets and Rendering Patterns</a>
               <ul class="nav flex-column">
+            <li class="nav-item" data-bs-level="2"><a href="#shared-core-svelte-bundle" class="nav-link">Shared core (Svelte bundle)</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#svelte-app-static-site" class="nav-link">Svelte app (static site)</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#mkdocs-embedded-maps" class="nav-link">MkDocs (embedded maps)</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#neutralino-desktop" class="nav-link">Neutralino (desktop)</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#example-expose-new-from-svelte-to-neutralino" class="nav-link">Example: expose “New” from Svelte to Neutralino</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#summary-pattern" class="nav-link">Summary pattern</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
               </ul>
             </li>
         </ul>
@@ -223,13 +247,61 @@
 </div></div>
                     <div class="col-md-9" role="main">
 
-<h1 id="moving-items-on-the-map">Moving items on the map</h1>
-<p>Use keyboard or drag-and-drop to reposition components without breaking flow.</p>
+<h1 id="build-targets-and-rendering-patterns">Build Targets and Rendering Patterns</h1>
+<p>Blockscape uses a <strong>single Svelte UI core</strong> that is packaged in different shells for the web app, MkDocs, and Neutralino. Each target has its own build output directory and a thin layer of glue that decides what content gets rendered and which UI features are enabled.</p>
+<h2 id="shared-core-svelte-bundle">Shared core (Svelte bundle)</h2>
+<p>All targets reuse the same Svelte bundle:</p>
 <ul>
-<li>Arrow keys move selection; <code>Shift+←/→</code> reorders inside a category; <code>Shift+↑/↓</code> moves between categories.</li>
-<li>Drag items to regroup or adjust maturity; watch dependencies to keep layout consistent.</li>
-<li>Use undo in your browser if you drop something in the wrong place.</li>
-</ul></div>
+<li><strong>UI core:</strong> <code>svelte/src/Blockscape.svelte</code> + <code>svelte/src/App.svelte</code></li>
+<li><strong>Default features:</strong> <code>svelte/src/blockscape.js</code> enables local backend, file open/save, editor panels, header/sidebar/footer, and model metadata by default.</li>
+<li><strong>Embed shim:</strong> <code>svelte/src/mount.js</code> instantiates Blockscape for every <code>.blockscape-root</code> element and overrides features for “embedded” contexts.</li>
+</ul>
+<p>This keeps the UI logic in one place while allowing each shell to opt-in/opt-out of features.</p>
+<h2 id="svelte-app-static-site">Svelte app (static site)</h2>
+<p><strong>Design pattern:</strong> full application build (single-page app) that ships the entire UI and default feature set.</p>
+<ul>
+<li><strong>Build output:</strong> <code>vite.config.mjs</code> writes the static site to <code>docs/</code>.</li>
+<li><strong>Included content:</strong> the full app HTML + JS; all default features in <code>initBlockscape()</code> are on.</li>
+<li><strong>Excluded content:</strong> none by default; the app’s own runtime decides what to show.</li>
+</ul>
+<p>This target is the most complete UI surface and is used for the main web app and GitHub Pages output.</p>
+<h2 id="mkdocs-embedded-maps">MkDocs (embedded maps)</h2>
+<p><strong>Design pattern:</strong> embed the Svelte bundle as a <strong>library</strong> inside a documentation site; only render maps where a fenced block is present.</p>
+<ul>
+<li><strong>Build output:</strong> <code>vite.config.export.mjs</code> writes <code>blockscape.js</code>/<code>blockscape.css</code> to <code>documentation/docs/site_assets/blockscape/</code>.</li>
+<li><strong>Inclusion mechanism:</strong> the MkDocs extension (<code>documentation/mkdocs_blockscape/extension.py</code>) replaces <code>``blockscape fences with a</code>.blockscape-root` + JSON seed script.</li>
+<li><strong>Runtime shim:</strong> <code>mount.js</code> scans for <code>.blockscape-root</code> nodes and instantiates the UI per map.</li>
+<li><strong>Feature exclusions:</strong> <code>mount.js</code> turns off local backend + file open/save, hides header/sidebar/footer and model metadata.</li>
+</ul>
+<p>Net effect: docs content renders normally, and only explicitly fenced maps become Blockscape instances.</p>
+<h2 id="neutralino-desktop">Neutralino (desktop)</h2>
+<p><strong>Design pattern:</strong> local desktop shell that wraps the Svelte bundle, adds native file IO, and hides the web chrome for a map-first UI.</p>
+<ul>
+<li><strong>Build output:</strong> <code>vite.config.export.nj.mjs</code> writes <code>blockscape.js</code>/<code>blockscape.css</code> into <code>nj/resources/site_assets/blockscape/</code>.</li>
+<li><strong>Shell HTML:</strong> <code>nj/resources/index.html</code> loads the Svelte bundle and provides a custom header + file controls.</li>
+<li><strong>Runtime shim:</strong> <code>nj/resources/js/app.js</code> bridges Neutralino APIs to the web app (open/save, autosave, file tracking).</li>
+<li><strong>Paste/import behavior:</strong> when content is pasted into the Neutralino app, prompt to create a new file instead of overwriting the current file.</li>
+<li><strong>CSS shim:</strong> <code>nj/resources/index.html</code> includes overrides that hide header/sidebar/footer, JSON panel, context menus, and related UI.</li>
+</ul>
+<p>Net effect: the core app runs locally, but the shell narrows the surface to a viewer/editor workflow with desktop file access.</p>
+<h2 id="example-expose-new-from-svelte-to-neutralino">Example: expose “New” from Svelte to Neutralino</h2>
+<p>If you want the desktop shell to expose the same <strong>New</strong> workflow as the web app, follow this process:</p>
+<ol>
+<li><strong>Find the “New” entry points in Svelte.</strong> The button lives in <code>svelte/src/App.svelte</code> (id <code>newPanelButton</code>), and the panel markup is in <code>svelte/src/components/NewPanel.svelte</code> (id <code>newPanel</code>).</li>
+<li><strong>Verify the wiring in the runtime controller.</strong> <code>svelte/src/blockscape.js</code> binds click handlers for <code>newPanelButton</code> and <code>newBlankButton</code> and toggles the panel via <code>openNewPanel()</code>/<code>closeNewPanel()</code>. This is the logic you want visible in the shell.</li>
+<li><strong>Check desktop shell overrides.</strong> <code>nj/resources/index.html</code> includes CSS that hides <code>#newPanel</code> (and other UI) to keep a map-only layout. Remove or narrow that rule so the New panel can render while leaving the Svelte header hidden.</li>
+<li><strong>Expose a trigger in the desktop layout.</strong> Add a Neutralino-specific button in the desktop header (next to Open/Save) and wire it to click <code>#newPanelButton</code> in <code>nj/resources/js/app.js</code>. This keeps the desktop shell’s header while still using the Svelte New panel.</li>
+<li><strong>Rebuild the Neutralino assets.</strong> Run <code>npm run export:nj</code> so the updated UI/CSS lands in <code>nj/resources/site_assets/blockscape/</code>, then run <code>neu build</code> if you package the app.</li>
+</ol>
+<p>This pattern keeps the UI logic in Svelte while the Neutralino shell decides what to surface.</p>
+<h2 id="summary-pattern">Summary pattern</h2>
+<p>Blockscape follows a <strong>“core bundle + shell adapters”</strong> pattern:</p>
+<ul>
+<li><strong>Core:</strong> one Svelte bundle used everywhere.</li>
+<li><strong>Adapters:</strong> build configs (<code>vite.config.mjs</code>, <code>vite.config.export*.mjs</code>) decide the output directory and asset shape.</li>
+<li><strong>Shims:</strong> MkDocs extension + <code>mount.js</code> for embeds; Neutralino HTML/CSS/JS for native file workflows.</li>
+</ul>
+<p>This keeps the UI consistent while letting each target include only the content and capabilities that make sense in that environment.</p></div>
             </div>
         </div>
 
