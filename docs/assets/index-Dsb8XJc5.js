@@ -2090,6 +2090,41 @@ function createItemEditor({
     isOpen: () => !!state.wrapper && !state.wrapper.hidden
   };
 }
+function canUseNeutralino() {
+  return typeof window !== "undefined" && window.Neutralino && window.Neutralino.os && typeof window.Neutralino.os.open === "function";
+}
+function openExternalUrl(url) {
+  if (!url) return false;
+  if (canUseNeutralino()) {
+    try {
+      window.Neutralino.os.open(url);
+      return true;
+    } catch (error) {
+      console.warn("[Blockscape] failed to open external url", url, error);
+    }
+  }
+  window.open(url, "_blank", "noopener");
+  return true;
+}
+function isExternalHref(href) {
+  if (!href || href.startsWith("#") || /^javascript:/i.test(href)) return false;
+  try {
+    const parsed = new URL(href, window.location.href);
+    if (parsed.protocol === "http:" || parsed.protocol === "https:") {
+      return parsed.origin !== window.location.origin;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+function resolveHref(href) {
+  try {
+    return new URL(href, window.location.href).toString();
+  } catch {
+    return href;
+  }
+}
 function createTileContextMenu({
   menuEl,
   previewEl,
@@ -2271,14 +2306,14 @@ function createTileContextMenu({
       actions.push({
         label: "Open link ↗",
         title: meta.externalUrl,
-        onClick: () => window.open(meta.externalUrl, "_blank", "noopener")
+        onClick: () => openExternalUrl(meta.externalUrl)
       });
     }
     if (meta.obsidianUrl) {
       actions.push({
         label: "Open in Obsidian",
         title: meta.obsidianUrl,
-        onClick: () => window.open(meta.obsidianUrl, "_blank", "noopener")
+        onClick: () => openExternalUrl(meta.obsidianUrl)
       });
     }
     setPreviewActions(actions);
@@ -3510,6 +3545,18 @@ function initBlockscape(featureOverrides = {}) {
       console.warn("[Blockscape] failed to notify local save path", err);
     }
   }
+  function notifyLocalSaveClear({ origin } = {}) {
+    if (typeof window === "undefined") return;
+    try {
+      window.dispatchEvent(
+        new CustomEvent("blockscape:local-save-clear", {
+          detail: { origin }
+        })
+      );
+    } catch (err) {
+      console.warn("[Blockscape] failed to notify local save clear", err);
+    }
+  }
   function extractServerFilePathFromUrl() {
     if (typeof window === "undefined" || !window.location) return null;
     const url = new URL(window.location.href);
@@ -3543,9 +3590,35 @@ function initBlockscape(featureOverrides = {}) {
     const itemId = decodedExtras[1] ? decodedExtras[1].trim() : null;
     return { path: normalized, modelId: modelId || null, itemId: itemId || null };
   }
+  function clearServerPathFromUrl() {
+    if (typeof window === "undefined" || !window.location) return;
+    try {
+      const url = new URL(window.location.href);
+      const normalizedPath = url.pathname.replace(/\/+$/, "");
+      const segments = normalizedPath.split("/").filter(Boolean);
+      const serverIndex = segments.findIndex(
+        (segment) => segment.toLowerCase() === "server"
+      );
+      if (serverIndex === -1) return;
+      const baseSegments = segments.slice(0, serverIndex);
+      const cleanedSearch = new URLSearchParams(url.search);
+      cleanedSearch.delete("load");
+      cleanedSearch.delete("share");
+      const basePath = baseSegments.length ? `/${baseSegments.join("/")}` : "/";
+      url.pathname = basePath.replace(/\/+/g, "/");
+      url.search = cleanedSearch.toString() ? `?${cleanedSearch.toString()}` : "";
+      url.hash = "";
+      window.history.replaceState({}, document.title, url.toString());
+    } catch (err) {
+      console.warn("[Blockscape] failed to clear server path from URL", err);
+    }
+  }
   function updateServerUrlFromActive({ itemId } = {}) {
     const active = models[activeIndex];
-    if (!(active == null ? void 0 : active.sourcePath)) return;
+    if (!(active == null ? void 0 : active.sourcePath)) {
+      clearServerPathFromUrl();
+      return;
+    }
     updateUrlForServerPath(active.sourcePath, {
       modelId: getModelId(active),
       itemId: itemId === void 0 ? selection : itemId
@@ -3761,8 +3834,13 @@ function initBlockscape(featureOverrides = {}) {
       var _a2;
       if (!localSavePathInput) return;
       localSavePathInput.placeholder = defaultSaveName();
-      if ((_a2 = models[activeIndex]) == null ? void 0 : _a2.sourcePath) {
-        localSavePathInput.value = models[activeIndex].sourcePath;
+      const sourcePath = (_a2 = models[activeIndex]) == null ? void 0 : _a2.sourcePath;
+      if (sourcePath) {
+        localSavePathInput.value = sourcePath;
+        return;
+      }
+      if (localSavePathInput.value) {
+        localSavePathInput.value = "";
       }
     }
     function renderDirFilter() {
@@ -3812,7 +3890,17 @@ function initBlockscape(featureOverrides = {}) {
       }
     }
     function highlightSourcePath(path) {
-      if (!available || !localFileList || !path) return;
+      if (!available || !localFileList) return;
+      if (!path) {
+        lastKnownPath = "";
+        Array.from(localFileList.options).forEach((opt) => {
+          opt.selected = false;
+        });
+        if (localSavePathInput) {
+          localSavePathInput.value = "";
+        }
+        return;
+      }
       const match = files.find((f) => f.path === path);
       if (!match) return;
       const dir = dirOfPath(path);
@@ -5782,6 +5870,7 @@ function initBlockscape(featureOverrides = {}) {
     const entry = createBlankSeriesEntry();
     const idx = addModelEntry(entry, { versionLabel: "blank" });
     setActive(idx);
+    notifyLocalSaveClear({ origin: "new-blank" });
     closeNewPanel();
     showNotice("Blank series created. Add categories and tiles to start.", 2600);
     return idx;
@@ -8946,7 +9035,7 @@ ${text2}` : text2;
     button.textContent = "O";
     button.addEventListener("click", (event) => {
       event.stopPropagation();
-      window.open(url, "_blank", "noopener");
+      openExternalUrl(url);
     });
     button.addEventListener("keydown", (event) => event.stopPropagation());
     return button;
@@ -8960,7 +9049,7 @@ ${text2}` : text2;
     button.textContent = "↗";
     button.addEventListener("click", (event) => {
       event.stopPropagation();
-      window.open(url, "_blank", "noopener");
+      openExternalUrl(url);
     });
     button.addEventListener("keydown", (event) => event.stopPropagation());
     return button;
@@ -10278,6 +10367,18 @@ ${text2}` : text2;
       return;
     searchResults.hidden = true;
   });
+  document.addEventListener("click", (event) => {
+    var _a, _b, _c;
+    const anchor = (_b = (_a = event.target) == null ? void 0 : _a.closest) == null ? void 0 : _b.call(_a, "a[href]");
+    if (!anchor) return;
+    if ((_c = anchor.classList) == null ? void 0 : _c.contains("blockscape-gist-link")) return;
+    if (anchor.hasAttribute("download")) return;
+    const href = anchor.getAttribute("href");
+    if (!isExternalHref(href)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    openExternalUrl(resolveHref(href));
+  });
   if (urlForm && urlInput && loadUrlButton) {
     urlForm.addEventListener("submit", async (e) => {
       e.preventDefault();
@@ -11211,15 +11312,15 @@ const { document: document_1 } = globals;
 function create_fragment$1(ctx) {
   let link;
   let t0;
-  let div26;
+  let div27;
   let header;
+  let div10;
   let div9;
   let div8;
-  let div7;
   let div0;
   let t3;
-  let div6;
-  let div1;
+  let div7;
+  let div2;
   let button0;
   let span0;
   let t5;
@@ -11230,73 +11331,83 @@ function create_fragment$1(ctx) {
   let t9;
   let label0;
   let t12;
-  let button2;
+  let div1;
+  let span3;
   let t14;
-  let button3;
+  let button2;
   let t16;
-  let div5;
-  let div3;
+  let button3;
+  let t17;
+  let t18;
+  let button4;
   let t20;
-  let form;
-  let t26;
   let button5;
-  let div5_hidden_value;
-  let div5_aria_hidden_value;
-  let div6_data_expanded_value;
+  let t22;
+  let button6;
+  let t24;
+  let div6;
+  let div4;
   let t28;
+  let form;
+  let t34;
+  let button8;
+  let div6_hidden_value;
+  let div6_aria_hidden_value;
+  let div7_data_expanded_value;
+  let t36;
   let a0;
   let header_hidden_value;
-  let t29;
+  let t37;
   let main;
-  let div24;
+  let div25;
   let aside;
-  let div10;
-  let t31;
-  let ul;
-  let t32;
   let div11;
-  let t36;
-  let section0;
-  let div13;
+  let t39;
+  let ul;
   let t40;
-  let p0;
-  let t42;
-  let div16;
-  let label3;
+  let div12;
   let t44;
+  let section0;
   let div14;
+  let t48;
+  let p0;
+  let t50;
+  let div17;
+  let label3;
+  let t52;
+  let div15;
   let label4;
-  let t46;
+  let t54;
   let select0;
   let option;
-  let t48;
+  let t56;
   let select1;
-  let t49;
-  let div15;
-  let t55;
-  let div18;
+  let t57;
+  let div16;
+  let t63;
+  let div19;
   let aside_hidden_value;
-  let t62;
-  let div23;
-  let t88;
+  let t70;
+  let div24;
+  let t96;
   let footer;
-  let div25;
+  let div26;
   let footer_hidden_value;
-  let t90;
+  let t98;
   let html_tag;
   let raw_value = `<script id="seed" type="application/json">${/*seedText*/
-  ctx[4]}<\/script>`;
-  let t91;
+  ctx[5]}<\/script>`;
+  let t99;
   let svg1;
-  let t92;
-  let div27;
-  let t93;
+  let t100;
   let div28;
-  let t94;
-  let div33;
   let t101;
-  let shortcuthelp;
+  let div29;
   let t102;
+  let div34;
+  let t109;
+  let shortcuthelp;
+  let t110;
   let newpanel;
   let current;
   let mounted;
@@ -11307,16 +11418,16 @@ function create_fragment$1(ctx) {
     c() {
       link = element("link");
       t0 = space();
-      div26 = element("div");
+      div27 = element("div");
       header = element("header");
+      div10 = element("div");
       div9 = element("div");
       div8 = element("div");
-      div7 = element("div");
       div0 = element("div");
       div0.innerHTML = `<h1 class="sr-only">Blockscape</h1> <img class="blockscape-brand__logo" src="logos/blockscape-logo.svg" alt="Blockscape — landscape tile explorer" decoding="async"/>`;
       t3 = space();
-      div6 = element("div");
-      div1 = element("div");
+      div7 = element("div");
+      div2 = element("div");
       button0 = element("button");
       span0 = element("span");
       span0.textContent = "Advanced";
@@ -11330,87 +11441,103 @@ function create_fragment$1(ctx) {
       label0 = element("label");
       label0.innerHTML = `<span>Open</span> <input id="file" type="file" accept=".bs,.json,.txt" multiple=""/>`;
       t12 = space();
-      button2 = element("button");
-      button2.textContent = "Share";
+      div1 = element("div");
+      span3 = element("span");
+      span3.textContent = "Zoom";
       t14 = space();
-      button3 = element("button");
-      button3.textContent = "Help";
+      button2 = element("button");
+      button2.textContent = "-";
       t16 = space();
-      div5 = element("div");
-      div3 = element("div");
-      div3.innerHTML = `<label class="sr-only" for="search">Search tiles</label> <input id="search" class="pf-v5-c-form-control" type="text" placeholder="Search…"/> <div id="searchResults" class="search-results" role="listbox" aria-label="Search across all models" hidden=""></div>`;
+      button3 = element("button");
+      t17 = text(
+        /*zoomLabel*/
+        ctx[1]
+      );
+      t18 = space();
+      button4 = element("button");
+      button4.textContent = "+";
       t20 = space();
+      button5 = element("button");
+      button5.textContent = "Share";
+      t22 = space();
+      button6 = element("button");
+      button6.textContent = "Help";
+      t24 = space();
+      div6 = element("div");
+      div4 = element("div");
+      div4.innerHTML = `<label class="sr-only" for="search">Search tiles</label> <input id="search" class="pf-v5-c-form-control" type="text" placeholder="Search…"/> <div id="searchResults" class="search-results" role="listbox" aria-label="Search across all models" hidden=""></div>`;
+      t28 = space();
       form = element("form");
       form.innerHTML = `<label class="sr-only" for="urlInput">Load JSON from URL</label> <input id="urlInput" name="modelUrl" class="pf-v5-c-form-control is-url" type="url" placeholder="Load JSON from URL…" autocomplete="additional-name"/> <button id="loadUrl" class="pf-v5-c-button pf-m-primary" type="submit">Load URL</button> <div id="urlHint" class="url-hint" aria-live="polite"></div>`;
-      t26 = space();
-      button5 = element("button");
-      button5.textContent = "Edit";
-      t28 = space();
+      t34 = space();
+      button8 = element("button");
+      button8.textContent = "Edit";
+      t36 = space();
       a0 = element("a");
       a0.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"></path></svg>`;
-      t29 = space();
+      t37 = space();
       main = element("main");
-      div24 = element("div");
+      div25 = element("div");
       aside = element("aside");
-      div10 = element("div");
-      div10.textContent = "Models";
-      t31 = space();
-      ul = element("ul");
-      t32 = space();
       div11 = element("div");
-      div11.innerHTML = `<button id="removeModel" class="pf-v5-c-button pf-m-tertiary" type="button" title="Remove selected model">Remove active</button> <button id="clear" class="pf-v5-c-button pf-m-tertiary" type="button">Clear selection</button>`;
-      t36 = space();
-      section0 = element("section");
-      div13 = element("div");
-      div13.innerHTML = `<div class="sidebar-heading">Local files</div> <button id="toggleServerSidebar" class="pf-v5-c-button pf-m-tertiary" type="button" aria-pressed="false" hidden="">Wide menu</button>`;
+      div11.textContent = "Models";
+      t39 = space();
+      ul = element("ul");
       t40 = space();
+      div12 = element("div");
+      div12.innerHTML = `<button id="removeModel" class="pf-v5-c-button pf-m-tertiary" type="button" title="Remove selected model">Remove active</button> <button id="clear" class="pf-v5-c-button pf-m-tertiary" type="button">Clear selection</button>`;
+      t44 = space();
+      section0 = element("section");
+      div14 = element("div");
+      div14.innerHTML = `<div class="sidebar-heading">Local files</div> <button id="toggleServerSidebar" class="pf-v5-c-button pf-m-tertiary" type="button" aria-pressed="false" hidden="">Wide menu</button>`;
+      t48 = space();
       p0 = element("p");
       p0.textContent = "Checking for local server…";
-      t42 = space();
-      div16 = element("div");
+      t50 = space();
+      div17 = element("div");
       label3 = element("label");
       label3.textContent = "Blockscape files under ~/blockscape";
-      t44 = space();
-      div14 = element("div");
+      t52 = space();
+      div15 = element("div");
       label4 = element("label");
       label4.textContent = "Folder";
-      t46 = space();
+      t54 = space();
       select0 = element("select");
       option = element("option");
       option.textContent = "Root (~/blockscape)";
-      t48 = space();
+      t56 = space();
       select1 = element("select");
-      t49 = space();
-      div15 = element("div");
-      div15.innerHTML = `<button id="refreshLocalFiles" class="pf-v5-c-button pf-m-tertiary" type="button">Refresh</button> <button id="loadLocalFile" class="pf-v5-c-button pf-m-secondary" type="button">Load</button> <button id="deleteLocalFile" class="pf-v5-c-button pf-m-danger" type="button">Delete</button>`;
-      t55 = space();
-      div18 = element("div");
-      div18.innerHTML = `<label for="localSavePath">Save active map to ~/blockscape</label> <input id="localSavePath" class="pf-v5-c-form-control" type="text" placeholder="my-map.bs"/> <div class="local-backend__save-actions"><button id="saveLocalFile" class="pf-v5-c-button pf-m-primary" type="button">Save</button> <button id="saveLocalFileAs" class="pf-v5-c-button pf-m-secondary" type="button">Save as</button></div>`;
-      t62 = space();
-      div23 = element("div");
-      div23.innerHTML = `<section class="pf-v5-c-page__main-section blockscape-json-panel" hidden="" aria-label="Model source JSON editor"><p class="blockscape-json-panel__title">Paste / edit JSON for the <b>active</b> model (schema below)</p> <div class="muted">Schema: <code>{ id, title, abstract?, categories:[{id,title,items:[{id,name,deps?:[],logo?,external?:url,color?,stage?:1-4,...}}], ... }</code><br/>
+      t57 = space();
+      div16 = element("div");
+      div16.innerHTML = `<button id="refreshLocalFiles" class="pf-v5-c-button pf-m-tertiary" type="button">Refresh</button> <button id="loadLocalFile" class="pf-v5-c-button pf-m-secondary" type="button">Load</button> <button id="deleteLocalFile" class="pf-v5-c-button pf-m-danger" type="button">Delete</button>`;
+      t63 = space();
+      div19 = element("div");
+      div19.innerHTML = `<label for="localSavePath">Save active map to ~/blockscape</label> <input id="localSavePath" class="pf-v5-c-form-control" type="text" placeholder="my-map.bs"/> <div class="local-backend__save-actions"><button id="saveLocalFile" class="pf-v5-c-button pf-m-primary" type="button">Save</button> <button id="saveLocalFileAs" class="pf-v5-c-button pf-m-secondary" type="button">Save as</button></div>`;
+      t70 = space();
+      div24 = element("div");
+      div24.innerHTML = `<section class="pf-v5-c-page__main-section blockscape-json-panel" hidden="" aria-label="Model source JSON editor"><p class="blockscape-json-panel__title">Paste / edit JSON for the <b>active</b> model (schema below)</p> <div class="muted">Schema: <code>{ id, title, abstract?, categories:[{id,title,items:[{id,name,deps?:[],logo?,external?:url,color?,stage?:1-4,...}}], ... }</code><br/>
             You can paste multiple objects separated by <code>---</code> or <code>%%%</code>, or a JSON array of models, to append several models.
             A single object replaces only when you click “Replace active with JSON”. Tip: with no input focused, press
             Cmd/Ctrl+V anywhere on the page to append clipboard JSON instantly.</div> <div class="blockscape-json-controls"><textarea id="jsonBox" class="pf-v5-c-form-control" aria-label="JSON editor for the active model"></textarea> <div class="blockscape-json-actions"><button id="copyJson" class="pf-v5-c-button pf-m-tertiary" type="button" title="Copy the current JSON to your clipboard">Copy</button> <button id="copySeries" class="pf-v5-c-button pf-m-tertiary" type="button" title="Copy every version in this series as an array">Copy series</button> <button id="pasteJson" class="pf-v5-c-button pf-m-tertiary" type="button" title="Paste clipboard JSON to replace the editor contents">Paste</button> <button id="appendFromBox" class="pf-v5-c-button pf-m-primary" type="button">Append model(s)</button> <button id="replaceActive" class="pf-v5-c-button pf-m-secondary" type="button">Replace active with
                 JSON</button> <button id="createVersion" class="pf-v5-c-button pf-m-secondary" type="button" title="Create a new version from the current map">New version</button></div></div></section> <section class="pf-v5-c-page__main-section blockscape-main-section"><div id="app" aria-live="polite"></div></section>`;
-      t88 = space();
+      t96 = space();
       footer = element("footer");
-      div25 = element("div");
-      div25.innerHTML = `<a href="https://pwright.github.io/backscape/" target="_blank" rel="noreferrer noopener">Old versions</a>`;
-      t90 = space();
+      div26 = element("div");
+      div26.innerHTML = `<a href="https://pwright.github.io/backscape/" target="_blank" rel="noreferrer noopener">Old versions</a>`;
+      t98 = space();
       html_tag = new HtmlTag(false);
-      t91 = space();
+      t99 = space();
       svg1 = svg_element("svg");
-      t92 = space();
-      div27 = element("div");
-      t93 = space();
+      t100 = space();
       div28 = element("div");
-      t94 = space();
-      div33 = element("div");
-      div33.innerHTML = `<div class="item-preview__header"><span class="item-preview__title">Preview</span> <div class="item-preview__actions" hidden=""></div> <button type="button" class="item-preview__close" aria-label="Close preview">×</button></div> <div class="item-preview__body"><div class="item-preview__status">Right-click a tile to see related notes.</div></div>`;
       t101 = space();
-      create_component(shortcuthelp.$$.fragment);
+      div29 = element("div");
       t102 = space();
+      div34 = element("div");
+      div34.innerHTML = `<div class="item-preview__header"><span class="item-preview__title">Preview</span> <div class="item-preview__actions" hidden=""></div> <button type="button" class="item-preview__close" aria-label="Close preview">×</button></div> <div class="item-preview__body"><div class="item-preview__status">Right-click a tile to see related notes.</div></div>`;
+      t109 = space();
+      create_component(shortcuthelp.$$.fragment);
+      t110 = space();
       create_component(newpanel.$$.fragment);
       document_1.title = "Blockscape — simple landscape-style tiles";
       attr(link, "rel", "icon");
@@ -11436,49 +11563,62 @@ function create_fragment$1(ctx) {
       attr(button1, "type", "button");
       attr(button1, "title", "Create something new");
       attr(label0, "class", "pf-v5-c-button pf-m-primary blockscape-file");
-      attr(button2, "id", "shareModel");
-      attr(button2, "class", "pf-v5-c-button pf-m-secondary");
+      attr(span3, "class", "blockscape-zoom__label");
+      attr(button2, "class", "pf-v5-c-button pf-m-tertiary blockscape-zoom__button");
       attr(button2, "type", "button");
-      attr(button2, "title", "Copy a shareable URL for this model");
-      attr(button3, "id", "helpButton");
-      attr(button3, "class", "pf-v5-c-button pf-m-primary");
+      attr(button2, "title", "Zoom out (Ctrl -)");
+      attr(button3, "class", "pf-v5-c-button pf-m-tertiary blockscape-zoom__reset");
       attr(button3, "type", "button");
-      attr(button3, "title", "Show keyboard shortcuts");
-      attr(div1, "class", "blockscape-toolbar__primary");
-      attr(div3, "class", "blockscape-search");
+      attr(button3, "title", "Reset zoom (Ctrl 0)");
+      attr(button4, "class", "pf-v5-c-button pf-m-tertiary blockscape-zoom__button");
+      attr(button4, "type", "button");
+      attr(button4, "title", "Zoom in (Ctrl +)");
+      attr(div1, "class", "blockscape-zoom");
+      attr(div1, "role", "group");
+      attr(div1, "aria-label", "Zoom controls");
+      attr(button5, "id", "shareModel");
+      attr(button5, "class", "pf-v5-c-button pf-m-secondary");
+      attr(button5, "type", "button");
+      attr(button5, "title", "Copy a shareable URL for this model");
+      attr(button6, "id", "helpButton");
+      attr(button6, "class", "pf-v5-c-button pf-m-primary");
+      attr(button6, "type", "button");
+      attr(button6, "title", "Show keyboard shortcuts");
+      attr(div2, "class", "blockscape-toolbar__primary");
+      attr(div4, "class", "blockscape-search");
       attr(form, "id", "urlForm");
       attr(form, "class", "blockscape-url-form");
       attr(form, "autocomplete", "on");
       form.noValidate = true;
-      attr(button5, "id", "openInEditor");
-      attr(button5, "class", "pf-v5-c-button pf-m-secondary");
-      attr(button5, "type", "button");
-      attr(button5, "title", "Open current JSON in the editor");
-      attr(div5, "id", "blockscapeHeaderExtras");
-      attr(div5, "class", "blockscape-toolbar__extras");
-      div5.hidden = div5_hidden_value = !/*headerExpanded*/
+      attr(button8, "id", "openInEditor");
+      attr(button8, "class", "pf-v5-c-button pf-m-secondary");
+      attr(button8, "type", "button");
+      attr(button8, "title", "Open current JSON in the editor");
+      attr(div6, "id", "blockscapeHeaderExtras");
+      attr(div6, "class", "blockscape-toolbar__extras");
+      div6.hidden = div6_hidden_value = !/*headerExpanded*/
       ctx[0];
-      attr(div5, "aria-hidden", div5_aria_hidden_value = !/*headerExpanded*/
+      attr(div6, "aria-hidden", div6_aria_hidden_value = !/*headerExpanded*/
       ctx[0]);
-      attr(div6, "class", "blockscape-toolbar__controls");
-      attr(div6, "data-expanded", div6_data_expanded_value = /*headerExpanded*/
+      attr(div7, "class", "blockscape-toolbar__controls");
+      attr(div7, "data-expanded", div7_data_expanded_value = /*headerExpanded*/
       ctx[0] ? "true" : "false");
       attr(a0, "href", "https://github.com/pwright/blockscape");
       attr(a0, "target", "_blank");
       attr(a0, "class", "pf-v5-c-button pf-m-plain blockscape-toolbar__github");
       attr(a0, "title", "View on GitHub");
       attr(a0, "aria-label", "View Blockscape on GitHub");
-      attr(div7, "class", "blockscape-toolbar");
-      attr(div8, "class", "pf-v5-c-masthead__content");
-      attr(div9, "class", "pf-v5-c-masthead pf-m-display-inline blockscape-masthead");
+      attr(div8, "class", "blockscape-toolbar");
+      attr(div9, "class", "pf-v5-c-masthead__content");
+      attr(div10, "class", "pf-v5-c-masthead pf-m-display-inline blockscape-masthead");
       attr(header, "class", "pf-v5-c-page__header");
       header.hidden = header_hidden_value = !/*showHeader*/
-      ctx[3];
-      attr(div10, "class", "sidebar-heading");
+      ctx[4];
+      attr(div11, "class", "sidebar-heading");
       attr(ul, "id", "modelList");
       attr(ul, "class", "model-nav-list");
-      attr(div11, "class", "model-actions");
-      attr(div13, "class", "local-backend__header");
+      attr(div12, "class", "model-actions");
+      attr(div14, "class", "local-backend__header");
       attr(p0, "id", "localBackendStatus");
       attr(p0, "class", "local-backend__status muted");
       attr(label3, "class", "sr-only");
@@ -11489,135 +11629,165 @@ function create_fragment$1(ctx) {
       attr(select0, "id", "localDirSelect");
       attr(select0, "class", "pf-v5-c-form-control");
       attr(select0, "aria-label", "Folder filter");
-      attr(div14, "class", "local-backend__dir");
+      attr(div15, "class", "local-backend__dir");
       attr(select1, "id", "localFileList");
       attr(select1, "class", "pf-v5-c-form-control");
       attr(select1, "size", "12");
       select1.multiple = true;
       attr(select1, "aria-label", "Blockscape files on local server");
-      attr(div15, "class", "local-backend__actions");
-      attr(div16, "class", "local-backend__list");
-      attr(div18, "class", "local-backend__save");
+      attr(div16, "class", "local-backend__actions");
+      attr(div17, "class", "local-backend__list");
+      attr(div19, "class", "local-backend__save");
       attr(section0, "id", "localBackendPanel");
       attr(section0, "class", "local-backend");
       section0.hidden = true;
       attr(aside, "class", "blockscape-sidebar");
       attr(aside, "aria-label", "Models");
       aside.hidden = aside_hidden_value = !/*showSidebar*/
-      ctx[2];
-      attr(div23, "class", "blockscape-main");
-      attr(div24, "class", "blockscape-content");
+      ctx[3];
+      attr(div24, "class", "blockscape-main");
+      attr(div25, "class", "blockscape-content");
       attr(main, "class", "pf-v5-c-page__main");
-      attr(div25, "class", "blockscape-footer__inner");
+      attr(div26, "class", "blockscape-footer__inner");
       attr(footer, "class", "pf-v5-c-page__footer blockscape-footer");
       footer.hidden = footer_hidden_value = !/*showFooter*/
-      ctx[1];
-      attr(div26, "class", "pf-v5-c-page");
-      html_tag.a = t91;
+      ctx[2];
+      attr(div27, "class", "pf-v5-c-page");
+      html_tag.a = t99;
       attr(svg1, "id", "overlay");
       attr(svg1, "class", "svg-layer");
-      attr(div27, "id", "tabTooltip");
-      attr(div27, "class", "blockscape-tab-tooltip");
-      div27.hidden = true;
-      attr(div27, "aria-hidden", "true");
-      attr(div28, "id", "tileContextMenu");
-      attr(div28, "class", "tile-context-menu");
+      attr(div28, "id", "tabTooltip");
+      attr(div28, "class", "blockscape-tab-tooltip");
       div28.hidden = true;
       attr(div28, "aria-hidden", "true");
-      attr(div33, "id", "itemPreview");
-      attr(div33, "class", "item-preview");
-      div33.hidden = true;
-      attr(div33, "aria-hidden", "true");
+      attr(div29, "id", "tileContextMenu");
+      attr(div29, "class", "tile-context-menu");
+      div29.hidden = true;
+      attr(div29, "aria-hidden", "true");
+      attr(div34, "id", "itemPreview");
+      attr(div34, "class", "item-preview");
+      div34.hidden = true;
+      attr(div34, "aria-hidden", "true");
     },
     m(target2, anchor) {
       append(document_1.head, link);
       insert(target2, t0, anchor);
-      insert(target2, div26, anchor);
-      append(div26, header);
-      append(header, div9);
+      insert(target2, div27, anchor);
+      append(div27, header);
+      append(header, div10);
+      append(div10, div9);
       append(div9, div8);
+      append(div8, div0);
+      append(div8, t3);
       append(div8, div7);
-      append(div7, div0);
-      append(div7, t3);
-      append(div7, div6);
-      append(div6, div1);
-      append(div1, button0);
+      append(div7, div2);
+      append(div2, button0);
       append(button0, span0);
       append(button0, t5);
       append(button0, span1);
-      append(div1, t7);
-      append(div1, button1);
-      append(div1, t9);
-      append(div1, label0);
-      append(div1, t12);
-      append(div1, button2);
+      append(div2, t7);
+      append(div2, button1);
+      append(div2, t9);
+      append(div2, label0);
+      append(div2, t12);
+      append(div2, div1);
+      append(div1, span3);
       append(div1, t14);
+      append(div1, button2);
+      append(div1, t16);
       append(div1, button3);
-      append(div6, t16);
-      append(div6, div5);
-      append(div5, div3);
-      append(div5, t20);
-      append(div5, form);
-      append(div5, t26);
-      append(div5, button5);
-      append(div7, t28);
-      append(div7, a0);
-      append(div26, t29);
-      append(div26, main);
-      append(main, div24);
-      append(div24, aside);
-      append(aside, div10);
-      append(aside, t31);
-      append(aside, ul);
-      append(aside, t32);
+      append(button3, t17);
+      append(div1, t18);
+      append(div1, button4);
+      append(div2, t20);
+      append(div2, button5);
+      append(div2, t22);
+      append(div2, button6);
+      append(div7, t24);
+      append(div7, div6);
+      append(div6, div4);
+      append(div6, t28);
+      append(div6, form);
+      append(div6, t34);
+      append(div6, button8);
+      append(div8, t36);
+      append(div8, a0);
+      append(div27, t37);
+      append(div27, main);
+      append(main, div25);
+      append(div25, aside);
       append(aside, div11);
-      append(aside, t36);
+      append(aside, t39);
+      append(aside, ul);
+      append(aside, t40);
+      append(aside, div12);
+      append(aside, t44);
       append(aside, section0);
-      append(section0, div13);
-      append(section0, t40);
+      append(section0, div14);
+      append(section0, t48);
       append(section0, p0);
-      append(section0, t42);
-      append(section0, div16);
-      append(div16, label3);
-      append(div16, t44);
-      append(div16, div14);
-      append(div14, label4);
-      append(div14, t46);
-      append(div14, select0);
+      append(section0, t50);
+      append(section0, div17);
+      append(div17, label3);
+      append(div17, t52);
+      append(div17, div15);
+      append(div15, label4);
+      append(div15, t54);
+      append(div15, select0);
       append(select0, option);
-      append(div16, t48);
-      append(div16, select1);
-      append(div16, t49);
-      append(div16, div15);
-      append(section0, t55);
-      append(section0, div18);
-      append(div24, t62);
-      append(div24, div23);
-      append(div26, t88);
-      append(div26, footer);
-      append(footer, div25);
-      insert(target2, t90, anchor);
+      append(div17, t56);
+      append(div17, select1);
+      append(div17, t57);
+      append(div17, div16);
+      append(section0, t63);
+      append(section0, div19);
+      append(div25, t70);
+      append(div25, div24);
+      append(div27, t96);
+      append(div27, footer);
+      append(footer, div26);
+      insert(target2, t98, anchor);
       html_tag.m(raw_value, target2, anchor);
-      insert(target2, t91, anchor);
+      insert(target2, t99, anchor);
       insert(target2, svg1, anchor);
-      insert(target2, t92, anchor);
-      insert(target2, div27, anchor);
-      insert(target2, t93, anchor);
+      insert(target2, t100, anchor);
       insert(target2, div28, anchor);
-      insert(target2, t94, anchor);
-      insert(target2, div33, anchor);
       insert(target2, t101, anchor);
-      mount_component(shortcuthelp, target2, anchor);
+      insert(target2, div29, anchor);
       insert(target2, t102, anchor);
+      insert(target2, div34, anchor);
+      insert(target2, t109, anchor);
+      mount_component(shortcuthelp, target2, anchor);
+      insert(target2, t110, anchor);
       mount_component(newpanel, target2, anchor);
       current = true;
       if (!mounted) {
-        dispose = listen(
-          button0,
-          "click",
-          /*toggleHeaderExpanded*/
-          ctx[5]
-        );
+        dispose = [
+          listen(
+            button0,
+            "click",
+            /*toggleHeaderExpanded*/
+            ctx[6]
+          ),
+          listen(
+            button2,
+            "click",
+            /*zoomOut*/
+            ctx[8]
+          ),
+          listen(
+            button3,
+            "click",
+            /*resetZoom*/
+            ctx[9]
+          ),
+          listen(
+            button4,
+            "click",
+            /*zoomIn*/
+            ctx[7]
+          )
+        ];
         mounted = true;
       }
     },
@@ -11636,34 +11806,40 @@ function create_fragment$1(ctx) {
       ctx2[0] ? "Hide advanced tools" : "Show advanced tools")) {
         attr(button0, "aria-label", button0_aria_label_value);
       }
+      if (!current || dirty & /*zoomLabel*/
+      2) set_data(
+        t17,
+        /*zoomLabel*/
+        ctx2[1]
+      );
       if (!current || dirty & /*headerExpanded*/
-      1 && div5_hidden_value !== (div5_hidden_value = !/*headerExpanded*/
+      1 && div6_hidden_value !== (div6_hidden_value = !/*headerExpanded*/
       ctx2[0])) {
-        div5.hidden = div5_hidden_value;
+        div6.hidden = div6_hidden_value;
       }
       if (!current || dirty & /*headerExpanded*/
-      1 && div5_aria_hidden_value !== (div5_aria_hidden_value = !/*headerExpanded*/
+      1 && div6_aria_hidden_value !== (div6_aria_hidden_value = !/*headerExpanded*/
       ctx2[0])) {
-        attr(div5, "aria-hidden", div5_aria_hidden_value);
+        attr(div6, "aria-hidden", div6_aria_hidden_value);
       }
       if (!current || dirty & /*headerExpanded*/
-      1 && div6_data_expanded_value !== (div6_data_expanded_value = /*headerExpanded*/
+      1 && div7_data_expanded_value !== (div7_data_expanded_value = /*headerExpanded*/
       ctx2[0] ? "true" : "false")) {
-        attr(div6, "data-expanded", div6_data_expanded_value);
+        attr(div7, "data-expanded", div7_data_expanded_value);
       }
       if (!current || dirty & /*showHeader*/
-      8 && header_hidden_value !== (header_hidden_value = !/*showHeader*/
-      ctx2[3])) {
+      16 && header_hidden_value !== (header_hidden_value = !/*showHeader*/
+      ctx2[4])) {
         header.hidden = header_hidden_value;
       }
       if (!current || dirty & /*showSidebar*/
-      4 && aside_hidden_value !== (aside_hidden_value = !/*showSidebar*/
-      ctx2[2])) {
+      8 && aside_hidden_value !== (aside_hidden_value = !/*showSidebar*/
+      ctx2[3])) {
         aside.hidden = aside_hidden_value;
       }
       if (!current || dirty & /*showFooter*/
-      2 && footer_hidden_value !== (footer_hidden_value = !/*showFooter*/
-      ctx2[1])) {
+      4 && footer_hidden_value !== (footer_hidden_value = !/*showFooter*/
+      ctx2[2])) {
         footer.hidden = footer_hidden_value;
       }
     },
@@ -11681,32 +11857,36 @@ function create_fragment$1(ctx) {
     d(detaching) {
       if (detaching) {
         detach(t0);
-        detach(div26);
-        detach(t90);
-        html_tag.d();
-        detach(t91);
-        detach(svg1);
-        detach(t92);
         detach(div27);
-        detach(t93);
+        detach(t98);
+        html_tag.d();
+        detach(t99);
+        detach(svg1);
+        detach(t100);
         detach(div28);
-        detach(t94);
-        detach(div33);
         detach(t101);
+        detach(div29);
         detach(t102);
+        detach(div34);
+        detach(t109);
+        detach(t110);
       }
       detach(link);
       destroy_component(shortcuthelp, detaching);
       destroy_component(newpanel, detaching);
       mounted = false;
-      dispose();
+      run_all(dispose);
     }
   };
 }
+const ZOOM_STEP = 0.1;
+const ZOOM_MIN = 0.2;
+const ZOOM_MAX = 2.5;
 function instance$1($$self, $$props, $$invalidate) {
   let showHeader;
   let showSidebar;
   let showFooter;
+  let zoomLabel;
   let { seed } = $$props;
   let { features = {} } = $$props;
   const defaultSeedText = `
@@ -11854,6 +12034,7 @@ function instance$1($$self, $$props, $$invalidate) {
 }`;
   const seedText = seed ? JSON.stringify(seed, null, 2) : defaultSeedText;
   let headerExpanded = false;
+  let zoom = 1;
   const toggleHeaderExpanded = () => {
     $$invalidate(0, headerExpanded = !headerExpanded);
     if (!headerExpanded) {
@@ -11864,42 +12045,82 @@ function instance$1($$self, $$props, $$invalidate) {
       }
     }
   };
+  const clampZoom = (value) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, value));
+  const applyZoom = () => {
+    document.body.style.zoom = String(zoom);
+  };
+  const setZoom = (value) => {
+    $$invalidate(12, zoom = clampZoom(value));
+    applyZoom();
+  };
+  const zoomIn = () => setZoom(zoom + ZOOM_STEP);
+  const zoomOut = () => setZoom(zoom - ZOOM_STEP);
+  const resetZoom = () => setZoom(1);
   onMount(() => {
     initBlockscape(features);
+    applyZoom();
+    const handleZoomKeys = (event) => {
+      if (!event.ctrlKey && !event.metaKey) return;
+      if (event.key === "=" || event.key === "+") {
+        zoomIn();
+        event.preventDefault();
+        return;
+      }
+      if (event.key === "-" || event.key === "_") {
+        zoomOut();
+        event.preventDefault();
+        return;
+      }
+      if (event.key === "0") {
+        resetZoom();
+        event.preventDefault();
+      }
+    };
+    window.addEventListener("keydown", handleZoomKeys);
+    return () => window.removeEventListener("keydown", handleZoomKeys);
   });
   $$self.$$set = ($$props2) => {
-    if ("seed" in $$props2) $$invalidate(6, seed = $$props2.seed);
-    if ("features" in $$props2) $$invalidate(7, features = $$props2.features);
+    if ("seed" in $$props2) $$invalidate(10, seed = $$props2.seed);
+    if ("features" in $$props2) $$invalidate(11, features = $$props2.features);
   };
   $$self.$$.update = () => {
     if ($$self.$$.dirty & /*features*/
-    128) {
-      $$invalidate(3, showHeader = features.showHeader !== false);
+    2048) {
+      $$invalidate(4, showHeader = features.showHeader !== false);
     }
     if ($$self.$$.dirty & /*features*/
-    128) {
-      $$invalidate(2, showSidebar = features.showSidebar !== false);
+    2048) {
+      $$invalidate(3, showSidebar = features.showSidebar !== false);
     }
     if ($$self.$$.dirty & /*features*/
-    128) {
-      $$invalidate(1, showFooter = features.showFooter !== false);
+    2048) {
+      $$invalidate(2, showFooter = features.showFooter !== false);
+    }
+    if ($$self.$$.dirty & /*zoom*/
+    4096) {
+      $$invalidate(1, zoomLabel = `${Math.round(zoom * 100)}%`);
     }
   };
   return [
     headerExpanded,
+    zoomLabel,
     showFooter,
     showSidebar,
     showHeader,
     seedText,
     toggleHeaderExpanded,
+    zoomIn,
+    zoomOut,
+    resetZoom,
     seed,
-    features
+    features,
+    zoom
   ];
 }
 class App extends SvelteComponent {
   constructor(options) {
     super();
-    init(this, options, instance$1, create_fragment$1, safe_not_equal, { seed: 6, features: 7 });
+    init(this, options, instance$1, create_fragment$1, safe_not_equal, { seed: 10, features: 11 });
   }
 }
 function create_fragment(ctx) {

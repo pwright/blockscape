@@ -156,6 +156,11 @@
   $: showFooter = features.showFooter !== false;
 
   let headerExpanded = false;
+  let zoom = 1.0;
+  const ZOOM_STEP = 0.1;
+  const ZOOM_MIN = 0.2;
+  const ZOOM_MAX = 2.5;
+  $: zoomLabel = `${Math.round(zoom * 100)}%`;
 
   const toggleHeaderExpanded = () => {
     headerExpanded = !headerExpanded;
@@ -168,8 +173,45 @@
     }
   };
 
+  const clampZoom = (value) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, value));
+
+  const applyZoom = () => {
+    document.body.style.zoom = String(zoom);
+  };
+
+  const setZoom = (value) => {
+    zoom = clampZoom(value);
+    applyZoom();
+  };
+
+  const zoomIn = () => setZoom(zoom + ZOOM_STEP);
+  const zoomOut = () => setZoom(zoom - ZOOM_STEP);
+  const resetZoom = () => setZoom(1.0);
+
   onMount(() => {
     initBlockscape(features);
+    applyZoom();
+
+    const handleZoomKeys = (event) => {
+      if (!event.ctrlKey && !event.metaKey) return;
+      if (event.key === '=' || event.key === '+') {
+        zoomIn();
+        event.preventDefault();
+        return;
+      }
+      if (event.key === '-' || event.key === '_') {
+        zoomOut();
+        event.preventDefault();
+        return;
+      }
+      if (event.key === '0') {
+        resetZoom();
+        event.preventDefault();
+      }
+    };
+
+    window.addEventListener('keydown', handleZoomKeys);
+    return () => window.removeEventListener('keydown', handleZoomKeys);
   });
 </script>
 
@@ -206,6 +248,34 @@
                 <span>Open</span>
                 <input id="file" type="file" accept=".bs,.json,.txt" multiple />
               </label>
+
+              <div class="blockscape-zoom" role="group" aria-label="Zoom controls">
+                <span class="blockscape-zoom__label">Zoom</span>
+                <button
+                  class="pf-v5-c-button pf-m-tertiary blockscape-zoom__button"
+                  type="button"
+                  title="Zoom out (Ctrl -)"
+                  on:click={zoomOut}
+                >
+                  -
+                </button>
+                <button
+                  class="pf-v5-c-button pf-m-tertiary blockscape-zoom__reset"
+                  type="button"
+                  title="Reset zoom (Ctrl 0)"
+                  on:click={resetZoom}
+                >
+                  {zoomLabel}
+                </button>
+                <button
+                  class="pf-v5-c-button pf-m-tertiary blockscape-zoom__button"
+                  type="button"
+                  title="Zoom in (Ctrl +)"
+                  on:click={zoomIn}
+                >
+                  +
+                </button>
+              </div>
 
               <button id="shareModel" class="pf-v5-c-button pf-m-secondary" type="button" title="Copy a shareable URL for this model">Share</button>
               <button id="helpButton" class="pf-v5-c-button pf-m-primary" type="button" title="Show keyboard shortcuts">Help</button>

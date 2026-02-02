@@ -6,6 +6,9 @@
     autosave: "blockscape-nj:autosave",
     lastPath: "blockscape-nj:lastPath",
   };
+  const ZOOM_STEP = 0.1;
+  const ZOOM_MIN = 0.2;
+  const ZOOM_MAX = 2.5;
   const DEFAULT_AUTOSAVE = true;
   const AUTOSAVE_INTERVAL_MS = 2000;
   const SETTINGS_DIR = ".blockscape";
@@ -30,6 +33,7 @@
   let lastSettingsPayload = "";
   let settingsLoaded = false;
   let recentFiles = [];
+  let zoom = 1.0;
 
   const getJsonBox = () => document.getElementById("jsonBox");
   const getJsonText = () => (getJsonBox()?.value || "").trim();
@@ -128,6 +132,25 @@
   const newMapBtn = byId("newMapBtn");
   const recentFilesListEl = byId("recentFilesList");
   const recentFilesEmptyEl = byId("recentFilesEmpty");
+  const zoomResetBtn = byId("zoomResetBtn");
+
+  const clampZoom = (value) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, value));
+  const updateZoomLabel = () => {
+    if (zoomResetBtn) {
+      zoomResetBtn.textContent = `${Math.round(zoom * 100)}%`;
+    }
+  };
+  const applyZoom = () => {
+    document.body.style.zoom = String(zoom);
+    updateZoomLabel();
+  };
+  const setZoom = (value) => {
+    zoom = clampZoom(value);
+    applyZoom();
+  };
+  const zoomIn = () => setZoom(zoom + ZOOM_STEP);
+  const zoomOut = () => setZoom(zoom - ZOOM_STEP);
+  const resetZoom = () => setZoom(1.0);
 
   const getHomePath = async () => {
     if (homePathPromise) return homePathPromise;
@@ -351,6 +374,14 @@
     const relPath = event?.detail?.path;
     if (!relPath) return;
     currentPath = await resolveNeutralinoSavePath(relPath);
+    lastSavedText = getJsonText();
+    autosavePendingDialog = false;
+    persistState();
+    updateFilePathDisplay();
+  });
+
+  window.addEventListener("blockscape:local-save-clear", () => {
+    currentPath = "";
     lastSavedText = getJsonText();
     autosavePendingDialog = false;
     persistState();
@@ -668,9 +699,14 @@
     byId("fileOpenBtn")?.addEventListener("click", () => openFile());
     byId("fileSaveBtn")?.addEventListener("click", () => saveFile());
     byId("fileSaveAsBtn")?.addEventListener("click", () => saveFileAs());
+    byId("zoomInBtn")?.addEventListener("click", () => zoomIn());
+    byId("zoomOutBtn")?.addEventListener("click", () => zoomOut());
+    zoomResetBtn?.addEventListener("click", () => resetZoom());
     newMapBtn?.addEventListener("click", async () => {
       if (!(await confirmSaveBeforeNew())) return;
       triggerNewPanel();
     });
+
+    applyZoom();
   });
 })();

@@ -13,6 +13,7 @@ import {
   downloadJson,
   tokens,
 } from "./settings";
+import { isExternalHref, openExternalUrl, resolveHref } from "./externalLinks";
 
 const ASSET_BASE =
   (typeof import.meta !== "undefined" && import.meta.env?.BASE_URL) || "";
@@ -901,6 +902,19 @@ export function initBlockscape(featureOverrides = {}) {
     }
   }
 
+  function notifyLocalSaveClear({ origin } = {}) {
+    if (typeof window === "undefined") return;
+    try {
+      window.dispatchEvent(
+        new CustomEvent("blockscape:local-save-clear", {
+          detail: { origin },
+        })
+      );
+    } catch (err) {
+      console.warn("[Blockscape] failed to notify local save clear", err);
+    }
+  }
+
   function extractServerFilePathFromUrl() {
     if (typeof window === "undefined" || !window.location) return null;
     const url = new URL(window.location.href);
@@ -935,9 +949,40 @@ export function initBlockscape(featureOverrides = {}) {
     return { path: normalized, modelId: modelId || null, itemId: itemId || null };
   }
 
+  function clearServerPathFromUrl() {
+    if (typeof window === "undefined" || !window.location) return;
+    try {
+      const url = new URL(window.location.href);
+      const normalizedPath = url.pathname.replace(/\/+$/, "");
+      const segments = normalizedPath.split("/").filter(Boolean);
+      const serverIndex = segments.findIndex(
+        (segment) => segment.toLowerCase() === "server"
+      );
+      if (serverIndex === -1) return;
+      const baseSegments = segments.slice(0, serverIndex);
+      const cleanedSearch = new URLSearchParams(url.search);
+      cleanedSearch.delete("load");
+      cleanedSearch.delete("share");
+      const basePath = baseSegments.length
+        ? `/${baseSegments.join("/")}`
+        : "/";
+      url.pathname = basePath.replace(/\/+/g, "/");
+      url.search = cleanedSearch.toString()
+        ? `?${cleanedSearch.toString()}`
+        : "";
+      url.hash = "";
+      window.history.replaceState({}, document.title, url.toString());
+    } catch (err) {
+      console.warn("[Blockscape] failed to clear server path from URL", err);
+    }
+  }
+
   function updateServerUrlFromActive({ itemId } = {}) {
     const active = models[activeIndex];
-    if (!active?.sourcePath) return;
+    if (!active?.sourcePath) {
+      clearServerPathFromUrl();
+      return;
+    }
     updateUrlForServerPath(active.sourcePath, {
       modelId: getModelId(active),
       itemId: itemId === undefined ? selection : itemId,
@@ -1168,8 +1213,13 @@ export function initBlockscape(featureOverrides = {}) {
     function updateActiveSavePlaceholder() {
       if (!localSavePathInput) return;
       localSavePathInput.placeholder = defaultSaveName();
-      if (models[activeIndex]?.sourcePath) {
-        localSavePathInput.value = models[activeIndex].sourcePath;
+      const sourcePath = models[activeIndex]?.sourcePath;
+      if (sourcePath) {
+        localSavePathInput.value = sourcePath;
+        return;
+      }
+      if (localSavePathInput.value) {
+        localSavePathInput.value = "";
       }
     }
 
@@ -1225,7 +1275,17 @@ export function initBlockscape(featureOverrides = {}) {
     }
 
     function highlightSourcePath(path) {
-      if (!available || !localFileList || !path) return;
+      if (!available || !localFileList) return;
+      if (!path) {
+        lastKnownPath = "";
+        Array.from(localFileList.options).forEach((opt) => {
+          opt.selected = false;
+        });
+        if (localSavePathInput) {
+          localSavePathInput.value = "";
+        }
+        return;
+      }
       const match = files.find((f) => f.path === path);
       if (!match) return;
       const dir = dirOfPath(path);
@@ -3446,6 +3506,7 @@ export function initBlockscape(featureOverrides = {}) {
     const entry = createBlankSeriesEntry();
     const idx = addModelEntry(entry, { versionLabel: "blank" });
     setActive(idx);
+    notifyLocalSaveClear({ origin: "new-blank" });
     closeNewPanel();
     showNotice("Blank series created. Add categories and tiles to start.", 2600);
     return idx;
@@ -7123,7 +7184,7 @@ export function initBlockscape(featureOverrides = {}) {
     button.textContent = "O";
     button.addEventListener("click", (event) => {
       event.stopPropagation();
-      window.open(url, "_blank", "noopener");
+      openExternalUrl(url);
     });
     button.addEventListener("keydown", (event) => event.stopPropagation());
     return button;
@@ -7138,7 +7199,7 @@ export function initBlockscape(featureOverrides = {}) {
     button.textContent = "↗";
     button.addEventListener("click", (event) => {
       event.stopPropagation();
-      window.open(url, "_blank", "noopener");
+      openExternalUrl(url);
     });
     button.addEventListener("keydown", (event) => event.stopPropagation());
     return button;
@@ -8627,6 +8688,18 @@ export function initBlockscape(featureOverrides = {}) {
     if (searchInput && (target === searchInput || searchInput.contains(target)))
       return;
     searchResults.hidden = true;
+  });
+
+  document.addEventListener("click", (event) => {
+    const anchor = event.target?.closest?.("a[href]");
+    if (!anchor) return;
+    if (anchor.classList?.contains("blockscape-gist-link")) return;
+    if (anchor.hasAttribute("download")) return;
+    const href = anchor.getAttribute("href");
+    if (!isExternalHref(href)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    openExternalUrl(resolveHref(href));
   });
 
   // Load from URL

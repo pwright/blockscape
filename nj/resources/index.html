@@ -48,6 +48,44 @@
         margin-top: 0.5rem;
       }
 
+      .zoom-controls {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        padding: 0.2rem 0.5rem;
+        border-radius: 999px;
+        border: 1px solid var(--color-border);
+        background: var(--color-surface-muted);
+      }
+
+      .zoom-label {
+        font-size: 0.72rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--color-muted);
+      }
+
+      .zoom-button {
+        border: 1px solid var(--color-border);
+        background: var(--color-surface);
+        color: var(--color-text);
+        padding: 0.2rem 0.55rem;
+        border-radius: 999px;
+        font-size: 0.8rem;
+        font-weight: var(--font-weight-semibold);
+        cursor: pointer;
+        min-width: 2.1rem;
+      }
+
+      .zoom-button:hover {
+        background: var(--color-surface);
+      }
+
+      .zoom-button--reset {
+        min-width: 3.1rem;
+        font-variant-numeric: tabular-nums;
+      }
+
       .file-button {
         border: 1px solid var(--color-border);
         background: var(--color-surface);
@@ -206,6 +244,12 @@
         <button class="file-button" id="fileSaveBtn" type="button">Save</button>
         <button class="file-button" id="fileSaveAsBtn" type="button">Save As</button>
         <button class="file-button" id="newMapBtn" type="button">New</button>
+        <div class="zoom-controls" role="group" aria-label="Zoom controls">
+          <span class="zoom-label">Zoom</span>
+          <button class="zoom-button" id="zoomOutBtn" type="button" title="Zoom out (Ctrl -)">-</button>
+          <button class="zoom-button zoom-button--reset" id="zoomResetBtn" type="button" title="Reset zoom (Ctrl 0)">100%</button>
+          <button class="zoom-button" id="zoomInBtn" type="button" title="Zoom in (Ctrl +)">+</button>
+        </div>
         <label class="file-toggle">
           <input id="fileAutosaveToggle" type="checkbox" />
           <span>Autosave</span>
