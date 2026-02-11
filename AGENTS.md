@@ -1,6 +1,6 @@
 # AGENTS.md
 
-**IMPORTANT**: before you do anything else, run the `beans prime` command and heed its output.
+**IMPORTANT**: before you do anything else, run the `/home/linuxbrew/.linuxbrew/bin/beans prime` command and heed its output.
 
 
 ## Overview

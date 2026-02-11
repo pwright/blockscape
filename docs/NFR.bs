@@ -2,7 +2,6 @@
   "id": "NFR",
   "title": "Non Functional Requirements",
   "abstract": "This blockscape visualizes a comprehensive collection of *ility words - non functionality requirement (NFR) attributes ending in '-ility' - organized into categories and showing their relationships.<br>These *ility words represent various aspects of software quality, system behavior, and architectural characteristics. Each word is categorized by theme (Performance, Security, Maintainability, etc.) and connected to other *ility words through dependency relationships.<br>The visualization helps understand how different quality attributes influence and enable each other, creating a network of interconnected *ility concepts.<br>You can view alternative requirements standards by loading from this URL.<br>https://gist.githubusercontent.com/pwright/281441c9c07eabe9ef0cd43a27e766de/raw/030d6dd59c2c1e7dbff3b7f565acb24f3cc32c78/requirements.bs",
-
   "categories": [
     {
       "id": "quality",
@@ -16,27 +15,40 @@
         {
           "id": "credibility",
           "name": "Credibility",
-          "deps": ["correctness"]
+          "deps": [
+            "correctness"
+          ]
         },
         {
           "id": "reliability",
           "name": "Reliability",
-          "deps": ["availability", "recoverability"]
+          "deps": [
+            "availability",
+            "recoverability"
+          ]
         },
         {
           "id": "dependability",
           "name": "Dependability",
-          "deps": ["reliability", "robustness"]
+          "deps": [
+            "reliability",
+            "robustness"
+          ]
         },
         {
           "id": "stability",
           "name": "Stability",
-          "deps": ["robustness"]
+          "deps": [
+            "robustness"
+          ]
         },
         {
           "id": "sustainability",
           "name": "Sustainability",
-          "deps": ["maintainability", "efficiency"]
+          "deps": [
+            "maintainability",
+            "efficiency"
+          ]
         }
       ]
     },
@@ -52,27 +64,38 @@
         {
           "id": "performance",
           "name": "Effectiveness",
-          "deps": ["efficiency"]
+          "deps": [
+            "efficiency"
+          ]
         },
         {
           "id": "scalability",
           "name": "Scalability",
-          "deps": ["efficiency"]
+          "deps": [
+            "efficiency"
+          ]
         },
         {
           "id": "responsiveness",
           "name": "Responsiveness",
-          "deps": ["efficiency"]
+          "deps": [
+            "efficiency"
+          ]
         },
         {
           "id": "timeliness",
           "name": "Timeliness",
-          "deps": ["responsiveness"]
+          "deps": [
+            "responsiveness"
+          ]
         },
         {
           "id": "predictability",
           "name": "Predictability",
-          "deps": ["efficiency", "timeliness"]
+          "deps": [
+            "efficiency",
+            "timeliness"
+          ]
         }
       ]
     },
@@ -88,12 +111,17 @@
         {
           "id": "safety",
           "name": "Safety",
-          "deps": ["security"]
+          "deps": [
+            "security"
+          ]
         },
         {
           "id": "accountability",
           "name": "Accountability",
-          "deps": ["security", "auditability"]
+          "deps": [
+            "security",
+            "auditability"
+          ]
         },
         {
           "id": "auditability",
@@ -103,12 +131,16 @@
         {
           "id": "traceability",
           "name": "Traceability",
-          "deps": ["auditability"]
+          "deps": [
+            "auditability"
+          ]
         },
         {
           "id": "integrity",
           "name": "Integrity",
-          "deps": ["security"]
+          "deps": [
+            "security"
+          ]
         }
       ]
     },
@@ -124,37 +156,52 @@
         {
           "id": "modifiability",
           "name": "Modifiability",
-          "deps": ["maintainability"]
+          "deps": [
+            "maintainability"
+          ]
         },
         {
           "id": "extensibility",
           "name": "Extensibility",
-          "deps": ["modifiability"]
+          "deps": [
+            "modifiability"
+          ]
         },
         {
           "id": "evolvability",
           "name": "Evolvability",
-          "deps": ["modifiability", "extensibility"]
+          "deps": [
+            "modifiability",
+            "extensibility"
+          ]
         },
         {
           "id": "customizability",
           "name": "Customizability",
-          "deps": ["modifiability"]
+          "deps": [
+            "modifiability"
+          ]
         },
         {
           "id": "configurability",
           "name": "Configurability",
-          "deps": ["customizability"]
+          "deps": [
+            "customizability"
+          ]
         },
         {
           "id": "modularity",
           "name": "Modularity",
-          "deps": ["configurability"]
+          "deps": [
+            "configurability"
+          ]
         },
         {
           "id": "tailorability",
           "name": "Tailorability",
-          "deps": ["customizability"]
+          "deps": [
+            "customizability"
+          ]
         }
       ]
     },
@@ -165,7 +212,10 @@
         {
           "id": "usability",
           "name": "Usability",
-          "deps": ["learnability", "understandability"]
+          "deps": [
+            "learnability",
+            "understandability"
+          ]
         },
         {
           "id": "learnability",
@@ -180,17 +230,23 @@
         {
           "id": "accessibility",
           "name": "Accessibility",
-          "deps": ["usability"]
+          "deps": [
+            "usability"
+          ]
         },
         {
           "id": "simplicity",
           "name": "Simplicity",
-          "deps": ["understandability"]
+          "deps": [
+            "understandability"
+          ]
         },
         {
           "id": "operability",
           "name": "Operability",
-          "deps": ["usability"]
+          "deps": [
+            "usability"
+          ]
         }
       ]
     },
@@ -206,17 +262,23 @@
         {
           "id": "deployability",
           "name": "Deployability",
-          "deps": ["installability"]
+          "deps": [
+            "installability"
+          ]
         },
         {
           "id": "distributability",
           "name": "Distributability",
-          "deps": ["deployability"]
+          "deps": [
+            "deployability"
+          ]
         },
         {
           "id": "compatibility",
           "name": "Compatibility",
-          "deps": ["interoperability"]
+          "deps": [
+            "interoperability"
+          ]
         },
         {
           "id": "interoperability",
@@ -226,12 +288,16 @@
         {
           "id": "mobility",
           "name": "Mobility",
-          "deps": ["portability"]
+          "deps": [
+            "portability"
+          ]
         },
         {
           "id": "nomadicity",
           "name": "Nomadicity",
-          "deps": ["mobility"]
+          "deps": [
+            "mobility"
+          ]
         }
       ]
     },
@@ -247,27 +313,38 @@
         {
           "id": "recoverability",
           "name": "Recoverability",
-          "deps": ["availability"]
+          "deps": [
+            "availability"
+          ]
         },
         {
           "id": "robustness",
           "name": "Robustness",
-          "deps": ["reliability"]
+          "deps": [
+            "reliability"
+          ]
         },
         {
           "id": "durability",
           "name": "Durability",
-          "deps": ["reliability"]
+          "deps": [
+            "reliability"
+          ]
         },
         {
           "id": "survivability",
           "name": "Survivability",
-          "deps": ["recoverability"]
+          "deps": [
+            "recoverability"
+          ]
         },
         {
           "id": "fault_tolerance",
           "name": "Resilience (Implied)",
-          "deps": ["robustness", "recoverability"]
+          "deps": [
+            "robustness",
+            "recoverability"
+          ]
         }
       ]
     },
@@ -283,27 +360,38 @@
         {
           "id": "debuggability",
           "name": "Debugability",
-          "deps": ["testability"]
+          "deps": [
+            "testability"
+          ]
         },
         {
           "id": "demonstrability",
           "name": "Demonstrability",
-          "deps": ["testability"]
+          "deps": [
+            "testability"
+          ]
         },
         {
           "id": "reproducibility",
           "name": "Reproducability",
-          "deps": ["testability"]
+          "deps": [
+            "testability"
+          ]
         },
         {
           "id": "repeatability",
           "name": "Repeatability",
-          "deps": ["testability"]
+          "deps": [
+            "testability"
+          ]
         },
         {
           "id": "verifiability",
           "name": "Audit/Compliance (Implied)",
-          "deps": ["traceability", "testability"]
+          "deps": [
+            "traceability",
+            "testability"
+          ]
         }
       ]
     },
@@ -319,22 +407,30 @@
         {
           "id": "flexibility",
           "name": "Flexibility",
-          "deps": ["adaptability"]
+          "deps": [
+            "adaptability"
+          ]
         },
         {
           "id": "extensibility_alt",
           "name": "Extensibility",
-          "deps": ["flexibility"]
+          "deps": [
+            "flexibility"
+          ]
         },
         {
           "id": "evolvability_alt",
           "name": "Evolvability",
-          "deps": ["extensibility_alt"]
+          "deps": [
+            "extensibility_alt"
+          ]
         },
         {
           "id": "scalability_alt",
           "name": "Scalability",
-          "deps": ["extensibility_alt"]
+          "deps": [
+            "extensibility_alt"
+          ]
         }
       ]
     }

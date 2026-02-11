@@ -1,4 +1,5 @@
 import { tokens } from "./generated/tokens";
+import { openExternalUrl } from "./externalLinks";
 
 export function createTileContextMenu({
   menuEl,
@@ -197,14 +198,14 @@ export function createTileContextMenu({
       actions.push({
         label: "Open link ↗",
         title: meta.externalUrl,
-        onClick: () => window.open(meta.externalUrl, "_blank", "noopener"),
+        onClick: () => openExternalUrl(meta.externalUrl),
       });
     }
     if (meta.obsidianUrl) {
       actions.push({
         label: "Open in Obsidian",
         title: meta.obsidianUrl,
-        onClick: () => window.open(meta.obsidianUrl, "_blank", "noopener"),
+        onClick: () => openExternalUrl(meta.obsidianUrl),
       });
     }
     setPreviewActions(actions);

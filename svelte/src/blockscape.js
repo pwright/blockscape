@@ -13,6 +13,7 @@ import {
   downloadJson,
   tokens,
 } from "./settings";
+import { isExternalHref, openExternalUrl, resolveHref } from "./externalLinks";
 
 const ASSET_BASE =
   (typeof import.meta !== "undefined" && import.meta.env?.BASE_URL) || "";
@@ -888,6 +889,32 @@ export function initBlockscape(featureOverrides = {}) {
     }
   }
 
+  function notifyLocalSavePath(path, { origin } = {}) {
+    if (typeof window === "undefined" || !path) return;
+    try {
+      window.dispatchEvent(
+        new CustomEvent("blockscape:local-save-path", {
+          detail: { path, origin },
+        })
+      );
+    } catch (err) {
+      console.warn("[Blockscape] failed to notify local save path", err);
+    }
+  }
+
+  function notifyLocalSaveClear({ origin } = {}) {
+    if (typeof window === "undefined") return;
+    try {
+      window.dispatchEvent(
+        new CustomEvent("blockscape:local-save-clear", {
+          detail: { origin },
+        })
+      );
+    } catch (err) {
+      console.warn("[Blockscape] failed to notify local save clear", err);
+    }
+  }
+
   function extractServerFilePathFromUrl() {
     if (typeof window === "undefined" || !window.location) return null;
     const url = new URL(window.location.href);
@@ -922,9 +949,40 @@ export function initBlockscape(featureOverrides = {}) {
     return { path: normalized, modelId: modelId || null, itemId: itemId || null };
   }
 
+  function clearServerPathFromUrl() {
+    if (typeof window === "undefined" || !window.location) return;
+    try {
+      const url = new URL(window.location.href);
+      const normalizedPath = url.pathname.replace(/\/+$/, "");
+      const segments = normalizedPath.split("/").filter(Boolean);
+      const serverIndex = segments.findIndex(
+        (segment) => segment.toLowerCase() === "server"
+      );
+      if (serverIndex === -1) return;
+      const baseSegments = segments.slice(0, serverIndex);
+      const cleanedSearch = new URLSearchParams(url.search);
+      cleanedSearch.delete("load");
+      cleanedSearch.delete("share");
+      const basePath = baseSegments.length
+        ? `/${baseSegments.join("/")}`
+        : "/";
+      url.pathname = basePath.replace(/\/+/g, "/");
+      url.search = cleanedSearch.toString()
+        ? `?${cleanedSearch.toString()}`
+        : "";
+      url.hash = "";
+      window.history.replaceState({}, document.title, url.toString());
+    } catch (err) {
+      console.warn("[Blockscape] failed to clear server path from URL", err);
+    }
+  }
+
   function updateServerUrlFromActive({ itemId } = {}) {
     const active = models[activeIndex];
-    if (!active?.sourcePath) return;
+    if (!active?.sourcePath) {
+      clearServerPathFromUrl();
+      return;
+    }
     updateUrlForServerPath(active.sourcePath, {
       modelId: getModelId(active),
       itemId: itemId === undefined ? selection : itemId,
@@ -1155,8 +1213,13 @@ export function initBlockscape(featureOverrides = {}) {
     function updateActiveSavePlaceholder() {
       if (!localSavePathInput) return;
       localSavePathInput.placeholder = defaultSaveName();
-      if (models[activeIndex]?.sourcePath) {
-        localSavePathInput.value = models[activeIndex].sourcePath;
+      const sourcePath = models[activeIndex]?.sourcePath;
+      if (sourcePath) {
+        localSavePathInput.value = sourcePath;
+        return;
+      }
+      if (localSavePathInput.value) {
+        localSavePathInput.value = "";
       }
     }
 
@@ -1212,7 +1275,17 @@ export function initBlockscape(featureOverrides = {}) {
     }
 
     function highlightSourcePath(path) {
-      if (!available || !localFileList || !path) return;
+      if (!available || !localFileList) return;
+      if (!path) {
+        lastKnownPath = "";
+        Array.from(localFileList.options).forEach((opt) => {
+          opt.selected = false;
+        });
+        if (localSavePathInput) {
+          localSavePathInput.value = "";
+        }
+        return;
+      }
       const match = files.find((f) => f.path === path);
       if (!match) return;
       const dir = dirOfPath(path);
@@ -2401,6 +2474,26 @@ export function initBlockscape(featureOverrides = {}) {
     });
   }
 
+  const exportSettingsPayload = () => ({
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    settings: buildSettingsSnapshot(getCurrentSettingsState(), {
+      localBackend,
+    }),
+  });
+
+  const applySettingsPayload = (payload) => {
+    const snapshot = normalizeSettingsPayload(payload);
+    return applyImportedSettings(snapshot || {});
+  };
+
+  if (typeof window !== "undefined") {
+    window.__blockscapeSettingsBridge = {
+      exportPayload: exportSettingsPayload,
+      applyPayload: applySettingsPayload,
+    };
+  }
+
   function persistSeriesNavDoubleClickWait(value) {
     if (typeof window === "undefined" || !window.localStorage) return;
     try {
@@ -3413,6 +3506,7 @@ export function initBlockscape(featureOverrides = {}) {
     const entry = createBlankSeriesEntry();
     const idx = addModelEntry(entry, { versionLabel: "blank" });
     setActive(idx);
+    notifyLocalSaveClear({ origin: "new-blank" });
     closeNewPanel();
     showNotice("Blank series created. Add categories and tiles to start.", 2600);
     return idx;
@@ -4361,7 +4455,10 @@ export function initBlockscape(featureOverrides = {}) {
   // Accept 1) object, 2) array-of-objects, 3) '---' or '%%%' separated objects
   function normalizeToModelsFromText(txt, titleBase = "Pasted", options = {}) {
     const defenced = unwrapMarkdownCodeBlock(typeof txt === "string" ? txt : "");
-    const trimmed = (defenced || "").trim();
+    const cleaned = (defenced || "")
+      .replace(/^\uFEFF/, "")
+      .replace(/\u0000/g, "");
+    const trimmed = cleaned.trim();
     if (!trimmed) return [];
     const parsed = tryParseJson(trimmed);
     if (parsed) {
@@ -5543,16 +5640,27 @@ export function initBlockscape(featureOverrides = {}) {
     saveSettingsBtn.type = "button";
     saveSettingsBtn.className = "pf-v5-c-button pf-m-tertiary";
     saveSettingsBtn.textContent = "Download settings";
-    saveSettingsBtn.addEventListener("click", () => {
-      const payload = {
-        version: 1,
-        exportedAt: new Date().toISOString(),
-        settings: buildSettingsSnapshot(getCurrentSettingsState(), {
-          localBackend,
-        }),
-      };
-      download("settings.json", JSON.stringify(payload, null, 2));
-      showNotice("Settings downloaded.", 2000);
+    saveSettingsBtn.addEventListener("click", async () => {
+      const payload = exportSettingsPayload();
+      if (
+        typeof window !== "undefined" &&
+        typeof window.__blockscapeSettingsSaveToFile === "function"
+      ) {
+        try {
+          const didSave = await window.__blockscapeSettingsSaveToFile(payload);
+          if (didSave) {
+            showNotice("Settings saved to ~/.blockscape/settings.json.", 2000);
+          } else {
+            showNotice("Settings save failed. Check logs.", 2400);
+          }
+        } catch (error) {
+          console.warn("[Blockscape] settings save failed", error);
+          showNotice("Settings save failed. Check logs.", 2400);
+        }
+      } else {
+        download("settings.json", JSON.stringify(payload, null, 2));
+        showNotice("Settings downloaded.", 2000);
+      }
     });
 
     settingsActions.append(loadSettingsBtn, saveSettingsBtn, settingsFileInput);
@@ -7076,7 +7184,7 @@ export function initBlockscape(featureOverrides = {}) {
     button.textContent = "O";
     button.addEventListener("click", (event) => {
       event.stopPropagation();
-      window.open(url, "_blank", "noopener");
+      openExternalUrl(url);
     });
     button.addEventListener("keydown", (event) => event.stopPropagation());
     return button;
@@ -7091,7 +7199,7 @@ export function initBlockscape(featureOverrides = {}) {
     button.textContent = "↗";
     button.addEventListener("click", (event) => {
       event.stopPropagation();
-      window.open(url, "_blank", "noopener");
+      openExternalUrl(url);
     });
     button.addEventListener("keydown", (event) => event.stopPropagation());
     return button;
@@ -8510,6 +8618,7 @@ export function initBlockscape(featureOverrides = {}) {
 
     if (firstSavedPath) {
       updateUrlForServerPath(firstSavedPath);
+      notifyLocalSavePath(firstSavedPath, { origin });
     }
 
     await localBackend.refresh();
@@ -8581,6 +8690,18 @@ export function initBlockscape(featureOverrides = {}) {
     searchResults.hidden = true;
   });
 
+  document.addEventListener("click", (event) => {
+    const anchor = event.target?.closest?.("a[href]");
+    if (!anchor) return;
+    if (anchor.classList?.contains("blockscape-gist-link")) return;
+    if (anchor.hasAttribute("download")) return;
+    const href = anchor.getAttribute("href");
+    if (!isExternalHref(href)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    openExternalUrl(resolveHref(href));
+  });
+
   // Load from URL
   if (urlForm && urlInput && loadUrlButton) {
     urlForm.addEventListener("submit", async (e) => {
@@ -8635,7 +8756,7 @@ export function initBlockscape(featureOverrides = {}) {
 
   // Load JSON files from same directory (for static hosting)
   async function loadJsonFiles() {
-    const jsonFiles = ["comms.bs", "planets.bs", "styleguide.bs", "blockscape-features.bs"];
+    const jsonFiles = ["Kubernetes.bs", "planets.bs", "styleguide.bs", "blockscape-features.bs"];
     const joinPath = (name) => {
       if (!ASSET_BASE) return name;
       return ASSET_BASE.endsWith("/")

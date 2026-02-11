@@ -1,83 +1,83 @@
 [
-{
-"id": "index",
-"title": "Corporate Communications Evolution – Index (with Lifecycle Layers)",
-"abstract": "<p><strong>Metadata</strong>: title: Corporate communications evolution; source: [https://chatgpt.com/share/69346882-c334-8010-86a9-575b672ec59f](https://chatgpt.com/share/69346882-c334-8010-86a9-575b672ec59f); author: ChatGPT; created: 2025-12-06.</p><p>This index map lists the major periods in corporate communication, from courier and postal systems through telephony, proprietary email, internet email, enterprise instant messaging, Slack or Teams-style platforms, and the AI layer. Items are grouped into lifecycle layers from live topics down to historical technologies. Each item id matches the model id of a detailed period map.</p>",
-"categories": [
-{
-"id": "currently-working",
-"title": "Currently Working (Dominant Today)",
-"items": [
-{
-"id": "email",
-"name": "Internet Email",
-"deps": [
-"proprietary.email"
-]
-},
-{
-"id": "slack",
-"name": "Slack& Enterprise Social",
-"deps": [
-"im"
-]
-},
-{
-"id": "ai-layer",
-"name": "AI-layered",
-"deps": [
-"slack"
-]
-}
-]
-},
-{
-"id": "mature-but-fading",
-"title": "Mature but Fading (Still Used, Declining)",
-"items": [
-{
-"id": "im",
-"name": "Enterprise IM",
-"deps": [
-"email"
-]
-},
-{
-"id": "telephony.fax",
-"name": "Telephony & Fax",
-"deps": [
-"postal.courier"
-]
-}
-]
-},
-{
-"id": "likely-to-die",
-"title": "Likely to Die (Residual Use Only)",
-"items": [
-{
-"id": "proprietary.email",
-"name": "Proprietary Email",
-"deps": [
-"telephony.fax"
-]
-}
-]
-},
-{
-"id": "dead-historical",
-"title": "Dead / Historical",
-"items": [
-{
-"id": "postal.courier",
-"name": "Postal Era",
-"deps": []
-}
-]
-}
-]
-}
-,
+  {
+    "id": "index",
+    "title": "Corporate Communications Evolution – Index (with Lifecycle Layers)",
+    "abstract": "<p><strong>Metadata</strong>: title: Corporate communications evolution; source: [https://chatgpt.com/share/69346882-c334-8010-86a9-575b672ec59f](https://chatgpt.com/share/69346882-c334-8010-86a9-575b672ec59f); author: ChatGPT; created: 2025-12-06.</p><p>This index map lists the major periods in corporate communication, from courier and postal systems through telephony, proprietary email, internet email, enterprise instant messaging, Slack or Teams-style platforms, and the AI layer. Items are grouped into lifecycle layers from live topics down to historical technologies. Each item id matches the model id of a detailed period map.</p>",
+    "categories": [
+      {
+        "id": "currently-working",
+        "title": "Currently Working (Dominant Today)",
+        "items": [
+          {
+            "id": "email",
+            "name": "Internet Email",
+            "deps": [
+              "proprietary.email"
+            ]
+          },
+          {
+            "id": "slack",
+            "name": "Slack& Enterprise Social",
+            "deps": [
+              "im"
+            ]
+          },
+          {
+            "id": "ai-layer",
+            "name": "AI-layered",
+            "deps": [
+              "slack"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "mature-but-fading",
+        "title": "Mature but Fading (Still Used, Declining)",
+        "items": [
+          {
+            "id": "im",
+            "name": "Enterprise IM",
+            "deps": [
+              "email"
+            ]
+          },
+          {
+            "id": "telephony.fax",
+            "name": "Telephony & Fax",
+            "deps": [
+              "postal.courier"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "likely-to-die",
+        "title": "Likely to Die (Residual Use Only)",
+        "items": [
+          {
+            "id": "proprietary.email",
+            "name": "Proprietary Email",
+            "deps": [
+              "telephony.fax"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "dead-historical",
+        "title": "Dead / Historical",
+        "items": [
+          {
+            "id": "postal.courier",
+            "name": "Postal Era",
+            "deps": []
+          }
+        ]
+      }
+    ],
+    "seriesId": "comms"
+  },
   {
     "id": "postal.courier",
     "title": "Corporate Communications – Postal & Courier Era",
@@ -156,7 +156,8 @@
           }
         ]
       }
-    ]
+    ],
+    "seriesId": "comms"
   },
   {
     "id": "telephony.fax",
@@ -246,7 +247,8 @@
           }
         ]
       }
-    ]
+    ],
+    "seriesId": "comms"
   },
   {
     "id": "proprietary.email",
@@ -332,7 +334,8 @@
           }
         ]
       }
-    ]
+    ],
+    "seriesId": "comms"
   },
   {
     "id": "email",
@@ -413,7 +416,8 @@
           }
         ]
       }
-    ]
+    ],
+    "seriesId": "comms"
   },
   {
     "id": "im",
@@ -500,7 +504,8 @@
           }
         ]
       }
-    ]
+    ],
+    "seriesId": "comms"
   },
   {
     "id": "slack",
@@ -606,7 +611,8 @@
           }
         ]
       }
-    ]
+    ],
+    "seriesId": "comms"
   },
   {
     "id": "ai-layer",
@@ -701,6 +707,7 @@
           }
         ]
       }
-    ]
+    ],
+    "seriesId": "comms"
   }
 ]

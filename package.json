@@ -9,6 +9,8 @@
     "build:tokens": "node scripts/build-tokens.js",
     "build": "npm run build:tokens && npm run clean-docs && vite build && npm run export && npm run docs:build",
     "export": "npm run build:tokens && vite build --config vite.config.export.mjs && cp svelte/src/mount.js documentation/docs/site_assets/blockscape/mount.js",
+    "export:nj": "npm run build:tokens && vite build --config vite.config.export.nj.mjs && cp svelte/src/mount.js nj/resources/site_assets/blockscape/mount.js",
+    "build-app": "npm run export:nj && cd nj && neu build",
     "docs:build": "cd documentation && PYTHONPATH=. mkdocs build",
     "clean-docs": "node scripts/clean-docs.js",
     "preview": "vite preview",

@@ -8,3 +8,5 @@ blockscape-data/
 site/
 .site-test/
 #mkdocs-blockscape/
+**/.tmp/
+__pycache__/
