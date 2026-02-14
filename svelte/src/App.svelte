@@ -156,11 +156,13 @@
   $: showFooter = features.showFooter !== false;
 
   let headerExpanded = false;
-  let zoom = 1.0;
-  const ZOOM_STEP = 0.1;
-  const ZOOM_MIN = 0.2;
-  const ZOOM_MAX = 2.5;
-  $: zoomLabel = `${Math.round(zoom * 100)}%`;
+  const SIZE_PRESETS = [
+    { label: 'S', value: 0.9 },
+    { label: 'M', value: 1.0 },
+    { label: 'L', value: 1.15 }
+  ];
+  let sizeIndex = 1; // default 100%
+  $: zoomLabel = `${Math.round(SIZE_PRESETS[sizeIndex].value * 100)}%`;
 
   const toggleHeaderExpanded = () => {
     headerExpanded = !headerExpanded;
@@ -173,20 +175,24 @@
     }
   };
 
-  const clampZoom = (value) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, value));
-
   const applyZoom = () => {
-    document.body.style.zoom = String(zoom);
+    const scale = SIZE_PRESETS[sizeIndex].value;
+    document.documentElement.style.setProperty('--blockscape-scale', String(scale));
+    window.dispatchEvent(new CustomEvent('blockscape:zoom', { detail: { scale } }));
   };
 
-  const setZoom = (value) => {
-    zoom = clampZoom(value);
+  const zoomIn = () => {
+    sizeIndex = Math.min(SIZE_PRESETS.length - 1, sizeIndex + 1);
     applyZoom();
   };
-
-  const zoomIn = () => setZoom(zoom + ZOOM_STEP);
-  const zoomOut = () => setZoom(zoom - ZOOM_STEP);
-  const resetZoom = () => setZoom(1.0);
+  const zoomOut = () => {
+    sizeIndex = Math.max(0, sizeIndex - 1);
+    applyZoom();
+  };
+  const resetZoom = () => {
+    sizeIndex = 1;
+    applyZoom();
+  };
 
   onMount(() => {
     initBlockscape(features);

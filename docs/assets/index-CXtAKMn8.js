@@ -8777,6 +8777,7 @@ ${text2}` : text2;
     if (!globalEventsBound) {
       globalEventsBound = true;
       window.addEventListener("resize", scheduleOverlaySync);
+      window.addEventListener("blockscape:zoom", scheduleOverlaySync);
       window.addEventListener("scroll", scheduleOverlaySync, { passive: true });
       window.addEventListener("resize", scheduleThumbLabelMeasure);
       document.addEventListener("click", (event) => {
@@ -11977,9 +11978,6 @@ function create_fragment$1(ctx) {
     }
   };
 }
-const ZOOM_STEP = 0.1;
-const ZOOM_MIN = 0.2;
-const ZOOM_MAX = 2.5;
 function instance$1($$self, $$props, $$invalidate) {
   let showHeader;
   let showSidebar;
@@ -12132,7 +12130,12 @@ function instance$1($$self, $$props, $$invalidate) {
 }`;
   const seedText = seed ? JSON.stringify(seed, null, 2) : defaultSeedText;
   let headerExpanded = false;
-  let zoom = 1;
+  const SIZE_PRESETS = [
+    { label: "S", value: 0.9 },
+    { label: "M", value: 1 },
+    { label: "L", value: 1.15 }
+  ];
+  let sizeIndex = 1;
   const toggleHeaderExpanded = () => {
     $$invalidate(0, headerExpanded = !headerExpanded);
     if (!headerExpanded) {
@@ -12143,17 +12146,23 @@ function instance$1($$self, $$props, $$invalidate) {
       }
     }
   };
-  const clampZoom = (value) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, value));
   const applyZoom = () => {
-    document.body.style.zoom = String(zoom);
+    const scale = SIZE_PRESETS[sizeIndex].value;
+    document.documentElement.style.setProperty("--blockscape-scale", String(scale));
+    window.dispatchEvent(new CustomEvent("blockscape:zoom", { detail: { scale } }));
   };
-  const setZoom = (value) => {
-    $$invalidate(12, zoom = clampZoom(value));
+  const zoomIn = () => {
+    $$invalidate(12, sizeIndex = Math.min(SIZE_PRESETS.length - 1, sizeIndex + 1));
     applyZoom();
   };
-  const zoomIn = () => setZoom(zoom + ZOOM_STEP);
-  const zoomOut = () => setZoom(zoom - ZOOM_STEP);
-  const resetZoom = () => setZoom(1);
+  const zoomOut = () => {
+    $$invalidate(12, sizeIndex = Math.max(0, sizeIndex - 1));
+    applyZoom();
+  };
+  const resetZoom = () => {
+    $$invalidate(12, sizeIndex = 1);
+    applyZoom();
+  };
   onMount(() => {
     initBlockscape(features);
     applyZoom();
@@ -12194,9 +12203,9 @@ function instance$1($$self, $$props, $$invalidate) {
     2048) {
       $$invalidate(2, showFooter = features.showFooter !== false);
     }
-    if ($$self.$$.dirty & /*zoom*/
+    if ($$self.$$.dirty & /*sizeIndex*/
     4096) {
-      $$invalidate(1, zoomLabel = `${Math.round(zoom * 100)}%`);
+      $$invalidate(1, zoomLabel = `${Math.round(SIZE_PRESETS[sizeIndex].value * 100)}%`);
     }
   };
   return [
@@ -12212,7 +12221,7 @@ function instance$1($$self, $$props, $$invalidate) {
     resetZoom,
     seed,
     features,
-    zoom
+    sizeIndex
   ];
 }
 class App extends SvelteComponent {

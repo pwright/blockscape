@@ -6878,6 +6878,7 @@ export function initBlockscape(featureOverrides = {}) {
     if (!globalEventsBound) {
       globalEventsBound = true;
       window.addEventListener("resize", scheduleOverlaySync);
+      window.addEventListener("blockscape:zoom", scheduleOverlaySync);
       window.addEventListener("scroll", scheduleOverlaySync, { passive: true });
       window.addEventListener("resize", scheduleThumbLabelMeasure);
       document.addEventListener("click", (event) => {
