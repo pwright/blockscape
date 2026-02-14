@@ -2,6 +2,24 @@
 
 :root {
   color-scheme: light;
+  --blockscape-scale: 1;
+  --blockscape-tile-base: 6.5rem;
+  --blockscape-gap-base: var(--space-md);
+  --blockscape-logo-size-base: 40px;
+  --blockscape-tile-padding-top-base: var(--space-xs);
+  --blockscape-tile-padding-bottom-base: var(--space-sm);
+  --blockscape-tile-padding-x-base: var(--space-md);
+  --blockscape-tile-gap-inner-base: calc(var(--space-2xs) * 0.5);
+}
+
+:root {
+  --blockscape-tile: calc(var(--blockscape-tile-base) * var(--blockscape-scale));
+  --blockscape-gap: calc(var(--blockscape-gap-base) * var(--blockscape-scale));
+  --blockscape-logo-size: calc(var(--blockscape-logo-size-base) * var(--blockscape-scale));
+  --blockscape-tile-padding-top: calc(var(--blockscape-tile-padding-top-base) * var(--blockscape-scale));
+  --blockscape-tile-padding-bottom: calc(var(--blockscape-tile-padding-bottom-base) * var(--blockscape-scale));
+  --blockscape-tile-padding-x: calc(var(--blockscape-tile-padding-x-base) * var(--blockscape-scale));
+  --blockscape-tile-gap-inner: calc(var(--blockscape-tile-gap-inner-base) * var(--blockscape-scale));
 }
 
     *,

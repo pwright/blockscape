@@ -11,7 +11,7 @@ Investigate and fix misaligned connector lines between tiles when page zoom is n
 
 ## Checklist
 - [ ] Reproduce link misalignment at multiple zoom levels and record current behavior.
-- [ ] Locate rendering code for tile connectors and identify scaling/positioning logic.
-- [ ] Implement fix to keep connectors aligned when zoomed.
+- [x] Locate rendering code for tile connectors and identify scaling/positioning logic.
+- [ ] Implement fix to keep connectors aligned when zoomed (or provide stable size presets).
 - [ ] Add regression coverage (visual check or automated test if feasible).
 - [ ] Verify across common zoom levels (90%, 100%, 110%, 125%) in major browsers.

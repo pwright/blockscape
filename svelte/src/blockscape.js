@@ -85,6 +85,8 @@ export function initBlockscape(featureOverrides = {}) {
   const EDITOR_TRANSFER_MESSAGE_TYPE = "blockscape:editorTransfer";
   const SERVER_SIDEBAR_WIDE_STORAGE_KEY = "blockscape:serverSidebarWide";
   const defaultDocumentTitle = document.title;
+  let overlayWidth = 0;
+  let overlayHeight = 0;
 
   // Ensure local backend panel starts hidden; it will only unhide after a successful health check.
   if (localBackendPanel) localBackendPanel.hidden = true;
@@ -3992,12 +3994,34 @@ export function initBlockscape(featureOverrides = {}) {
     }
   }
 
+  function getOverlayViewportSize() {
+    if (window.visualViewport) {
+      return {
+        width: window.visualViewport.width,
+        height: window.visualViewport.height,
+      };
+    }
+    return { width: window.innerWidth, height: window.innerHeight };
+  }
+
+  function syncOverlaySize() {
+    if (!overlay) return;
+    const { width, height } = getOverlayViewportSize();
+    if (width === overlayWidth && height === overlayHeight) return;
+    overlayWidth = width;
+    overlayHeight = height;
+    overlay.setAttribute("width", width);
+    overlay.setAttribute("height", height);
+    overlay.setAttribute("viewBox", `0 0 ${width} ${height}`);
+  }
+
   let overlaySyncPending = false;
   function scheduleOverlaySync() {
     if (overlaySyncPending) return;
     overlaySyncPending = true;
     requestAnimationFrame(() => {
       overlaySyncPending = false;
+      syncOverlaySize();
       reflowRects();
       drawLinks();
     });
@@ -5261,8 +5285,7 @@ export function initBlockscape(featureOverrides = {}) {
       app.appendChild(versionNav);
     }
 
-    overlay.setAttribute("width", window.innerWidth);
-    overlay.setAttribute("height", window.innerHeight);
+    syncOverlaySize();
 
     const buildModelMeta = () => {
       const meta = document.createElement("div");
@@ -6877,9 +6900,24 @@ export function initBlockscape(featureOverrides = {}) {
 
     if (!globalEventsBound) {
       globalEventsBound = true;
+      const handleZoomEvent = () => {
+        scheduleOverlaySync();
+      };
       window.addEventListener("resize", scheduleOverlaySync);
+      window.addEventListener("blockscape:zoom", handleZoomEvent);
       window.addEventListener("scroll", scheduleOverlaySync, { passive: true });
       window.addEventListener("resize", scheduleThumbLabelMeasure);
+      if (window.visualViewport) {
+        window.visualViewport.addEventListener(
+          "resize",
+          scheduleOverlaySync
+        );
+        window.visualViewport.addEventListener(
+          "scroll",
+          scheduleOverlaySync,
+          { passive: true }
+        );
+      }
       document.addEventListener("click", (event) => {
         if (!selection && !selectedCategoryId) return;
         if (typeof event.button === "number" && event.button !== 0) return;
