@@ -17,6 +17,7 @@ export const STORAGE_KEYS = {
   seriesNavDoubleClickMs: "blockscape:seriesNavDoubleClickMs",
   centerItems: "blockscape:centerItems",
   linkThickness: "blockscape:linkThickness",
+  stripParentheticalNames: "blockscape:stripParentheticalNames",
 };
 
 export const DEFAULTS = {
@@ -50,6 +51,7 @@ export const DEFAULTS = {
   seriesNavDoubleClickMax: 4000,
   centerItems: false,
   linkThickness: "m",
+  stripParentheticalNames: true,
 };
 
 export const formatSettings = {
@@ -120,6 +122,7 @@ export function buildSettingsSnapshot(current, { localBackend } = {}) {
     depColor: current.depColor,
     revdepColor: current.revdepColor,
     linkThickness: current.linkThickness,
+    stripParentheticalNames: current.stripParentheticalNames,
   };
   if (autoReloadConfig) {
     snapshot.autoReloadEnabled = !!autoReloadConfig.enabled;
@@ -165,6 +168,8 @@ export function applySettingsSnapshot(snapshot = {}, ctx) {
     persistSeriesNavDoubleClickWait,
     applyCenterItems,
     persistCenterItems,
+    applyStripParentheticalNames,
+    persistStripParentheticalNames,
     localBackend,
     ui,
     refreshObsidianLinks,
@@ -313,6 +318,17 @@ export function applySettingsSnapshot(snapshot = {}, ctx) {
       if (ui?.linkThicknessInput) ui.linkThicknessInput.value = applied;
       appliedKeys.push("linkThickness");
     }
+  }
+
+  if (snapshot.stripParentheticalNames != null) {
+    const applied = applyStripParentheticalNames?.(
+      asBool(snapshot.stripParentheticalNames)
+    );
+    persistStripParentheticalNames?.(applied);
+    if (ui?.stripParentheticalToggle) {
+      ui.stripParentheticalToggle.checked = applied;
+    }
+    appliedKeys.push("stripParentheticalNames");
   }
 
   if (snapshot.depColor) {

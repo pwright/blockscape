@@ -2500,7 +2500,8 @@ function buildSettingsSnapshot(current, { localBackend } = {}) {
     colorPresets: current.colorPresets,
     depColor: current.depColor,
     revdepColor: current.revdepColor,
-    linkThickness: current.linkThickness
+    linkThickness: current.linkThickness,
+    stripParentheticalNames: current.stripParentheticalNames
   };
   if (autoReloadConfig) {
     snapshot.autoReloadEnabled = !!autoReloadConfig.enabled;
@@ -2546,6 +2547,8 @@ function applySettingsSnapshot(snapshot = {}, ctx) {
     persistSeriesNavDoubleClickWait,
     applyCenterItems,
     persistCenterItems,
+    applyStripParentheticalNames,
+    persistStripParentheticalNames,
     localBackend,
     ui,
     refreshObsidianLinks: refreshObsidianLinks2,
@@ -2675,6 +2678,16 @@ function applySettingsSnapshot(snapshot = {}, ctx) {
       if (ui == null ? void 0 : ui.linkThicknessInput) ui.linkThicknessInput.value = applied;
       appliedKeys.push("linkThickness");
     }
+  }
+  if (snapshot.stripParentheticalNames != null) {
+    const applied = applyStripParentheticalNames == null ? void 0 : applyStripParentheticalNames(
+      asBool(snapshot.stripParentheticalNames)
+    );
+    persistStripParentheticalNames == null ? void 0 : persistStripParentheticalNames(applied);
+    if (ui == null ? void 0 : ui.stripParentheticalToggle) {
+      ui.stripParentheticalToggle.checked = applied;
+    }
+    appliedKeys.push("stripParentheticalNames");
   }
   if (snapshot.depColor) {
     const applied = applyDepColor == null ? void 0 : applyDepColor(snapshot.depColor);
@@ -2929,6 +2942,8 @@ function initBlockscape(featureOverrides = {}) {
   const MAX_AUTO_RELOAD_INTERVAL_MS = 1e4;
   const AUTO_ID_FROM_NAME_STORAGE_KEY = "blockscape:autoIdFromName";
   const DEFAULT_AUTO_ID_FROM_NAME = true;
+  const STRIP_PARENTHESES_STORAGE_KEY = "blockscape:stripParentheticalNames";
+  const DEFAULT_STRIP_PARENTHESES = true;
   const COLOR_PRESETS_STORAGE_KEY = "blockscape:colorPresets";
   const CENTER_ITEMS_STORAGE_KEY = "blockscape:centerItems";
   const THEME_STORAGE_KEY = "blockscape:theme";
@@ -2960,6 +2975,7 @@ function initBlockscape(featureOverrides = {}) {
   let obsidianLinkMode = DEFAULT_OBSIDIAN_LINK_MODE;
   let obsidianVaultName = "";
   let autoIdFromNameEnabled = DEFAULT_AUTO_ID_FROM_NAME;
+  let stripParentheticalNames = DEFAULT_STRIP_PARENTHESES;
   let theme = THEME_LIGHT;
   let colorPresets = [];
   let centerItems = DEFAULT_CENTER_ITEMS;
@@ -3004,7 +3020,8 @@ function initBlockscape(featureOverrides = {}) {
     colorPresetList: null,
     depColorInput: null,
     revdepColorInput: null,
-    linkThicknessInput: null
+    linkThicknessInput: null,
+    stripParentheticalToggle: null
   };
   const disabledLocalBackend = {
     detect: async () => false,
@@ -3045,6 +3062,7 @@ function initBlockscape(featureOverrides = {}) {
   initializeObsidianVaultName();
   initializeSelectionDimEnabled();
   initializeAutoIdFromNameEnabled();
+  initializeStripParentheticalNames();
   initializeCenterItems();
   syncSelectionClass();
   function uid() {
@@ -4895,6 +4913,7 @@ function initBlockscape(featureOverrides = {}) {
       autoIdFromNameEnabled,
       seriesNavDoubleClickWaitMs,
       showSecondaryLinks,
+      stripParentheticalNames,
       centerItems,
       showReusedInMap,
       theme,
@@ -4947,6 +4966,8 @@ function initBlockscape(featureOverrides = {}) {
       persistRevdepColor,
       applyLinkThickness,
       persistLinkThickness,
+      applyStripParentheticalNames,
+      persistStripParentheticalNames,
       applyTheme,
       setColorPresets,
       applyCenterItems,
@@ -5038,6 +5059,68 @@ function initBlockscape(featureOverrides = {}) {
   function applyObsidianLinksEnabled(enabled) {
     obsidianLinksEnabled = !!enabled;
     return obsidianLinksEnabled;
+  }
+  function stripTrailingParenthetical(text2) {
+    const raw = (text2 ?? "").toString();
+    const stripped = raw.replace(/\s*\([^)]*\)\s*$/, "").trim();
+    return stripped || raw.trim();
+  }
+  function getDisplayName(target2) {
+    const raw = (target2 && typeof target2 === "object" ? target2.name || target2.id : target2) || "";
+    return stripParentheticalNames ? stripTrailingParenthetical(raw) : raw;
+  }
+  function refreshDisplayNames() {
+    if (!app) return;
+    app.querySelectorAll(".tile .name").forEach((el) => {
+      var _a;
+      const tile = el.closest(".tile");
+      const id = (_a = tile == null ? void 0 : tile.dataset) == null ? void 0 : _a.id;
+      const match = id ? findItemAndCategoryById(id) : null;
+      const display = (match == null ? void 0 : match.item) ? getDisplayName(match.item) : getDisplayName(id);
+      el.textContent = display;
+    });
+    if (searchInput) {
+      handleSearchInput(searchInput.value || "");
+    }
+    if (selection) {
+      const match = findItemAndCategoryById(selection);
+      if ((match == null ? void 0 : match.item) && previewTitle) {
+        previewTitle.textContent = getDisplayName(match.item);
+      }
+    }
+  }
+  function applyStripParentheticalNames(enabled) {
+    stripParentheticalNames = !!enabled;
+    refreshDisplayNames();
+    return stripParentheticalNames;
+  }
+  function persistStripParentheticalNames(enabled) {
+    if (typeof window === "undefined" || !window.localStorage) return;
+    try {
+      window.localStorage.setItem(
+        STRIP_PARENTHESES_STORAGE_KEY,
+        enabled ? "1" : "0"
+      );
+    } catch (error) {
+      console.warn("[Blockscape] failed to persist strip parentheses", error);
+    }
+  }
+  function initializeStripParentheticalNames() {
+    if (typeof window === "undefined" || !window.localStorage) {
+      return applyStripParentheticalNames(DEFAULT_STRIP_PARENTHESES);
+    }
+    try {
+      const raw = window.localStorage.getItem(STRIP_PARENTHESES_STORAGE_KEY);
+      if (raw == null) {
+        return applyStripParentheticalNames(DEFAULT_STRIP_PARENTHESES);
+      }
+      const applied = applyStripParentheticalNames(raw === "1" || raw === "true");
+      persistStripParentheticalNames(applied);
+      return applied;
+    } catch (error) {
+      console.warn("[Blockscape] failed to read strip parentheses", error);
+      return applyStripParentheticalNames(DEFAULT_STRIP_PARENTHESES);
+    }
   }
   function persistObsidianLinksEnabled(enabled) {
     if (typeof window === "undefined" || !window.localStorage) return;
@@ -6282,6 +6365,7 @@ function initBlockscape(featureOverrides = {}) {
       categories.forEach((cat) => {
         const catTitle = (cat.title || cat.id || "").toString();
         (cat.items || []).forEach((it) => {
+          const displayName = getDisplayName(it);
           const name = (it.name || it.id || "").toString();
           const haystack = `${name} ${it.id || ""} ${catTitle}`.toLowerCase();
           if (terms.every((t) => haystack.includes(t))) {
@@ -6292,6 +6376,7 @@ function initBlockscape(featureOverrides = {}) {
               modelId,
               itemId: it.id,
               itemName: name,
+              itemDisplayName: displayName,
               categoryTitle: catTitle
             });
           }
@@ -6338,7 +6423,7 @@ function initBlockscape(featureOverrides = {}) {
       const primary = document.createElement("div");
       primary.className = "search-result__primary";
       const title = document.createElement("span");
-      title.textContent = match.type === "model" ? match.modelTitle : match.itemName || match.itemId || "Item";
+      title.textContent = match.type === "model" ? match.modelTitle : match.itemDisplayName || match.itemName || match.itemId || "Item";
       primary.appendChild(title);
       const badge = document.createElement("span");
       badge.className = "search-result__badge";
@@ -8077,6 +8162,19 @@ ${text2}` : text2;
     );
     settingsPanel.appendChild(obsidianModeRow);
     settingsUi.obsidianModeInputs = obsidianModeInputs;
+    const { row: stripParenRow, input: stripParenInput } = createSettingsToggle({
+      id: "toggleStripParentheses",
+      label: "Hide parentheses in names",
+      hint: "Display item names without trailing text in parentheses.",
+      checked: stripParentheticalNames,
+      className: "map-controls__toggle",
+      onChange: (checked) => {
+        const applied = applyStripParentheticalNames(checked);
+        persistStripParentheticalNames(applied);
+      }
+    });
+    settingsPanel.appendChild(stripParenRow);
+    settingsUi.stripParentheticalToggle = stripParenInput;
     const obsidianVaultRow = document.createElement("label");
     obsidianVaultRow.className = "settings-text";
     obsidianVaultRow.setAttribute("for", "obsidianVaultInput");
@@ -8528,7 +8626,7 @@ ${text2}` : text2;
         }
         const nm = document.createElement("div");
         nm.className = "name";
-        nm.textContent = it.name || it.id;
+        nm.textContent = getDisplayName(it);
         const idLine = document.createElement("div");
         idLine.className = "tile-id";
         idLine.textContent = it.id || "";
