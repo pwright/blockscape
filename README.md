@@ -137,6 +137,10 @@ The skeptic who values architecture diagrams gains something extra:
 - **Orange badge**: Reused components (used by multiple other components)
 - **Dashed border + ↗ icon**: External reference link available
 
+## Display Settings
+
+- **Hide parentheses in names (default ON):** Item tiles and search results drop any trailing “( … )” from names so labels stay concise. Toggle it in **Settings → Hide parentheses in names**; it persists locally and never alters the underlying JSON.
+
 ## Built-in Templates
 
 The application includes two example templates:
