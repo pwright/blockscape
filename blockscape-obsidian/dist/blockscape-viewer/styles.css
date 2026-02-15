@@ -1,0 +1,71 @@
+@import url("./assets/blockscape.css");
+
+/* Obsidian-specific layout tightening */
+.blockscape-root.blockscape-obsidian {
+  position: relative;
+  width: min(1180px, calc(100vw - 24px));
+  margin: 0 auto var(--space-lg, 1.5rem);
+  --blockscape-logo-offset: -18px;
+  --blockscape-name-offset: 12px;
+  --blockscape-tile-padding-top: 28px;
+}
+
+.blockscape-content,
+.blockscape-main,
+.blockscape-view {
+  width: 100%;
+  margin: 0 auto;
+}
+
+/* hide chrome that is redundant in Obsidian */
+.blockscape-toolbar,
+.blockscape-sidebar,
+.blockscape-masthead,
+.blockscape-footer,
+.blockscape-legend,
+.blockscape-map-controls,
+.blockscape-toolbar__github {
+  display: none !important;
+}
+
+/* series navigation cards wrap nicely */
+.series-nav,
+.series-nav-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  width: 100%;
+}
+.series-nav-card {
+  min-width: 200px;
+  flex: 0 0 auto;
+}
+
+/* tile text and badge alignment */
+.tile .logo {
+  transform: translateY(var(--blockscape-logo-offset));
+}
+.tile .name {
+  margin-top: var(--blockscape-name-offset);
+  padding-top: 0;
+  text-align: center;
+}
+.tile .tile-delete,
+.tile .external-link,
+.tile .obsidian-link {
+  top: calc(var(--space-sm));
+}
+
+/* overlay alignment */
+.svg-layer {
+  position: absolute;
+  top: 0;
+  left: calc(-1 * var(--blockscape-view-offset, 0px));
+  width: 100vw;
+  height: 100%;
+  pointer-events: none;
+}
+
+.blockscape-root.blockscape-obsidian .blockscape-grid {
+  margin: 0 auto;
+}
