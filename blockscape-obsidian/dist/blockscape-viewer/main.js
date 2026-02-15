@@ -95,18 +95,28 @@ class BlockscapeViewerPlugin extends Plugin {
     // force dark palette to match Obsidian dark theme
     document.documentElement.setAttribute('data-theme', 'dark');
 
-    const updateOverlayOffset = () => {
+    // Reposition overlay to align lines with tiles inside the centered container.
+    const repositionOverlay = () => {
       const layer = root.querySelector('.svg-layer') || document.querySelector('.svg-layer');
       if (!layer) return;
       const rect = root.getBoundingClientRect();
-      const scrollX = (root.closest('.markdown-preview-view')?.scrollLeft || 0) + (window.scrollX || 0);
-      const offset = rect.left + scrollX;
-      layer.style.setProperty('--blockscape-view-offset', `${offset}px`);
+      const scrollX =
+        (root.closest('.markdown-preview-view')?.scrollLeft || 0) + (window.scrollX || 0);
+      const scrollY =
+        (root.closest('.markdown-preview-view')?.scrollTop || 0) + (window.scrollY || 0);
+      const offsetX = rect.left + scrollX;
+      const offsetY = rect.top + scrollY;
+      layer.style.position = 'absolute';
+      layer.style.left = '0px';
+      layer.style.top = '0px';
+      layer.style.width = `${root.clientWidth}px`;
+      layer.style.height = `${root.clientHeight}px`;
+      layer.style.transform = `translate(${-offsetX}px, ${-offsetY}px)`;
     };
 
-    updateOverlayOffset();
-    window.addEventListener('resize', updateOverlayOffset);
-    root.addEventListener('scroll', updateOverlayOffset);
+    repositionOverlay();
+    window.addEventListener('resize', repositionOverlay);
+    root.addEventListener('scroll', repositionOverlay);
   }
 }
 
