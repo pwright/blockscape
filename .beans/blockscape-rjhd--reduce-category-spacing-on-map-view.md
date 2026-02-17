@@ -9,6 +9,6 @@ updated_at: 2026-02-17T22:43:44Z
 
 Goal: reduce vertical spacing between category sections on Map view by ~50%.
 ## Checklist
-- [ ] Locate spacing styles controlling gap between category rows.
-- [ ] Adjust spacing to roughly half current size without breaking layout.
+- [x] Locate spacing styles controlling gap between category rows.
+- [x] Adjust spacing to roughly half current size without breaking layout.
 - [ ] Verify Map view visually in light/dark modes.
