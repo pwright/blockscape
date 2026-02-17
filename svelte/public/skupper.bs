@@ -73,7 +73,7 @@
     ]
   },
   {
-    "id": "skupper-virtual-network",
+    "id": "skupper-van",
     "title": "Skupper Virtual Application Network (VAN)",
     "abstract": "This landscape models a Skupper-enabled architecture where client and server TCP sessions are independently terminated by routers and bridged over a Virtual Application Network (VAN). Instead of sharing a single end-to-end TCP state, connections are proxied, encapsulated, and routed across clusters. This decouples failure domains, enables multi-cluster service exposure without load balancers, and provides resilient cross-network connectivity.",
     "categories": [
@@ -148,9 +148,9 @@
     ]
   },
   {
-    "id": "rhsi-amqp-tcp-data-plane",
-    "title": "RHSI Data Plane: TCP Payload over AMQP/TCP",
-    "abstract": "RHSI carries only application payloads across the fabric. Client and server TCP sessions terminate at edge routers (listener/connector). The payload stream is segmented, framed, and forwarded across a VAN transport (often AMQP over TCP/TLS). End-to-end TCP SDUs (sequence numbers, retransmits, congestion control) are not preserved across the fabric; each side has its own independent TCP state managed by the local router.",
+    "id": "sk-amqp-tcp-data-plane",
+    "title": "Skupper Data Plane: TCP Payload over AMQP/TCP",
+    "abstract": "Skupper carries only application payloads across the fabric. Client and server TCP sessions terminate at edge routers (listener/connector). The payload stream is segmented, framed, and forwarded across a VAN transport (often AMQP over TCP/TLS). End-to-end TCP SDUs (sequence numbers, retransmits, congestion control) are not preserved across the fabric; each side has its own independent TCP state managed by the local router.",
     "categories": [
       {
         "id": "app-sessions",
@@ -269,8 +269,8 @@
     ]
   },
   {
-    "id": "rhsi-routing-socket-gating",
-    "title": "RHSI Control Plane: Reachability, Socket Gating, and Propagation Lag",
+    "id": "sk-routing-socket-gating",
+    "title": "Skupper Control Plane: Reachability, Socket Gating, and Propagation Lag",
     "abstract": "Listener sockets are gated by backend reachability: a router exposes a listening socket only when at least one connector for the service is reachable in the VAN. When connectors disappear, the listener socket closes and new connects fail (often as no-route-to-host). Because routing information propagates asynchronously, there can be a short window where a listener still believes a connector exists; it may accept a TCP handshake and then immediately close the connection before any payload is exchanged.",
     "categories": [
       {
@@ -407,8 +407,8 @@
     ]
   },
   {
-    "id": "rhsi-lifecycle-failure-signaling",
-    "title": "RHSI Connection Lifecycle: Restarts, Path Loss, and RST/FIN Signaling",
+    "id": "sk-lifecycle-failure-signaling",
+    "title": "Skupper Connection Lifecycle: Restarts, Path Loss, and RST/FIN Signaling",
     "abstract": "Because TCP is proxied, routers own the responsibility of translating fabric events into TCP lifecycle signals. Router restarts or intermediary failures cause both client-side and server-side sessions to be terminated, typically via router-generated RST/FIN. Existing connections drop immediately; new connections depend on socket gating and the recovery/propagation timing. Client resilience depends on retries, keepalives, and application-level timeouts to handle fast-fail and accepted-then-closed states.",
     "categories": [
       {
