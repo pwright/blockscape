@@ -10525,7 +10525,7 @@ ${text2}` : text2;
     }
   }
   async function loadJsonFiles() {
-    const jsonFiles = ["Kubernetes.bs", "planets.bs", "styleguide.bs", "blockscape-features.bs"];
+    const jsonFiles = ["Kubernetes.bs", "skupper.bs", "planets.bs", "styleguide.bs", "blockscape-features.bs"];
     const joinPath = (name) => {
       if (!ASSET_BASE) return name;
       return ASSET_BASE.endsWith("/") ? `${ASSET_BASE}${name}` : `${ASSET_BASE}/${name}`;

@@ -8851,7 +8851,7 @@ export function initBlockscape(featureOverrides = {}) {
 
   // Load JSON files from same directory (for static hosting)
   async function loadJsonFiles() {
-    const jsonFiles = ["Kubernetes.bs", "planets.bs", "styleguide.bs", "blockscape-features.bs"];
+    const jsonFiles = ["Kubernetes.bs", "skupper.bs", "planets.bs", "styleguide.bs", "blockscape-features.bs"];
     const joinPath = (name) => {
       if (!ASSET_BASE) return name;
       return ASSET_BASE.endsWith("/")
