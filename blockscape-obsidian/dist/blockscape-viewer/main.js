@@ -3,8 +3,10 @@ const { Plugin, Notice, TFile } = require('obsidian');
 class BlockscapeViewerPlugin extends Plugin {
   async onload() {
     this.autosaveEnabled = this.loadAutosaveSetting();
+    this.headerPref = this.loadHeaderPreference();
     this.saveFingerprints = new Map();
     this.blurTimers = new Map();
+    this.settingsSnapshotPromise = this.loadData().catch(() => null);
     this.assetsPromise = this.ensureAssets();
     const render = async (source, el, ctx) => {
       await this.assetsPromise;
@@ -28,6 +30,45 @@ class BlockscapeViewerPlugin extends Plugin {
     try {
       localStorage.setItem('blockscape:autosaveEnabled', enabled ? '1' : '0');
     } catch (_) {}
+  }
+
+  loadHeaderPreference() {
+    try {
+      const raw = localStorage.getItem('blockscape:obsidianShowHeader');
+      if (raw === '1') return true;
+      if (raw === '0') return false;
+    } catch (_) {}
+    return false;
+  }
+
+  persistHeaderPreference(show) {
+    try {
+      localStorage.setItem('blockscape:obsidianShowHeader', show ? '1' : '0');
+    } catch (_) {}
+  }
+
+  async applySavedSettings() {
+    try {
+      const payload = await this.settingsSnapshotPromise;
+      if (!payload || !payload.settings) return;
+      const bridge = window.__blockscapeSettingsBridge;
+      if (bridge?.applyPayload) {
+        bridge.applyPayload(payload.settings);
+      }
+    } catch (err) {
+      console.warn('Blockscape: unable to apply saved settings', err);
+    }
+  }
+
+  async exportAndStoreSettings() {
+    try {
+      const bridge = window.__blockscapeSettingsBridge;
+      const payload = bridge?.exportPayload ? bridge.exportPayload() : null;
+      if (!payload) return;
+      await this.saveData({ settings: payload });
+    } catch (err) {
+      console.warn('Blockscape: unable to persist settings', err);
+    }
   }
 
   ensureAssets() {
@@ -84,6 +125,9 @@ class BlockscapeViewerPlugin extends Plugin {
     }
 
     const root = el.createDiv({ cls: 'blockscape-root blockscape-obsidian' });
+    if (Array.isArray(seed)) {
+      root.__blockscapeSeriesSeed = seed;
+    }
 
     const Blockscape = window.Blockscape?.default || window.Blockscape;
     if (!Blockscape) {
@@ -91,25 +135,35 @@ class BlockscapeViewerPlugin extends Plugin {
       return;
     }
 
+    const baseFeatures = {
+      localBackend: false,
+      fileOpen: false,
+      fileSave: false,
+      autoLoadFromDir: false,
+      showHeader: this.headerPref,
+      showSidebar: false,
+      showFooter: false,
+      showModelMeta: false,
+      seriesNavMinVersions: 2,
+    };
+
     const instance = new Blockscape({
       target: root,
       props: {
         seed,
-        features: {
-          localBackend: false,
-          fileOpen: false,
-          fileSave: false,
-          autoLoadFromDir: false,
-          showHeader: false,
-          showSidebar: false,
-          showFooter: false,
-          showModelMeta: false,
-          seriesNavMinVersions: 2,
-        },
+        features: baseFeatures,
       },
     });
 
-    this.injectSaveControls({ el, root, ctx, initialSource: source });
+    this.injectSaveControls({
+      el,
+      root,
+      ctx,
+      initialSource: source,
+      instance,
+      baseFeatures,
+    });
+    this.applySavedSettings();
 
     // force dark palette to match Obsidian dark theme
     document.documentElement.setAttribute('data-theme', 'dark');
@@ -119,18 +173,16 @@ class BlockscapeViewerPlugin extends Plugin {
       const layer = root.querySelector('.svg-layer') || document.querySelector('.svg-layer');
       if (!layer) return;
       const rect = root.getBoundingClientRect();
-      const scrollX =
-        (root.closest('.markdown-preview-view')?.scrollLeft || 0) + (window.scrollX || 0);
-      const scrollY =
-        (root.closest('.markdown-preview-view')?.scrollTop || 0) + (window.scrollY || 0);
-      const offsetX = rect.left + scrollX;
-      const offsetY = rect.top + scrollY;
       layer.style.position = 'absolute';
       layer.style.left = '0px';
       layer.style.top = '0px';
-      layer.style.width = `${root.clientWidth}px`;
-      layer.style.height = `${root.clientHeight}px`;
-      layer.style.transform = `translate(${-offsetX}px, ${-offsetY}px)`;
+      layer.style.width = `${rect.width}px`;
+      layer.style.height = `${rect.height}px`;
+      layer.style.transform = 'translate(0, 0)';
+      layer.style.pointerEvents = 'none';
+      layer.style.background = 'rgba(255,0,0,0.03)'; // debug overlay tint
+      layer.setAttribute('width', String(rect.width));
+      layer.setAttribute('height', String(rect.height));
     };
 
     repositionOverlay();
@@ -138,7 +190,7 @@ class BlockscapeViewerPlugin extends Plugin {
     root.addEventListener('scroll', repositionOverlay);
   }
 
-  injectSaveControls({ el, root, ctx, initialSource }) {
+  injectSaveControls({ el, root, ctx, initialSource, instance, baseFeatures }) {
     if (!ctx || typeof ctx.getSectionInfo !== 'function' || !ctx.sourcePath) return;
     const section = ctx.getSectionInfo(el);
     if (!section) return;
@@ -184,6 +236,30 @@ class BlockscapeViewerPlugin extends Plugin {
     autosaveLabel.appendChild(autosaveText);
     controls.appendChild(autosaveLabel);
 
+    const headerLabel = document.createElement('label');
+    headerLabel.style.display = 'flex';
+    headerLabel.style.alignItems = 'center';
+    headerLabel.style.gap = '4px';
+    headerLabel.style.fontSize = '0.9em';
+    const headerCheckbox = document.createElement('input');
+    headerCheckbox.type = 'checkbox';
+    headerCheckbox.checked = !!baseFeatures?.showHeader;
+    headerCheckbox.addEventListener('change', () => {
+      const next = !!headerCheckbox.checked;
+      this.headerPref = next;
+      this.persistHeaderPreference(next);
+      if (instance?.$set && baseFeatures) {
+        const updatedFeatures = { ...baseFeatures, showHeader: next };
+        baseFeatures.showHeader = next;
+        instance.$set({ features: updatedFeatures });
+      }
+    });
+    const headerText = document.createElement('span');
+    headerText.textContent = 'Show header';
+    headerLabel.appendChild(headerCheckbox);
+    headerLabel.appendChild(headerText);
+    controls.appendChild(headerLabel);
+
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'blockscape-save-button mod-cta';
@@ -217,6 +293,35 @@ class BlockscapeViewerPlugin extends Plugin {
     const start = Number.isInteger(section?.lineStart) ? section.lineStart : 'na';
     const end = Number.isInteger(section?.lineEnd) ? section.lineEnd : 'na';
     return `${ctx.sourcePath}#${start}-${end}`;
+  }
+
+  buildSavePayload({ root, parsed, raw }) {
+    const seriesSeed = root?.__blockscapeSeriesSeed;
+    if (Array.isArray(seriesSeed)) {
+      const next = JSON.parse(JSON.stringify(seriesSeed));
+      let replaced = false;
+      const parsedId = parsed && typeof parsed === 'object' ? parsed.id : undefined;
+      if (parsedId) {
+        for (let i = 0; i < next.length; i += 1) {
+          const candidate = next[i];
+          if (candidate && candidate.id === parsedId) {
+            next[i] = parsed;
+            replaced = true;
+            break;
+          }
+        }
+      }
+      if (!replaced && next.length) {
+        next[0] = parsed;
+      }
+      return next;
+    }
+    if (parsed !== undefined) return parsed;
+    try {
+      return JSON.parse(raw);
+    } catch (_) {
+      return raw;
+    }
   }
 
   async saveToNote({ ctx, section, root, statusEl, buttonEl, initialSource, saveKey, reason = 'manual', silent = false }) {
@@ -255,7 +360,9 @@ class BlockscapeViewerPlugin extends Plugin {
         throw new Error(`Invalid JSON: ${err.message}`);
       }
 
-      const pretty = JSON.stringify(parsed, null, 2);
+      const payload = this.buildSavePayload({ root, parsed, raw });
+      const pretty =
+        typeof payload === 'string' ? payload : JSON.stringify(payload, null, 2);
       const fenced = ['```blockscape', pretty, '```'].join('\n');
 
       const content = await this.app.vault.read(file);
@@ -285,6 +392,7 @@ class BlockscapeViewerPlugin extends Plugin {
 
       await this.app.vault.modify(file, updated);
       this.saveFingerprints.set(key, raw);
+      await this.exportAndStoreSettings();
       setStatus(reason === 'blur' ? 'Autosaved' : 'Saved');
       if (!silent) new Notice('Blockscape saved to note');
     } catch (err) {
