@@ -2549,6 +2549,8 @@ function applySettingsSnapshot(snapshot = {}, ctx) {
     persistCenterItems,
     applyStripParentheticalNames,
     persistStripParentheticalNames,
+    applyShowSeriesPanel,
+    persistShowSeriesPanel,
     localBackend,
     ui,
     refreshObsidianLinks: refreshObsidianLinks2,
@@ -2989,6 +2991,7 @@ function initBlockscape(featureOverrides = {}) {
   const MIN_SERIES_NAV_DOUBLE_CLICK_MS = 300;
   const MAX_SERIES_NAV_DOUBLE_CLICK_MS = 4e3;
   let seriesNavDoubleClickWaitMs = DEFAULT_SERIES_NAV_DOUBLE_CLICK_MS;
+  let showSeriesPanel = true;
   const settingsUi = {
     hoverScaleInput: null,
     hoverScaleValue: null,
@@ -3015,6 +3018,7 @@ function initBlockscape(featureOverrides = {}) {
     reusedToggle: null,
     themeToggle: null,
     tabThemeToggle: null,
+    tabSeriesPanelToggle: null,
     tabSecondaryLinksToggle: null,
     tabCenterToggle: null,
     colorPresetList: null,
@@ -3023,6 +3027,7 @@ function initBlockscape(featureOverrides = {}) {
     linkThicknessInput: null,
     stripParentheticalToggle: null
   };
+  let versionNavEl = null;
   const disabledLocalBackend = {
     detect: async () => false,
     refresh: async () => {
@@ -4897,6 +4902,17 @@ function initBlockscape(featureOverrides = {}) {
   }
   function setShowReusedInMap(next) {
     showReusedInMap = !!next;
+  }
+  function applyShowSeriesPanel(visible) {
+    showSeriesPanel = visible !== false;
+    if (versionNavEl) {
+      versionNavEl.hidden = !showSeriesPanel;
+      versionNavEl.style.display = showSeriesPanel ? "" : "none";
+    }
+    if (settingsUi.tabSeriesPanelToggle) {
+      settingsUi.tabSeriesPanelToggle.checked = showSeriesPanel;
+    }
+    return showSeriesPanel;
   }
   function getCurrentSettingsState() {
     return {
@@ -7361,10 +7377,14 @@ function initBlockscape(featureOverrides = {}) {
     index.clear();
     categoryIndex.clear();
     versionThumbLabels = [];
+    showSeriesPanel = true;
+    if (settingsUi.tabSeriesPanelToggle)
+      settingsUi.tabSeriesPanelToggle.checked = true;
     ensureVersionContainer(models[activeIndex], { versionLabel: "1" });
-    const versionNav = renderVersionNavigator(models[activeIndex]);
-    if (versionNav) {
-      app.appendChild(versionNav);
+    versionNavEl = renderVersionNavigator(models[activeIndex]);
+    if (versionNavEl) {
+      applyShowSeriesPanel(showSeriesPanel);
+      app.appendChild(versionNavEl);
     }
     overlay.setAttribute("width", window.innerWidth);
     overlay.setAttribute("height", window.innerHeight);
@@ -7720,6 +7740,14 @@ ${text2}` : text2;
     });
     tabActions.appendChild(tabThemeToggleRow);
     settingsUi.tabThemeToggle = tabThemeToggleInput;
+    const { row: tabSeriesPanelToggleRow, input: tabSeriesPanelToggleInput } = createTabToggle({
+      id: "tabToggleSeriesPanel",
+      label: "Series panel",
+      checked: showSeriesPanel,
+      onChange: (checked) => applyShowSeriesPanel(checked)
+    });
+    tabActions.appendChild(tabSeriesPanelToggleRow);
+    settingsUi.tabSeriesPanelToggle = tabSeriesPanelToggleInput;
     const { row: tabSecondaryToggleRow, input: tabSecondaryToggleInput } = createTabToggle({
       id: "tabToggleSecondaryLinks",
       label: "Show indirect links",

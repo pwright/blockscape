@@ -244,6 +244,7 @@ export function initBlockscape(featureOverrides = {}) {
   const MIN_SERIES_NAV_DOUBLE_CLICK_MS = 300;
   const MAX_SERIES_NAV_DOUBLE_CLICK_MS = 4000;
   let seriesNavDoubleClickWaitMs = DEFAULT_SERIES_NAV_DOUBLE_CLICK_MS;
+  let showSeriesPanel = true;
   const settingsUi = {
     hoverScaleInput: null,
     hoverScaleValue: null,
@@ -270,6 +271,7 @@ export function initBlockscape(featureOverrides = {}) {
     reusedToggle: null,
     themeToggle: null,
     tabThemeToggle: null,
+    tabSeriesPanelToggle: null,
     tabSecondaryLinksToggle: null,
     tabCenterToggle: null,
     colorPresetList: null,
@@ -278,6 +280,7 @@ export function initBlockscape(featureOverrides = {}) {
     linkThicknessInput: null,
     stripParentheticalToggle: null,
   };
+  let versionNavEl = null;
   const disabledLocalBackend = {
     detect: async () => false,
     refresh: async () => {},
@@ -2401,6 +2404,18 @@ export function initBlockscape(featureOverrides = {}) {
 
   function setShowReusedInMap(next) {
     showReusedInMap = !!next;
+  }
+
+  function applyShowSeriesPanel(visible) {
+    showSeriesPanel = visible !== false;
+    if (versionNavEl) {
+      versionNavEl.hidden = !showSeriesPanel;
+      versionNavEl.style.display = showSeriesPanel ? "" : "none";
+    }
+    if (settingsUi.tabSeriesPanelToggle) {
+      settingsUi.tabSeriesPanelToggle.checked = showSeriesPanel;
+    }
+    return showSeriesPanel;
   }
 
   function getCurrentSettingsState() {
@@ -5255,10 +5270,16 @@ export function initBlockscape(featureOverrides = {}) {
     categoryIndex.clear();
     versionThumbLabels = [];
 
+    // Reset series panel visibility on each render (no persistence).
+    showSeriesPanel = true;
+    if (settingsUi.tabSeriesPanelToggle)
+      settingsUi.tabSeriesPanelToggle.checked = true;
+
     ensureVersionContainer(models[activeIndex], { versionLabel: "1" });
-    const versionNav = renderVersionNavigator(models[activeIndex]);
-    if (versionNav) {
-      app.appendChild(versionNav);
+    versionNavEl = renderVersionNavigator(models[activeIndex]);
+    if (versionNavEl) {
+      applyShowSeriesPanel(showSeriesPanel);
+      app.appendChild(versionNavEl);
     }
 
     overlay.setAttribute("width", window.innerWidth);
@@ -5663,6 +5684,16 @@ export function initBlockscape(featureOverrides = {}) {
     });
     tabActions.appendChild(tabThemeToggleRow);
     settingsUi.tabThemeToggle = tabThemeToggleInput;
+
+    const { row: tabSeriesPanelToggleRow, input: tabSeriesPanelToggleInput } =
+      createTabToggle({
+        id: "tabToggleSeriesPanel",
+        label: "Series panel",
+        checked: showSeriesPanel,
+        onChange: (checked) => applyShowSeriesPanel(checked),
+      });
+    tabActions.appendChild(tabSeriesPanelToggleRow);
+    settingsUi.tabSeriesPanelToggle = tabSeriesPanelToggleInput;
 
     const { row: tabSecondaryToggleRow, input: tabSecondaryToggleInput } = createTabToggle({
       id: "tabToggleSecondaryLinks",

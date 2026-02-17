@@ -170,6 +170,8 @@ export function applySettingsSnapshot(snapshot = {}, ctx) {
     persistCenterItems,
     applyStripParentheticalNames,
     persistStripParentheticalNames,
+    applyShowSeriesPanel,
+    persistShowSeriesPanel,
     localBackend,
     ui,
     refreshObsidianLinks,
