@@ -27,5 +27,15 @@
   { "from": "Operation", "to": "Ops" },
   { "from": "Mechanics", "to": "Steps" },
   { "from": "Referral", "to": "Ref" },
-  { "from": "Institutional", "to": "Inst" }
+  { "from": "Institutional", "to": "Inst" },
+  { "from": "Telecommunications", "to": "Telecoms" },
+  { "from": "Communication", "to": "Comms" },
+  { "from": "Communications", "to": "Comms" },
+  { "from": "Configuration", "to": "Config" },
+  { "from": "Distribution", "to": "Distrib" },
+  { "from": "Coordination", "to": "Coord" },
+  { "from": "Orchestration", "to": "Orch" },
+  { "from": "Dependencies", "to": "Deps" },
+  { "from": "Multi-tenancy", "to": "Multi-tenant" },
+  { "from": "Segmentation", "to": "Segment" }
 ]

@@ -290,8 +290,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--min-sub-length",
         type=int,
-        default=32,
-        help="Only apply substitutions when the original name length is >= this value (default: 32)",
+        default=14,
+        help="Only apply substitutions when the original name length is >= this value (default: 14)",
     )
     parser.add_argument(
         "--trim-limit",

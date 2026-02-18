@@ -144,7 +144,7 @@
           },
           {
             "id": "just-variables",
-            "name": "Local & Environment",
+            "name": "Local & Env",
             "external": "https://just.systems/man/en/variables.html",
             "color": "#ffffff",
             "deps": []
@@ -171,7 +171,7 @@
           },
           {
             "id": "just-dependencies",
-            "name": "Recipe Dependencies",
+            "name": "Recipe Deps",
             "external": "https://just.systems/man/en/dependencies.html",
             "color": "#ffffff",
             "deps": [

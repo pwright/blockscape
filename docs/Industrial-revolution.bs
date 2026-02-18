@@ -181,7 +181,7 @@
           },
           {
             "id": "telecommunications",
-            "name": "Telecommunications",
+            "name": "Telecoms",
             "external": "https://en.wikipedia.org/wiki/Telecommunications",
             "deps": [
               "electricity-grid"
@@ -323,7 +323,7 @@
           },
           {
             "id": "global-communication",
-            "name": "Global Communication",
+            "name": "Global Comms",
             "external": "https://en.wikipedia.org/wiki/Internet",
             "deps": [
               "internet"
@@ -337,7 +337,7 @@
         "items": [
           {
             "id": "microprocessors",
-            "name": "Microprocessors",
+            "name": "Processors",
             "external": "https://en.wikipedia.org/wiki/Microprocessor",
             "deps": [
               "semiconductor-fabrication"
@@ -412,7 +412,7 @@
           },
           {
             "id": "telecom-backbone",
-            "name": "Telecommunications",
+            "name": "Telecoms",
             "external": "https://en.wikipedia.org/wiki/Telecommunications_network",
             "deps": []
           },

@@ -16,30 +16,32 @@ nav:
       - Features: documentation/features.md
       - Series: documentation/series.md
       - Models: documentation/models.md
-      - Docker for local editor: documentation/docker.md
-      - Apicurio as backend: documentation/apicurio.md
-      - MkDocs usage: documentation/mkdocs.md
       - Build patterns: documentation/build-patterns.md
-      - Neutralino app: neutralino-app.md
       - LLM generation: documentation/llm-generation.md
-      - Share links: documentation/share-links.md
-      - Local usage on Linux: documentation/bs-opener-linux.md
-      - Local usage on Mac: documentation/bs-opener-mac.md
-      - Local backend server: documentation/server.md
-      - JSON prompting: documentation/rise-and-fall-json.md
       - Editor: documentation/editor.md
       - Evolution: documentation/evolution.md
       - Gestalt: documentation/gestalt.md
       - Gists: documentation/gists.md
       - Icons: documentation/icons.md
       - LLM consume: documentation/llm-consume.md
+      - JSON prompting: documentation/rise-and-fall-json.md
       - Navigation: documentation/navigation.md
       - Paste: documentation/paste.md
       - Portfolio: documentation/portfolio.md
       - Relational awareness: documentation/relational-awareness.md
+      - Share links: documentation/share-links.md
       - Stages: documentation/stages.md
       - Value chain: documentation/value-chain.md
       - Watch models: documentation/watch-models.md
+  - Integrations:
+      - Obsidian plugin: documentation/obsidian.md
+      - MkDocs usage: documentation/mkdocs.md
+      - Apicurio as backend: documentation/apicurio.md
+      - Docker for local editor: documentation/docker.md
+      - Local usage on Linux: documentation/bs-opener-linux.md
+      - Local usage on Mac: documentation/bs-opener-mac.md
+      - Local backend server: documentation/server.md
+      - Neutralino app: neutralino-app.md
   - TOC: toc.md
 
 markdown_extensions:

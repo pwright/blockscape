@@ -39,7 +39,7 @@ Utility scripts that support the Blockscape Svelte site and companion Obsidian v
 - Usage: `python3 scripts/tidy_bs.py path/to/file.bs [options]`
   - `--dry-run` preview changes without writing.
   - `--output out.bs` write to a new file; default overwrites input.
-  - `--substitutions name_substitutions.json` JSON list or map of `{from,to}` pairs (default file at repo root); use with `--min-sub-length` (default 32 chars).
+  - `--substitutions name_substitutions.json` JSON list or map of `{from,to}` pairs (default file at repo root); use with `--min-sub-length` (default 14 chars).
   - `--trim-limit 20` shorten names to under the limit (set to `0` or `--no-trim` to skip).
   - `--no-strip-parens`, `--no-substitutions`, `--no-validate` to disable individual steps.
   - `--strip-md-links` rewrite inline Markdown links inside every string literal to their bare URLs.

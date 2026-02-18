@@ -10553,7 +10553,7 @@ ${text2}` : text2;
     }
   }
   async function loadJsonFiles() {
-    const jsonFiles = ["Renaissance.bs", "Kubernetes.bs", "Skupper.bs", "Industrial-revolution.bs", "planets.bs", "blockscape-features.bs"];
+    const jsonFiles = ["models.bs"];
     const joinPath = (name) => {
       if (!ASSET_BASE) return name;
       return ASSET_BASE.endsWith("/") ? `${ASSET_BASE}${name}` : `${ASSET_BASE}/${name}`;
