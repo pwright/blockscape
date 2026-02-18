@@ -6,7 +6,7 @@ site_dir: ../docs/documentation
 
 nav:
   - Home: https://pwright.github.io/blockscape/
-  - Hello: index.md
+  - Hello: documentation/tipping.md
   - Maps:
       - Blockscape Example: maps/blockscape-example.md
       - Wardley Example: maps/wardley-example.md
