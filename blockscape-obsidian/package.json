@@ -1,0 +1,11 @@
+{
+  "name": "blockscape-obsidian",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Obsidian Blockscape viewer plugin (prebuilt assets)",
+  "scripts": {
+    "build": "echo \"Blockscape Obsidian plugin is prebuilt from root project; nothing to compile here.\"",
+    "package": "cd dist && zip -r blockscape-viewer-0.0.1.zip blockscape-viewer",
+    "release": "npm run build && npm run package"
+  }
+}

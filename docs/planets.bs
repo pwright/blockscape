@@ -1,90 +1,90 @@
 [
-  {
-    "id": "solar-system",
-    "title": "Solar System Model",
-    "abstract": "Index of all planetary exploration models in this series.",
-    "categories": [
-      {
-        "id": "habitable",
-        "title": "Habitable",
-        "items": [
-          {
-            "id": "earth",
-            "name": "Earth",
-            "deps": [],
-            "logo": "https://upload.wikimedia.org/wikipedia/commons/9/97/The_Earth_seen_from_Apollo_17.jpg"
-          }
-        ]
-      },
-      {
-        "id": "visible-by-eye",
-        "title": "Visible by Eye",
-        "items": [
-          {
-            "id": "mercury",
-            "name": "Mercury",
-            "deps": [],
-            "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4a/Mercury_in_true_color.jpg/250px-Mercury_in_true_color.jpg"
-          },
-          {
-            "id": "venus",
-            "name": "Venus",
-            "deps": [],
-            "logo": "https://upload.wikimedia.org/wikipedia/commons/e/e5/Venus-real_color.jpg"
-          },
-          {
-            "id": "mars",
-            "name": "Mars",
-            "deps": [],
-            "logo": "https://upload.wikimedia.org/wikipedia/commons/0/02/OSIRIS_Mars_true_color.jpg"
-          },
-          {
-            "id": "jupiter",
-            "name": "Jupiter",
-            "deps": [],
-            "logo": "https://upload.wikimedia.org/wikipedia/commons/e/e2/Jupiter.jpg"
-          },
-          {
-            "id": "saturn",
-            "name": "Saturn",
-            "deps": [],
-            "logo": "https://upload.wikimedia.org/wikipedia/commons/c/c7/Saturn_during_Equinox.jpg"
-          }
-        ]
-      },
-      {
-        "id": "outer",
-        "title": "Telescope",
-        "items": [
-          {
-            "id": "uranus",
-            "name": "Uranus",
-            "deps": [],
-            "logo": "https://upload.wikimedia.org/wikipedia/commons/3/3d/Uranus2.jpg"
-          },
-          {
-            "id": "neptune",
-            "name": "Neptune",
-            "deps": [],
-            "logo": "https://upload.wikimedia.org/wikipedia/commons/5/56/Neptune_Full.jpg"
-          }
-        ]
-      },
-      {
-        "id": "former-planets",
-        "title": "Former Planets",
-        "items": [
-          {
-            "id": "pluto",
-            "name": "Pluto",
-            "color": "#000000",
-            "deps": [],
-            "external": "https://en.wikipedia.org/wiki/Pluto"
-          }
-        ]
-      }
-    ]
-  },
+{
+  "id": "solar-system",
+  "title": "Solar System Model",
+  "abstract": "Index of all planetary exploration models in this series.",
+  "categories": [
+    {
+      "id": "habitable",
+      "title": "Habitable",
+      "items": [
+        {
+          "id": "earth",
+          "name": "Earth",
+          "deps": [],
+          "logo": "https://upload.wikimedia.org/wikipedia/commons/a/a9/Rotating_earth_%28large%29_transparent.gif"
+        }
+      ]
+    },
+    {
+      "id": "visible-by-eye",
+      "title": "Visible by Eye",
+      "items": [
+        {
+          "id": "mercury",
+          "name": "Mercury",
+          "deps": [],
+          "logo": "https://upload.wikimedia.org/wikipedia/commons/b/b9/3D_Mercury.png"
+        },
+        {
+          "id": "venus",
+          "name": "Venus",
+          "deps": [],
+          "logo": "https://upload.wikimedia.org/wikipedia/commons/f/f4/3D_Venus.png"
+        },
+        {
+          "id": "mars",
+          "name": "Mars",
+          "deps": [],
+          "logo": "https://upload.wikimedia.org/wikipedia/commons/f/f5/3D_Mars.png"
+        },
+        {
+          "id": "jupiter",
+          "name": "Jupiter",
+          "deps": [],
+          "logo": "https://upload.wikimedia.org/wikipedia/commons/e/ed/3D_Jupiter.png"
+        },
+        {
+          "id": "saturn",
+          "name": "Saturn",
+          "deps": [],
+          "logo": "https://upload.wikimedia.org/wikipedia/commons/c/c0/3D_Saturn.png"
+        }
+      ]
+    },
+    {
+      "id": "outer",
+      "title": "Telescope",
+      "items": [
+        {
+          "id": "uranus",
+          "name": "Uranus",
+          "deps": [],
+          "logo": "https://upload.wikimedia.org/wikipedia/commons/3/32/3D_Uranus.png"
+        },
+        {
+          "id": "neptune",
+          "name": "Neptune",
+          "deps": [],
+          "logo": "https://upload.wikimedia.org/wikipedia/commons/d/da/3D_Neptune.png"
+        }
+      ]
+    },
+    {
+      "id": "former-planets",
+      "title": "Former Planets",
+      "items": [
+        {
+          "id": "pluto",
+          "name": "Pluto",
+          "color": "#000000",
+          "deps": [],
+          "external": "https://en.wikipedia.org/wiki/Pluto"
+        }
+      ]
+    }
+  ]
+},
   {
     "id": "mercury",
     "title": "Mercury Exploration Model",

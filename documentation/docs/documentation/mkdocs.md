@@ -31,6 +31,62 @@ The root `npm run docs:build` script runs the same build. Avoid editing the gene
 
 ## Author a map in Markdown
 
-Add a fenced block with the `blockscape` bs file.
+Create a fenced code block with `blockscape` containing your map JSON:
 
-The MkDocs extension turns the block into a mount point, and the bundled JS/CSS renders each map inline with local file access disabled for docs.
+
+```
+{
+  "title": "Demo map",
+  "categories": [    {
+      "id": "shared-foundations",
+      "title": "Shared Foundations",
+      "items": [
+        {
+          "id": "experiments-learning",
+          "name": "Experiments & Learning"
+        },
+        {
+          "id": "custom-build",
+          "name": "Custom Build"
+        },
+        {
+          "id": "standard-components",
+          "name": "Standard Components"
+        }
+      ]
+    }
+  ]
+}
+
+```
+
+The plugin renders the interactive Blockscape view inline with local file access disabled.
+
+Here is the same code, but with the mkdocs extension `blockscape` codefence:
+
+```blockscape
+{
+  "title": "Demo map",
+  "categories": [    {
+      "id": "shared-foundations",
+      "title": "Shared Foundations",
+      "items": [
+        {
+          "id": "experiments-learning",
+          "name": "Experiments & Learning"
+        },
+        {
+          "id": "custom-build",
+          "name": "Custom Build"
+        },
+        {
+          "id": "standard-components",
+          "name": "Standard Components"
+        }
+      ]
+    }
+  ]
+}
+
+```
+

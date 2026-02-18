@@ -1,0 +1,231 @@
+@import url("./assets/blockscape.css");
+
+/* Obsidian-specific layout tightening */
+.blockscape-root.blockscape-obsidian {
+  position: relative;
+  overflow: visible !important;
+  width: min(1180px, calc(100vw - 24px));
+  margin: 0 auto var(--space-lg, 1.5rem);
+  --blockscape-logo-offset: -18px;
+  --blockscape-name-offset: 12px;
+  --blockscape-tile-padding-top: 28px;
+}
+
+.blockscape-content,
+.blockscape-main,
+.blockscape-view {
+  width: 100%;
+  margin: 0 auto;
+}
+
+/* hide chrome that is redundant in Obsidian */
+.blockscape-toolbar,
+.blockscape-sidebar,
+.blockscape-masthead,
+.blockscape-footer,
+.blockscape-legend,
+.blockscape-map-controls,
+.blockscape-toolbar__github {
+  display: none !important;
+}
+
+/* series navigation cards wrap nicely */
+.series-nav,
+.series-nav-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  width: min(1180px, 100%);
+  margin: 0 auto;
+}
+
+.series-nav {
+  flex-direction: column;
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-muted);
+  box-shadow: var(--shadow-lg);
+}
+
+.series-nav-card {
+  width: 200px;
+  height: 140px;
+  flex: 0 0 auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0));
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-sm);
+  box-shadow: 0 8px 16px -14px #00000066;
+  transition: border-color var(--transition), box-shadow var(--transition), transform var(--transition);
+}
+
+.series-nav-card:is(:hover, :focus-visible) {
+  border-color: var(--color-primary);
+  box-shadow: 0 10px 24px -16px rgba(37, 99, 235, 0.35);
+  transform: translateY(-1px);
+}
+
+.series-nav-card.is-active {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.35), 0 14px 26px -18px rgba(37,99,235,0.5);
+}
+
+.series-nav-card .tile {
+  width: 100%;
+  height: 100%;
+  background: var(--color-surface);
+}
+
+.series-nav-placeholder {
+  width: 200px;
+  height: 140px;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-muted);
+  background: transparent;
+}
+
+/* tile text and badge alignment */
+.tile .logo {
+  transform: translateY(var(--blockscape-logo-offset));
+}
+.tile .name {
+  margin-top: var(--blockscape-name-offset);
+  padding-top: 0;
+  text-align: center;
+}
+.tile .tile-delete,
+.tile .external-link,
+.tile .obsidian-link {
+  top: calc(var(--space-sm));
+}
+
+.blockscape-root.blockscape-obsidian .blockscape-grid {
+  margin: 0 auto;
+}
+
+/* Force overlay to be absolutely positioned so we can shift it */
+.svg-layer {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Version nav (series strip) */
+.version-nav {
+  margin: 1rem 0;
+  padding: 1rem 1.25rem;
+  border-radius: var(--radius-lg);
+  background: #0f1627;
+  border: 1px solid #1f2a3f;
+  box-shadow: 0 18px 32px -22px rgba(0, 0, 0, 0.65);
+  color: #e5e7eb;
+}
+.version-nav__title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+.version-nav__status {
+  font-size: 0.85rem;
+  color: #9ca3af;
+}
+.version-nav__controls {
+  display: inline-flex;
+  gap: 0.5rem;
+}
+.version-nav__button {
+  min-width: 78px;
+  background: #111927;
+  border: 1px solid #2c394f;
+  color: #e5e7eb;
+  padding: 0.45rem 0.75rem;
+  border-radius: 10px;
+  font-weight: 600;
+  transition: all 0.15s ease;
+}
+.version-nav__button:hover {
+  background: #17233a;
+  border-color: #3b4c67;
+}
+.version-nav__thumbs {
+  display: flex;
+  align-items: stretch;
+  gap: 0.75rem;
+  margin-top: 0.85rem;
+  padding: 0.65rem;
+  background: #202837;
+  border-radius: 12px;
+  border: 1px solid #2f3a4f;
+  min-height: 150px;
+}
+.version-nav__thumb {
+  width: 180px;
+  height: 120px;
+  border-radius: 12px;
+  border: 1px solid #2c394f;
+  background: #0c1220;
+  color: #e5e7eb;
+  padding: 0.65rem;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  gap: 0.35rem;
+  position: relative;
+  box-shadow: 0 12px 26px -18px rgba(0, 0, 0, 0.7);
+}
+.version-nav__thumb img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  margin: 0 auto;
+}
+.version-nav__thumb-label {
+  font-size: 0.9rem;
+  line-height: 1.2;
+  font-weight: 600;
+  color: #d1d5db;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.version-nav__thumb--add {
+  border: 1px dashed #334155;
+  background: #0b1220;
+  color: #9ca3af;
+  place-items: center;
+}
+.version-nav__thumb.is-active {
+  border-color: #60a5fa;
+  box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.35),
+    0 18px 32px -20px rgba(59, 130, 246, 0.45);
+}
+.version-nav__thumb-remove {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid #2c394f;
+  color: #e5e7eb;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.version-nav__thumb-remove:hover {
+  background: #b91c1c;
+  border-color: #dc2626;
+}

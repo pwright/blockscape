@@ -39,7 +39,7 @@
                                 <a href="https://pwright.github.io/blockscape/" class="nav-link">Home</a>
                             </li>
                             <li class="nav-item">
-                                <a href="../.." class="nav-link">Hello</a>
+                                <a href="../tipping/" class="nav-link">Hello</a>
                             </li>
                             <li class="nav-item dropdown">
                                 <a href="#" class="nav-link dropdown-toggle" role="button" data-bs-toggle="dropdown"  aria-expanded="false">Maps</a>
@@ -79,51 +79,11 @@
 </li>
                                     
 <li>
-    <a href="../docker/" class="dropdown-item">Docker for local editor</a>
-</li>
-                                    
-<li>
-    <a href="../apicurio/" class="dropdown-item">Apicurio as backend</a>
-</li>
-                                    
-<li>
-    <a href="../mkdocs/" class="dropdown-item">MkDocs usage</a>
-</li>
-                                    
-<li>
     <a href="../build-patterns/" class="dropdown-item">Build patterns</a>
 </li>
                                     
 <li>
-    <a href="../../neutralino-app/" class="dropdown-item">Neutralino app</a>
-</li>
-                                    
-<li>
     <a href="../llm-generation/" class="dropdown-item">LLM generation</a>
-</li>
-                                    
-<li>
-    <a href="../share-links/" class="dropdown-item">Share links</a>
-</li>
-                                    
-<li>
-    <a href="../bs-opener-linux/" class="dropdown-item">Local usage on Linux</a>
-</li>
-                                    
-<li>
-    <a href="../bs-opener-mac/" class="dropdown-item">Local usage on Mac</a>
-</li>
-                                    
-<li>
-    <a href="../server/" class="dropdown-item">Local backend server</a>
-</li>
-                                    
-<li>
-    <a href="../rise-and-fall-json/" class="dropdown-item">JSON prompting</a>
-</li>
-                                    
-<li>
-    <a href="../editor/" class="dropdown-item">Editor</a>
 </li>
                                     
 <li>
@@ -147,6 +107,10 @@
 </li>
                                     
 <li>
+    <a href="../rise-and-fall-json/" class="dropdown-item">JSON prompting</a>
+</li>
+                                    
+<li>
     <a href="../navigation/" class="dropdown-item">Navigation</a>
 </li>
                                     
@@ -163,6 +127,10 @@
 </li>
                                     
 <li>
+    <a href="../share-links/" class="dropdown-item">Share links</a>
+</li>
+                                    
+<li>
     <a href="../stages/" class="dropdown-item">Stages</a>
 </li>
                                     
@@ -172,6 +140,43 @@
                                     
 <li>
     <a href="../watch-models/" class="dropdown-item">Watch models</a>
+</li>
+                                </ul>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a href="#" class="nav-link dropdown-toggle" role="button" data-bs-toggle="dropdown"  aria-expanded="false">Integrations</a>
+                                <ul class="dropdown-menu">
+                                    
+<li>
+    <a href="../obsidian/" class="dropdown-item">Obsidian plugin</a>
+</li>
+                                    
+<li>
+    <a href="../mkdocs/" class="dropdown-item">MkDocs usage</a>
+</li>
+                                    
+<li>
+    <a href="../apicurio/" class="dropdown-item">Apicurio as backend</a>
+</li>
+                                    
+<li>
+    <a href="../docker/" class="dropdown-item">Docker for local editor</a>
+</li>
+                                    
+<li>
+    <a href="../bs-opener-linux/" class="dropdown-item">Local usage on Linux</a>
+</li>
+                                    
+<li>
+    <a href="../bs-opener-mac/" class="dropdown-item">Local usage on Mac</a>
+</li>
+                                    
+<li>
+    <a href="../server/" class="dropdown-item">Local backend server</a>
+</li>
+                                    
+<li>
+    <a href="../../neutralino-app/" class="dropdown-item">Desktop app (Linux and macos)</a>
 </li>
                                 </ul>
                             </li>
@@ -285,9 +290,9 @@
 </ul>
 <h2 id="editing-tools">Editing tools</h2>
 <ul>
-<li><strong>Map-side edits:</strong> Click <strong>Edit</strong> to open the JSON editor (<code>editor.html</code>). All changes you make there immediately reflect in the map.</li>
-<li><strong>CRUD in the editor:</strong> Add/remove categories and items, reorder them, and edit IDs/titles/names. A validate button checks the JSON before you save.</li>
-<li><strong>Reordering aids:</strong> Drag categories, drag items, or use the move up/down buttons tested in <code>cypress/e2e/editor-workflow.cy.js</code>.</li>
+<li><strong>Map-side edits:</strong> Use the JSON panel at the top of the page to edit and validate models; changes update the map immediately.</li>
+<li><strong>Info tab edits:</strong> Update a model’s <strong>Title</strong> and <strong>Abstract</strong> directly from the <strong>Info</strong> tab without leaving the viewer.</li>
+<li><strong>Reordering aids:</strong> Drag categories, drag items, or use the move up/down buttons.</li>
 </ul>
 <h2 id="sharing-and-collaboration">Sharing and collaboration</h2>
 <ul>
@@ -297,7 +302,7 @@
 </ul>
 <h2 id="running-the-app">Running the app</h2>
 <ul>
-<li><strong>Fast local dev:</strong> <code>npm install</code> then <code>npm run dev</code> (Vite on http://localhost:5173). The JSON editor lives at <code>/editor.html</code>.</li>
+<li><strong>Fast local dev:</strong> <code>npm install</code> then <code>npm run dev</code> (Vite on http://localhost:5173).</li>
 <li><strong>Production build:</strong> <code>npm run build</code> emits <code>docs/</code>; serve it with <code>npm run preview</code> or <code>npm run serve</code> (<code>http-server</code>).</li>
 <li><strong>Local backend (optional):</strong> <code>npm run server</code> serves the built app and a file API rooted at <code>~/blockscape</code> (override with <code>BLOCKSCAPE_ROOT</code>). You can auto-load a local file via <code>http://127.0.0.1:4173/server/path/to/file.bs</code>.</li>
 <li><strong>Docker:</strong> Pull <code>docker.io/pwrightrd/blockscape:latest</code> and run it to serve the static build plus the optional file API.</li>
@@ -306,7 +311,7 @@
 </ul>
 <h2 id="quality-and-tests">Quality and tests</h2>
 <ul>
-<li>Cypress specs cover the preview flow (<code>model-preview.cy.js</code>) and full CRUD in the JSON editor (<code>editor-workflow.cy.js</code>).</li>
+<li>Cypress spec covers the preview flow (<code>model-preview.cy.js</code>).</li>
 <li>Token builds (<code>npm run build:tokens</code>) and docs builds (<code>npm run docs:build</code>) are part of the standard <code>npm run build</code> pipeline.</li>
 </ul>
 <p>If you’re new: start the dev server, load a sample map, click tiles to see dependencies, then open <strong>Edit</strong> to tweak the JSON and watch the map update. That’s the whole loop.</p></div>

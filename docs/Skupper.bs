@@ -1,0 +1,570 @@
+[
+  {
+    "id": "k8s-direct-tcp",
+    "title": "Direct TCP Across Kubernetes Network",
+    "abstract": "This landscape represents a traditional end-to-end TCP connection between a client and server application across load balancers and firewalls. TCP state is shared directly between client and server. Intermediate infrastructure forwards packets but does not terminate connections, creating tight coupling between endpoints and exposing failure modes such as hanging sockets when infrastructure components restart.",
+    "categories": [
+      {
+        "id": "application-experience",
+        "title": "Application Experience",
+        "items": [
+          {
+            "id": "client-app",
+            "name": "Client Application",
+            "deps": [
+              "load-balancer",
+              "tcp-session"
+            ]
+          },
+          {
+            "id": "server-app",
+            "name": "Server Application",
+            "deps": [
+              "firewall",
+              "tcp-session"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "edge-network",
+        "title": "Edge & Network Controls",
+        "items": [
+          {
+            "id": "load-balancer",
+            "name": "Load Balancer / Route",
+            "deps": [
+              "kubernetes-pod",
+              "tcp-session"
+            ]
+          },
+          {
+            "id": "firewall",
+            "name": "Firewall / Gateway",
+            "deps": [
+              "kubernetes-pod",
+              "tcp-session"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "transport",
+        "title": "Transport Semantics",
+        "items": [
+          {
+            "id": "tcp-session",
+            "name": "End-to-End TCP Session",
+            "deps": []
+          }
+        ]
+      },
+      {
+        "id": "infrastructure",
+        "title": "Cluster Infrastructure",
+        "items": [
+          {
+            "id": "kubernetes-pod",
+            "name": "Kubernetes Pods / Nodes",
+            "deps": []
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "skupper-van",
+    "title": "Skupper Virtual Application Network (VAN)",
+    "abstract": "This landscape models a Skupper-enabled architecture where client and server TCP sessions are independently terminated by routers and bridged over a Virtual Application Network (VAN). Instead of sharing a single end-to-end TCP state, connections are proxied, encapsulated, and routed across clusters. This decouples failure domains, enables multi-cluster service exposure without load balancers, and provides resilient cross-network connectivity.",
+    "categories": [
+      {
+        "id": "application-experience",
+        "title": "Application Experience",
+        "items": [
+          {
+            "id": "client-app",
+            "name": "Client Application",
+            "deps": [
+              "skupper-listener"
+            ]
+          },
+          {
+            "id": "server-app",
+            "name": "Server Application",
+            "deps": [
+              "skupper-connector"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "service-proxy",
+        "title": "Service Proxies",
+        "items": [
+          {
+            "id": "skupper-listener",
+            "name": "Skupper Router (Listener)",
+            "deps": [
+              "van-fabric"
+            ],
+            "logo": "logos/skupper-logo.svg"
+          },
+          {
+            "id": "skupper-connector",
+            "name": "Skupper Router (Connector)",
+            "deps": [
+              "van-fabric"
+            ],
+            "logo": "logos/skupper-logo.svg"
+          }
+        ]
+      },
+      {
+        "id": "van-layer",
+        "title": "Virtual Application Network",
+        "items": [
+          {
+            "id": "van-fabric",
+            "name": "Routing Fabric (AMQP/TCP)",
+            "deps": [
+              "router-runtime"
+            ],
+            "logo": "logos/skupper-logo.svg"
+          }
+        ]
+      },
+      {
+        "id": "infrastructure",
+        "title": "Cluster Infrastructure",
+        "items": [
+          {
+            "id": "router-runtime",
+            "name": "Router Pods / Runtime",
+            "logo": "logos/skupper-logo.svg",
+            "deps": []
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "sk-amqp-tcp-data-plane",
+    "title": "Skupper Data Plane: TCP Payload over AMQP/TCP",
+    "abstract": "Skupper carries only application payloads across the fabric. Client and server TCP sessions terminate at edge routers (listener/connector). The payload stream is segmented, framed, and forwarded across a VAN transport (often AMQP over TCP/TLS). End-to-end TCP SDUs (sequence numbers, retransmits, congestion control) are not preserved across the fabric; each side has its own independent TCP state managed by the local router.",
+    "categories": [
+      {
+        "id": "app-sessions",
+        "title": "Application Sessions",
+        "items": [
+          {
+            "id": "dp-client-tcp-session",
+            "name": "Client \u2194 Listener TCP Session",
+            "deps": [
+              "dp-listener-proxy"
+            ]
+          },
+          {
+            "id": "dp-server-tcp-session",
+            "name": "Connector \u2194 Server TCP Session",
+            "deps": [
+              "dp-connector-proxy"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "edge-proxying",
+        "title": "TCP Proxying at the Edge",
+        "items": [
+          {
+            "id": "dp-listener-proxy",
+            "name": "Listening Router TCP Termination",
+            "deps": [
+              "dp-stream-bridge",
+              "dp-socket-gating"
+            ],
+            "logo": "logos/skupper-logo.svg"
+          },
+          {
+            "id": "dp-connector-proxy",
+            "name": "Connecting Router TCP Termination",
+            "deps": [
+              "dp-stream-bridge",
+              "dp-backend-dialer"
+            ],
+            "logo": "logos/skupper-logo.svg"
+          }
+        ]
+      },
+      {
+        "id": "payload-bridging",
+        "title": "Payload Bridging & Flow Control",
+        "items": [
+          {
+            "id": "dp-stream-bridge",
+            "name": "TCP Payload Stream Bridge",
+            "deps": [
+              "dp-frame-encoding",
+              "dp-flow-control"
+            ],
+            "logo": "logos/skupper-logo.svg"
+          },
+          {
+            "id": "dp-flow-control",
+            "name": "Credit / Backpressure Mapping",
+            "deps": [
+              "dp-van-transport"
+            ],
+            "logo": "logos/skupper-logo.svg"
+          },
+          {
+            "id": "dp-frame-encoding",
+            "name": "Framing & Multiplexing (Streams/Links)",
+            "deps": [
+              "dp-van-transport"
+            ],
+            "logo": "logos/skupper-logo.svg"
+          }
+        ]
+      },
+      {
+        "id": "van-transport",
+        "title": "VAN Transport (AMQP/TCP)",
+        "items": [
+          {
+            "id": "dp-van-transport",
+            "name": "AMQP over TCP (optionally TLS)",
+            "deps": [
+              "dp-router-mesh"
+            ],
+            "logo": "logos/skupper-logo.svg"
+          },
+          {
+            "id": "dp-router-mesh",
+            "name": "Inter-Router Mesh & Paths",
+            "deps": [
+              "dp-network-connectivity"
+            ],
+            "logo": "logos/skupper-logo.svg"
+          }
+        ]
+      },
+      {
+        "id": "infrastructure",
+        "title": "Underlying Connectivity",
+        "items": [
+          {
+            "id": "dp-network-connectivity",
+            "name": "L3/L4 Network Paths (K8s/Underlay)",
+            "deps": []
+          }
+        ]
+      }
+    ],
+    "links": [
+      {
+        "from": "dp-socket-gating",
+        "to": "dp-router-mesh"
+      }
+    ]
+  },
+  {
+    "id": "sk-routing-socket-gating",
+    "title": "Skupper Control Plane: Reachability, Socket Gating, and Propagation Lag",
+    "abstract": "Listener sockets are gated by backend reachability: a router exposes a listening socket only when at least one connector for the service is reachable in the VAN. When connectors disappear, the listener socket closes and new connects fail (often as no-route-to-host). Because routing information propagates asynchronously, there can be a short window where a listener still believes a connector exists; it may accept a TCP handshake and then immediately close the connection before any payload is exchanged.",
+    "categories": [
+      {
+        "id": "user-visible-behavior",
+        "title": "User-Visible Connection Outcomes",
+        "items": [
+          {
+            "id": "cp-connect-success",
+            "name": "Connect Succeeds (Handshake + Data Exchange)",
+            "deps": [
+              "cp-socket-open",
+              "cp-service-route"
+            ]
+          },
+          {
+            "id": "cp-no-route-to-host",
+            "name": "No-route-to-host / Connection Refused",
+            "deps": [
+              "cp-socket-closed"
+            ]
+          },
+          {
+            "id": "cp-accepted-then-closed",
+            "name": "Accepted then Immediately Closed",
+            "deps": [
+              "cp-propagation-lag",
+              "cp-socket-open"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "listener-edge",
+        "title": "Listener Edge Decisions",
+        "items": [
+          {
+            "id": "cp-socket-open",
+            "name": "Listening Socket Open (Backend Present)",
+            "deps": [
+              "cp-socket-gating"
+            ],
+            "logo": "logos/skupper-logo.svg"
+          },
+          {
+            "id": "cp-socket-closed",
+            "name": "Listening Socket Closed (No Backends)",
+            "deps": [
+              "cp-socket-gating"
+            ],
+            "logo": "logos/skupper-logo.svg"
+          },
+          {
+            "id": "cp-socket-gating",
+            "name": "Socket Gating Logic",
+            "deps": [
+              "cp-service-discovery",
+              "cp-routing-updates"
+            ],
+            "logo": "logos/skupper-logo.svg"
+          }
+        ]
+      },
+      {
+        "id": "service-routing",
+        "title": "Service Routing & Reachability",
+        "items": [
+          {
+            "id": "cp-service-route",
+            "name": "Selected Connector Route (Service Path)",
+            "deps": [
+              "cp-routing-updates",
+              "cp-fabric-topology"
+            ],
+            "logo": "logos/skupper-logo.svg"
+          },
+          {
+            "id": "cp-service-discovery",
+            "name": "Connector Presence / Service Advertisement",
+            "deps": [
+              "cp-fabric-topology"
+            ],
+            "logo": "logos/skupper-logo.svg"
+          }
+        ]
+      },
+      {
+        "id": "topology-propagation",
+        "title": "Topology Propagation",
+        "items": [
+          {
+            "id": "cp-routing-updates",
+            "name": "Routing Table Propagation",
+            "deps": [
+              "cp-control-messages"
+            ],
+            "logo": "logos/skupper-logo.svg"
+          },
+          {
+            "id": "cp-propagation-lag",
+            "name": "Propagation Lag Window",
+            "deps": [
+              "cp-routing-updates"
+            ],
+            "logo": "logos/skupper-logo.svg"
+          },
+          {
+            "id": "cp-control-messages",
+            "name": "Control Messaging over VAN",
+            "deps": [
+              "cp-fabric-topology"
+            ],
+            "logo": "logos/skupper-logo.svg"
+          }
+        ]
+      },
+      {
+        "id": "fabric-foundation",
+        "title": "Fabric Foundation",
+        "items": [
+          {
+            "id": "cp-fabric-topology",
+            "name": "Inter-Router Topology & Links",
+            "deps": [],
+            "logo": "logos/skupper-logo.svg"
+          }
+        ]
+      }
+    ],
+    "links": [
+      {
+        "from": "cp-accepted-then-closed",
+        "to": "cp-service-route"
+      }
+    ]
+  },
+  {
+    "id": "sk-lifecycle-failure-signaling",
+    "title": "Skupper Connection Lifecycle: Restarts, Path Loss, and RST/FIN Signaling",
+    "abstract": "Because TCP is proxied, routers own the responsibility of translating fabric events into TCP lifecycle signals. Router restarts or intermediary failures cause both client-side and server-side sessions to be terminated, typically via router-generated RST/FIN. Existing connections drop immediately; new connections depend on socket gating and the recovery/propagation timing. Client resilience depends on retries, keepalives, and application-level timeouts to handle fast-fail and accepted-then-closed states.",
+    "categories": [
+      {
+        "id": "application-resilience",
+        "title": "Application Resilience Objectives",
+        "items": [
+          {
+            "id": "lc-fast-retry",
+            "name": "Aggressive Reconnect (Exponential Backoff)",
+            "deps": [
+              "lc-observed-failures"
+            ]
+          },
+          {
+            "id": "lc-keepalives-heartbeats",
+            "name": "TCP Keepalives / App Heartbeats",
+            "deps": [
+              "lc-silent-drop-detection",
+              "lc-observed-failures"
+            ]
+          },
+          {
+            "id": "lc-timeouts-idempotency",
+            "name": "App Timeouts & Retry-Safe Semantics",
+            "deps": [
+              "lc-observed-failures"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "observable-failure-modes",
+        "title": "Observable Failure Modes",
+        "items": [
+          {
+            "id": "lc-observed-failures",
+            "name": "RST/FIN Drops & Connection Refusals",
+            "deps": [
+              "lc-router-signal-generation",
+              "lc-socket-gating-effects"
+            ]
+          },
+          {
+            "id": "lc-silent-drop-detection",
+            "name": "Detecting Silent Drops",
+            "deps": [
+              "lc-path-loss",
+              "lc-propagation-lag-effects"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "router-actions",
+        "title": "Router-Owned Lifecycle Actions",
+        "items": [
+          {
+            "id": "lc-router-signal-generation",
+            "name": "Router Generates TCP RST/FIN",
+            "deps": [
+              "lc-router-restart",
+              "lc-path-loss"
+            ],
+            "logo": "logos/skupper-logo.svg"
+          },
+          {
+            "id": "lc-session-termination",
+            "name": "Terminate Client and Server Sessions",
+            "deps": [
+              "lc-router-signal-generation"
+            ],
+            "logo": "logos/skupper-logo.svg"
+          }
+        ]
+      },
+      {
+        "id": "availability-gating",
+        "title": "Availability & Gating Effects",
+        "items": [
+          {
+            "id": "lc-socket-gating-effects",
+            "name": "Socket Opens/Closes Based on Backend Reachability",
+            "deps": [
+              "lc-connectors-online"
+            ],
+            "logo": "logos/skupper-logo.svg"
+          },
+          {
+            "id": "lc-propagation-lag-effects",
+            "name": "Accepted-then-Closed During Propagation Lag",
+            "deps": [
+              "lc-topology-propagation"
+            ],
+            "logo": "logos/skupper-logo.svg"
+          }
+        ]
+      },
+      {
+        "id": "fabric-events",
+        "title": "Fabric Events",
+        "items": [
+          {
+            "id": "lc-router-restart",
+            "name": "Listener/Intermediary Router Restart",
+            "deps": [
+              "lc-router-runtime"
+            ],
+            "logo": "logos/skupper-logo.svg"
+          },
+          {
+            "id": "lc-path-loss",
+            "name": "Downstream/Intermediary Path Failure",
+            "deps": [
+              "lc-router-runtime"
+            ]
+          },
+          {
+            "id": "lc-connectors-online",
+            "name": "Connector Availability (At Least One Reachable)",
+            "deps": [
+              "lc-router-runtime"
+            ],
+            "logo": "logos/skupper-logo.svg"
+          },
+          {
+            "id": "lc-topology-propagation",
+            "name": "Topology & Route Propagation",
+            "deps": [
+              "lc-router-runtime"
+            ],
+            "logo": "logos/skupper-logo.svg"
+          }
+        ]
+      },
+      {
+        "id": "infrastructure",
+        "title": "Runtime Foundation",
+        "items": [
+          {
+            "id": "lc-router-runtime",
+            "name": "skupper-router Pods / Runtime",
+            "deps": [],
+            "logo": "logos/skupper-logo.svg"
+          }
+        ]
+      }
+    ],
+    "links": [
+      {
+        "from": "lc-session-termination",
+        "to": "lc-fast-retry"
+      },
+      {
+        "from": "lc-propagation-lag-effects",
+        "to": "lc-timeouts-idempotency"
+      }
+    ]
+  }
+]

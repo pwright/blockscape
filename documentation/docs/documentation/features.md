@@ -30,9 +30,9 @@ Welcome to Blockscape! This page walks through what the project does and how to 
 
 ## Editing tools
 
-- **Map-side edits:** Click **Edit** to open the JSON editor (`editor.html`). All changes you make there immediately reflect in the map.
-- **CRUD in the editor:** Add/remove categories and items, reorder them, and edit IDs/titles/names. A validate button checks the JSON before you save.
-- **Reordering aids:** Drag categories, drag items, or use the move up/down buttons tested in `cypress/e2e/editor-workflow.cy.js`.
+- **Map-side edits:** Use the JSON panel at the top of the page to edit and validate models; changes update the map immediately.
+- **Info tab edits:** Update a model’s **Title** and **Abstract** directly from the **Info** tab without leaving the viewer.
+- **Reordering aids:** Drag categories, drag items, or use the move up/down buttons.
 
 ## Sharing and collaboration
 
@@ -42,7 +42,7 @@ Welcome to Blockscape! This page walks through what the project does and how to 
 
 ## Running the app
 
-- **Fast local dev:** `npm install` then `npm run dev` (Vite on http://localhost:5173). The JSON editor lives at `/editor.html`.
+- **Fast local dev:** `npm install` then `npm run dev` (Vite on http://localhost:5173).
 - **Production build:** `npm run build` emits `docs/`; serve it with `npm run preview` or `npm run serve` (`http-server`).
 - **Local backend (optional):** `npm run server` serves the built app and a file API rooted at `~/blockscape` (override with `BLOCKSCAPE_ROOT`). You can auto-load a local file via `http://127.0.0.1:4173/server/path/to/file.bs`.
 - **Docker:** Pull `docker.io/pwrightrd/blockscape:latest` and run it to serve the static build plus the optional file API.
@@ -51,7 +51,7 @@ Welcome to Blockscape! This page walks through what the project does and how to 
 
 ## Quality and tests
 
-- Cypress specs cover the preview flow (`model-preview.cy.js`) and full CRUD in the JSON editor (`editor-workflow.cy.js`).
+- Cypress spec covers the preview flow (`model-preview.cy.js`).
 - Token builds (`npm run build:tokens`) and docs builds (`npm run docs:build`) are part of the standard `npm run build` pipeline.
 
 If you’re new: start the dev server, load a sample map, click tiles to see dependencies, then open **Edit** to tweak the JSON and watch the map update. That’s the whole loop.

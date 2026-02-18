@@ -6,9 +6,9 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         
         
-        <link rel="canonical" href="https://pwright.github.io/blockscape/documentation/editor/">
+        <link rel="canonical" href="https://pwright.github.io/blockscape/documentation/obsidian/">
         <link rel="shortcut icon" href="../../img/favicon.ico">
-        <title>Editor - Blockscape</title>
+        <title>Obsidian plugin - Blockscape</title>
         <link href="../../css/bootstrap.min.css" rel="stylesheet">
         <link href="../../css/fontawesome.min.css" rel="stylesheet">
         <link href="../../css/brands.min.css" rel="stylesheet">
@@ -39,7 +39,7 @@
                                 <a href="https://pwright.github.io/blockscape/" class="nav-link">Home</a>
                             </li>
                             <li class="nav-item">
-                                <a href="../.." class="nav-link">Hello</a>
+                                <a href="../tipping/" class="nav-link">Hello</a>
                             </li>
                             <li class="nav-item dropdown">
                                 <a href="#" class="nav-link dropdown-toggle" role="button" data-bs-toggle="dropdown"  aria-expanded="false">Maps</a>
@@ -59,7 +59,7 @@
                                 </ul>
                             </li>
                             <li class="nav-item dropdown">
-                                <a href="#" class="nav-link dropdown-toggle active" aria-current="page" role="button" data-bs-toggle="dropdown"  aria-expanded="false">Documentation</a>
+                                <a href="#" class="nav-link dropdown-toggle" role="button" data-bs-toggle="dropdown"  aria-expanded="false">Documentation</a>
                                 <ul class="dropdown-menu">
                                     
 <li>
@@ -79,51 +79,11 @@
 </li>
                                     
 <li>
-    <a href="../docker/" class="dropdown-item">Docker for local editor</a>
-</li>
-                                    
-<li>
-    <a href="../apicurio/" class="dropdown-item">Apicurio as backend</a>
-</li>
-                                    
-<li>
-    <a href="../mkdocs/" class="dropdown-item">MkDocs usage</a>
-</li>
-                                    
-<li>
     <a href="../build-patterns/" class="dropdown-item">Build patterns</a>
 </li>
                                     
 <li>
-    <a href="../../neutralino-app/" class="dropdown-item">Neutralino app</a>
-</li>
-                                    
-<li>
     <a href="../llm-generation/" class="dropdown-item">LLM generation</a>
-</li>
-                                    
-<li>
-    <a href="../share-links/" class="dropdown-item">Share links</a>
-</li>
-                                    
-<li>
-    <a href="../bs-opener-linux/" class="dropdown-item">Local usage on Linux</a>
-</li>
-                                    
-<li>
-    <a href="../bs-opener-mac/" class="dropdown-item">Local usage on Mac</a>
-</li>
-                                    
-<li>
-    <a href="../server/" class="dropdown-item">Local backend server</a>
-</li>
-                                    
-<li>
-    <a href="../rise-and-fall-json/" class="dropdown-item">JSON prompting</a>
-</li>
-                                    
-<li>
-    <a href="./" class="dropdown-item active" aria-current="page">Editor</a>
 </li>
                                     
 <li>
@@ -147,6 +107,10 @@
 </li>
                                     
 <li>
+    <a href="../rise-and-fall-json/" class="dropdown-item">JSON prompting</a>
+</li>
+                                    
+<li>
     <a href="../navigation/" class="dropdown-item">Navigation</a>
 </li>
                                     
@@ -163,6 +127,10 @@
 </li>
                                     
 <li>
+    <a href="../share-links/" class="dropdown-item">Share links</a>
+</li>
+                                    
+<li>
     <a href="../stages/" class="dropdown-item">Stages</a>
 </li>
                                     
@@ -172,6 +140,43 @@
                                     
 <li>
     <a href="../watch-models/" class="dropdown-item">Watch models</a>
+</li>
+                                </ul>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a href="#" class="nav-link dropdown-toggle active" aria-current="page" role="button" data-bs-toggle="dropdown"  aria-expanded="false">Integrations</a>
+                                <ul class="dropdown-menu">
+                                    
+<li>
+    <a href="./" class="dropdown-item active" aria-current="page">Obsidian plugin</a>
+</li>
+                                    
+<li>
+    <a href="../mkdocs/" class="dropdown-item">MkDocs usage</a>
+</li>
+                                    
+<li>
+    <a href="../apicurio/" class="dropdown-item">Apicurio as backend</a>
+</li>
+                                    
+<li>
+    <a href="../docker/" class="dropdown-item">Docker for local editor</a>
+</li>
+                                    
+<li>
+    <a href="../bs-opener-linux/" class="dropdown-item">Local usage on Linux</a>
+</li>
+                                    
+<li>
+    <a href="../bs-opener-mac/" class="dropdown-item">Local usage on Mac</a>
+</li>
+                                    
+<li>
+    <a href="../server/" class="dropdown-item">Local backend server</a>
+</li>
+                                    
+<li>
+    <a href="../../neutralino-app/" class="dropdown-item">Desktop app (Linux and macos)</a>
 </li>
                                 </ul>
                             </li>
@@ -187,12 +192,12 @@
                             </a>
                         </li>
                             <li class="nav-item">
-                                <a rel="prev" href="../rise-and-fall-json/" class="nav-link">
+                                <a rel="prev" href="../watch-models/" class="nav-link">
                                     <i class="fa fa-arrow-left"></i> Previous
                                 </a>
                             </li>
                             <li class="nav-item">
-                                <a rel="next" href="../evolution/" class="nav-link">
+                                <a rel="next" href="../mkdocs/" class="nav-link">
                                     Next <i class="fa fa-arrow-right"></i>
                                 </a>
                             </li>
@@ -214,8 +219,24 @@
     <div id="toc-collapse" class="navbar-collapse collapse card bg-body-tertiary">
         <ul class="nav flex-column">
             
-            <li class="nav-item" data-bs-level="1"><a href="#editing-maps" class="nav-link">Editing maps</a>
+            <li class="nav-item" data-bs-level="1"><a href="#using-blockscape-in-obsidian" class="nav-link">Using Blockscape in Obsidian</a>
               <ul class="nav flex-column">
+            <li class="nav-item" data-bs-level="2"><a href="#install-the-plugin" class="nav-link">Install the plugin</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#add-a-map-to-a-note" class="nav-link">Add a map to a note</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#edit-and-save" class="nav-link">Edit and save</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#update-the-plugin-bundle" class="nav-link">Update the plugin bundle</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
               </ul>
             </li>
         </ul>
@@ -223,13 +244,80 @@
 </div></div>
                     <div class="col-md-9" role="main">
 
-<h1 id="editing-maps">Editing maps</h1>
-<p>Toggle <strong>Edit</strong> to open the JSON editor alongside the map. Changes you save are reflected immediately.</p>
+<h1 id="using-blockscape-in-obsidian">Using Blockscape in Obsidian</h1>
+<p>Blockscape ships with a prebuilt Obsidian community plugin that renders maps and series directly inside notes.</p>
+<h2 id="install-the-plugin">Install the plugin</h2>
 <ul>
-<li>CRUD: add/remove categories and items, tweak IDs/names, and update dependencies.</li>
-<li>Reorder with drag-and-drop or the move up/down buttons; both mirror the keyboard shortcuts on the map.</li>
-<li>Click <strong>Validate</strong> before saving to catch schema issues early.</li>
-</ul></div>
+<li>Copy <code>blockscape-obsidian/dist/blockscape-viewer</code> into your vault's <code>.obsidian/plugins/</code> directory, or unzip <code>blockscape-obsidian/dist/blockscape-viewer-0.0.1.zip</code> there.</li>
+<li>Reload Obsidian and enable <strong>Blockscape Viewer</strong> under Community Plugins (the bundle is desktop-only per the manifest).</li>
+</ul>
+<p>To build:</p>
+<ul>
+<li>Run <code>npm run export</code> (or <code>npm run build</code>) to refresh the Blockscape JS/CSS in <code>blockscape-obsidian/dist/blockscape-viewer/assets/</code> (synced by the postexport hook).</li>
+</ul>
+<h2 id="add-a-map-to-a-note">Add a map to a note</h2>
+<p>Create a fenced code block with <code>blockscape</code> (or <code>bs</code>) containing your map JSON:</p>
+<pre><code>{
+  &quot;title&quot;: &quot;Demo map&quot;,
+  &quot;categories&quot;: [    {
+      &quot;id&quot;: &quot;shared-foundations&quot;,
+      &quot;title&quot;: &quot;Shared Foundations&quot;,
+      &quot;items&quot;: [
+        {
+          &quot;id&quot;: &quot;experiments-learning&quot;,
+          &quot;name&quot;: &quot;Experiments &amp; Learning&quot;
+        },
+        {
+          &quot;id&quot;: &quot;custom-build&quot;,
+          &quot;name&quot;: &quot;Custom Build&quot;
+        },
+        {
+          &quot;id&quot;: &quot;standard-components&quot;,
+          &quot;name&quot;: &quot;Standard Components&quot;
+        }
+      ]
+    }
+  ]
+}
+
+</code></pre>
+<p>The plugin renders the interactive Blockscape view inline with local file access disabled.</p>
+<p>Here is the same code, but with the mkdocs extension <code>blockscape</code> codefence:</p>
+<div class="blockscape-root">
+  <script type="application/json" class="blockscape-seed">
+{
+  "title": "Demo map",
+  "categories": [    {
+      "id": "shared-foundations",
+      "title": "Shared Foundations",
+      "items": [
+        {
+          "id": "experiments-learning",
+          "name": "Experiments & Learning"
+        },
+        {
+          "id": "custom-build",
+          "name": "Custom Build"
+        },
+        {
+          "id": "standard-components",
+          "name": "Standard Components"
+        }
+      ]
+    }
+  ]
+}
+  </script>
+</div>
+
+<h2 id="edit-and-save">Edit and save</h2>
+<ul>
+<li>Use <strong>Save to note</strong> above the render to rewrite the fenced block with formatted JSON; autosave on blur is on by default and can be toggled.</li>
+<li><strong>Show header</strong> toggles the Blockscape header bar; the choice and other viewer settings persist per vault.</li>
+<li>Series seeds (arrays) are preserved—the plugin updates the matching entry when an item id matches; otherwise it replaces the first entry.</li>
+</ul>
+<h2 id="update-the-plugin-bundle">Update the plugin bundle</h2>
+<p>After UI changes, rerun <code>npm run export</code> to copy the latest viewer assets into the plugin bundle. To share the plugin, package it from <code>blockscape-obsidian/</code> with <code>npm run package</code> and distribute <code>blockscape-viewer-0.0.1.zip</code>.</p></div>
             </div>
         </div>
 

@@ -1711,11 +1711,47 @@
       word-break: break-all;
     }
 
-    .blockscape-abstract-panel {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-md);
-    }
+.blockscape-abstract-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.blockscape-info-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.blockscape-info-fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.blockscape-info-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+  font-weight: var(--font-weight-semibold);
+  color: var(--blockscape-muted-strong);
+}
+
+.blockscape-info-label {
+  font-size: var(--font-size-xs);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.blockscape-info-form .pf-v5-c-form-control {
+  width: 100%;
+  border-radius: 0;
+}
+
+.blockscape-info-actions {
+  display: flex;
+  gap: var(--space-xs);
+}
 
     .blockscape-abstract-placeholder {
       border: 1px dashed var(--color-border);
@@ -1740,13 +1776,13 @@
     }
 
     .category {
-      margin: var(--space-md) 0;
+      margin: calc(var(--space-md) / 4) 0;
     }
 
     .blockscape-render {
       display: flex;
       flex-direction: column;
-      gap: var(--space-lg);
+      gap: calc(var(--space-lg) / 4);
       position: relative;
     }
 
@@ -1902,13 +1938,13 @@
 
     .category {
       position: relative;
-      padding: 0 0 var(--space-xl);
+      padding: 0 0 calc(var(--space-xl) / 4);
       border-radius: var(--radius-lg);
     }
 
     .category--selected {
       border: 1px solid var(--color-primary);
-      padding: var(--space-sm) var(--space-sm) var(--space-xl);
+      padding: var(--space-sm) var(--space-sm) calc(var(--space-xl) / 4);
       box-shadow: 0 12px 28px -18px rgba(37, 99, 235, 0.35);
       background: linear-gradient(
         180deg,
