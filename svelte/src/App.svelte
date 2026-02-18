@@ -305,7 +305,6 @@
                 <button id="loadUrl" class="pf-v5-c-button pf-m-primary" type="submit">Load URL</button>
                 <div id="urlHint" class="url-hint" aria-live="polite"></div>
               </form>
-              <button id="openInEditor" class="pf-v5-c-button pf-m-secondary" type="button" title="Open current JSON in the editor">Edit</button>
             </div>
           </div>
           <a href="https://github.com/pwright/blockscape" target="_blank"

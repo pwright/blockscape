@@ -4,24 +4,75 @@ Blockscape ships with a prebuilt Obsidian community plugin that renders maps and
 
 ## Install the plugin
 
-- Run `npm run export` (or `npm run build`) to refresh the Blockscape JS/CSS in `blockscape-obsidian/dist/blockscape-viewer/assets/` (synced by the postexport hook).
 - Copy `blockscape-obsidian/dist/blockscape-viewer` into your vault's `.obsidian/plugins/` directory, or unzip `blockscape-obsidian/dist/blockscape-viewer-0.0.1.zip` there.
 - Reload Obsidian and enable **Blockscape Viewer** under Community Plugins (the bundle is desktop-only per the manifest).
+
+To build:
+
+- Run `npm run export` (or `npm run build`) to refresh the Blockscape JS/CSS in `blockscape-obsidian/dist/blockscape-viewer/assets/` (synced by the postexport hook).
+
 
 ## Add a map to a note
 
 Create a fenced code block with `blockscape` (or `bs`) containing your map JSON:
 
-````
+
+```
+{
+  "title": "Demo map",
+  "categories": [    {
+      "id": "shared-foundations",
+      "title": "Shared Foundations",
+      "items": [
+        {
+          "id": "experiments-learning",
+          "name": "Experiments & Learning"
+        },
+        {
+          "id": "custom-build",
+          "name": "Custom Build"
+        },
+        {
+          "id": "standard-components",
+          "name": "Standard Components"
+        }
+      ]
+    }
+  ]
+}
+
+```
+
+The plugin renders the interactive Blockscape view inline with local file access disabled.
+
+Here is the same code, but with the mkdocs extension `blockscape` codefence:
+
 ```blockscape
 {
   "title": "Demo map",
-  "categories": []
+  "categories": [    {
+      "id": "shared-foundations",
+      "title": "Shared Foundations",
+      "items": [
+        {
+          "id": "experiments-learning",
+          "name": "Experiments & Learning"
+        },
+        {
+          "id": "custom-build",
+          "name": "Custom Build"
+        },
+        {
+          "id": "standard-components",
+          "name": "Standard Components"
+        }
+      ]
+    }
+  ]
 }
-```
-````
 
-The plugin renders the interactive Blockscape view inline with local file access disabled.
+```
+
 
 ## Edit and save
 

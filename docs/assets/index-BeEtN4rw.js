@@ -2813,7 +2813,6 @@ function initBlockscape(featureOverrides = {}) {
   const downloadButton = document.getElementById("downloadJson");
   const shareButton = document.getElementById("shareModel");
   const createVersionButton = document.getElementById("createVersion");
-  const editButton = document.getElementById("openInEditor");
   const copyJsonButton = document.getElementById("copyJson");
   const copySeriesButton = document.getElementById("copySeries");
   const pasteJsonButton = document.getElementById("pasteJson");
@@ -2840,8 +2839,6 @@ function initBlockscape(featureOverrides = {}) {
   const saveLocalFileButton = document.getElementById("saveLocalFile");
   const saveLocalFileAsButton = document.getElementById("saveLocalFileAs");
   const localSavePathInput = document.getElementById("localSavePath");
-  const EDITOR_TRANSFER_KEY = "blockscape:editorPayload";
-  const EDITOR_TRANSFER_MESSAGE_TYPE = "blockscape:editorTransfer";
   const SERVER_SIDEBAR_WIDE_STORAGE_KEY = "blockscape:serverSidebarWide";
   const defaultDocumentTitle = document.title;
   if (localBackendPanel) localBackendPanel.hidden = true;
@@ -6837,65 +6834,6 @@ function initBlockscape(featureOverrides = {}) {
     const start = defenced.trimStart();
     return /^\s*(\{|\[|---|%%%)/.test(start);
   }
-  function consumeEditorPayload() {
-    if (typeof window === "undefined" || !window.localStorage) return null;
-    let raw;
-    try {
-      raw = localStorage.getItem(EDITOR_TRANSFER_KEY);
-    } catch (err) {
-      console.warn("[Blockscape] failed to access editor payload", err);
-      return null;
-    }
-    if (!raw) return null;
-    let payload;
-    try {
-      payload = JSON.parse(raw);
-    } catch (err) {
-      console.warn("[Blockscape] invalid payload JSON", err);
-      try {
-        localStorage.removeItem(EDITOR_TRANSFER_KEY);
-      } catch (_) {
-      }
-      return null;
-    }
-    if ((payload == null ? void 0 : payload.source) !== "editor") return null;
-    try {
-      localStorage.removeItem(EDITOR_TRANSFER_KEY);
-    } catch (err) {
-      console.warn("[Blockscape] failed to clear editor payload", err);
-    }
-    if (!payload.text || typeof payload.text !== "string") {
-      console.warn("[Blockscape] payload missing text");
-      return null;
-    }
-    let entries = [];
-    try {
-      entries = normalizeToModelsFromText(
-        payload.text,
-        payload.title || "Editor Export"
-      );
-    } catch (err) {
-      console.warn("[Blockscape] could not parse payload text", err);
-      return null;
-    }
-    if (!entries.length) return null;
-    let firstIndex = null;
-    entries.forEach((entry) => {
-      const idx = addModelEntry(entry, { versionLabel: "editor" });
-      if (firstIndex == null) firstIndex = idx;
-    });
-    console.log(`[Blockscape] imported ${entries.length} model(s) from editor`);
-    return { index: firstIndex, count: entries.length };
-  }
-  function importEditorPayload(trigger = "storage") {
-    const result = consumeEditorPayload();
-    if (!result || typeof result.index !== "number") return false;
-    setActive(result.index);
-    console.log(
-      `[Blockscape] imported ${result.count} model(s) from editor via ${trigger}.`
-    );
-    return true;
-  }
   function consumeShareLink() {
     const hash = window.location.hash || "";
     let token = null;
@@ -7634,22 +7572,87 @@ ${text2}` : text2;
     const abstractWrapper = document.createElement("div");
     abstractWrapper.className = "blockscape-abstract-panel";
     abstractPanel.appendChild(modelMeta.cloneNode(true));
-    if (model.m.abstract) {
-      console.log("[Blockscape] Rendering abstract content");
-      const abstractDiv = document.createElement("div");
-      abstractDiv.className = "blockscape-abstract";
-      abstractDiv.innerHTML = model.m.abstract;
-      enhanceAbstractWithGistLinks(abstractDiv);
-      abstractWrapper.appendChild(abstractDiv);
-      infoTooltipHtml = abstractDiv.outerHTML;
-    } else {
-      console.log("[Blockscape] No abstract found in model.m");
-      const placeholder = document.createElement("div");
-      placeholder.className = "blockscape-abstract-placeholder";
-      placeholder.textContent = "No abstract has been provided for this model.";
-      abstractWrapper.appendChild(placeholder);
-      infoTooltipHtml = placeholder.outerHTML;
-    }
+    const infoForm = document.createElement("form");
+    infoForm.className = "blockscape-info-form";
+    infoForm.noValidate = true;
+    const controls = document.createElement("div");
+    controls.className = "blockscape-info-fields";
+    const makeField = (labelText, controlEl) => {
+      const wrapper = document.createElement("label");
+      wrapper.className = "blockscape-info-field";
+      const label = document.createElement("span");
+      label.className = "blockscape-info-label";
+      label.textContent = labelText;
+      wrapper.append(label, controlEl);
+      return wrapper;
+    };
+    const titleInput = document.createElement("input");
+    titleInput.type = "text";
+    titleInput.className = "pf-v5-c-form-control";
+    titleInput.placeholder = "Title";
+    titleInput.value = model.m.title && model.m.title.toString() || getModelTitle(models[activeIndex], "");
+    const abstractInput = document.createElement("textarea");
+    abstractInput.className = "pf-v5-c-form-control";
+    abstractInput.rows = 6;
+    abstractInput.placeholder = "Abstract (supports basic HTML)";
+    abstractInput.value = model.m.abstract || "";
+    const applyInfoChanges = () => {
+      var _a2, _b2, _c;
+      if (activeIndex < 0) return;
+      const entry = models[activeIndex];
+      const nextTitle = (titleInput.value || "").trim();
+      const nextAbstract = abstractInput.value || "";
+      let changed = false;
+      const currentTitle = (((_a2 = entry.data) == null ? void 0 : _a2.title) || "").toString();
+      if (nextTitle !== currentTitle) {
+        entry.data.title = nextTitle;
+        if (!entry.isSeries && !((_b2 = entry.apicurioVersions) == null ? void 0 : _b2.length)) {
+          entry.title = nextTitle;
+        }
+        changed = true;
+      }
+      const currentAbstract = ((_c = entry.data) == null ? void 0 : _c.abstract) || "";
+      if (nextAbstract !== currentAbstract) {
+        entry.data.abstract = nextAbstract;
+        changed = true;
+      }
+      if (!changed) return;
+      renderModelList();
+      loadActiveIntoEditor();
+      rebuildFromActive();
+    };
+    titleInput.addEventListener("blur", applyInfoChanges);
+    abstractInput.addEventListener("blur", applyInfoChanges);
+    infoForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+      applyInfoChanges();
+    });
+    controls.append(
+      makeField("Title", titleInput),
+      makeField("Abstract", abstractInput)
+    );
+    const infoActions = document.createElement("div");
+    infoActions.className = "blockscape-info-actions";
+    const saveButton = document.createElement("button");
+    saveButton.type = "submit";
+    saveButton.className = "pf-v5-c-button pf-m-primary";
+    saveButton.textContent = "Update";
+    infoActions.appendChild(saveButton);
+    infoForm.append(controls, infoActions);
+    const formatAbstractHtml = (value) => {
+      if (!value) return "";
+      return value.replace(/\n/g, "<br>");
+    };
+    const abstractValue = model.m.abstract || "";
+    const abstractHtml = formatAbstractHtml(abstractValue);
+    const hasAbstract = Boolean(abstractHtml);
+    const abstractPreview = document.createElement("div");
+    abstractPreview.className = hasAbstract ? "blockscape-abstract" : "blockscape-abstract-placeholder";
+    abstractPreview.innerHTML = hasAbstract ? abstractHtml : "No abstract has been provided for this model.";
+    enhanceAbstractWithGistLinks(abstractPreview);
+    abstractWrapper.appendChild(abstractPreview);
+    abstractWrapper.appendChild(infoForm);
+    infoTooltipHtml = abstractPreview.outerHTML;
     activeInfoTooltipHtml = infoTooltipHtml;
     abstractPanel.appendChild(abstractWrapper);
     const sourceWrapper = document.createElement("div");
@@ -9471,76 +9474,6 @@ ${text2}` : text2;
       }
     });
   }
-  if (editButton) {
-    editButton.addEventListener("click", () => {
-      const text2 = (jsonBox.value || "").trim();
-      if (!text2) {
-        alert("Load or paste a model before opening the editor.");
-        return;
-      }
-      try {
-        JSON.parse(text2);
-      } catch (err) {
-        alert("Current JSON is invalid. Fix it before opening the editor.");
-        return;
-      }
-      try {
-        const payload = {
-          ts: Date.now(),
-          text: text2,
-          source: "viewer"
-        };
-        if (selection) {
-          payload.selectedItemId = selection;
-        }
-        localStorage.setItem(EDITOR_TRANSFER_KEY, JSON.stringify(payload));
-      } catch (storageError) {
-        console.error(
-          "[Blockscape] failed to store editor payload",
-          storageError
-        );
-        alert("Unable to stash JSON for the editor (storage disabled?).");
-        return;
-      }
-      let editorUrl = "editor.html#viewer";
-      if (selection) {
-        const encoded = encodeURIComponent(selection);
-        editorUrl = `editor.html?selected=${encoded}#viewer`;
-      }
-      window.open(editorUrl, "_blank");
-    });
-  }
-  if (typeof window !== "undefined") {
-    window.addEventListener("storage", (event) => {
-      if (!event) return;
-      if (event.storageArea && event.storageArea !== window.localStorage)
-        return;
-      if (event.key !== EDITOR_TRANSFER_KEY) return;
-      if (!event.newValue) return;
-      let payload;
-      try {
-        payload = JSON.parse(event.newValue);
-      } catch (err) {
-        console.warn("[Blockscape] storage payload parse failed", err);
-        return;
-      }
-      if (!payload || payload.source !== "editor") return;
-      importEditorPayload("storage-event");
-    });
-    window.addEventListener("message", (event) => {
-      if (!event || !event.data) return;
-      const currentOrigin = window.location.origin;
-      if (currentOrigin && currentOrigin !== "null") {
-        if (event.origin !== currentOrigin) return;
-      } else if (event.origin && event.origin !== "null") {
-        return;
-      }
-      if (typeof event.data !== "object") return;
-      if (event.data === null) return;
-      if (event.data.type !== EDITOR_TRANSFER_MESSAGE_TYPE) return;
-      importEditorPayload("message");
-    });
-  }
   document.addEventListener("keydown", (event) => {
     var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j;
     if (isShortcutHelpOpen()) {
@@ -10816,10 +10749,8 @@ ${text2}` : text2;
     const serverPathResult = await consumeServerPathLoad();
     const serverPathIndex = typeof (serverPathResult == null ? void 0 : serverPathResult.modelIndex) === "number" ? serverPathResult.modelIndex : null;
     const loadIndex = await consumeLoadParam();
-    const editorResult = consumeEditorPayload();
-    const editorIndex = editorResult == null ? void 0 : editorResult.index;
     const shareIndex = consumeShareLink();
-    const initialIndex = typeof serverPathIndex === "number" ? serverPathIndex : typeof loadIndex === "number" ? loadIndex : typeof shareIndex === "number" ? shareIndex : typeof editorIndex === "number" ? editorIndex : firstSeedIndex ?? 0;
+    const initialIndex = typeof serverPathIndex === "number" ? serverPathIndex : typeof loadIndex === "number" ? loadIndex : typeof shareIndex === "number" ? shareIndex : firstSeedIndex ?? 0;
     setActive(initialIndex);
     if ((serverPathResult == null ? void 0 : serverPathResult.itemId) && typeof serverPathResult.modelIndex === "number" && serverPathResult.modelIndex === initialIndex) {
       requestAnimationFrame(() => {
@@ -11476,65 +11407,63 @@ function create_fragment$1(ctx) {
   let div4;
   let t28;
   let form;
-  let t34;
-  let button8;
   let div6_hidden_value;
   let div6_aria_hidden_value;
   let div7_data_expanded_value;
-  let t36;
+  let t34;
   let a0;
   let header_hidden_value;
-  let t37;
+  let t35;
   let main;
   let div25;
   let aside;
   let div11;
-  let t39;
+  let t37;
   let ul;
-  let t40;
+  let t38;
   let div12;
-  let t44;
+  let t42;
   let section0;
   let div14;
-  let t48;
+  let t46;
   let p0;
-  let t50;
+  let t48;
   let div17;
   let label3;
-  let t52;
+  let t50;
   let div15;
   let label4;
-  let t54;
+  let t52;
   let select0;
   let option;
-  let t56;
+  let t54;
   let select1;
-  let t57;
+  let t55;
   let div16;
-  let t63;
+  let t61;
   let div19;
   let aside_hidden_value;
-  let t70;
+  let t68;
   let div24;
-  let t96;
+  let t94;
   let footer;
   let div26;
   let footer_hidden_value;
-  let t98;
+  let t96;
   let html_tag;
   let raw_value = `<script id="seed" type="application/json">${/*seedText*/
   ctx[5]}<\/script>`;
-  let t99;
+  let t97;
   let svg1;
-  let t100;
+  let t98;
   let div28;
-  let t101;
+  let t99;
   let div29;
-  let t102;
+  let t100;
   let div34;
-  let t109;
+  let t107;
   let shortcuthelp;
-  let t110;
+  let t108;
   let newpanel;
   let current;
   let mounted;
@@ -11597,74 +11526,71 @@ function create_fragment$1(ctx) {
       form = element("form");
       form.innerHTML = `<label class="sr-only" for="urlInput">Load JSON from URL</label> <input id="urlInput" name="modelUrl" class="pf-v5-c-form-control is-url" type="url" placeholder="Load JSON from URL…" autocomplete="additional-name"/> <button id="loadUrl" class="pf-v5-c-button pf-m-primary" type="submit">Load URL</button> <div id="urlHint" class="url-hint" aria-live="polite"></div>`;
       t34 = space();
-      button8 = element("button");
-      button8.textContent = "Edit";
-      t36 = space();
       a0 = element("a");
       a0.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"></path></svg>`;
-      t37 = space();
+      t35 = space();
       main = element("main");
       div25 = element("div");
       aside = element("aside");
       div11 = element("div");
       div11.textContent = "Models";
-      t39 = space();
+      t37 = space();
       ul = element("ul");
-      t40 = space();
+      t38 = space();
       div12 = element("div");
       div12.innerHTML = `<button id="removeModel" class="pf-v5-c-button pf-m-tertiary" type="button" title="Remove selected model">Remove active</button> <button id="clear" class="pf-v5-c-button pf-m-tertiary" type="button">Clear selection</button>`;
-      t44 = space();
+      t42 = space();
       section0 = element("section");
       div14 = element("div");
       div14.innerHTML = `<div class="sidebar-heading">Local files</div> <button id="toggleServerSidebar" class="pf-v5-c-button pf-m-tertiary" type="button" aria-pressed="false" hidden="">Wide menu</button>`;
-      t48 = space();
+      t46 = space();
       p0 = element("p");
       p0.textContent = "Checking for local server…";
-      t50 = space();
+      t48 = space();
       div17 = element("div");
       label3 = element("label");
       label3.textContent = "Blockscape files under ~/blockscape";
-      t52 = space();
+      t50 = space();
       div15 = element("div");
       label4 = element("label");
       label4.textContent = "Folder";
-      t54 = space();
+      t52 = space();
       select0 = element("select");
       option = element("option");
       option.textContent = "Root (~/blockscape)";
-      t56 = space();
+      t54 = space();
       select1 = element("select");
-      t57 = space();
+      t55 = space();
       div16 = element("div");
       div16.innerHTML = `<button id="refreshLocalFiles" class="pf-v5-c-button pf-m-tertiary" type="button">Refresh</button> <button id="loadLocalFile" class="pf-v5-c-button pf-m-secondary" type="button">Load</button> <button id="deleteLocalFile" class="pf-v5-c-button pf-m-danger" type="button">Delete</button>`;
-      t63 = space();
+      t61 = space();
       div19 = element("div");
       div19.innerHTML = `<label for="localSavePath">Save active map to ~/blockscape</label> <input id="localSavePath" class="pf-v5-c-form-control" type="text" placeholder="my-map.bs"/> <div class="local-backend__save-actions"><button id="saveLocalFile" class="pf-v5-c-button pf-m-primary" type="button">Save</button> <button id="saveLocalFileAs" class="pf-v5-c-button pf-m-secondary" type="button">Save as</button></div>`;
-      t70 = space();
+      t68 = space();
       div24 = element("div");
       div24.innerHTML = `<section class="pf-v5-c-page__main-section blockscape-json-panel" hidden="" aria-label="Model source JSON editor"><p class="blockscape-json-panel__title">Paste / edit JSON for the <b>active</b> model (schema below)</p> <div class="muted">Schema: <code>{ id, title, abstract?, categories:[{id,title,items:[{id,name,deps?:[],logo?,external?:url,color?,stage?:1-4,...}}], ... }</code><br/>
             You can paste multiple objects separated by <code>---</code> or <code>%%%</code>, or a JSON array of models, to append several models.
             A single object replaces only when you click “Replace active with JSON”. Tip: with no input focused, press
             Cmd/Ctrl+V anywhere on the page to append clipboard JSON instantly.</div> <div class="blockscape-json-controls"><textarea id="jsonBox" class="pf-v5-c-form-control" aria-label="JSON editor for the active model"></textarea> <div class="blockscape-json-actions"><button id="copyJson" class="pf-v5-c-button pf-m-tertiary" type="button" title="Copy the current JSON to your clipboard">Copy</button> <button id="copySeries" class="pf-v5-c-button pf-m-tertiary" type="button" title="Copy every version in this series as an array">Copy series</button> <button id="pasteJson" class="pf-v5-c-button pf-m-tertiary" type="button" title="Paste clipboard JSON to replace the editor contents">Paste</button> <button id="appendFromBox" class="pf-v5-c-button pf-m-primary" type="button">Append model(s)</button> <button id="replaceActive" class="pf-v5-c-button pf-m-secondary" type="button">Replace active with
                 JSON</button> <button id="createVersion" class="pf-v5-c-button pf-m-secondary" type="button" title="Create a new version from the current map">New version</button></div></div></section> <section class="pf-v5-c-page__main-section blockscape-main-section"><div id="app" aria-live="polite"></div></section>`;
-      t96 = space();
+      t94 = space();
       footer = element("footer");
       div26 = element("div");
       div26.innerHTML = `<a href="https://pwright.github.io/backscape/" target="_blank" rel="noreferrer noopener">Old versions</a>`;
-      t98 = space();
+      t96 = space();
       html_tag = new HtmlTag(false);
-      t99 = space();
+      t97 = space();
       svg1 = svg_element("svg");
-      t100 = space();
+      t98 = space();
       div28 = element("div");
-      t101 = space();
+      t99 = space();
       div29 = element("div");
-      t102 = space();
+      t100 = space();
       div34 = element("div");
       div34.innerHTML = `<div class="item-preview__header"><span class="item-preview__title">Preview</span> <div class="item-preview__actions" hidden=""></div> <button type="button" class="item-preview__close" aria-label="Close preview">×</button></div> <div class="item-preview__body"><div class="item-preview__status">Right-click a tile to see related notes.</div></div>`;
-      t109 = space();
+      t107 = space();
       create_component(shortcuthelp.$$.fragment);
-      t110 = space();
+      t108 = space();
       create_component(newpanel.$$.fragment);
       document_1.title = "Blockscape — simple landscape-style tiles";
       attr(link, "rel", "icon");
@@ -11717,10 +11643,6 @@ function create_fragment$1(ctx) {
       attr(form, "class", "blockscape-url-form");
       attr(form, "autocomplete", "on");
       form.noValidate = true;
-      attr(button8, "id", "openInEditor");
-      attr(button8, "class", "pf-v5-c-button pf-m-secondary");
-      attr(button8, "type", "button");
-      attr(button8, "title", "Open current JSON in the editor");
       attr(div6, "id", "blockscapeHeaderExtras");
       attr(div6, "class", "blockscape-toolbar__extras");
       div6.hidden = div6_hidden_value = !/*headerExpanded*/
@@ -11780,7 +11702,7 @@ function create_fragment$1(ctx) {
       footer.hidden = footer_hidden_value = !/*showFooter*/
       ctx[2];
       attr(div27, "class", "pf-v5-c-page");
-      html_tag.a = t99;
+      html_tag.a = t97;
       attr(svg1, "id", "overlay");
       attr(svg1, "class", "svg-layer");
       attr(div28, "id", "tabTooltip");
@@ -11835,57 +11757,55 @@ function create_fragment$1(ctx) {
       append(div6, div4);
       append(div6, t28);
       append(div6, form);
-      append(div6, t34);
-      append(div6, button8);
-      append(div8, t36);
+      append(div8, t34);
       append(div8, a0);
-      append(div27, t37);
+      append(div27, t35);
       append(div27, main);
       append(main, div25);
       append(div25, aside);
       append(aside, div11);
-      append(aside, t39);
+      append(aside, t37);
       append(aside, ul);
-      append(aside, t40);
+      append(aside, t38);
       append(aside, div12);
-      append(aside, t44);
+      append(aside, t42);
       append(aside, section0);
       append(section0, div14);
-      append(section0, t48);
+      append(section0, t46);
       append(section0, p0);
-      append(section0, t50);
+      append(section0, t48);
       append(section0, div17);
       append(div17, label3);
-      append(div17, t52);
+      append(div17, t50);
       append(div17, div15);
       append(div15, label4);
-      append(div15, t54);
+      append(div15, t52);
       append(div15, select0);
       append(select0, option);
-      append(div17, t56);
+      append(div17, t54);
       append(div17, select1);
-      append(div17, t57);
+      append(div17, t55);
       append(div17, div16);
-      append(section0, t63);
+      append(section0, t61);
       append(section0, div19);
-      append(div25, t70);
+      append(div25, t68);
       append(div25, div24);
-      append(div27, t96);
+      append(div27, t94);
       append(div27, footer);
       append(footer, div26);
-      insert(target2, t98, anchor);
+      insert(target2, t96, anchor);
       html_tag.m(raw_value, target2, anchor);
-      insert(target2, t99, anchor);
+      insert(target2, t97, anchor);
       insert(target2, svg1, anchor);
-      insert(target2, t100, anchor);
+      insert(target2, t98, anchor);
       insert(target2, div28, anchor);
-      insert(target2, t101, anchor);
+      insert(target2, t99, anchor);
       insert(target2, div29, anchor);
-      insert(target2, t102, anchor);
+      insert(target2, t100, anchor);
       insert(target2, div34, anchor);
-      insert(target2, t109, anchor);
+      insert(target2, t107, anchor);
       mount_component(shortcuthelp, target2, anchor);
-      insert(target2, t110, anchor);
+      insert(target2, t108, anchor);
       mount_component(newpanel, target2, anchor);
       current = true;
       if (!mounted) {
@@ -11985,18 +11905,18 @@ function create_fragment$1(ctx) {
       if (detaching) {
         detach(t0);
         detach(div27);
-        detach(t98);
+        detach(t96);
         html_tag.d();
-        detach(t99);
+        detach(t97);
         detach(svg1);
-        detach(t100);
+        detach(t98);
         detach(div28);
-        detach(t101);
+        detach(t99);
         detach(div29);
-        detach(t102);
+        detach(t100);
         detach(div34);
-        detach(t109);
-        detach(t110);
+        detach(t107);
+        detach(t108);
       }
       detach(link);
       destroy_component(shortcuthelp, detaching);

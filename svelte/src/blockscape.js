@@ -53,7 +53,6 @@ export function initBlockscape(featureOverrides = {}) {
   const downloadButton = document.getElementById("downloadJson");
   const shareButton = document.getElementById("shareModel");
   const createVersionButton = document.getElementById("createVersion");
-  const editButton = document.getElementById("openInEditor");
   const copyJsonButton = document.getElementById("copyJson");
   const copySeriesButton = document.getElementById("copySeries");
   const pasteJsonButton = document.getElementById("pasteJson");
@@ -81,8 +80,6 @@ export function initBlockscape(featureOverrides = {}) {
   const saveLocalFileButton = document.getElementById("saveLocalFile");
   const saveLocalFileAsButton = document.getElementById("saveLocalFileAs");
   const localSavePathInput = document.getElementById("localSavePath");
-  const EDITOR_TRANSFER_KEY = "blockscape:editorPayload";
-  const EDITOR_TRANSFER_MESSAGE_TYPE = "blockscape:editorTransfer";
   const SERVER_SIDEBAR_WIDE_STORAGE_KEY = "blockscape:serverSidebarWide";
   const defaultDocumentTitle = document.title;
 
@@ -4614,66 +4611,6 @@ export function initBlockscape(featureOverrides = {}) {
     return /^\s*(\{|\[|---|%%%)/.test(start);
   }
 
-  function consumeEditorPayload() {
-    if (typeof window === "undefined" || !window.localStorage) return null;
-    let raw;
-    try {
-      raw = localStorage.getItem(EDITOR_TRANSFER_KEY);
-    } catch (err) {
-      console.warn("[Blockscape] failed to access editor payload", err);
-      return null;
-    }
-    if (!raw) return null;
-    let payload;
-    try {
-      payload = JSON.parse(raw);
-    } catch (err) {
-      console.warn("[Blockscape] invalid payload JSON", err);
-      try {
-        localStorage.removeItem(EDITOR_TRANSFER_KEY);
-      } catch (_) {}
-      return null;
-    }
-    if (payload?.source !== "editor") return null;
-    try {
-      localStorage.removeItem(EDITOR_TRANSFER_KEY);
-    } catch (err) {
-      console.warn("[Blockscape] failed to clear editor payload", err);
-    }
-    if (!payload.text || typeof payload.text !== "string") {
-      console.warn("[Blockscape] payload missing text");
-      return null;
-    }
-    let entries = [];
-    try {
-      entries = normalizeToModelsFromText(
-        payload.text,
-        payload.title || "Editor Export"
-      );
-    } catch (err) {
-      console.warn("[Blockscape] could not parse payload text", err);
-      return null;
-    }
-    if (!entries.length) return null;
-    let firstIndex = null;
-    entries.forEach((entry) => {
-      const idx = addModelEntry(entry, { versionLabel: "editor" });
-      if (firstIndex == null) firstIndex = idx;
-    });
-    console.log(`[Blockscape] imported ${entries.length} model(s) from editor`);
-    return { index: firstIndex, count: entries.length };
-  }
-
-  function importEditorPayload(trigger = "storage") {
-    const result = consumeEditorPayload();
-    if (!result || typeof result.index !== "number") return false;
-    setActive(result.index);
-    console.log(
-      `[Blockscape] imported ${result.count} model(s) from editor via ${trigger}.`
-    );
-    return true;
-  }
-
   function updateShareHashForModel(model, fallbackTitle = "Shared Model") {
     if (!model || !model.data) {
       throw new Error("Select or load a model before sharing.");
@@ -5568,22 +5505,110 @@ export function initBlockscape(featureOverrides = {}) {
     const abstractWrapper = document.createElement("div");
     abstractWrapper.className = "blockscape-abstract-panel";
     abstractPanel.appendChild(modelMeta.cloneNode(true));
-    if (model.m.abstract) {
-      console.log("[Blockscape] Rendering abstract content");
-      const abstractDiv = document.createElement("div");
-      abstractDiv.className = "blockscape-abstract";
-      abstractDiv.innerHTML = model.m.abstract;
-      enhanceAbstractWithGistLinks(abstractDiv);
-      abstractWrapper.appendChild(abstractDiv);
-      infoTooltipHtml = abstractDiv.outerHTML;
-    } else {
-      console.log("[Blockscape] No abstract found in model.m");
-      const placeholder = document.createElement("div");
-      placeholder.className = "blockscape-abstract-placeholder";
-      placeholder.textContent = "No abstract has been provided for this model.";
-      abstractWrapper.appendChild(placeholder);
-      infoTooltipHtml = placeholder.outerHTML;
-    }
+
+    const infoForm = document.createElement("form");
+    infoForm.className = "blockscape-info-form";
+    infoForm.noValidate = true;
+
+    const controls = document.createElement("div");
+    controls.className = "blockscape-info-fields";
+
+    const makeField = (labelText, controlEl) => {
+      const wrapper = document.createElement("label");
+      wrapper.className = "blockscape-info-field";
+      const label = document.createElement("span");
+      label.className = "blockscape-info-label";
+      label.textContent = labelText;
+      wrapper.append(label, controlEl);
+      return wrapper;
+    };
+
+    const titleInput = document.createElement("input");
+    titleInput.type = "text";
+    titleInput.className = "pf-v5-c-form-control";
+    titleInput.placeholder = "Title";
+    titleInput.value =
+      (model.m.title && model.m.title.toString()) ||
+      getModelTitle(models[activeIndex], "");
+
+    const abstractInput = document.createElement("textarea");
+    abstractInput.className = "pf-v5-c-form-control";
+    abstractInput.rows = 6;
+    abstractInput.placeholder = "Abstract (supports basic HTML)";
+    abstractInput.value = model.m.abstract || "";
+
+    const applyInfoChanges = () => {
+      if (activeIndex < 0) return;
+      const entry = models[activeIndex];
+      const nextTitle = (titleInput.value || "").trim();
+      const nextAbstract = abstractInput.value || "";
+      let changed = false;
+
+      const currentTitle = (entry.data?.title || "").toString();
+      if (nextTitle !== currentTitle) {
+        entry.data.title = nextTitle;
+        if (!entry.isSeries && !entry.apicurioVersions?.length) {
+          entry.title = nextTitle;
+        }
+        changed = true;
+      }
+
+      const currentAbstract = entry.data?.abstract || "";
+      if (nextAbstract !== currentAbstract) {
+        entry.data.abstract = nextAbstract;
+        changed = true;
+      }
+
+      if (!changed) return;
+      renderModelList();
+      loadActiveIntoEditor();
+      rebuildFromActive();
+    };
+
+    titleInput.addEventListener("blur", applyInfoChanges);
+    abstractInput.addEventListener("blur", applyInfoChanges);
+    infoForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+      applyInfoChanges();
+    });
+
+    controls.append(
+      makeField("Title", titleInput),
+      makeField("Abstract", abstractInput)
+    );
+
+    const infoActions = document.createElement("div");
+    infoActions.className = "blockscape-info-actions";
+    const saveButton = document.createElement("button");
+    saveButton.type = "submit";
+    saveButton.className = "pf-v5-c-button pf-m-primary";
+    saveButton.textContent = "Update";
+    infoActions.appendChild(saveButton);
+
+    infoForm.append(controls, infoActions);
+
+    const formatAbstractHtml = (value) => {
+      if (!value) return "";
+      return value.replace(/\n/g, "<br>");
+    };
+
+    const abstractValue = model.m.abstract || "";
+    const abstractHtml = formatAbstractHtml(abstractValue);
+    const hasAbstract = Boolean(abstractHtml);
+    const abstractPreview = document.createElement("div");
+    abstractPreview.className = hasAbstract
+      ? "blockscape-abstract"
+      : "blockscape-abstract-placeholder";
+    abstractPreview.innerHTML = hasAbstract
+      ? abstractHtml
+      : "No abstract has been provided for this model.";
+    enhanceAbstractWithGistLinks(abstractPreview);
+
+    // Show preview first, then editing controls beneath it.
+    abstractWrapper.appendChild(abstractPreview);
+    abstractWrapper.appendChild(infoForm);
+
+    infoTooltipHtml = abstractPreview.outerHTML;
     activeInfoTooltipHtml = infoTooltipHtml;
     abstractPanel.appendChild(abstractWrapper);
 
@@ -7657,79 +7682,6 @@ export function initBlockscape(featureOverrides = {}) {
     });
   }
 
-  if (editButton) {
-    editButton.addEventListener("click", () => {
-      const text = (jsonBox.value || "").trim();
-      if (!text) {
-        alert("Load or paste a model before opening the editor.");
-        return;
-      }
-      try {
-        JSON.parse(text);
-      } catch (err) {
-        alert("Current JSON is invalid. Fix it before opening the editor.");
-        return;
-      }
-      try {
-        const payload = {
-          ts: Date.now(),
-          text,
-          source: "viewer",
-        };
-        if (selection) {
-          payload.selectedItemId = selection;
-        }
-        localStorage.setItem(EDITOR_TRANSFER_KEY, JSON.stringify(payload));
-      } catch (storageError) {
-        console.error(
-          "[Blockscape] failed to store editor payload",
-          storageError
-        );
-        alert("Unable to stash JSON for the editor (storage disabled?).");
-        return;
-      }
-      let editorUrl = "editor.html#viewer";
-      if (selection) {
-        const encoded = encodeURIComponent(selection);
-        editorUrl = `editor.html?selected=${encoded}#viewer`;
-      }
-      window.open(editorUrl, "_blank");
-    });
-  }
-
-  if (typeof window !== "undefined") {
-    window.addEventListener("storage", (event) => {
-      if (!event) return;
-      if (event.storageArea && event.storageArea !== window.localStorage)
-        return;
-      if (event.key !== EDITOR_TRANSFER_KEY) return;
-      if (!event.newValue) return;
-      let payload;
-      try {
-        payload = JSON.parse(event.newValue);
-      } catch (err) {
-        console.warn("[Blockscape] storage payload parse failed", err);
-        return;
-      }
-      if (!payload || payload.source !== "editor") return;
-      importEditorPayload("storage-event");
-    });
-
-    window.addEventListener("message", (event) => {
-      if (!event || !event.data) return;
-      const currentOrigin = window.location.origin;
-      if (currentOrigin && currentOrigin !== "null") {
-        if (event.origin !== currentOrigin) return;
-      } else if (event.origin && event.origin !== "null") {
-        return;
-      }
-      if (typeof event.data !== "object") return;
-      if (event.data === null) return;
-      if (event.data.type !== EDITOR_TRANSFER_MESSAGE_TYPE) return;
-      importEditorPayload("message");
-    });
-  }
-
   document.addEventListener("keydown", (event) => {
     if (isShortcutHelpOpen()) {
       if (event.key === "Escape") {
@@ -9181,8 +9133,6 @@ export function initBlockscape(featureOverrides = {}) {
         ? serverPathResult.modelIndex
         : null;
     const loadIndex = await consumeLoadParam();
-    const editorResult = consumeEditorPayload();
-    const editorIndex = editorResult?.index;
     const shareIndex = consumeShareLink();
     const initialIndex =
       typeof serverPathIndex === "number"
@@ -9191,8 +9141,6 @@ export function initBlockscape(featureOverrides = {}) {
         ? loadIndex
         : typeof shareIndex === "number"
         ? shareIndex
-        : typeof editorIndex === "number"
-        ? editorIndex
         : firstSeedIndex ?? 0;
     setActive(initialIndex);
     if (

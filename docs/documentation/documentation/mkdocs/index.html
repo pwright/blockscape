@@ -87,10 +87,6 @@
 </li>
                                     
 <li>
-    <a href="../editor/" class="dropdown-item">Editor</a>
-</li>
-                                    
-<li>
     <a href="../evolution/" class="dropdown-item">Evolution</a>
 </li>
                                     
@@ -111,6 +107,10 @@
 </li>
                                     
 <li>
+    <a href="../rise-and-fall-json/" class="dropdown-item">JSON prompting</a>
+</li>
+                                    
+<li>
     <a href="../navigation/" class="dropdown-item">Navigation</a>
 </li>
                                     
@@ -124,6 +124,10 @@
                                     
 <li>
     <a href="../relational-awareness/" class="dropdown-item">Relational awareness</a>
+</li>
+                                    
+<li>
+    <a href="../share-links/" class="dropdown-item">Share links</a>
 </li>
                                     
 <li>
@@ -160,11 +164,19 @@
 </li>
                                     
 <li>
+    <a href="../bs-opener-linux/" class="dropdown-item">Local usage on Linux</a>
+</li>
+                                    
+<li>
+    <a href="../bs-opener-mac/" class="dropdown-item">Local usage on Mac</a>
+</li>
+                                    
+<li>
     <a href="../server/" class="dropdown-item">Local backend server</a>
 </li>
                                     
 <li>
-    <a href="../../neutralino-app/" class="dropdown-item">Neutralino app</a>
+    <a href="../../neutralino-app/" class="dropdown-item">Desktop app (Linux and macos)</a>
 </li>
                                 </ul>
                             </li>
@@ -252,8 +264,59 @@ PYTHONPATH=documentation mkdocs build   # static output to docs/documentation/
 </code></pre>
 <p>The root <code>npm run docs:build</code> script runs the same build. Avoid editing the generated HTML under <code>docs/</code>; rebuild instead.</p>
 <h2 id="author-a-map-in-markdown">Author a map in Markdown</h2>
-<p>Add a fenced block with the <code>blockscape</code> bs file.</p>
-<p>The MkDocs extension turns the block into a mount point, and the bundled JS/CSS renders each map inline with local file access disabled for docs.</p></div>
+<p>Create a fenced code block with <code>blockscape</code> containing your map JSON:</p>
+<pre><code>{
+  &quot;title&quot;: &quot;Demo map&quot;,
+  &quot;categories&quot;: [    {
+      &quot;id&quot;: &quot;shared-foundations&quot;,
+      &quot;title&quot;: &quot;Shared Foundations&quot;,
+      &quot;items&quot;: [
+        {
+          &quot;id&quot;: &quot;experiments-learning&quot;,
+          &quot;name&quot;: &quot;Experiments &amp; Learning&quot;
+        },
+        {
+          &quot;id&quot;: &quot;custom-build&quot;,
+          &quot;name&quot;: &quot;Custom Build&quot;
+        },
+        {
+          &quot;id&quot;: &quot;standard-components&quot;,
+          &quot;name&quot;: &quot;Standard Components&quot;
+        }
+      ]
+    }
+  ]
+}
+
+</code></pre>
+<p>The plugin renders the interactive Blockscape view inline with local file access disabled.</p>
+<p>Here is the same code, but with the mkdocs extension <code>blockscape</code> codefence:</p>
+<div class="blockscape-root">
+  <script type="application/json" class="blockscape-seed">
+{
+  "title": "Demo map",
+  "categories": [    {
+      "id": "shared-foundations",
+      "title": "Shared Foundations",
+      "items": [
+        {
+          "id": "experiments-learning",
+          "name": "Experiments & Learning"
+        },
+        {
+          "id": "custom-build",
+          "name": "Custom Build"
+        },
+        {
+          "id": "standard-components",
+          "name": "Standard Components"
+        }
+      ]
+    }
+  ]
+}
+  </script>
+</div></div>
             </div>
         </div>
 

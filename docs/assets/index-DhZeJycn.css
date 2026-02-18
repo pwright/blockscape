@@ -1639,10 +1639,40 @@ a {
       word-break: break-all;
     }
 .blockscape-abstract-panel {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-md);
-    }
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+.blockscape-info-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+.blockscape-info-fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+.blockscape-info-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+  font-weight: var(--font-weight-semibold);
+  color: var(--blockscape-muted-strong);
+}
+.blockscape-info-label {
+  font-size: var(--font-size-xs);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.blockscape-info-form .pf-v5-c-form-control {
+  width: 100%;
+  border-radius: 0;
+}
+.blockscape-info-actions {
+  display: flex;
+  gap: var(--space-xs);
+}
 .blockscape-abstract-placeholder {
       border: 1px dashed var(--color-border);
       border-radius: var(--radius-md);

@@ -18,7 +18,6 @@ nav:
       - Models: documentation/models.md
       - Build patterns: documentation/build-patterns.md
       - LLM generation: documentation/llm-generation.md
-      - Editor: documentation/editor.md
       - Evolution: documentation/evolution.md
       - Gestalt: documentation/gestalt.md
       - Gists: documentation/gists.md
@@ -41,7 +40,7 @@ nav:
       - Local usage on Linux: documentation/bs-opener-linux.md
       - Local usage on Mac: documentation/bs-opener-mac.md
       - Local backend server: documentation/server.md
-      - Neutralino app: neutralino-app.md
+      - Desktop app (Linux and macos): neutralino-app.md
   - TOC: toc.md
 
 markdown_extensions:
