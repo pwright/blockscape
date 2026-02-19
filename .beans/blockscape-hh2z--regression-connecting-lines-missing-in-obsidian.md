@@ -16,4 +16,4 @@ Connecting lines between panel coins no longer visible when viewing in Obsidian.
 - [ ] Update related docs/screenshots if needed.
 - [x] Run relevant checks (build) and note results.
 
-Investigated Obsidian plugin overlay; `.svg-layer` was sized via `width/height:100%` which collapses when parent height is auto in Obsidian, preventing dependency lines from rendering. Final fix: viewport-fixed overlay translated to the centered root bounds so line coordinates align. Built plugin with new build stamp system (`npm run package` -> build #7).
+Investigated Obsidian plugin overlay; `.svg-layer` was sized via `width/height:100%` which collapses when parent height is auto in Obsidian, preventing dependency lines from rendering. Final fix: restored legacy overlay anchoring (absolute inside root, sized to root, no transforms) for predictable edge alignment. Built plugin with new build stamp system (`npm run package` -> build #22).

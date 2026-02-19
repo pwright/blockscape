@@ -1,8 +1,5 @@
 const { Plugin, Notice, TFile } = require('obsidian');
 
-// Build stamp is replaced automatically by bump-build.js
-const BUILD_NUMBER = "24";
-
 class BlockscapeViewerPlugin extends Plugin {
   async onload() {
     this.autosaveEnabled = this.loadAutosaveSetting();
@@ -128,42 +125,6 @@ class BlockscapeViewerPlugin extends Plugin {
     }
 
     const root = el.createDiv({ cls: 'blockscape-root blockscape-obsidian' });
-    // Subtle build badge for traceability in Obsidian
-    const buildBadge = root.createDiv({
-      cls: 'blockscape-build-badge',
-      text: `obsidian build #${BUILD_NUMBER}`,
-    });
-    buildBadge.setAttribute('aria-hidden', 'true');
-
-    // Align overlay to the root (legacy reliable behavior)
-    const repositionOverlay = () => {
-      const layer =
-        root.querySelector('.svg-layer') || document.querySelector('.svg-layer');
-      if (!layer) return;
-
-      // Ensure overlay lives under the map root so absolute coords align
-      if (layer.parentNode !== root) {
-        layer.parentNode?.removeChild(layer);
-        root.appendChild(layer);
-      }
-
-      const rect = root.getBoundingClientRect();
-      layer.style.position = 'absolute';
-      layer.style.left = '0px';
-      layer.style.top = '0px';
-      layer.style.width = `${rect.width}px`;
-      layer.style.height = `${rect.height}px`;
-      layer.style.transform = 'translate(0, 0)';
-      layer.style.pointerEvents = 'none';
-      layer.style.zIndex = '5';
-      layer.removeAttribute('viewBox'); // let width/height control
-      layer.setAttribute('width', String(rect.width));
-      layer.setAttribute('height', String(rect.height));
-    };
-
-    repositionOverlay();
-    window.addEventListener('resize', repositionOverlay);
-    root.addEventListener('scroll', repositionOverlay);
     if (Array.isArray(seed)) {
       root.__blockscapeSeriesSeed = seed;
     }
@@ -206,6 +167,27 @@ class BlockscapeViewerPlugin extends Plugin {
 
     // force dark palette to match Obsidian dark theme
     document.documentElement.setAttribute('data-theme', 'dark');
+
+    // Reposition overlay to align lines with tiles inside the centered container.
+    const repositionOverlay = () => {
+      const layer = root.querySelector('.svg-layer') || document.querySelector('.svg-layer');
+      if (!layer) return;
+      const rect = root.getBoundingClientRect();
+      layer.style.position = 'absolute';
+      layer.style.left = '0px';
+      layer.style.top = '0px';
+      layer.style.width = `${rect.width}px`;
+      layer.style.height = `${rect.height}px`;
+      layer.style.transform = 'translate(0, 0)';
+      layer.style.pointerEvents = 'none';
+      layer.style.background = 'rgba(255,0,0,0.03)'; // debug overlay tint
+      layer.setAttribute('width', String(rect.width));
+      layer.setAttribute('height', String(rect.height));
+    };
+
+    repositionOverlay();
+    window.addEventListener('resize', repositionOverlay);
+    root.addEventListener('scroll', repositionOverlay);
   }
 
   injectSaveControls({ el, root, ctx, initialSource, instance, baseFeatures }) {
