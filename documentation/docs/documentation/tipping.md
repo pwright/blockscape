@@ -450,7 +450,7 @@
 
   function renderPanelCoins() {
     panelCoinsEl.innerHTML = "";
-    ["U", "M", "D"].forEach(letter => {
+    ["V", "C", "D"].forEach(letter => {
       const coin = createCoin(0, letter, true);
       panelCoinsEl.appendChild(coin);
     });
@@ -637,3 +637,4 @@ What if we joined the two concepts together with a pinch of wardley?
 
 Clicking around might help. 
 If not, try **Next** in top menu.
+

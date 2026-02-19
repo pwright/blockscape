@@ -221,23 +221,11 @@
             
             <li class="nav-item" data-bs-level="1"><a href="#neutralino-app-blockscape-viewer" class="nav-link">Neutralino App (Blockscape Viewer)</a>
               <ul class="nav flex-column">
-            <li class="nav-item" data-bs-level="2"><a href="#requirements" class="nav-link">Requirements</a>
+            <li class="nav-item" data-bs-level="2"><a href="#running-app" class="nav-link">Running app</a>
               <ul class="nav flex-column">
               </ul>
             </li>
-            <li class="nav-item" data-bs-level="2"><a href="#install-neutralino-binaries" class="nav-link">Install Neutralino Binaries</a>
-              <ul class="nav flex-column">
-              </ul>
-            </li>
-            <li class="nav-item" data-bs-level="2"><a href="#build-the-neutralino-assets" class="nav-link">Build the Neutralino Assets</a>
-              <ul class="nav flex-column">
-              </ul>
-            </li>
-            <li class="nav-item" data-bs-level="2"><a href="#run-the-app-dev" class="nav-link">Run the App (Dev)</a>
-              <ul class="nav flex-column">
-              </ul>
-            </li>
-            <li class="nav-item" data-bs-level="2"><a href="#run-the-app-packaged" class="nav-link">Run the App (Packaged)</a>
+            <li class="nav-item" data-bs-level="2"><a href="#building-app" class="nav-link">Building app</a>
               <ul class="nav flex-column">
               </ul>
             </li>
@@ -249,28 +237,32 @@
                     <div class="col-md-9" role="main">
 
 <h1 id="neutralino-app-blockscape-viewer">Neutralino App (Blockscape Viewer)</h1>
-<h2 id="requirements">Requirements</h2>
+<h2 id="running-app">Running app</h2>
+<p>Choose the file for your hardware at https://github.com/pwright/blockscape/tree/main/nj/dist/blockscape-nj</p>
+<p>You must also download the <a href="https://github.com/pwright/blockscape/raw/refs/heads/main/nj/dist/blockscape-nj/resources.neu">resources.neu</a> file and place it in same dir as executable. </p>
+<h2 id="building-app">Building app</h2>
+<h3 id="requirements">Requirements</h3>
 <ul>
 <li>Node.js 20</li>
 <li>Neutralino CLI (<code>neu</code>) installed</li>
 <li>Build dependencies installed (<code>npm install</code>)</li>
 </ul>
-<h2 id="install-neutralino-binaries">Install Neutralino Binaries</h2>
+<h3 id="install-neutralino-binaries">Install Neutralino Binaries</h3>
 <p>Run this from the repo root:</p>
 <pre><code class="language-sh">cd nj
 neu update
 </code></pre>
-<h2 id="build-the-neutralino-assets">Build the Neutralino Assets</h2>
+<h3 id="build-the-neutralino-assets">Build the Neutralino Assets</h3>
 <p>From the repo root:</p>
 <pre><code class="language-sh">npm run export:nj
 </code></pre>
 <p>This writes the Blockscape bundle to <code>nj/resources/site_assets/blockscape/</code>.</p>
-<h2 id="run-the-app-dev">Run the App (Dev)</h2>
+<h3 id="run-the-app-dev">Run the App (Dev)</h3>
 <p>Use the directory resources directly (fast iteration):</p>
 <pre><code class="language-sh">cd nj
 neu run --load-dir-res
 </code></pre>
-<h2 id="run-the-app-packaged">Run the App (Packaged)</h2>
+<h3 id="run-the-app-packaged">Run the App (Packaged)</h3>
 <p>Use packaged <code>resources.neu</code>:</p>
 <pre><code class="language-sh">cd nj
 neu build
