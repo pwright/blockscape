@@ -10650,16 +10650,72 @@ ${text2}` : text2;
     try {
       const parsed = new URL(candidate, window.location.href);
       const host = parsed.hostname.toLowerCase();
-      return host === "gist.githubusercontent.com" || host.startsWith("gist.") && host.endsWith("githubusercontent.com");
+      return host === "gist.github.com" || host === "gist.githubusercontent.com" || host.startsWith("gist.") && host.endsWith("githubusercontent.com");
     } catch {
       return false;
     }
   }
+  function normalizeLoadTargetUrl(candidate) {
+    if (!candidate) return null;
+    const trimmed = candidate.toString().trim();
+    if (!trimmed) return null;
+    try {
+      const parsed = new URL(trimmed, window.location.href);
+      if (parsed.hostname === "gist.github.com") {
+        const raw = rewriteGistPageToRaw(parsed);
+        if (raw) return raw.toString();
+      }
+      if (parsed.hostname === "gist.githubusercontent.com") {
+        const raw = ensureGistRawPath(parsed);
+        if (raw) return raw.toString();
+      }
+      return parsed.toString();
+    } catch {
+      return trimmed;
+    }
+  }
+  function ensureGistRawPath(urlObj) {
+    try {
+      const parsed = new URL(urlObj.toString());
+      const parts = parsed.pathname.split("/").filter(Boolean);
+      if (parts.includes("raw")) return parsed;
+      if (parts.length >= 2) {
+        const [user, gistId, ...rest] = parts;
+        const remainder = rest.join("/");
+        parsed.pathname = `/${user}/${gistId}/raw${remainder ? `/${remainder}` : ""}`;
+        return parsed;
+      }
+      return parsed;
+    } catch {
+      return null;
+    }
+  }
+  function rewriteGistPageToRaw(urlObj) {
+    try {
+      const parts = urlObj.pathname.split("/").filter(Boolean);
+      if (parts.length < 2) return urlObj;
+      const [user, gistId, ...rest] = parts;
+      const fileFromPath = rest.find((p) => p.includes("."));
+      let fileFromHash = null;
+      if (urlObj.hash && urlObj.hash.startsWith("#file-")) {
+        fileFromHash = urlObj.hash.replace(/^#file-/, "").replace(/-/g, ".");
+      }
+      const filename = fileFromPath || fileFromHash || "";
+      const raw = new URL(`https://gist.githubusercontent.com/${user}/${gistId}/raw/${filename}`);
+      return raw;
+    } catch {
+      return urlObj;
+    }
+  }
   async function loadFromUrl(url) {
     try {
-      console.log("[Blockscape] loading from URL:", url);
-      const text2 = await fetchTextWithCacheBypass(url);
-      const rawName = url.split("/").pop() || "";
+      const resolvedUrl = normalizeLoadTargetUrl(url);
+      console.log("[Blockscape] loading from URL:", {
+        requested: url,
+        resolved: resolvedUrl
+      });
+      const text2 = await fetchTextWithCacheBypass(resolvedUrl);
+      const rawName = (resolvedUrl || url || "").split("/").pop() || "";
       const baseName = rawName.replace(/\.[^.]+$/, "") || "URL Model";
       let entries;
       try {

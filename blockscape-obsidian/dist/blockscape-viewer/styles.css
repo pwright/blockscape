@@ -111,7 +111,7 @@
   margin: 0 auto;
 }
 
-/* Overlay lives inside the map root so paths track tiles */
+/* Force overlay to be absolutely positioned so we can shift it */
 .svg-layer {
   position: absolute !important;
   top: 0 !important;
@@ -119,26 +119,7 @@
   width: 100% !important;
   height: 100% !important;
   pointer-events: none;
-  z-index: 5;
-}
-
-/* Make dependency lines loud/visible inside Obsidian */
-.svg-layer path {
-  stroke-width: 2.6px !important;
-  stroke-opacity: 0.75 !important;
-}
-
-.blockscape-build-badge {
-  position: absolute;
-  right: 10px;
-  bottom: 8px;
-  font-size: 10px;
-  line-height: 1.2;
-  font-family: var(--font-mono, "JetBrains Mono", monospace);
-  color: var(--color-muted);
-  opacity: 0.55;
-  pointer-events: none;
-  user-select: none;
+  z-index: 0;
 }
 
 /* Version nav (series strip) */

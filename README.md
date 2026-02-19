@@ -174,6 +174,15 @@ NOTE: This process creates new tabs in your browser.
 
 - **Del** to delete an item (ctrl-z to undo)
 
+### Loading a remote .bs file via URL
+
+Append `?load=<url>` (or `#load=<url>`) to the app URL to auto-load a remote `.bs`/JSON file. Examples:
+
+- `https://blockscape.app/?load=https://example.com/my-map.bs`
+- `https://blockscape.app/#load=https://gist.github.com/user/gistid#file-map.bs`
+
+Gist page URLs are rewritten to their raw content automatically; direct `gist.githubusercontent.com/.../raw/...` links also work.
+
 ## Development
 
 - Primary app lives in `svelte/` (Vite + Svelte). Run `npm run dev` for the dev server on http://localhost:5173.
