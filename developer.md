@@ -70,6 +70,11 @@ cd nj && neu build -- --load-dir-res && cd ..
 - `.bs` files in `svelte/public/` are good fixtures for manual QA; keep them in sync with schema changes.
 - Avoid editing `docs/` directly; rebuild after changes. If you touch the legacy root `index.html`, keep `developer.md` notes updated.
 
+## Obsidian overlay rendering (SVG lines)
+- The Obsidian plugin moves `.svg-layer` into a shadow host (`.svg-layer-host`) appended to the map root to isolate it from vault/theme CSS.
+- Overlay/host stay `position:absolute` at `0,0` with width/height set to the root bounding box (no viewport translate), `pointer-events: none`, `z-index: 5`.
+- Inside the shadow we boost visibility: `stroke-width: 2.6px`, `stroke-opacity: 0.75`.
+- Touch points: `blockscape-obsidian/dist/blockscape-viewer/main.js` (host creation/move) and `.../styles.css` (z-index + stroke). Repackage with `npm --prefix blockscape-obsidian run package` to stamp a new build.
 
 
 ## Svelte + legacy `index.html`

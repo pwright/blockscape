@@ -54,7 +54,7 @@
         "items": [
           {
             "id": "tcp-session",
-            "name": "End-to-End TCP Session",
+            "name": "End-to-End TCP",
             "deps": []
           }
         ]
@@ -65,7 +65,7 @@
         "items": [
           {
             "id": "kubernetes-pod",
-            "name": "Kubernetes Pods / Nodes",
+            "name": "Kubernetes Pods /",
             "deps": []
           }
         ]
@@ -103,7 +103,7 @@
         "items": [
           {
             "id": "skupper-listener",
-            "name": "Skupper Router (Listener)",
+            "name": "Skupper Router",
             "deps": [
               "van-fabric"
             ],
@@ -111,7 +111,7 @@
           },
           {
             "id": "skupper-connector",
-            "name": "Skupper Router (Connector)",
+            "name": "Skupper Router",
             "deps": [
               "van-fabric"
             ],
@@ -125,7 +125,7 @@
         "items": [
           {
             "id": "van-fabric",
-            "name": "Routing Fabric (AMQP/TCP)",
+            "name": "Routing Fabric",
             "deps": [
               "router-runtime"
             ],
@@ -158,14 +158,14 @@
         "items": [
           {
             "id": "dp-client-tcp-session",
-            "name": "Client \u2194 Listener TCP Session",
+            "name": "Client \u2194 Listener TCP",
             "deps": [
               "dp-listener-proxy"
             ]
           },
           {
             "id": "dp-server-tcp-session",
-            "name": "Connector \u2194 Server TCP Session",
+            "name": "Connector \u2194 Server TCP",
             "deps": [
               "dp-connector-proxy"
             ]
@@ -178,7 +178,7 @@
         "items": [
           {
             "id": "dp-listener-proxy",
-            "name": "Listening Router TCP Termination",
+            "name": "Listening Router TCP",
             "deps": [
               "dp-stream-bridge",
               "dp-socket-gating"
@@ -187,7 +187,7 @@
           },
           {
             "id": "dp-connector-proxy",
-            "name": "Connecting Router TCP Termination",
+            "name": "Connecting Router TCP",
             "deps": [
               "dp-stream-bridge",
               "dp-backend-dialer"
@@ -202,7 +202,7 @@
         "items": [
           {
             "id": "dp-stream-bridge",
-            "name": "TCP Payload Stream Bridge",
+            "name": "TCP Payload Stream",
             "deps": [
               "dp-frame-encoding",
               "dp-flow-control"
@@ -211,7 +211,7 @@
           },
           {
             "id": "dp-flow-control",
-            "name": "Credit / Backpressure Mapping",
+            "name": "Credit / Backpressure",
             "deps": [
               "dp-van-transport"
             ],
@@ -219,7 +219,7 @@
           },
           {
             "id": "dp-frame-encoding",
-            "name": "Framing & Multiplexing (Streams/Links)",
+            "name": "Framing &",
             "deps": [
               "dp-van-transport"
             ],
@@ -233,7 +233,7 @@
         "items": [
           {
             "id": "dp-van-transport",
-            "name": "AMQP over TCP (optionally TLS)",
+            "name": "AMQP over TCP",
             "deps": [
               "dp-router-mesh"
             ],
@@ -241,7 +241,7 @@
           },
           {
             "id": "dp-router-mesh",
-            "name": "Inter-Router Mesh & Paths",
+            "name": "Inter-Router Mesh &",
             "deps": [
               "dp-network-connectivity"
             ],
@@ -255,7 +255,7 @@
         "items": [
           {
             "id": "dp-network-connectivity",
-            "name": "L3/L4 Network Paths (K8s/Underlay)",
+            "name": "L3/L4 Network Paths",
             "deps": []
           }
         ]
@@ -279,7 +279,7 @@
         "items": [
           {
             "id": "cp-connect-success",
-            "name": "Connect Succeeds (Handshake + Data Exchange)",
+            "name": "Connect Succeeds",
             "deps": [
               "cp-socket-open",
               "cp-service-route"
@@ -287,14 +287,14 @@
           },
           {
             "id": "cp-no-route-to-host",
-            "name": "No-route-to-host / Connection Refused",
+            "name": "No-route-to-host /",
             "deps": [
               "cp-socket-closed"
             ]
           },
           {
             "id": "cp-accepted-then-closed",
-            "name": "Accepted then Immediately Closed",
+            "name": "Accepted then",
             "deps": [
               "cp-propagation-lag",
               "cp-socket-open"
@@ -308,7 +308,7 @@
         "items": [
           {
             "id": "cp-socket-open",
-            "name": "Listening Socket Open (Backend Present)",
+            "name": "Listening Socket Open",
             "deps": [
               "cp-socket-gating"
             ],
@@ -316,7 +316,7 @@
           },
           {
             "id": "cp-socket-closed",
-            "name": "Listening Socket Closed (No Backends)",
+            "name": "Listening Socket",
             "deps": [
               "cp-socket-gating"
             ],
@@ -339,7 +339,7 @@
         "items": [
           {
             "id": "cp-service-route",
-            "name": "Selected Connector Route (Service Path)",
+            "name": "Selected Connector",
             "deps": [
               "cp-routing-updates",
               "cp-fabric-topology"
@@ -348,7 +348,7 @@
           },
           {
             "id": "cp-service-discovery",
-            "name": "Connector Presence / Service Advertisement",
+            "name": "Connector Presence /",
             "deps": [
               "cp-fabric-topology"
             ],
@@ -362,7 +362,7 @@
         "items": [
           {
             "id": "cp-routing-updates",
-            "name": "Routing Table Propagation",
+            "name": "Routing Table",
             "deps": [
               "cp-control-messages"
             ],
@@ -370,7 +370,7 @@
           },
           {
             "id": "cp-propagation-lag",
-            "name": "Propagation Lag Window",
+            "name": "Propagation Lag",
             "deps": [
               "cp-routing-updates"
             ],
@@ -378,7 +378,7 @@
           },
           {
             "id": "cp-control-messages",
-            "name": "Control Messaging over VAN",
+            "name": "Control Messaging",
             "deps": [
               "cp-fabric-topology"
             ],
@@ -392,7 +392,7 @@
         "items": [
           {
             "id": "cp-fabric-topology",
-            "name": "Inter-Router Topology & Links",
+            "name": "Inter-Router",
             "deps": [],
             "logo": "logos/skupper-logo.svg"
           }
@@ -417,14 +417,14 @@
         "items": [
           {
             "id": "lc-fast-retry",
-            "name": "Aggressive Reconnect (Exponential Backoff)",
+            "name": "Aggressive Reconnect",
             "deps": [
               "lc-observed-failures"
             ]
           },
           {
             "id": "lc-keepalives-heartbeats",
-            "name": "TCP Keepalives / App Heartbeats",
+            "name": "TCP Keepalives / App",
             "deps": [
               "lc-silent-drop-detection",
               "lc-observed-failures"
@@ -432,7 +432,7 @@
           },
           {
             "id": "lc-timeouts-idempotency",
-            "name": "App Timeouts & Retry-Safe Semantics",
+            "name": "App Timeouts &",
             "deps": [
               "lc-observed-failures"
             ]
@@ -445,7 +445,7 @@
         "items": [
           {
             "id": "lc-observed-failures",
-            "name": "RST/FIN Drops & Connection Refusals",
+            "name": "RST/FIN Drops &",
             "deps": [
               "lc-router-signal-generation",
               "lc-socket-gating-effects"
@@ -453,7 +453,7 @@
           },
           {
             "id": "lc-silent-drop-detection",
-            "name": "Detecting Silent Drops",
+            "name": "Detecting Silent",
             "deps": [
               "lc-path-loss",
               "lc-propagation-lag-effects"
@@ -467,7 +467,7 @@
         "items": [
           {
             "id": "lc-router-signal-generation",
-            "name": "Router Generates TCP RST/FIN",
+            "name": "Router Generates TCP",
             "deps": [
               "lc-router-restart",
               "lc-path-loss"
@@ -476,7 +476,7 @@
           },
           {
             "id": "lc-session-termination",
-            "name": "Terminate Client and Server Sessions",
+            "name": "Terminate Client and",
             "deps": [
               "lc-router-signal-generation"
             ],
@@ -490,7 +490,7 @@
         "items": [
           {
             "id": "lc-socket-gating-effects",
-            "name": "Socket Opens/Closes Based on Backend Reachability",
+            "name": "Socket Opens/Closes",
             "deps": [
               "lc-connectors-online"
             ],
@@ -498,7 +498,7 @@
           },
           {
             "id": "lc-propagation-lag-effects",
-            "name": "Accepted-then-Closed During Propagation Lag",
+            "name": "Accepted-then-Close",
             "deps": [
               "lc-topology-propagation"
             ],
@@ -512,7 +512,7 @@
         "items": [
           {
             "id": "lc-router-restart",
-            "name": "Listener/Intermediary Router Restart",
+            "name": "Listener/Intermedia",
             "deps": [
               "lc-router-runtime"
             ],
@@ -520,14 +520,14 @@
           },
           {
             "id": "lc-path-loss",
-            "name": "Downstream/Intermediary Path Failure",
+            "name": "Downstream/Intermed",
             "deps": [
               "lc-router-runtime"
             ]
           },
           {
             "id": "lc-connectors-online",
-            "name": "Connector Availability (At Least One Reachable)",
+            "name": "Connector Avail",
             "deps": [
               "lc-router-runtime"
             ],
@@ -535,7 +535,7 @@
           },
           {
             "id": "lc-topology-propagation",
-            "name": "Topology & Route Propagation",
+            "name": "Topology & Route",
             "deps": [
               "lc-router-runtime"
             ],
@@ -549,7 +549,7 @@
         "items": [
           {
             "id": "lc-router-runtime",
-            "name": "skupper-router Pods / Runtime",
+            "name": "skupper-router Pods /",
             "deps": [],
             "logo": "logos/skupper-logo.svg"
           }
@@ -564,6 +564,465 @@
       {
         "from": "lc-propagation-lag-effects",
         "to": "lc-timeouts-idempotency"
+      }
+    ]
+  },
+  {
+    "id": "vanflow-spec",
+    "title": "VanFlow Protocol Specification (Skupper VAN Observability)",
+    "abstract": "VanFlow specifies how components of a Virtual Application Network (VAN) (notably Skupper) emit and exchange observability events. It defines discovery (BEACON), liveness (HEARTBEAT), incremental state updates (RECORD), and resynchronization (FLUSH), carried as AMQP 1.0 messages over multicast/anycast addresses, with a codepoint-based record/attribute data model for topology, processes, and flows.",
+    "categories": [
+      {
+        "id": "user-outcomes",
+        "title": "User Outcomes",
+        "items": [
+          {
+            "id": "topology-visualization",
+            "name": "Topology",
+            "external": "https://github.com/skupperproject/vanflow-specification#vanflow-specification",
+            "deps": [
+              "collector-query-api",
+              "record-topology-model",
+              "record-incremental-updates"
+            ]
+          },
+          {
+            "id": "flow-analytics",
+            "name": "Flow Analytics",
+            "external": "https://github.com/skupperproject/vanflow-specification#transport",
+            "deps": [
+              "collector-query-api",
+              "record-flow-model",
+              "flow-opt-in-channel"
+            ]
+          },
+          {
+            "id": "health-liveness-monitoring",
+            "name": "Health & Liveness",
+            "external": "https://github.com/skupperproject/vanflow-specification#heartbeat",
+            "deps": [
+              "collector-ingest",
+              "heartbeat-message",
+              "beacon-discovery"
+            ]
+          },
+          {
+            "id": "alerting-automation",
+            "name": "Alerting & Automation",
+            "deps": [
+              "collector-query-api",
+              "record-lifecycle",
+              "collector-storage-index"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "collection-aggregation",
+        "title": "Collection & Aggregation",
+        "items": [
+          {
+            "id": "collector-ingest",
+            "name": "Collector Ingest &",
+            "external": "https://github.com/skupperproject/vanflow-specification#message-types",
+            "deps": [
+              "amqp-addressing",
+              "record-message",
+              "beacon-discovery",
+              "flush-sync"
+            ]
+          },
+          {
+            "id": "collector-storage-index",
+            "name": "Record Store / Index",
+            "deps": [
+              "collector-ingest",
+              "record-types-codepoints",
+              "record-attributes-codepoints"
+            ]
+          },
+          {
+            "id": "collector-query-api",
+            "name": "Query API",
+            "deps": [
+              "collector-storage-index",
+              "record-types-codepoints",
+              "record-lifecycle"
+            ]
+          },
+          {
+            "id": "collector-export-integrations",
+            "name": "Export & Integrations",
+            "deps": [
+              "collector-query-api",
+              "collector-storage-index"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "event-sources",
+        "title": "Event Sources",
+        "items": [
+          {
+            "id": "router-event-source",
+            "name": "Router Event Source",
+            "external": "https://github.com/skupperproject/vanflow-specification#beacon",
+            "deps": [
+              "beacon-discovery",
+              "record-message",
+              "heartbeat-message",
+              "vanflow-message-format"
+            ]
+          },
+          {
+            "id": "controller-event-source",
+            "name": "Controller Event",
+            "external": "https://github.com/skupperproject/vanflow-specification#beacon",
+            "deps": [
+              "beacon-discovery",
+              "record-message",
+              "heartbeat-message",
+              "vanflow-message-format"
+            ]
+          },
+          {
+            "id": "collector-event-source",
+            "name": "Collector Event",
+            "external": "https://github.com/skupperproject/vanflow-specification#beacon",
+            "deps": [
+              "beacon-discovery",
+              "heartbeat-message",
+              "vanflow-message-format"
+            ]
+          },
+          {
+            "id": "flow-opt-in-channel",
+            "name": "Flow Publishing",
+            "external": "https://github.com/skupperproject/vanflow-specification#transport",
+            "deps": [
+              "amqp-addressing",
+              "record-flow-model",
+              "record-message"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "protocol-operations",
+        "title": "Protocol Operations",
+        "items": [
+          {
+            "id": "beacon-discovery",
+            "name": "BEACON",
+            "external": "https://github.com/skupperproject/vanflow-specification#beacon",
+            "deps": [
+              "amqp-addressing",
+              "vanflow-message-format",
+              "protocol-versioning"
+            ]
+          },
+          {
+            "id": "heartbeat-message",
+            "name": "HEARTBEAT",
+            "external": "https://github.com/skupperproject/vanflow-specification#heartbeat",
+            "deps": [
+              "amqp-addressing",
+              "vanflow-message-format",
+              "protocol-versioning"
+            ]
+          },
+          {
+            "id": "record-message",
+            "name": "RECORD",
+            "external": "https://github.com/skupperproject/vanflow-specification#record",
+            "deps": [
+              "vanflow-message-format",
+              "record-incremental-updates",
+              "record-types-codepoints",
+              "record-attributes-codepoints"
+            ]
+          },
+          {
+            "id": "flush-sync",
+            "name": "FLUSH",
+            "external": "https://github.com/skupperproject/vanflow-specification#flush",
+            "deps": [
+              "amqp-addressing",
+              "vanflow-message-format",
+              "record-lifecycle"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "data-model",
+        "title": "Records & Semantics",
+        "items": [
+          {
+            "id": "record-types-codepoints",
+            "name": "Record Types",
+            "external": "https://github.com/skupperproject/vanflow-specification#record-types",
+            "deps": []
+          },
+          {
+            "id": "record-attributes-codepoints",
+            "name": "Record Attributes",
+            "external": "https://github.com/skupperproject/vanflow-specification#record-attributes",
+            "deps": []
+          },
+          {
+            "id": "record-incremental-updates",
+            "name": "Incremental Update",
+            "external": "https://github.com/skupperproject/vanflow-specification#record",
+            "deps": [
+              "record-types-codepoints",
+              "record-attributes-codepoints"
+            ]
+          },
+          {
+            "id": "record-lifecycle",
+            "name": "Record Lifecycle",
+            "deps": [
+              "record-attributes-codepoints",
+              "record-incremental-updates"
+            ]
+          },
+          {
+            "id": "record-topology-model",
+            "name": "Topology Model",
+            "deps": [
+              "record-types-codepoints",
+              "record-attributes-codepoints"
+            ]
+          },
+          {
+            "id": "record-flow-model",
+            "name": "Flow & Process Model",
+            "deps": [
+              "record-types-codepoints",
+              "record-attributes-codepoints"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "transport-encoding",
+        "title": "Transport & Encoding",
+        "items": [
+          {
+            "id": "amqp-1-0",
+            "name": "AMQP 1.0 Transport",
+            "external": "https://docs.oasis-open.org/amqp/core/v1.0/amqp-core-complete-v1.0.pdf",
+            "deps": []
+          },
+          {
+            "id": "amqp-addressing",
+            "name": "Addressing",
+            "external": "https://github.com/skupperproject/vanflow-specification#transport",
+            "deps": [
+              "amqp-1-0"
+            ]
+          },
+          {
+            "id": "vanflow-message-format",
+            "name": "VanFlow AMQP Message",
+            "external": "https://github.com/skupperproject/vanflow-specification#transport",
+            "deps": [
+              "amqp-1-0"
+            ]
+          },
+          {
+            "id": "protocol-versioning",
+            "name": "Protocol Version",
+            "external": "https://github.com/skupperproject/vanflow-specification#beacon",
+            "deps": [
+              "vanflow-message-format"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "skupper-network-observer-openapi",
+    "title": "Skupper Network Observer API (OpenAPI)",
+    "abstract": "The Skupper Network Observer API exposes a REST interface for retrieving live and historical topology, site, router, link, and flow information from a Skupper virtual application network. It enables UI consoles and automation tools to query observed resources, relationships, and metrics collected from the underlying VanFlow event stream and maintained by the Network Observer service.",
+    "categories": [
+      {
+        "id": "consumer-experience",
+        "title": "Consumer Experience",
+        "items": [
+          {
+            "id": "topology-view",
+            "name": "Topology View",
+            "external": "https://raw.githubusercontent.com/skupperproject/skupper/main/cmd/network-observer/spec/openapi.yaml",
+            "deps": [
+              "topology-endpoint",
+              "sites-endpoint",
+              "links-endpoint"
+            ]
+          },
+          {
+            "id": "site-detail-view",
+            "name": "Site Detail View",
+            "deps": [
+              "sites-endpoint",
+              "routers-endpoint"
+            ]
+          },
+          {
+            "id": "flow-monitoring-view",
+            "name": "Flow Monitoring View",
+            "deps": [
+              "flows-endpoint",
+              "metrics-endpoint"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "api-surface",
+        "title": "REST API Surface",
+        "items": [
+          {
+            "id": "topology-endpoint",
+            "name": "Topology Endpoint",
+            "external": "https://raw.githubusercontent.com/skupperproject/skupper/6c3ea1ae613ff35228dcd8ca30b9c9bdc5fae55c/cmd/network-observer/spec/openapi.yaml",
+            "deps": [
+              "topology-model",
+              "observer-service"
+            ]
+          },
+          {
+            "id": "sites-endpoint",
+            "name": "Sites Endpoint",
+            "deps": [
+              "site-model",
+              "observer-service"
+            ]
+          },
+          {
+            "id": "routers-endpoint",
+            "name": "Routers Endpoint",
+            "deps": [
+              "router-model",
+              "observer-service"
+            ]
+          },
+          {
+            "id": "links-endpoint",
+            "name": "Links Endpoint",
+            "deps": [
+              "link-model",
+              "observer-service"
+            ]
+          },
+          {
+            "id": "flows-endpoint",
+            "name": "Flows Endpoint",
+            "deps": [
+              "flow-model",
+              "observer-service"
+            ]
+          },
+          {
+            "id": "metrics-endpoint",
+            "name": "Metrics Endpoint",
+            "deps": [
+              "metrics-model",
+              "observer-service"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "api-models",
+        "title": "API Schemas & Models",
+        "items": [
+          {
+            "id": "topology-model",
+            "name": "Topology Schema",
+            "deps": []
+          },
+          {
+            "id": "site-model",
+            "name": "Site Schema",
+            "deps": []
+          },
+          {
+            "id": "router-model",
+            "name": "Router Schema",
+            "deps": []
+          },
+          {
+            "id": "link-model",
+            "name": "Link Schema",
+            "deps": []
+          },
+          {
+            "id": "flow-model",
+            "name": "Flow Schema",
+            "deps": []
+          },
+          {
+            "id": "metrics-model",
+            "name": "Metrics Schema",
+            "deps": []
+          }
+        ]
+      },
+      {
+        "id": "observer-core",
+        "title": "Network Observer Core",
+        "items": [
+          {
+            "id": "observer-service",
+            "name": "Observer Service",
+            "deps": [
+              "state-store",
+              "vanflow-ingest"
+            ]
+          },
+          {
+            "id": "state-store",
+            "name": "In-Memory State Store",
+            "deps": [
+              "vanflow-ingest"
+            ]
+          },
+          {
+            "id": "vanflow-ingest",
+            "name": "VanFlow Event",
+            "deps": [
+              "amqp-transport"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "transport-runtime",
+        "title": "Transport & Runtime",
+        "items": [
+          {
+            "id": "amqp-transport",
+            "name": "AMQP Transport",
+            "deps": []
+          },
+          {
+            "id": "http-server",
+            "name": "HTTP Server",
+            "deps": []
+          },
+          {
+            "id": "openapi-definition",
+            "name": "OpenAPI",
+            "external": "https://raw.githubusercontent.com/skupperproject/skupper/main/cmd/network-observer/spec/openapi.yaml",
+            "deps": [
+              "http-server"
+            ]
+          }
+        ]
       }
     ]
   }

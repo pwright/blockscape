@@ -172,7 +172,41 @@ class BlockscapeViewerPlugin extends Plugin {
     const repositionOverlay = () => {
       const layer = root.querySelector('.svg-layer') || document.querySelector('.svg-layer');
       if (!layer) return;
+
+      // Ensure overlay lives inside a shadow host to avoid external CSS interference
+      if (!root._overlayHost) {
+        const host = document.createElement('div');
+        host.className = 'svg-layer-host';
+        host.style.position = 'absolute';
+        host.style.inset = '0';
+        host.style.pointerEvents = 'none';
+        host.style.zIndex = '5';
+        host.attachShadow({ mode: 'open' });
+        root._overlayHost = host;
+        root.appendChild(host);
+      }
+
+      const host = root._overlayHost;
+      const shadow = host.shadowRoot;
+
+      if (layer.getRootNode() !== shadow) {
+        shadow.innerHTML = '';
+        const style = document.createElement('style');
+        style.textContent = `
+          .svg-layer { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+          .svg-layer path { stroke-width:2.6px !important; stroke-opacity:0.75 !important; }
+        `;
+        shadow.appendChild(style);
+        shadow.appendChild(layer);
+      }
+
       const rect = root.getBoundingClientRect();
+      host.style.width = `${rect.width}px`;
+      host.style.height = `${rect.height}px`;
+      host.style.transform = 'translate(0, 0)';
+      host.style.left = '0px';
+      host.style.top = '0px';
+
       layer.style.position = 'absolute';
       layer.style.left = '0px';
       layer.style.top = '0px';
@@ -180,7 +214,7 @@ class BlockscapeViewerPlugin extends Plugin {
       layer.style.height = `${rect.height}px`;
       layer.style.transform = 'translate(0, 0)';
       layer.style.pointerEvents = 'none';
-      layer.style.background = 'rgba(255,0,0,0.03)'; // debug overlay tint
+      layer.style.background = 'rgba(255,0,0,0)'; // no tint
       layer.setAttribute('width', String(rect.width));
       layer.setAttribute('height', String(rect.height));
     };
