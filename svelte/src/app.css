@@ -10,15 +10,19 @@
   --blockscape-tile-padding-bottom-base: var(--space-sm);
   --blockscape-tile-padding-x-base: var(--space-md);
   --blockscape-tile-gap-inner-base: calc(var(--space-2xs) * 0.5);
+  --blockscape-bg-image: none;
+  --blockscape-bg-opacity: 0;
+  --blockscape-bg-preview-height: 160px;
 }
 
-:root {
-  --blockscape-tile: calc(var(--blockscape-tile-base) * var(--blockscape-scale));
-  --blockscape-gap: calc(var(--blockscape-gap-base) * var(--blockscape-scale));
-  --blockscape-logo-size: calc(var(--blockscape-logo-size-base) * var(--blockscape-scale));
-  --blockscape-tile-padding-top: calc(var(--blockscape-tile-padding-top-base) * var(--blockscape-scale));
-  --blockscape-tile-padding-bottom: calc(var(--blockscape-tile-padding-bottom-base) * var(--blockscape-scale));
-  --blockscape-tile-padding-x: calc(var(--blockscape-tile-padding-x-base) * var(--blockscape-scale));
+    :root {
+      --blockscape-sidebar-bg-opacity: 0;
+      --blockscape-tile: calc(var(--blockscape-tile-base) * var(--blockscape-scale));
+      --blockscape-gap: calc(var(--blockscape-gap-base) * var(--blockscape-scale));
+      --blockscape-logo-size: calc(var(--blockscape-logo-size-base) * var(--blockscape-scale));
+      --blockscape-tile-padding-top: calc(var(--blockscape-tile-padding-top-base) * var(--blockscape-scale));
+      --blockscape-tile-padding-bottom: calc(var(--blockscape-tile-padding-bottom-base) * var(--blockscape-scale));
+      --blockscape-tile-padding-x: calc(var(--blockscape-tile-padding-x-base) * var(--blockscape-scale));
   --blockscape-tile-gap-inner: calc(var(--blockscape-tile-gap-inner-base) * var(--blockscape-scale));
 }
 
@@ -44,6 +48,44 @@
     .blockscape-root {
       --blockscape-logo-offset: -25px;
       --blockscape-name-offset: -45px;
+      position: relative;
+      isolation: isolate;
+    }
+
+    .blockscape-root::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background-image: var(--blockscape-bg-image);
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      opacity: var(--blockscape-bg-opacity);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .blockscape-root > * {
+      position: relative;
+      z-index: 1;
+    }
+
+    .blockscape-bg-preview {
+      position: fixed;
+      left: 0;
+      bottom: 0;
+      width: 100%;
+      height: var(--blockscape-bg-preview-height);
+      background-image: var(--blockscape-bg-image);
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      opacity: var(--blockscape-bg-opacity);
+      pointer-events: none;
+      z-index: 2;
+      transition: opacity 120ms ease, filter 120ms ease;
+      filter: saturate(1.05);
+      display: none;
     }
 
     a {
@@ -195,6 +237,28 @@
       border-color: var(--color-primary);
       box-shadow: var(--shadow-md);
       background: var(--color-surface);
+    }
+
+    .blockscape-bg-controls {
+      display: flex;
+      align-items: center;
+      gap: var(--space-xs);
+      flex-wrap: wrap;
+      max-width: 520px;
+    }
+
+    .blockscape-bg-controls input[type="url"] {
+      min-width: 220px;
+      flex: 1 1 240px;
+    }
+
+    .blockscape-bg-controls .bg-opacity {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2xs);
+      font-size: var(--font-size-sm);
+      color: var(--color-muted);
+      white-space: nowrap;
     }
 
     .blockscape-toolbar__extras {
@@ -897,6 +961,27 @@
       gap: var(--space-md);
       max-height: calc(100vh - 2 * var(--space-lg));
       overflow: hidden;
+      position: relative;
+      isolation: isolate;
+    }
+
+    .blockscape-sidebar::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background-image: var(--blockscape-bg-image);
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      opacity: var(--blockscape-sidebar-bg-opacity);
+      pointer-events: none;
+      z-index: 0;
+      border-radius: inherit;
+    }
+
+    .blockscape-sidebar > * {
+      position: relative;
+      z-index: 1;
     }
 
     @media (min-width: 1025px) {
@@ -1121,6 +1206,14 @@
       display: flex;
       flex-direction: column;
       gap: var(--space-lg);
+      position: relative;
+      isolation: isolate;
+      background: transparent;
+    }
+
+    .blockscape-main > * {
+      position: relative;
+      z-index: 1;
     }
 
     .blockscape-json-panel,
@@ -1267,6 +1360,13 @@
 
     .blockscape-main-section {
       padding: 0 var(--space-lg) var(--space-xl);
+      position: relative;
+      isolation: isolate;
+    }
+
+    .blockscape-main-section > * {
+      position: relative;
+      z-index: 1;
     }
 
     .blockscape-model-meta {
@@ -1779,17 +1879,34 @@
       margin: calc(var(--space-md) / 4) 0;
     }
 
-    .blockscape-render {
-      display: flex;
-      flex-direction: column;
-      gap: calc(var(--space-lg) / 4);
-      position: relative;
-    }
+.blockscape-render {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--space-lg) / 4);
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
 
-    .map-controls {
-      display: flex;
-      align-items: center;
-      justify-content: flex-end;
+.blockscape-render::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: var(--blockscape-bg-image);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  opacity: calc(var(--blockscape-bg-opacity) * 0.5);
+  pointer-events: none;
+  z-index: 0;
+  border-radius: var(--radius-lg);
+  filter: saturate(1.02);
+}
+
+.map-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
       gap: var(--space-sm);
       margin-bottom: var(--space-sm);
       flex-wrap: wrap;

@@ -147,6 +147,7 @@ export function initBlockscape(featureOverrides = {}) {
   let activeInfoTooltipHtml = "";
   let pendingInfoPreview = false;
   let infoTabTwinkleTimer = null;
+  let bgPreview = null;
   const versionThumbScroll = new Map(); // key -> scrollLeft
   let apicurioSettingsToggle = null;
   let activeSeriesPreviewTarget = null;
@@ -198,6 +199,12 @@ export function initBlockscape(featureOverrides = {}) {
   const COLOR_PRESETS_STORAGE_KEY = "blockscape:colorPresets";
   const CENTER_ITEMS_STORAGE_KEY = "blockscape:centerItems";
   const THEME_STORAGE_KEY = "blockscape:theme";
+  const BG_IMAGE_STORAGE_KEY = "blockscape:bgImageUrl";
+  const DEFAULT_BACKGROUND_URL =
+    "https://commons.wikimedia.org/wiki/Category:Background_images#/media/File:Bank-vault-door-black-background-bw-web.jpg";
+  const BG_OPACITY_STORAGE_KEY = "blockscape:bgImageOpacity";
+  const DEFAULT_BG_OPACITY = 0.35;
+  const SIDEBAR_BG_ENABLED_STORAGE_KEY = "blockscape:sidebarBgEnabled";
   const STAGE_COLUMN_COUNT = 4;
   const STAGE_MIN = 1;
   const STAGE_MAX = 4;
@@ -206,6 +213,7 @@ export function initBlockscape(featureOverrides = {}) {
   const THEME_DARK = "dark";
   const CATEGORY_VIEW_VERSION_PREFIX = "cat:";
   const DEFAULT_CENTER_ITEMS = false;
+  const DEFAULT_SIDEBAR_BG_ENABLED = false;
   const DEP_COLOR_STORAGE_KEY = "blockscape:depColor";
   const REVDEP_COLOR_STORAGE_KEY = "blockscape:revdepColor";
   const LINK_THICKNESS_STORAGE_KEY = "blockscape:linkThickness";
@@ -228,8 +236,11 @@ export function initBlockscape(featureOverrides = {}) {
   let autoIdFromNameEnabled = DEFAULT_AUTO_ID_FROM_NAME;
   let stripParentheticalNames = DEFAULT_STRIP_PARENTHESES;
   let theme = THEME_LIGHT;
+  let backgroundImageUrl = "";
+  let backgroundImageOpacity = DEFAULT_BG_OPACITY;
   let colorPresets = [];
   let centerItems = DEFAULT_CENTER_ITEMS;
+  let sidebarBgEnabled = DEFAULT_SIDEBAR_BG_ENABLED;
   let depColor = "";
   let revdepColor = "";
   let linkThickness = "m";
@@ -300,6 +311,7 @@ export function initBlockscape(featureOverrides = {}) {
     : Promise.resolve(false);
   apicurio.hydrateConfig();
   applyTheme(readStoredTheme());
+  initializeBackgroundImage();
   setColorPresets(loadColorPresets(), { silent: true });
   initializeDepColor();
   initializeRevdepColor();
@@ -318,6 +330,7 @@ export function initBlockscape(featureOverrides = {}) {
   initializeAutoIdFromNameEnabled();
   initializeStripParentheticalNames();
   initializeCenterItems();
+  initializeSidebarBgEnabled();
   syncSelectionClass();
 
   // ===== Utilities =====
@@ -332,6 +345,15 @@ export function initBlockscape(featureOverrides = {}) {
       binary += String.fromCharCode(b);
     });
     return btoa(binary);
+  }
+
+  function getModelBackground(entry) {
+    if (!entry) return "";
+    const fromEntry = entry?.data?.backgroundUrl;
+    if (fromEntry != null) return fromEntry.toString();
+    const fromParsed = entry?.m?.backgroundUrl;
+    if (fromParsed != null) return fromParsed.toString();
+    return "";
   }
 
   function base64Decode(base64) {
@@ -474,6 +496,114 @@ export function initBlockscape(featureOverrides = {}) {
     return theme;
   }
 
+  function clampBackgroundOpacity(value) {
+    const num = typeof value === "string" ? parseFloat(value) : value;
+    if (!Number.isFinite(num)) return DEFAULT_BG_OPACITY;
+    return Math.min(1, Math.max(0, num));
+  }
+
+  function persistBackgroundSettings() {
+    if (typeof window === "undefined" || !window.localStorage) return;
+    try {
+      window.localStorage.setItem(BG_IMAGE_STORAGE_KEY, backgroundImageUrl);
+      window.localStorage.setItem(
+        BG_OPACITY_STORAGE_KEY,
+        String(backgroundImageOpacity)
+      );
+    } catch (err) {
+      console.warn("[Blockscape] background persistence failed", err);
+    }
+  }
+
+  function ensureBgPreview() {
+    if (bgPreview) return bgPreview;
+    bgPreview = document.createElement("div");
+    bgPreview.className = "blockscape-bg-preview";
+    document.body.appendChild(bgPreview);
+    return bgPreview;
+  }
+
+  function setBackgroundVars(target) {
+    if (!target) return;
+    const imageValue = backgroundImageUrl ? `url("${backgroundImageUrl}")` : "none";
+    const appliedOpacity = backgroundImageUrl ? backgroundImageOpacity : 0;
+    target.style.setProperty("--blockscape-bg-image", imageValue);
+    target.style.setProperty("--blockscape-bg-opacity", String(appliedOpacity));
+    const sidebarOpacity = sidebarBgEnabled ? appliedOpacity * 0.7 : 0;
+    target.style.setProperty(
+      "--blockscape-sidebar-bg-opacity",
+      String(sidebarOpacity)
+    );
+    if (typeof document !== "undefined") {
+      document.documentElement.style.setProperty("--blockscape-bg-image", imageValue);
+      document.documentElement.style.setProperty(
+        "--blockscape-bg-opacity",
+        String(appliedOpacity)
+      );
+      document.documentElement.style.setProperty(
+        "--blockscape-sidebar-bg-opacity",
+        String(sidebarOpacity)
+      );
+    }
+  }
+
+  function updateBackgroundPreview() {
+    if (!backgroundImageUrl) {
+      if (bgPreview) bgPreview.style.opacity = "0";
+      return;
+    }
+    const preview = ensureBgPreview();
+    preview.style.backgroundImage = `url("${backgroundImageUrl}")`;
+    preview.style.opacity = String(backgroundImageOpacity);
+  }
+
+  function applyBackgroundOpacity(value, { skipPersist = false } = {}) {
+    backgroundImageOpacity = clampBackgroundOpacity(value);
+    if (app) setBackgroundVars(app);
+    app?.querySelectorAll(".blockscape-root").forEach(setBackgroundVars);
+    updateBackgroundPreview();
+    if (!skipPersist) persistBackgroundSettings();
+    return backgroundImageOpacity;
+  }
+
+  function applyBackgroundImage(url) {
+    backgroundImageUrl = (url || "").trim();
+    if (app) setBackgroundVars(app);
+    app?.querySelectorAll(".blockscape-root").forEach(setBackgroundVars);
+    updateBackgroundPreview();
+    // Re-apply opacity so empty URLs reset opacity to 0 across hosts
+    applyBackgroundOpacity(backgroundImageOpacity, { skipPersist: true });
+    persistBackgroundSettings();
+    console.log("[Blockscape] background image set", {
+      url: backgroundImageUrl,
+      opacity: backgroundImageOpacity,
+    });
+    return backgroundImageUrl;
+  }
+
+  function initializeBackgroundImage() {
+    if (typeof window === "undefined" || !window.localStorage) {
+      applyBackgroundImage("");
+      applyBackgroundOpacity(DEFAULT_BG_OPACITY);
+      return;
+    }
+    try {
+      const storedUrl = window.localStorage.getItem(BG_IMAGE_STORAGE_KEY) || "";
+      const storedOpacityRaw = window.localStorage.getItem(BG_OPACITY_STORAGE_KEY);
+      const storedOpacity = storedOpacityRaw
+        ? parseFloat(storedOpacityRaw)
+        : DEFAULT_BG_OPACITY;
+      applyBackgroundImage(storedUrl);
+      applyBackgroundOpacity(
+        Number.isFinite(storedOpacity) ? storedOpacity : DEFAULT_BG_OPACITY
+      );
+      updateBackgroundPreview();
+    } catch (err) {
+      applyBackgroundImage("");
+      applyBackgroundOpacity(DEFAULT_BG_OPACITY);
+    }
+  }
+
   function persistCenterItems(enabled) {
     if (typeof window === "undefined" || !window.localStorage) return;
     try {
@@ -524,6 +654,40 @@ export function initBlockscape(featureOverrides = {}) {
     } catch (error) {
       console.warn("[Blockscape] failed to read center items pref", error);
       return applyCenterItems(DEFAULT_CENTER_ITEMS);
+    }
+  }
+
+  function persistSidebarBgEnabled(enabled) {
+    if (typeof window === "undefined" || !window.localStorage) return;
+    try {
+      window.localStorage.setItem(
+        SIDEBAR_BG_ENABLED_STORAGE_KEY,
+        enabled ? "true" : "false"
+      );
+    } catch (error) {
+      console.warn("[Blockscape] failed to persist sidebar background pref", error);
+    }
+  }
+
+  function applySidebarBgEnabled(enabled) {
+    sidebarBgEnabled = !!enabled;
+    if (app) setBackgroundVars(app);
+    app?.querySelectorAll(".blockscape-root").forEach(setBackgroundVars);
+    persistSidebarBgEnabled(sidebarBgEnabled);
+    return sidebarBgEnabled;
+  }
+
+  function initializeSidebarBgEnabled() {
+    if (typeof window === "undefined" || !window.localStorage) {
+      return applySidebarBgEnabled(DEFAULT_SIDEBAR_BG_ENABLED);
+    }
+    try {
+      const stored = window.localStorage.getItem(SIDEBAR_BG_ENABLED_STORAGE_KEY);
+      if (stored == null) return applySidebarBgEnabled(DEFAULT_SIDEBAR_BG_ENABLED);
+      return applySidebarBgEnabled(stored === "true" || stored === "1");
+    } catch (error) {
+      console.warn("[Blockscape] failed to read sidebar background pref", error);
+      return applySidebarBgEnabled(DEFAULT_SIDEBAR_BG_ENABLED);
     }
   }
 
@@ -4206,6 +4370,8 @@ export function initBlockscape(featureOverrides = {}) {
       "(index",
       i + " )"
     );
+    // Apply model-scoped background image
+    applyBackgroundImage(getModelBackground(models[i]));
     if (typeof localBackend?.highlightSource === "function") {
       const targetPath = models[i]?.sourcePath || null;
       localBackend.highlightSource(targetPath);
@@ -4535,6 +4701,9 @@ export function initBlockscape(featureOverrides = {}) {
     }
     if (!value || typeof value !== "object") return [];
     ensureModelMetadata(value, { titleHint: `${titleBase} #1` });
+    if (options.defaultBackgroundUrl && !value.backgroundUrl) {
+      value.backgroundUrl = options.defaultBackgroundUrl;
+    }
     return [
       {
         id: uid(),
@@ -4578,6 +4747,9 @@ export function initBlockscape(featureOverrides = {}) {
     return parts.map((p, i) => {
       const obj = JSON.parse(p);
       ensureModelMetadata(obj, { titleHint: `${titleBase} #${i + 1}` });
+      if (options.defaultBackgroundUrl && !obj.backgroundUrl) {
+        obj.backgroundUrl = options.defaultBackgroundUrl;
+      }
       return {
         id: uid(),
         title: obj.title || `${titleBase} #${i + 1}`,
@@ -5531,9 +5703,15 @@ export function initBlockscape(featureOverrides = {}) {
       (model.m.title && model.m.title.toString()) ||
       getModelTitle(models[activeIndex], "");
 
+    const bgUrlInput = document.createElement("input");
+    bgUrlInput.type = "url";
+    bgUrlInput.className = "pf-v5-c-form-control";
+    bgUrlInput.placeholder = "Background image URL";
+    bgUrlInput.value = getModelBackground(model);
+
     const abstractInput = document.createElement("textarea");
     abstractInput.className = "pf-v5-c-form-control";
-    abstractInput.rows = 6;
+    abstractInput.rows = 14; // taller by +8 lines
     abstractInput.placeholder = "Abstract (supports basic HTML)";
     abstractInput.value = model.m.abstract || "";
 
@@ -5553,6 +5731,14 @@ export function initBlockscape(featureOverrides = {}) {
         changed = true;
       }
 
+      const nextBg = (bgUrlInput.value || "").trim();
+      const currentBg = getModelBackground(entry);
+      if (nextBg !== currentBg) {
+        entry.data.backgroundUrl = nextBg;
+        applyBackgroundImage(nextBg);
+        changed = true;
+      }
+
       const currentAbstract = entry.data?.abstract || "";
       if (nextAbstract !== currentAbstract) {
         entry.data.abstract = nextAbstract;
@@ -5566,6 +5752,7 @@ export function initBlockscape(featureOverrides = {}) {
     };
 
     titleInput.addEventListener("blur", applyInfoChanges);
+    bgUrlInput.addEventListener("blur", applyInfoChanges);
     abstractInput.addEventListener("blur", applyInfoChanges);
     infoForm.addEventListener("submit", (event) => {
       event.preventDefault();
@@ -5574,6 +5761,7 @@ export function initBlockscape(featureOverrides = {}) {
 
     controls.append(
       makeField("Title", titleInput),
+      makeField("Background image URL", bgUrlInput),
       makeField("Abstract", abstractInput)
     );
 
@@ -5710,6 +5898,27 @@ export function initBlockscape(featureOverrides = {}) {
     tabActions.appendChild(tabThemeToggleRow);
     settingsUi.tabThemeToggle = tabThemeToggleInput;
 
+    const bgControls = document.createElement("div");
+    bgControls.className = "blockscape-bg-controls";
+
+    const bgOpacityWrap = document.createElement("label");
+    bgOpacityWrap.className = "bg-opacity";
+    const bgOpacityText = document.createElement("span");
+    bgOpacityText.textContent = "Opacity";
+    const bgOpacityInput = document.createElement("input");
+    bgOpacityInput.type = "range";
+    bgOpacityInput.min = "0";
+    bgOpacityInput.max = "100";
+    bgOpacityInput.step = "5";
+    bgOpacityInput.value = String(Math.round(backgroundImageOpacity * 100));
+    bgOpacityInput.addEventListener("input", () =>
+      applyBackgroundOpacity(bgOpacityInput.valueAsNumber / 100)
+    );
+    bgOpacityWrap.append(bgOpacityText, bgOpacityInput);
+
+    bgControls.append(bgOpacityWrap);
+    tabActions.appendChild(bgControls);
+
     const { row: tabSeriesPanelToggleRow, input: tabSeriesPanelToggleInput } =
       createTabToggle({
         id: "tabToggleSeriesPanel",
@@ -5737,6 +5946,16 @@ export function initBlockscape(featureOverrides = {}) {
     });
     tabActions.appendChild(tabCenterToggleRow);
     settingsUi.tabCenterToggle = tabCenterToggleInput;
+
+    const { row: tabSidebarBgToggleRow, input: tabSidebarBgToggleInput } =
+      createTabToggle({
+        id: "tabToggleSidebarBg",
+        label: "Sidebar background",
+        checked: sidebarBgEnabled,
+        onChange: (checked) => applySidebarBgEnabled(checked),
+      });
+    tabActions.appendChild(tabSidebarBgToggleRow);
+    settingsUi.tabSidebarBgToggle = tabSidebarBgToggleInput;
 
     const settingsActions = document.createElement("div");
     settingsActions.className = "settings-actions";
@@ -9169,7 +9388,9 @@ export function initBlockscape(featureOverrides = {}) {
     if (!seedRaw) {
       throw new Error("Seed template is empty.");
     }
-    const seedEntries = normalizeToModelsFromText(seedRaw, "Blockscape");
+    const seedEntries = normalizeToModelsFromText(seedRaw, "Blockscape", {
+      defaultBackgroundUrl: DEFAULT_BACKGROUND_URL,
+    });
     if (!seedEntries.length) {
       throw new Error("Seed template could not be parsed.");
     }
