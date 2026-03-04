@@ -181,6 +181,7 @@ export function initBlockscape(featureOverrides = {}) {
   const DEFAULT_TILE_COMPACTNESS = 1;
   const MIN_TILE_COMPACTNESS = 0.75;
   const MAX_TILE_COMPACTNESS = 1.25;
+  const OBSIDIAN_FEATURE_ENABLED = false;
   const OBSIDIAN_LINK_ENABLED_STORAGE_KEY = "blockscape:obsidianLinksEnabled";
   const OBSIDIAN_LINK_MODE_STORAGE_KEY = "blockscape:obsidianLinkMode";
   const OBSIDIAN_VAULT_STORAGE_KEY = "blockscape:obsidianVault";
@@ -282,6 +283,9 @@ export function initBlockscape(featureOverrides = {}) {
     tabSeriesPanelToggle: null,
     tabSecondaryLinksToggle: null,
     tabCenterToggle: null,
+    sidebarBgToggle: null,
+    bgOpacityInput: null,
+    bgOpacityValue: null,
     colorPresetList: null,
     depColorInput: null,
     revdepColorInput: null,
@@ -2723,6 +2727,10 @@ export function initBlockscape(featureOverrides = {}) {
   }
 
   function applyObsidianLinkMode(mode) {
+    if (!OBSIDIAN_FEATURE_ENABLED) {
+      obsidianLinkMode = DEFAULT_OBSIDIAN_LINK_MODE;
+      return obsidianLinkMode;
+    }
     obsidianLinkMode = normalizeObsidianLinkMode(mode);
     return obsidianLinkMode;
   }
@@ -2737,21 +2745,11 @@ export function initBlockscape(featureOverrides = {}) {
   }
 
   function initializeObsidianLinkMode() {
-    if (typeof window === "undefined" || !window.localStorage) {
-      return applyObsidianLinkMode(DEFAULT_OBSIDIAN_LINK_MODE);
-    }
-    try {
-      const raw = window.localStorage.getItem(OBSIDIAN_LINK_MODE_STORAGE_KEY);
-      if (!raw) return applyObsidianLinkMode(DEFAULT_OBSIDIAN_LINK_MODE);
-      return applyObsidianLinkMode(raw);
-    } catch (error) {
-      console.warn("[Blockscape] failed to read Obsidian link mode", error);
-      return applyObsidianLinkMode(DEFAULT_OBSIDIAN_LINK_MODE);
-    }
+    return applyObsidianLinkMode(DEFAULT_OBSIDIAN_LINK_MODE);
   }
 
   function applyObsidianLinksEnabled(enabled) {
-    obsidianLinksEnabled = !!enabled;
+    obsidianLinksEnabled = false;
     return obsidianLinksEnabled;
   }
 
@@ -2838,24 +2836,11 @@ export function initBlockscape(featureOverrides = {}) {
   }
 
   function initializeObsidianLinksEnabled() {
-    if (typeof window === "undefined" || !window.localStorage) {
-      return applyObsidianLinksEnabled(false);
-    }
-    try {
-      const raw = window.localStorage.getItem(
-        OBSIDIAN_LINK_ENABLED_STORAGE_KEY
-      );
-      if (raw == null) return applyObsidianLinksEnabled(false);
-      return applyObsidianLinksEnabled(raw === "1");
-    } catch (error) {
-      console.warn("[Blockscape] failed to read Obsidian toggle", error);
-      return applyObsidianLinksEnabled(false);
-    }
+    return applyObsidianLinksEnabled(false);
   }
 
   function applyObsidianVaultName(value) {
-    const trimmed = (value ?? "").toString().trim();
-    obsidianVaultName = trimmed;
+    obsidianVaultName = "";
     return obsidianVaultName;
   }
 
@@ -2869,17 +2854,7 @@ export function initBlockscape(featureOverrides = {}) {
   }
 
   function initializeObsidianVaultName() {
-    if (typeof window === "undefined" || !window.localStorage) {
-      return applyObsidianVaultName("");
-    }
-    try {
-      const raw = window.localStorage.getItem(OBSIDIAN_VAULT_STORAGE_KEY);
-      if (!raw) return applyObsidianVaultName("");
-      return applyObsidianVaultName(raw);
-    } catch (error) {
-      console.warn("[Blockscape] failed to read Obsidian vault", error);
-      return applyObsidianVaultName("");
-    }
+    return applyObsidianVaultName("");
   }
 
 
@@ -5480,6 +5455,7 @@ export function initBlockscape(featureOverrides = {}) {
 
     const mapPanel = document.createElement("div");
     const abstractPanel = document.createElement("div");
+    const settingsTabPanel = document.createElement("div");
     const sourcePanel = document.createElement("div");
     const apicurioPanel = document.createElement("div");
     const createLegend = () => {
@@ -5522,7 +5498,8 @@ export function initBlockscape(featureOverrides = {}) {
     const tabDefs = [
       { id: "map", label: "Map", panel: mapPanel },
       { id: "abstract", label: "Info", panel: abstractPanel },
-      { id: "source", label: "Settings", panel: sourcePanel },
+      { id: "settings", label: "Settings", panel: settingsTabPanel },
+      { id: "source", label: "Source", panel: sourcePanel },
       { id: "apicurio", label: "Apicurio", panel: apicurioPanel },
     ];
     const apicurioInitiallyEnabled =
@@ -5800,8 +5777,8 @@ export function initBlockscape(featureOverrides = {}) {
     activeInfoTooltipHtml = infoTooltipHtml;
     abstractPanel.appendChild(abstractWrapper);
 
-    const sourceWrapper = document.createElement("div");
-    sourceWrapper.className = "blockscape-source-panel";
+    const settingsWrapper = document.createElement("div");
+    settingsWrapper.className = "blockscape-source-panel";
     const settingsPanel = document.createElement("div");
     settingsPanel.className = "blockscape-settings-panel";
 
@@ -5898,27 +5875,6 @@ export function initBlockscape(featureOverrides = {}) {
     tabActions.appendChild(tabThemeToggleRow);
     settingsUi.tabThemeToggle = tabThemeToggleInput;
 
-    const bgControls = document.createElement("div");
-    bgControls.className = "blockscape-bg-controls";
-
-    const bgOpacityWrap = document.createElement("label");
-    bgOpacityWrap.className = "bg-opacity";
-    const bgOpacityText = document.createElement("span");
-    bgOpacityText.textContent = "Opacity";
-    const bgOpacityInput = document.createElement("input");
-    bgOpacityInput.type = "range";
-    bgOpacityInput.min = "0";
-    bgOpacityInput.max = "100";
-    bgOpacityInput.step = "5";
-    bgOpacityInput.value = String(Math.round(backgroundImageOpacity * 100));
-    bgOpacityInput.addEventListener("input", () =>
-      applyBackgroundOpacity(bgOpacityInput.valueAsNumber / 100)
-    );
-    bgOpacityWrap.append(bgOpacityText, bgOpacityInput);
-
-    bgControls.append(bgOpacityWrap);
-    tabActions.appendChild(bgControls);
-
     const { row: tabSeriesPanelToggleRow, input: tabSeriesPanelToggleInput } =
       createTabToggle({
         id: "tabToggleSeriesPanel",
@@ -5947,79 +5903,6 @@ export function initBlockscape(featureOverrides = {}) {
     tabActions.appendChild(tabCenterToggleRow);
     settingsUi.tabCenterToggle = tabCenterToggleInput;
 
-    const { row: tabSidebarBgToggleRow, input: tabSidebarBgToggleInput } =
-      createTabToggle({
-        id: "tabToggleSidebarBg",
-        label: "Sidebar background",
-        checked: sidebarBgEnabled,
-        onChange: (checked) => applySidebarBgEnabled(checked),
-      });
-    tabActions.appendChild(tabSidebarBgToggleRow);
-    settingsUi.tabSidebarBgToggle = tabSidebarBgToggleInput;
-
-    const settingsActions = document.createElement("div");
-    settingsActions.className = "settings-actions";
-    const settingsFileInput = document.createElement("input");
-    settingsFileInput.type = "file";
-    settingsFileInput.accept = "application/json";
-    settingsFileInput.hidden = true;
-    const loadSettingsBtn = document.createElement("button");
-    loadSettingsBtn.type = "button";
-    loadSettingsBtn.className = "pf-v5-c-button pf-m-secondary";
-    loadSettingsBtn.textContent = "Load settings";
-    loadSettingsBtn.addEventListener("click", () => settingsFileInput.click());
-    settingsFileInput.addEventListener("change", async () => {
-      const file = settingsFileInput.files?.[0];
-      if (!file) return;
-      try {
-        const raw = await file.text();
-        const parsed = JSON.parse(raw);
-        const snapshot = parsed?.settings || parsed;
-        const result = applyImportedSettings(snapshot || {}, { refreshObsidianLinks });
-        const appliedCount = result.applied?.length || 0;
-        showNotice(
-          appliedCount
-            ? `Loaded ${appliedCount} setting${appliedCount === 1 ? "" : "s"} from ${file.name}.`
-            : `No matching settings found in ${file.name}.`,
-          2200
-        );
-      } catch (error) {
-        console.warn("[Blockscape] failed to load settings.json", error);
-        showNotice("Invalid settings file.", 2400);
-      } finally {
-        settingsFileInput.value = "";
-      }
-    });
-
-    const saveSettingsBtn = document.createElement("button");
-    saveSettingsBtn.type = "button";
-    saveSettingsBtn.className = "pf-v5-c-button pf-m-tertiary";
-    saveSettingsBtn.textContent = "Download settings";
-    saveSettingsBtn.addEventListener("click", async () => {
-      const payload = exportSettingsPayload();
-      if (
-        typeof window !== "undefined" &&
-        typeof window.__blockscapeSettingsSaveToFile === "function"
-      ) {
-        try {
-          const didSave = await window.__blockscapeSettingsSaveToFile(payload);
-          if (didSave) {
-            showNotice("Settings saved to ~/.blockscape/settings.json.", 2000);
-          } else {
-            showNotice("Settings save failed. Check logs.", 2400);
-          }
-        } catch (error) {
-          console.warn("[Blockscape] settings save failed", error);
-          showNotice("Settings save failed. Check logs.", 2400);
-        }
-      } else {
-        download("settings.json", JSON.stringify(payload, null, 2));
-        showNotice("Settings downloaded.", 2000);
-      }
-    });
-
-    settingsActions.append(loadSettingsBtn, saveSettingsBtn, settingsFileInput);
-    settingsPanel.appendChild(settingsActions);
     const colorPresetSection = document.createElement("div");
     colorPresetSection.className = "color-presets";
     const colorPresetTitle = document.createElement("div");
@@ -6244,6 +6127,54 @@ export function initBlockscape(featureOverrides = {}) {
       });
     };
 
+    const bgOpacityRow = document.createElement("label");
+    bgOpacityRow.className = "settings-slider";
+    bgOpacityRow.setAttribute("for", "bgOpacitySlider");
+
+    const bgOpacityText = document.createElement("div");
+    bgOpacityText.className = "settings-slider__text";
+    const bgOpacityLabel = document.createElement("span");
+    bgOpacityLabel.className = "settings-slider__label";
+    bgOpacityLabel.textContent = "Background opacity";
+    const bgOpacityHint = document.createElement("span");
+    bgOpacityHint.className = "settings-slider__hint";
+    bgOpacityHint.textContent = "Adjust background transparency across map and sidebar.";
+    bgOpacityText.append(bgOpacityLabel, bgOpacityHint);
+
+    const bgOpacityValue = document.createElement("span");
+    bgOpacityValue.className = "settings-slider__value";
+    bgOpacityValue.textContent = `${Math.round(backgroundImageOpacity * 100)}%`;
+
+    const bgOpacityInput = document.createElement("input");
+    bgOpacityInput.type = "range";
+    bgOpacityInput.id = "bgOpacitySlider";
+    bgOpacityInput.className = "settings-slider__input";
+    bgOpacityInput.min = "0";
+    bgOpacityInput.max = "100";
+    bgOpacityInput.step = "5";
+    bgOpacityInput.value = String(Math.round(backgroundImageOpacity * 100));
+    bgOpacityInput.setAttribute("aria-label", "Adjust background opacity");
+    bgOpacityInput.addEventListener("input", () => {
+      const applied = applyBackgroundOpacity(bgOpacityInput.valueAsNumber / 100);
+      bgOpacityValue.textContent = `${Math.round(applied * 100)}%`;
+    });
+
+    bgOpacityRow.append(bgOpacityText, bgOpacityValue, bgOpacityInput);
+    settingsPanel.appendChild(bgOpacityRow);
+    settingsUi.bgOpacityInput = bgOpacityInput;
+    settingsUi.bgOpacityValue = bgOpacityValue;
+
+    const { row: sidebarBgToggleRow, input: sidebarBgToggleInput } = createSettingsToggle({
+      id: "toggleSidebarBackground",
+      label: "Sidebar background",
+      hint: "Apply the background image behind the sidebar.",
+      checked: sidebarBgEnabled,
+      className: "map-controls__toggle",
+      onChange: (checked) => applySidebarBgEnabled(checked),
+    });
+    settingsPanel.appendChild(sidebarBgToggleRow);
+    settingsUi.sidebarBgToggle = sidebarBgToggleInput;
+
     const { row: secondaryToggleRow, input: secondaryToggleInput } =
       createSettingsToggle({
         id: "toggleSecondaryLinks",
@@ -6282,25 +6213,6 @@ export function initBlockscape(featureOverrides = {}) {
     });
     settingsPanel.appendChild(autoIdToggleRow);
     settingsUi.autoIdToggle = autoIdToggleInput;
-
-    const obsidianModeInputs = [];
-    const { row: obsidianToggleRow, input: obsidianToggleInput } = createSettingsToggle({
-      id: "toggleObsidianLinks",
-      label: "Obsidian",
-      hint: "Make tiles open Obsidian when no external URL exists.",
-      checked: obsidianLinksEnabled,
-      className: "map-controls__toggle",
-      onChange: (checked) => {
-        const applied = applyObsidianLinksEnabled(checked);
-        persistObsidianLinksEnabled(applied);
-        obsidianModeInputs.forEach((input) => {
-          input.disabled = !applied;
-        });
-        refreshObsidianLinks();
-      },
-    });
-    settingsPanel.appendChild(obsidianToggleRow);
-    settingsUi.obsidianToggle = obsidianToggleInput;
 
     const hasLocalBackend =
       typeof localBackend?.isAvailable === "function" &&
@@ -6367,50 +6279,6 @@ export function initBlockscape(featureOverrides = {}) {
       settingsUi.autoReloadValue = autoReloadValue;
     }
 
-    const obsidianModeRow = document.createElement("div");
-    obsidianModeRow.className = "settings-radio";
-    const obsidianModeLabel = document.createElement("div");
-    obsidianModeLabel.className = "settings-radio__label";
-    obsidianModeLabel.textContent = "Obsidian link format";
-    const obsidianModeHint = document.createElement("div");
-    obsidianModeHint.className = "settings-radio__hint";
-    obsidianModeHint.textContent =
-      "Use the tile title or id when building Obsidian links.";
-    const obsidianModeOptions = document.createElement("div");
-    obsidianModeOptions.className = "settings-radio__options";
-
-    const registerObsidianModeOption = (value, text) => {
-      const option = document.createElement("label");
-      option.className = "settings-radio__option";
-      const radio = document.createElement("input");
-      radio.type = "radio";
-      radio.name = "obsidianLinkMode";
-      radio.value = value;
-      radio.checked = obsidianLinkMode === value;
-      radio.disabled = !obsidianLinksEnabled;
-      radio.addEventListener("change", () => {
-        if (!radio.checked) return;
-        const applied = applyObsidianLinkMode(value);
-        persistObsidianLinkMode(applied);
-        refreshObsidianLinks();
-      });
-      const textNode = document.createElement("span");
-      textNode.textContent = text;
-      option.append(radio, textNode);
-      obsidianModeInputs.push(radio);
-      obsidianModeOptions.appendChild(option);
-    };
-
-    registerObsidianModeOption(OBSIDIAN_LINK_MODE_TITLE, "Use title");
-    registerObsidianModeOption(OBSIDIAN_LINK_MODE_ID, "Use id");
-    obsidianModeRow.append(
-      obsidianModeLabel,
-      obsidianModeOptions,
-      obsidianModeHint
-    );
-    settingsPanel.appendChild(obsidianModeRow);
-    settingsUi.obsidianModeInputs = obsidianModeInputs;
-
     const { row: stripParenRow, input: stripParenInput } = createSettingsToggle({
       id: "toggleStripParentheses",
       label: "Hide parentheses in names",
@@ -6425,39 +6293,104 @@ export function initBlockscape(featureOverrides = {}) {
     settingsPanel.appendChild(stripParenRow);
     settingsUi.stripParentheticalToggle = stripParenInput;
 
-    const obsidianVaultRow = document.createElement("label");
-    obsidianVaultRow.className = "settings-text";
-    obsidianVaultRow.setAttribute("for", "obsidianVaultInput");
-    const obsidianVaultText = document.createElement("div");
-    obsidianVaultText.className = "settings-text__text";
-    const obsidianVaultLabel = document.createElement("span");
-    obsidianVaultLabel.className = "settings-text__label";
-    obsidianVaultLabel.textContent = "Obsidian vault";
-    const obsidianVaultHint = document.createElement("span");
-    obsidianVaultHint.className = "settings-text__hint";
-    obsidianVaultHint.textContent =
-      "Optional. Set the vault name to avoid duplicates.";
-    obsidianVaultText.append(obsidianVaultLabel, obsidianVaultHint);
-    const obsidianVaultInput = document.createElement("input");
-    obsidianVaultInput.type = "text";
-    obsidianVaultInput.id = "obsidianVaultInput";
-    obsidianVaultInput.className = "settings-text__input";
-    obsidianVaultInput.placeholder = "Vault name";
-    obsidianVaultInput.value = obsidianVaultName;
-    obsidianVaultInput.addEventListener("input", () => {
-      const applied = applyObsidianVaultName(obsidianVaultInput.value);
-      persistObsidianVaultName(applied);
-      refreshObsidianLinks();
-    });
-    obsidianVaultRow.append(obsidianVaultText, obsidianVaultInput);
-    settingsPanel.appendChild(obsidianVaultRow);
-    settingsUi.obsidianVaultInput = obsidianVaultInput;
+    if (OBSIDIAN_FEATURE_ENABLED) {
+      const obsidianModeInputs = [];
+      const { row: obsidianToggleRow, input: obsidianToggleInput } = createSettingsToggle({
+        id: "toggleObsidianLinks",
+        label: "Obsidian",
+        hint: "Make tiles open Obsidian when no external URL exists.",
+        checked: obsidianLinksEnabled,
+        className: "map-controls__toggle",
+        onChange: (checked) => {
+          const applied = applyObsidianLinksEnabled(checked);
+          persistObsidianLinksEnabled(applied);
+          obsidianModeInputs.forEach((input) => {
+            input.disabled = !applied;
+          });
+          refreshObsidianLinks();
+        },
+      });
+      settingsPanel.appendChild(obsidianToggleRow);
+      settingsUi.obsidianToggle = obsidianToggleInput;
 
-    const obsidianPluginNote = document.createElement("p");
-    obsidianPluginNote.className = "settings-note";
-    obsidianPluginNote.innerHTML =
-      'Requires the Obsidian <a href="https://vinzent03.github.io/obsidian-advanced-uri/" target="_blank" rel="noreferrer noopener">Advanced URI</a> plugin for create/open behavior.';
-    settingsPanel.appendChild(obsidianPluginNote);
+      const obsidianModeRow = document.createElement("div");
+      obsidianModeRow.className = "settings-radio";
+      const obsidianModeLabel = document.createElement("div");
+      obsidianModeLabel.className = "settings-radio__label";
+      obsidianModeLabel.textContent = "Obsidian link format";
+      const obsidianModeHint = document.createElement("div");
+      obsidianModeHint.className = "settings-radio__hint";
+      obsidianModeHint.textContent =
+        "Use the tile title or id when building Obsidian links.";
+      const obsidianModeOptions = document.createElement("div");
+      obsidianModeOptions.className = "settings-radio__options";
+
+      const registerObsidianModeOption = (value, text) => {
+        const option = document.createElement("label");
+        option.className = "settings-radio__option";
+        const radio = document.createElement("input");
+        radio.type = "radio";
+        radio.name = "obsidianLinkMode";
+        radio.value = value;
+        radio.checked = obsidianLinkMode === value;
+        radio.disabled = !obsidianLinksEnabled;
+        radio.addEventListener("change", () => {
+          if (!radio.checked) return;
+          const applied = applyObsidianLinkMode(value);
+          persistObsidianLinkMode(applied);
+          refreshObsidianLinks();
+        });
+        const textNode = document.createElement("span");
+        textNode.textContent = text;
+        option.append(radio, textNode);
+        obsidianModeInputs.push(radio);
+        obsidianModeOptions.appendChild(option);
+      };
+
+      registerObsidianModeOption(OBSIDIAN_LINK_MODE_TITLE, "Use title");
+      registerObsidianModeOption(OBSIDIAN_LINK_MODE_ID, "Use id");
+      obsidianModeRow.append(
+        obsidianModeLabel,
+        obsidianModeOptions,
+        obsidianModeHint
+      );
+      settingsPanel.appendChild(obsidianModeRow);
+      settingsUi.obsidianModeInputs = obsidianModeInputs;
+
+      const obsidianVaultRow = document.createElement("label");
+      obsidianVaultRow.className = "settings-text";
+      obsidianVaultRow.setAttribute("for", "obsidianVaultInput");
+      const obsidianVaultText = document.createElement("div");
+      obsidianVaultText.className = "settings-text__text";
+      const obsidianVaultLabel = document.createElement("span");
+      obsidianVaultLabel.className = "settings-text__label";
+      obsidianVaultLabel.textContent = "Obsidian vault";
+      const obsidianVaultHint = document.createElement("span");
+      obsidianVaultHint.className = "settings-text__hint";
+      obsidianVaultHint.textContent =
+        "Optional. Set the vault name to avoid duplicates.";
+      obsidianVaultText.append(obsidianVaultLabel, obsidianVaultHint);
+      const obsidianVaultInput = document.createElement("input");
+      obsidianVaultInput.type = "text";
+      obsidianVaultInput.id = "obsidianVaultInput";
+      obsidianVaultInput.className = "settings-text__input";
+      obsidianVaultInput.placeholder = "Vault name";
+      obsidianVaultInput.value = obsidianVaultName;
+      obsidianVaultInput.addEventListener("input", () => {
+        const applied = applyObsidianVaultName(obsidianVaultInput.value);
+        persistObsidianVaultName(applied);
+        refreshObsidianLinks();
+      });
+      obsidianVaultRow.append(obsidianVaultText, obsidianVaultInput);
+      settingsPanel.appendChild(obsidianVaultRow);
+      settingsUi.obsidianVaultInput = obsidianVaultInput;
+
+      const obsidianPluginNote = document.createElement("p");
+      obsidianPluginNote.className = "settings-note";
+      obsidianPluginNote.innerHTML =
+        'Requires the Obsidian <a href="https://vinzent03.github.io/obsidian-advanced-uri/" target="_blank" rel="noreferrer noopener">Advanced URI</a> plugin for create/open behavior.';
+      settingsPanel.appendChild(obsidianPluginNote);
+    }
 
     const formatSeriesNavWait = (value) => `${(value / 1000).toFixed(1)}s`;
     const seriesNavWaitRow = document.createElement("label");
@@ -6785,7 +6718,76 @@ export function initBlockscape(featureOverrides = {}) {
       });
     apicurioSettingsToggle = apicurioToggleInput;
     settingsPanel.appendChild(apicurioToggleRow);
-    sourceWrapper.appendChild(settingsPanel);
+    settingsWrapper.appendChild(settingsPanel);
+    settingsTabPanel.appendChild(settingsWrapper);
+
+    const sourceWrapper = document.createElement("div");
+    sourceWrapper.className = "blockscape-source-panel";
+
+    const settingsActions = document.createElement("div");
+    settingsActions.className = "settings-actions";
+    const settingsFileInput = document.createElement("input");
+    settingsFileInput.type = "file";
+    settingsFileInput.accept = "application/json";
+    settingsFileInput.hidden = true;
+    const loadSettingsBtn = document.createElement("button");
+    loadSettingsBtn.type = "button";
+    loadSettingsBtn.className = "pf-v5-c-button pf-m-secondary";
+    loadSettingsBtn.textContent = "Load settings";
+    loadSettingsBtn.addEventListener("click", () => settingsFileInput.click());
+    settingsFileInput.addEventListener("change", async () => {
+      const file = settingsFileInput.files?.[0];
+      if (!file) return;
+      try {
+        const raw = await file.text();
+        const parsed = JSON.parse(raw);
+        const snapshot = parsed?.settings || parsed;
+        const result = applyImportedSettings(snapshot || {}, { refreshObsidianLinks });
+        const appliedCount = result.applied?.length || 0;
+        showNotice(
+          appliedCount
+            ? `Loaded ${appliedCount} setting${appliedCount === 1 ? "" : "s"} from ${file.name}.`
+            : `No matching settings found in ${file.name}.`,
+          2200
+        );
+      } catch (error) {
+        console.warn("[Blockscape] failed to load settings.json", error);
+        showNotice("Invalid settings file.", 2400);
+      } finally {
+        settingsFileInput.value = "";
+      }
+    });
+
+    const saveSettingsBtn = document.createElement("button");
+    saveSettingsBtn.type = "button";
+    saveSettingsBtn.className = "pf-v5-c-button pf-m-tertiary";
+    saveSettingsBtn.textContent = "Download settings";
+    saveSettingsBtn.addEventListener("click", async () => {
+      const payload = exportSettingsPayload();
+      if (
+        typeof window !== "undefined" &&
+        typeof window.__blockscapeSettingsSaveToFile === "function"
+      ) {
+        try {
+          const didSave = await window.__blockscapeSettingsSaveToFile(payload);
+          if (didSave) {
+            showNotice("Settings saved to ~/.blockscape/settings.json.", 2000);
+          } else {
+            showNotice("Settings save failed. Check logs.", 2400);
+          }
+        } catch (error) {
+          console.warn("[Blockscape] settings save failed", error);
+          showNotice("Settings save failed. Check logs.", 2400);
+        }
+      } else {
+        download("settings.json", JSON.stringify(payload, null, 2));
+        showNotice("Settings downloaded.", 2000);
+      }
+    });
+
+    settingsActions.append(loadSettingsBtn, saveSettingsBtn, settingsFileInput);
+    sourceWrapper.appendChild(settingsActions);
+
     if (jsonPanel) {
       jsonPanel.hidden = false;
       jsonPanel.classList.remove("pf-v5-c-page__main-section");

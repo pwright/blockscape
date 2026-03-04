@@ -5,7 +5,6 @@ Utility scripts that support the Blockscape Svelte site and companion Obsidian v
 ## Common commands
 - Build design tokens: `npm run build:tokens` (calls `node scripts/build-tokens.js`).
 - Clean and rebuild the static site: `npm run build` (includes `clean-docs`, `export`, `docs:build`).
-- Sync Obsidian assets after an export: `npm run export` (triggers `scripts/sync-obsidian-assets.js` via `postexport`).
 
 ## Script reference
 
@@ -18,12 +17,6 @@ Utility scripts that support the Blockscape Svelte site and companion Obsidian v
 - Purpose: remove the generated `docs/` directory so a subsequent build recreates it from fresh assets.
 - Usage: `node scripts/clean-docs.js` or `npm run clean-docs` (invoked inside `npm run build`).
 - Notes: Safe to run; the next `npm run build` or `npm run docs:build` regenerates `docs/` instead of manually deleting HTML.
-
-### sync-obsidian-assets.js
-- Purpose: copy exported viewer assets into the Obsidian plugin bundle.
-- Prereq: `npm run export` or `npm run build` must have produced files in `documentation/docs/site_assets/blockscape/`.
-- Usage: `node scripts/sync-obsidian-assets.js` (automatically runs as `postexport`).
-- Behavior: copies `blockscape.js`, `blockscape.css`, and `mount.js` into `blockscape-obsidian/dist/blockscape-viewer/assets`, creating the target directory if needed. Fails with a helpful error if the source assets are missing.
 
 ### watch-models.js
 - Purpose: watch a directory of `.bs` or `.md` files, validate Blockscape models, and emit normalized `.bs` outputs.
