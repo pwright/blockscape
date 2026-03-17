@@ -5458,21 +5458,6 @@ export function initBlockscape(featureOverrides = {}) {
     const settingsTabPanel = document.createElement("div");
     const sourcePanel = document.createElement("div");
     const apicurioPanel = document.createElement("div");
-    const createLegend = () => {
-      const wrapper = document.createElement("div");
-      wrapper.className = "blockscape-map-legend";
-      const legend = document.createElement("div");
-      legend.className = "blockscape-legend";
-      legend.setAttribute("role", "presentation");
-      legend.innerHTML = `
-        <span class="legend-entry"><span class="legend-dot legend-dot--dep"></span> enables</span>
-        <span class="legend-entry"><span class="legend-dot legend-dot--revdep"></span> dependents</span>
-        <span class="legend-entry"><span class="legend-dot legend-dot--reused"></span> reused</span>
-        <span class="legend-entry"><span class="legend-dot legend-dot--external"></span> external link</span>
-      `;
-      wrapper.appendChild(legend);
-      return wrapper;
-    };
     let infoTooltipHtml = "";
     const seriesIdLookup = buildModelIdToVersionIndex(models[activeIndex]);
     const activeSeriesIndex = getActiveApicurioVersionIndex(
@@ -5626,7 +5611,6 @@ export function initBlockscape(featureOverrides = {}) {
 
     app.appendChild(tabsWrapper);
 
-    mapPanel.appendChild(createLegend());
     const renderHost = document.createElement("div");
     renderHost.className = "blockscape-render";
     const stageGuides = document.createElement("div");
