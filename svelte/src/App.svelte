@@ -11,6 +11,7 @@
   "id": "blockscape",
   "title": "Blockscape (AI maps)",
   "abstract": "Blockscape (pronounced BYK-shed) visualizes value chains and dependencies using a BS file. Inspired by Wardley maps, these maps emphasizes the topology that makes maps useful.",
+  "backgroundUrl": "https://upload.wikimedia.org/wikipedia/commons/4/44/Blured_black_keyboard.jpg",
   "categories": [
     {
       "id": "communication",

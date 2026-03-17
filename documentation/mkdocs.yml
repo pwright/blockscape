@@ -33,7 +33,6 @@ nav:
       - Value chain: documentation/value-chain.md
       - Watch models: documentation/watch-models.md
   - Integrations:
-      - Obsidian plugin: documentation/obsidian.md
       - MkDocs usage: documentation/mkdocs.md
       - Apicurio as backend: documentation/apicurio.md
       - Docker for local editor: documentation/docker.md

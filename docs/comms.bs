@@ -2,6 +2,7 @@
   {
     "id": "index",
     "title": "Corporate Communications Evolution – Index (with Lifecycle Layers)",
+    "backgroundUrl": "https://upload.wikimedia.org/wikipedia/commons/2/26/Bank-vault-door-black-background-bw-web.jpg",
     "abstract": "<p><strong>Metadata</strong>: title: Corporate communications evolution; source: [https://chatgpt.com/share/69346882-c334-8010-86a9-575b672ec59f](https://chatgpt.com/share/69346882-c334-8010-86a9-575b672ec59f); author: ChatGPT; created: 2025-12-06.</p><p>This index map lists the major periods in corporate communication, from courier and postal systems through telephony, proprietary email, internet email, enterprise instant messaging, Slack or Teams-style platforms, and the AI layer. Items are grouped into lifecycle layers from live topics down to historical technologies. Each item id matches the model id of a detailed period map.</p>",
     "categories": [
       {

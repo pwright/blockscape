@@ -5,7 +5,6 @@ Project entry point lives in `svelte/` (Vite + Svelte). `npm run build` renders 
 ## Repository Layout
 - `.beans/` — beans issue tracker state; keep updated when working on tasks.
 - `.devin/` — dev environment config scaffold.  See https://deepwiki.com/pwright/blockscape
-- `blockscape-obsidian/` — Obsidian plugin/supporting files for Blockscape.
 - `cypress/` — E2E tests; see `cypress.md` for runner notes.
 - `docs/` — generated static site (overwritten by `npm run build`; do not hand-edit).
 - `documentation/` — additional reference material and guides. Mkdocs site is here.
@@ -35,7 +34,7 @@ cd nj && neu build -- --load-dir-res && cd ..
 
 ### Settings + persistence
 - LocalStorage-backed keys for theme (`blockscape:theme`), colors (`blockscape:depColor`, `blockscape:revdepColor`, `blockscape:colorPresets`), layout (`blockscape:titleWrap`, `blockscape:hoverScale`, `blockscape:tileCompactness`, center mode, link thickness), and behaviors (selection dimming, auto-ID/strip-parentheses, series double-click wait, stage guides).
-- Obsidian link preferences (`blockscape:obsidianLinksEnabled`, mode `title|id`, vault name) and server sidebar width persisted per user.
+- Server sidebar width persisted per user.
 - Applies snapshots via `applyImportedSettings` and supports initial settings injection through `featureOverrides` or URLs.
 
 ### Storage / backends
@@ -56,7 +55,7 @@ cd nj && neu build -- --load-dir-res && cd ..
 ### Integrations / adapters
 - **Apicurio**: `createApicurioIntegration` (from `apicurio.js`) handles registry config persistence, push/list flows, and series artifact grouping.
 - **External links**: `isExternalHref`, `resolveHref`, `openExternalUrl` guard window vs Neutralino environments.
-- **Obsidian**: inline builder generates `obsidian://advanced-uri` links per tile, honoring mode (title vs id) and optional vault name; links surface in tiles, context menus, and the item preview.
+- External links: inline builder generates `https://` links per tile; links surface in tiles, context menus, and the item preview.
 
 ## Build & Run
 - Install deps: `npm install`
@@ -69,8 +68,6 @@ cd nj && neu build -- --load-dir-res && cd ..
 - Settings UI is generated in `blockscape.js`; when adding a preference, wire (1) localStorage key + defaults, (2) apply/persist helpers, and (3) a row in `createSettingsPanel`.
 - `.bs` files in `svelte/public/` are good fixtures for manual QA; keep them in sync with schema changes.
 - Avoid editing `docs/` directly; rebuild after changes. If you touch the legacy root `index.html`, keep `developer.md` notes updated.
-
-
 
 ## Svelte + legacy `index.html`
 
