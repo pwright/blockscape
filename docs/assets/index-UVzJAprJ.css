@@ -1807,6 +1807,11 @@ a {
   border-radius: var(--radius-lg);
   filter: saturate(1.02);
 }
+.blockscape-render > .category,
+.blockscape-render > .category-add {
+  position: relative;
+  z-index: 1;
+}
 .map-controls {
   display: flex;
   align-items: center;
@@ -2464,10 +2469,12 @@ a {
       color: var(--blockscape-muted);
     }
 .svg-layer {
-      position: fixed;
+      position: absolute;
       inset: 0;
+      width: 100%;
+      height: 100%;
       pointer-events: none;
-      z-index: 0;
+      z-index: 2;
     }
 .sr-only {
       position: absolute;

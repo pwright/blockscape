@@ -2783,7 +2783,7 @@ function downloadJson(filename, data) {
   URL.revokeObjectURL(url);
 }
 const ASSET_BASE = typeof import.meta !== "undefined" && "./" || "";
-function initBlockscape(featureOverrides = {}) {
+function initBlockscape(featureOverrides = {}, { host = document } = {}) {
   console.log("[Blockscape] init");
   const features = {
     localBackend: true,
@@ -2796,49 +2796,53 @@ function initBlockscape(featureOverrides = {}) {
     initialSettingsUrl: null,
     ...featureOverrides
   };
-  const jsonBox = document.getElementById("jsonBox");
-  const jsonPanel = document.querySelector(".blockscape-json-panel");
-  const app = document.getElementById("app");
-  const overlay = document.getElementById("overlay");
-  const tabTooltip = document.getElementById("tabTooltip");
-  const modelList = document.getElementById("modelList");
-  const preview = document.getElementById("itemPreview");
-  const urlForm = document.getElementById("urlForm");
-  const urlInput = document.getElementById("urlInput");
-  const loadUrlButton = document.getElementById("loadUrl");
+  const scope = host && typeof host.querySelector === "function" ? host : document;
+  const byId = (id) => scope.querySelector(`#${id}`);
+  const jsonBox = byId("jsonBox");
+  const jsonPanel = scope.querySelector(".blockscape-json-panel");
+  const app = byId("app");
+  const overlay = byId("overlay");
+  const tabTooltip = byId("tabTooltip");
+  const modelList = byId("modelList");
+  const preview = byId("itemPreview");
+  const urlForm = byId("urlForm");
+  const urlInput = byId("urlInput");
+  const loadUrlButton = byId("loadUrl");
   const previewTitle = preview.querySelector(".item-preview__title");
   const previewBody = preview.querySelector(".item-preview__body");
   const previewActions = preview.querySelector(".item-preview__actions");
   const previewClose = preview.querySelector(".item-preview__close");
-  const downloadButton = document.getElementById("downloadJson");
-  const shareButton = document.getElementById("shareModel");
-  const createVersionButton = document.getElementById("createVersion");
-  const copyJsonButton = document.getElementById("copyJson");
-  const copySeriesButton = document.getElementById("copySeries");
-  const pasteJsonButton = document.getElementById("pasteJson");
-  const helpButton = document.getElementById("helpButton");
-  const newPanelButton = document.getElementById("newPanelButton");
-  const newBlankButton = document.getElementById("newBlankButton");
-  const shortcutHelp = document.getElementById("shortcutHelp");
-  const shortcutHelpList = document.getElementById("shortcutHelpList");
-  const shortcutHelpClose = document.getElementById("shortcutHelpClose");
-  const shortcutHelpBackdrop = document.getElementById("shortcutHelpBackdrop");
-  const newPanel = document.getElementById("newPanel");
-  const newPanelClose = document.getElementById("newPanelClose");
-  const newPanelBackdrop = document.getElementById("newPanelBackdrop");
-  const searchInput = document.getElementById("search");
-  const searchResults = document.getElementById("searchResults");
-  const localBackendPanel = document.getElementById("localBackendPanel");
-  const localBackendStatus = document.getElementById("localBackendStatus");
-  const localFileList = document.getElementById("localFileList");
-  const localDirSelect = document.getElementById("localDirSelect");
-  const refreshLocalFilesButton = document.getElementById("refreshLocalFiles");
-  const loadLocalFileButton = document.getElementById("loadLocalFile");
-  const deleteLocalFileButton = document.getElementById("deleteLocalFile");
-  const toggleServerSidebarButton = document.getElementById("toggleServerSidebar");
-  const saveLocalFileButton = document.getElementById("saveLocalFile");
-  const saveLocalFileAsButton = document.getElementById("saveLocalFileAs");
-  const localSavePathInput = document.getElementById("localSavePath");
+  const downloadButton = byId("downloadJson");
+  const shareButton = byId("shareModel");
+  const createVersionButton = byId("createVersion");
+  const copyJsonButton = byId("copyJson");
+  const copySeriesButton = byId("copySeries");
+  const pasteJsonButton = byId("pasteJson");
+  const helpButton = byId("helpButton");
+  const newPanelButton = byId("newPanelButton");
+  const newBlankButton = byId("newBlankButton");
+  const shortcutHelp = byId("shortcutHelp");
+  const shortcutHelpList = byId("shortcutHelpList");
+  const shortcutHelpClose = byId("shortcutHelpClose");
+  const shortcutHelpBackdrop = byId("shortcutHelpBackdrop");
+  const newPanel = byId("newPanel");
+  const newPanelClose = byId("newPanelClose");
+  const newPanelBackdrop = byId("newPanelBackdrop");
+  const searchInput = byId("search");
+  const searchResults = byId("searchResults");
+  const localBackendPanel = byId("localBackendPanel");
+  const localBackendStatus = byId("localBackendStatus");
+  const localFileList = byId("localFileList");
+  const localDirSelect = byId("localDirSelect");
+  const refreshLocalFilesButton = byId("refreshLocalFiles");
+  const loadLocalFileButton = byId("loadLocalFile");
+  const deleteLocalFileButton = byId("deleteLocalFile");
+  const toggleServerSidebarButton = byId("toggleServerSidebar");
+  const saveLocalFileButton = byId("saveLocalFile");
+  const saveLocalFileAsButton = byId("saveLocalFileAs");
+  const localSavePathInput = byId("localSavePath");
+  const root = host && typeof host.getBoundingClientRect === "function" ? host : (app == null ? void 0 : app.closest(".blockscape-root")) || (app == null ? void 0 : app.parentElement) || document.body;
+  let overlayRoot = root;
   const SERVER_SIDEBAR_WIDE_STORAGE_KEY = "blockscape:serverSidebarWide";
   const defaultDocumentTitle = document.title;
   if (localBackendPanel) localBackendPanel.hidden = true;
@@ -2855,7 +2859,7 @@ function initBlockscape(featureOverrides = {}) {
     if (saveLocalFileAsButton) saveLocalFileAsButton.hidden = true;
     if (localSavePathInput) localSavePathInput.hidden = true;
   }
-  jsonBox.value = document.getElementById("seed").textContent.trim();
+  jsonBox.value = byId("seed").textContent.trim();
   let models = [];
   let activeIndex = -1;
   const apicurio = createApicurioIntegration({
@@ -3798,8 +3802,8 @@ function initBlockscape(featureOverrides = {}) {
   }
   function isGithubPagesHost() {
     if (typeof window === "undefined" || !window.location) return false;
-    const host = (window.location.hostname || "").toLowerCase();
-    return host.endsWith("github.io");
+    const host2 = (window.location.hostname || "").toLowerCase();
+    return host2.endsWith("github.io");
   }
   function readServerSidebarWide() {
     if (typeof window === "undefined" || !window.localStorage) return true;
@@ -5998,7 +6002,7 @@ function initBlockscape(featureOverrides = {}) {
     handleWindowScroll: handleTileMenuWindowScroll,
     updateColorPresets: updateTileMenuColors
   } = createTileContextMenu({
-    menuEl: document.getElementById("tileContextMenu"),
+    menuEl: byId("tileContextMenu"),
     previewEl: preview,
     previewTitleEl: previewTitle,
     previewBodyEl: previewBody,
@@ -7449,8 +7453,7 @@ function initBlockscape(featureOverrides = {}) {
       applyShowSeriesPanel(showSeriesPanel);
       app.appendChild(versionNavEl);
     }
-    overlay.setAttribute("width", window.innerWidth);
-    overlay.setAttribute("height", window.innerHeight);
+    syncOverlayBounds();
     const buildModelMeta = () => {
       var _a2, _b2, _c;
       const meta = document.createElement("div");
@@ -7659,6 +7662,7 @@ ${text2}` : text2;
     app.appendChild(tabsWrapper);
     const renderHost = document.createElement("div");
     renderHost.className = "blockscape-render";
+    overlayRoot = renderHost;
     const stageGuides = document.createElement("div");
     stageGuides.className = "stage-guides";
     stageGuides.hidden = !centerItems;
@@ -7678,6 +7682,7 @@ ${text2}` : text2;
     });
     stageGuides.appendChild(stageLabels);
     renderHost.appendChild(stageGuides);
+    renderHost.appendChild(overlay);
     stageGuidesOverlay = stageGuides;
     mapPanel.appendChild(renderHost);
     const abstractWrapper = document.createElement("div");
@@ -8905,11 +8910,25 @@ ${text2}` : text2;
         clearSelection();
       });
     }
-    document.getElementById("clear").onclick = () => clearSelection();
+    byId("clear").onclick = () => clearSelection();
+  }
+  function syncOverlayBounds() {
+    if (!overlay || !(overlayRoot == null ? void 0 : overlayRoot.getBoundingClientRect)) return null;
+    const rootRect = overlayRoot.getBoundingClientRect();
+    overlay.setAttribute("width", Math.max(1, Math.round(rootRect.width)));
+    overlay.setAttribute("height", Math.max(1, Math.round(rootRect.height)));
+    return rootRect;
   }
   function reflowRects() {
+    const rootRect = syncOverlayBounds();
     index.forEach((v) => {
-      v.rect = v.el.getBoundingClientRect();
+      const rect = v.el.getBoundingClientRect();
+      v.rect = rootRect ? {
+        left: rect.left - rootRect.left,
+        top: rect.top - rootRect.top,
+        width: rect.width,
+        height: rect.height
+      } : rect;
     });
   }
   function getSelectionRelations(id, { includeSecondary = showSecondaryLinks } = {}) {
@@ -10227,7 +10246,7 @@ ${text2}` : text2;
       }
     });
   }
-  document.getElementById("appendFromBox").onclick = async () => {
+  byId("appendFromBox").onclick = async () => {
     try {
       const autoSave = await isLocalBackendReady();
       const appended = normalizeToModelsFromText(jsonBox.value, "Pasted", {
@@ -10261,7 +10280,7 @@ ${text2}` : text2;
       alert("Append error (see console).");
     }
   };
-  document.getElementById("replaceActive").onclick = () => {
+  byId("replaceActive").onclick = () => {
     var _a;
     if (activeIndex < 0) {
       alert("No active model selected.");
@@ -10294,7 +10313,7 @@ ${text2}` : text2;
       alert("JSON parse error (see console).");
     }
   };
-  document.getElementById("file").onchange = async (e) => {
+  byId("file").onchange = async (e) => {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
     try {
@@ -10459,7 +10478,7 @@ ${text2}` : text2;
     if (!Number.isInteger(i)) return;
     setActive(i);
   });
-  document.getElementById("removeModel").onclick = () => {
+  byId("removeModel").onclick = () => {
     if (activeIndex < 0) return;
     const title = getModelTitle(models[activeIndex]);
     const ok = window.confirm(`Remove "${title}" from this session?`);
@@ -10534,13 +10553,13 @@ ${text2}` : text2;
       if (typeof idx === "number") {
         setActive(idx);
         urlInput.value = "";
-        const hint = document.getElementById("urlHint");
+        const hint = byId("urlHint");
         if (hint) hint.textContent = "";
       }
     });
   }
   (function attachUrlHint() {
-    const hint = document.getElementById("urlHint");
+    const hint = byId("urlHint");
     if (!urlInput || !hint) return;
     let timer = null;
     urlInput.addEventListener("input", () => {
@@ -10731,8 +10750,8 @@ ${text2}` : text2;
     if (typeof candidate !== "string") return false;
     try {
       const parsed = new URL(candidate, window.location.href);
-      const host = parsed.hostname.toLowerCase();
-      return host === "gist.github.com" || host === "gist.githubusercontent.com" || host.startsWith("gist.") && host.endsWith("githubusercontent.com");
+      const host2 = parsed.hostname.toLowerCase();
+      return host2 === "gist.github.com" || host2 === "gist.githubusercontent.com" || host2.startsWith("gist.") && host2.endsWith("githubusercontent.com");
     } catch {
       return false;
     }
@@ -10862,7 +10881,7 @@ ${text2}` : text2;
     }
   }
   (async function bootstrap() {
-    const seedEl = document.getElementById("seed");
+    const seedEl = byId("seed");
     if (!seedEl) {
       throw new Error("Seed template not found in document.");
     }
@@ -11592,7 +11611,7 @@ function create_fragment$1(ctx) {
   let t96;
   let html_tag;
   let raw_value = `<script id="seed" type="application/json">${/*seedText*/
-  ctx[5]}<\/script>`;
+  ctx[6]}<\/script>`;
   let t97;
   let svg1;
   let t98;
@@ -11647,7 +11666,7 @@ function create_fragment$1(ctx) {
       button3 = element("button");
       t17 = text(
         /*zoomLabel*/
-        ctx[1]
+        ctx[2]
       );
       t18 = space();
       button4 = element("button");
@@ -11746,11 +11765,11 @@ function create_fragment$1(ctx) {
         button0,
         "aria-expanded",
         /*headerExpanded*/
-        ctx[0]
+        ctx[1]
       );
       attr(button0, "aria-controls", "blockscapeHeaderExtras");
       attr(button0, "aria-label", button0_aria_label_value = /*headerExpanded*/
-      ctx[0] ? "Hide advanced tools" : "Show advanced tools");
+      ctx[1] ? "Hide advanced tools" : "Show advanced tools");
       attr(button1, "id", "newPanelButton");
       attr(button1, "class", "pf-v5-c-button pf-m-primary");
       attr(button1, "type", "button");
@@ -11786,12 +11805,12 @@ function create_fragment$1(ctx) {
       attr(div6, "id", "blockscapeHeaderExtras");
       attr(div6, "class", "blockscape-toolbar__extras");
       div6.hidden = div6_hidden_value = !/*headerExpanded*/
-      ctx[0];
+      ctx[1];
       attr(div6, "aria-hidden", div6_aria_hidden_value = !/*headerExpanded*/
-      ctx[0]);
+      ctx[1]);
       attr(div7, "class", "blockscape-toolbar__controls");
       attr(div7, "data-expanded", div7_data_expanded_value = /*headerExpanded*/
-      ctx[0] ? "true" : "false");
+      ctx[1] ? "true" : "false");
       attr(a0, "href", "https://github.com/pwright/blockscape");
       attr(a0, "target", "_blank");
       attr(a0, "class", "pf-v5-c-button pf-m-plain blockscape-toolbar__github");
@@ -11802,7 +11821,7 @@ function create_fragment$1(ctx) {
       attr(div10, "class", "pf-v5-c-masthead pf-m-display-inline blockscape-masthead");
       attr(header, "class", "pf-v5-c-page__header");
       header.hidden = header_hidden_value = !/*showHeader*/
-      ctx[4];
+      ctx[5];
       attr(div11, "class", "sidebar-heading");
       attr(ul, "id", "modelList");
       attr(ul, "class", "model-nav-list");
@@ -11833,14 +11852,14 @@ function create_fragment$1(ctx) {
       attr(aside, "class", "blockscape-sidebar");
       attr(aside, "aria-label", "Models");
       aside.hidden = aside_hidden_value = !/*showSidebar*/
-      ctx[3];
+      ctx[4];
       attr(div24, "class", "blockscape-main");
       attr(div25, "class", "blockscape-content");
       attr(main, "class", "pf-v5-c-page__main");
       attr(div26, "class", "blockscape-footer__inner");
       attr(footer, "class", "pf-v5-c-page__footer blockscape-footer");
       footer.hidden = footer_hidden_value = !/*showFooter*/
-      ctx[2];
+      ctx[3];
       attr(div27, "class", "pf-v5-c-page");
       html_tag.a = t97;
       attr(svg1, "id", "overlay");
@@ -11933,6 +11952,7 @@ function create_fragment$1(ctx) {
       append(div27, t94);
       append(div27, footer);
       append(footer, div26);
+      ctx[14](div27);
       insert(target2, t96, anchor);
       html_tag.m(raw_value, target2, anchor);
       insert(target2, t97, anchor);
@@ -11954,25 +11974,25 @@ function create_fragment$1(ctx) {
             button0,
             "click",
             /*toggleHeaderExpanded*/
-            ctx[6]
+            ctx[7]
           ),
           listen(
             button2,
             "click",
             /*zoomOut*/
-            ctx[8]
+            ctx[9]
           ),
           listen(
             button3,
             "click",
             /*resetZoom*/
-            ctx[9]
+            ctx[10]
           ),
           listen(
             button4,
             "click",
             /*zoomIn*/
-            ctx[7]
+            ctx[8]
           )
         ];
         mounted = true;
@@ -11980,53 +12000,53 @@ function create_fragment$1(ctx) {
     },
     p(ctx2, [dirty]) {
       if (!current || dirty & /*headerExpanded*/
-      1) {
+      2) {
         attr(
           button0,
           "aria-expanded",
           /*headerExpanded*/
-          ctx2[0]
+          ctx2[1]
         );
       }
       if (!current || dirty & /*headerExpanded*/
-      1 && button0_aria_label_value !== (button0_aria_label_value = /*headerExpanded*/
-      ctx2[0] ? "Hide advanced tools" : "Show advanced tools")) {
+      2 && button0_aria_label_value !== (button0_aria_label_value = /*headerExpanded*/
+      ctx2[1] ? "Hide advanced tools" : "Show advanced tools")) {
         attr(button0, "aria-label", button0_aria_label_value);
       }
       if (!current || dirty & /*zoomLabel*/
-      2) set_data(
+      4) set_data(
         t17,
         /*zoomLabel*/
-        ctx2[1]
+        ctx2[2]
       );
       if (!current || dirty & /*headerExpanded*/
-      1 && div6_hidden_value !== (div6_hidden_value = !/*headerExpanded*/
-      ctx2[0])) {
+      2 && div6_hidden_value !== (div6_hidden_value = !/*headerExpanded*/
+      ctx2[1])) {
         div6.hidden = div6_hidden_value;
       }
       if (!current || dirty & /*headerExpanded*/
-      1 && div6_aria_hidden_value !== (div6_aria_hidden_value = !/*headerExpanded*/
-      ctx2[0])) {
+      2 && div6_aria_hidden_value !== (div6_aria_hidden_value = !/*headerExpanded*/
+      ctx2[1])) {
         attr(div6, "aria-hidden", div6_aria_hidden_value);
       }
       if (!current || dirty & /*headerExpanded*/
-      1 && div7_data_expanded_value !== (div7_data_expanded_value = /*headerExpanded*/
-      ctx2[0] ? "true" : "false")) {
+      2 && div7_data_expanded_value !== (div7_data_expanded_value = /*headerExpanded*/
+      ctx2[1] ? "true" : "false")) {
         attr(div7, "data-expanded", div7_data_expanded_value);
       }
       if (!current || dirty & /*showHeader*/
-      16 && header_hidden_value !== (header_hidden_value = !/*showHeader*/
-      ctx2[4])) {
+      32 && header_hidden_value !== (header_hidden_value = !/*showHeader*/
+      ctx2[5])) {
         header.hidden = header_hidden_value;
       }
       if (!current || dirty & /*showSidebar*/
-      8 && aside_hidden_value !== (aside_hidden_value = !/*showSidebar*/
-      ctx2[3])) {
+      16 && aside_hidden_value !== (aside_hidden_value = !/*showSidebar*/
+      ctx2[4])) {
         aside.hidden = aside_hidden_value;
       }
       if (!current || dirty & /*showFooter*/
-      4 && footer_hidden_value !== (footer_hidden_value = !/*showFooter*/
-      ctx2[2])) {
+      8 && footer_hidden_value !== (footer_hidden_value = !/*showFooter*/
+      ctx2[3])) {
         footer.hidden = footer_hidden_value;
       }
     },
@@ -12059,6 +12079,7 @@ function create_fragment$1(ctx) {
         detach(t108);
       }
       detach(link);
+      ctx[14](null);
       destroy_component(shortcuthelp, detaching);
       destroy_component(newpanel, detaching);
       mounted = false;
@@ -12073,6 +12094,7 @@ function instance$1($$self, $$props, $$invalidate) {
   let zoomLabel;
   let { seed } = $$props;
   let { features = {} } = $$props;
+  let pageEl;
   const defaultSeedText = `
   {
   "id": "blockscape",
@@ -12226,9 +12248,10 @@ function instance$1($$self, $$props, $$invalidate) {
   ];
   let sizeIndex = 1;
   const toggleHeaderExpanded = () => {
-    $$invalidate(0, headerExpanded = !headerExpanded);
+    var _a, _b;
+    $$invalidate(1, headerExpanded = !headerExpanded);
     if (!headerExpanded) {
-      const searchInput = document.getElementById("search");
+      const searchInput = (_b = (_a = pageEl == null ? void 0 : pageEl.parentElement) == null ? void 0 : _a.querySelector) == null ? void 0 : _b.call(_a, "#search");
       if (searchInput && searchInput.value) {
         searchInput.value = "";
         searchInput.dispatchEvent(new Event("input", { bubbles: true }));
@@ -12241,19 +12264,19 @@ function instance$1($$self, $$props, $$invalidate) {
     window.dispatchEvent(new CustomEvent("blockscape:zoom", { detail: { scale } }));
   };
   const zoomIn = () => {
-    $$invalidate(12, sizeIndex = Math.min(SIZE_PRESETS.length - 1, sizeIndex + 1));
+    $$invalidate(13, sizeIndex = Math.min(SIZE_PRESETS.length - 1, sizeIndex + 1));
     applyZoom();
   };
   const zoomOut = () => {
-    $$invalidate(12, sizeIndex = Math.max(0, sizeIndex - 1));
+    $$invalidate(13, sizeIndex = Math.max(0, sizeIndex - 1));
     applyZoom();
   };
   const resetZoom = () => {
-    $$invalidate(12, sizeIndex = 1);
+    $$invalidate(13, sizeIndex = 1);
     applyZoom();
   };
   onMount(() => {
-    initBlockscape(features);
+    initBlockscape(features, { host: (pageEl == null ? void 0 : pageEl.parentElement) || document });
     applyZoom();
     const handleZoomKeys = (event) => {
       if (!event.ctrlKey && !event.metaKey) return;
@@ -12275,29 +12298,36 @@ function instance$1($$self, $$props, $$invalidate) {
     window.addEventListener("keydown", handleZoomKeys);
     return () => window.removeEventListener("keydown", handleZoomKeys);
   });
+  function div27_binding($$value) {
+    binding_callbacks[$$value ? "unshift" : "push"](() => {
+      pageEl = $$value;
+      $$invalidate(0, pageEl);
+    });
+  }
   $$self.$$set = ($$props2) => {
-    if ("seed" in $$props2) $$invalidate(10, seed = $$props2.seed);
-    if ("features" in $$props2) $$invalidate(11, features = $$props2.features);
+    if ("seed" in $$props2) $$invalidate(11, seed = $$props2.seed);
+    if ("features" in $$props2) $$invalidate(12, features = $$props2.features);
   };
   $$self.$$.update = () => {
     if ($$self.$$.dirty & /*features*/
-    2048) {
-      $$invalidate(4, showHeader = features.showHeader !== false);
+    4096) {
+      $$invalidate(5, showHeader = features.showHeader !== false);
     }
     if ($$self.$$.dirty & /*features*/
-    2048) {
-      $$invalidate(3, showSidebar = features.showSidebar !== false);
+    4096) {
+      $$invalidate(4, showSidebar = features.showSidebar !== false);
     }
     if ($$self.$$.dirty & /*features*/
-    2048) {
-      $$invalidate(2, showFooter = features.showFooter !== false);
+    4096) {
+      $$invalidate(3, showFooter = features.showFooter !== false);
     }
     if ($$self.$$.dirty & /*sizeIndex*/
-    4096) {
-      $$invalidate(1, zoomLabel = `${Math.round(SIZE_PRESETS[sizeIndex].value * 100)}%`);
+    8192) {
+      $$invalidate(2, zoomLabel = `${Math.round(SIZE_PRESETS[sizeIndex].value * 100)}%`);
     }
   };
   return [
+    pageEl,
     headerExpanded,
     zoomLabel,
     showFooter,
@@ -12310,13 +12340,14 @@ function instance$1($$self, $$props, $$invalidate) {
     resetZoom,
     seed,
     features,
-    sizeIndex
+    sizeIndex,
+    div27_binding
   ];
 }
 class App extends SvelteComponent {
   constructor(options) {
     super();
-    init(this, options, instance$1, create_fragment$1, safe_not_equal, { seed: 10, features: 11 });
+    init(this, options, instance$1, create_fragment$1, safe_not_equal, { seed: 11, features: 12 });
   }
 }
 function create_fragment(ctx) {
