@@ -18,7 +18,7 @@ import { isExternalHref, openExternalUrl, resolveHref } from "./externalLinks";
 const ASSET_BASE =
   (typeof import.meta !== "undefined" && import.meta.env?.BASE_URL) || "";
 
-export function initBlockscape(featureOverrides = {}) {
+export function initBlockscape(featureOverrides = {}, { host = document } = {}) {
   console.log("[Blockscape] init");
 
   const features = {
@@ -36,50 +36,57 @@ export function initBlockscape(featureOverrides = {}) {
     ...featureOverrides,
   };
 
-  const jsonBox = document.getElementById("jsonBox");
-  const jsonPanel = document.querySelector(".blockscape-json-panel");
-  const app = document.getElementById("app");
-  const overlay = document.getElementById("overlay");
-  const tabTooltip = document.getElementById("tabTooltip");
-  const modelList = document.getElementById("modelList");
-  const preview = document.getElementById("itemPreview");
-  const urlForm = document.getElementById("urlForm");
-  const urlInput = document.getElementById("urlInput");
-  const loadUrlButton = document.getElementById("loadUrl");
+  const scope =
+    host && typeof host.querySelector === "function" ? host : document;
+  const byId = (id) => scope.querySelector(`#${id}`);
+  const jsonBox = byId("jsonBox");
+  const jsonPanel = scope.querySelector(".blockscape-json-panel");
+  const app = byId("app");
+  const overlay = byId("overlay");
+  const tabTooltip = byId("tabTooltip");
+  const modelList = byId("modelList");
+  const preview = byId("itemPreview");
+  const urlForm = byId("urlForm");
+  const urlInput = byId("urlInput");
+  const loadUrlButton = byId("loadUrl");
   const previewTitle = preview.querySelector(".item-preview__title");
   const previewBody = preview.querySelector(".item-preview__body");
   const previewActions = preview.querySelector(".item-preview__actions");
   const previewClose = preview.querySelector(".item-preview__close");
-  const downloadButton = document.getElementById("downloadJson");
-  const shareButton = document.getElementById("shareModel");
-  const createVersionButton = document.getElementById("createVersion");
-  const copyJsonButton = document.getElementById("copyJson");
-  const copySeriesButton = document.getElementById("copySeries");
-  const pasteJsonButton = document.getElementById("pasteJson");
-  const helpButton = document.getElementById("helpButton");
-  const newPanelButton = document.getElementById("newPanelButton");
-  const newBlankButton = document.getElementById("newBlankButton");
-  const shortcutHelp = document.getElementById("shortcutHelp");
-  const shortcutHelpList = document.getElementById("shortcutHelpList");
-  const shortcutHelpClose = document.getElementById("shortcutHelpClose");
-  const shortcutHelpBackdrop = document.getElementById("shortcutHelpBackdrop");
-  const newPanel = document.getElementById("newPanel");
-  const newPanelClose = document.getElementById("newPanelClose");
-  const newPanelBackdrop = document.getElementById("newPanelBackdrop");
-  const searchInput = document.getElementById("search");
-  const searchResults = document.getElementById("searchResults");
-  const localBackendPanel = document.getElementById("localBackendPanel");
-  const localBackendStatus = document.getElementById("localBackendStatus");
-  const localFileList = document.getElementById("localFileList");
-  const localDirSelect = document.getElementById("localDirSelect");
-  const refreshLocalFilesButton = document.getElementById("refreshLocalFiles");
-  const loadLocalFileButton = document.getElementById("loadLocalFile");
-  const deleteLocalFileButton = document.getElementById("deleteLocalFile");
-  const toggleServerSidebarButton =
-    document.getElementById("toggleServerSidebar");
-  const saveLocalFileButton = document.getElementById("saveLocalFile");
-  const saveLocalFileAsButton = document.getElementById("saveLocalFileAs");
-  const localSavePathInput = document.getElementById("localSavePath");
+  const downloadButton = byId("downloadJson");
+  const shareButton = byId("shareModel");
+  const createVersionButton = byId("createVersion");
+  const copyJsonButton = byId("copyJson");
+  const copySeriesButton = byId("copySeries");
+  const pasteJsonButton = byId("pasteJson");
+  const helpButton = byId("helpButton");
+  const newPanelButton = byId("newPanelButton");
+  const newBlankButton = byId("newBlankButton");
+  const shortcutHelp = byId("shortcutHelp");
+  const shortcutHelpList = byId("shortcutHelpList");
+  const shortcutHelpClose = byId("shortcutHelpClose");
+  const shortcutHelpBackdrop = byId("shortcutHelpBackdrop");
+  const newPanel = byId("newPanel");
+  const newPanelClose = byId("newPanelClose");
+  const newPanelBackdrop = byId("newPanelBackdrop");
+  const searchInput = byId("search");
+  const searchResults = byId("searchResults");
+  const localBackendPanel = byId("localBackendPanel");
+  const localBackendStatus = byId("localBackendStatus");
+  const localFileList = byId("localFileList");
+  const localDirSelect = byId("localDirSelect");
+  const refreshLocalFilesButton = byId("refreshLocalFiles");
+  const loadLocalFileButton = byId("loadLocalFile");
+  const deleteLocalFileButton = byId("deleteLocalFile");
+  const toggleServerSidebarButton = byId("toggleServerSidebar");
+  const saveLocalFileButton = byId("saveLocalFile");
+  const saveLocalFileAsButton = byId("saveLocalFileAs");
+  const localSavePathInput = byId("localSavePath");
+  const root =
+    host && typeof host.getBoundingClientRect === "function"
+      ? host
+      : app?.closest(".blockscape-root") || app?.parentElement || document.body;
+  let overlayRoot = root;
   const SERVER_SIDEBAR_WIDE_STORAGE_KEY = "blockscape:serverSidebarWide";
   const defaultDocumentTitle = document.title;
 
@@ -100,7 +107,7 @@ export function initBlockscape(featureOverrides = {}) {
   }
 
   // Show the seed in the editor initially.
-  jsonBox.value = document.getElementById("seed").textContent.trim();
+  jsonBox.value = byId("seed").textContent.trim();
 
   // ===== State =====
   /** @type {{id:string,title:string,data:any}[]} */
@@ -3635,7 +3642,7 @@ export function initBlockscape(featureOverrides = {}) {
     handleWindowScroll: handleTileMenuWindowScroll,
     updateColorPresets: updateTileMenuColors,
   } = createTileContextMenu({
-    menuEl: document.getElementById("tileContextMenu"),
+    menuEl: byId("tileContextMenu"),
     previewEl: preview,
     previewTitleEl: previewTitle,
     previewBodyEl: previewBody,
@@ -5366,8 +5373,7 @@ export function initBlockscape(featureOverrides = {}) {
       app.appendChild(versionNavEl);
     }
 
-    overlay.setAttribute("width", window.innerWidth);
-    overlay.setAttribute("height", window.innerHeight);
+    syncOverlayBounds();
 
     const buildModelMeta = () => {
       const meta = document.createElement("div");
@@ -5613,6 +5619,7 @@ export function initBlockscape(featureOverrides = {}) {
 
     const renderHost = document.createElement("div");
     renderHost.className = "blockscape-render";
+    overlayRoot = renderHost;
     const stageGuides = document.createElement("div");
     stageGuides.className = "stage-guides";
     stageGuides.hidden = !centerItems;
@@ -5632,6 +5639,7 @@ export function initBlockscape(featureOverrides = {}) {
     });
     stageGuides.appendChild(stageLabels);
     renderHost.appendChild(stageGuides);
+    renderHost.appendChild(overlay);
     stageGuidesOverlay = stageGuides;
     mapPanel.appendChild(renderHost);
 
@@ -7153,12 +7161,29 @@ export function initBlockscape(featureOverrides = {}) {
         clearSelection();
       });
     }
-    document.getElementById("clear").onclick = () => clearSelection();
+    byId("clear").onclick = () => clearSelection();
+  }
+
+  function syncOverlayBounds() {
+    if (!overlay || !overlayRoot?.getBoundingClientRect) return null;
+    const rootRect = overlayRoot.getBoundingClientRect();
+    overlay.setAttribute("width", Math.max(1, Math.round(rootRect.width)));
+    overlay.setAttribute("height", Math.max(1, Math.round(rootRect.height)));
+    return rootRect;
   }
 
   function reflowRects() {
+    const rootRect = syncOverlayBounds();
     index.forEach((v) => {
-      v.rect = v.el.getBoundingClientRect();
+      const rect = v.el.getBoundingClientRect();
+      v.rect = rootRect
+        ? {
+            left: rect.left - rootRect.left,
+            top: rect.top - rootRect.top,
+            width: rect.width,
+            height: rect.height,
+          }
+        : rect;
     });
   }
 
@@ -8652,7 +8677,7 @@ export function initBlockscape(featureOverrides = {}) {
   }
 
   // Append models from textarea
-  document.getElementById("appendFromBox").onclick = async () => {
+    byId("appendFromBox").onclick = async () => {
     try {
       const autoSave = await isLocalBackendReady();
       const appended = normalizeToModelsFromText(jsonBox.value, "Pasted", {
@@ -8688,7 +8713,7 @@ export function initBlockscape(featureOverrides = {}) {
   };
 
   // Replace active model data with JSON from textarea
-  document.getElementById("replaceActive").onclick = () => {
+  byId("replaceActive").onclick = () => {
     if (activeIndex < 0) {
       alert("No active model selected.");
       return;
@@ -8727,7 +8752,7 @@ export function initBlockscape(featureOverrides = {}) {
   };
 
   // Load files: each text may be single object, array, or ---/%%% separated
-  document.getElementById("file").onchange = async (e) => {
+  byId("file").onchange = async (e) => {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
     try {
@@ -8919,7 +8944,7 @@ export function initBlockscape(featureOverrides = {}) {
   });
 
   // Remove selected model
-  document.getElementById("removeModel").onclick = () => {
+  byId("removeModel").onclick = () => {
     if (activeIndex < 0) return;
     const title = getModelTitle(models[activeIndex]);
     const ok = window.confirm(`Remove "${title}" from this session?`);
@@ -8999,7 +9024,7 @@ export function initBlockscape(featureOverrides = {}) {
       if (typeof idx === "number") {
         setActive(idx);
         urlInput.value = "";
-        const hint = document.getElementById("urlHint");
+        const hint = byId("urlHint");
         if (hint) hint.textContent = "";
       }
     });
@@ -9007,7 +9032,7 @@ export function initBlockscape(featureOverrides = {}) {
 
   // Show last 12 characters after user pauses typing
   (function attachUrlHint() {
-    const hint = document.getElementById("urlHint");
+    const hint = byId("urlHint");
     if (!urlInput || !hint) return;
     let timer = null;
     urlInput.addEventListener("input", () => {
@@ -9366,7 +9391,7 @@ export function initBlockscape(featureOverrides = {}) {
 
   // Bootstrap with Blockscape
   (async function bootstrap() {
-    const seedEl = document.getElementById("seed");
+    const seedEl = byId("seed");
     if (!seedEl) {
       throw new Error("Seed template not found in document.");
     }

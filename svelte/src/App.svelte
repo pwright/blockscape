@@ -5,6 +5,7 @@
   import NewPanel from './components/NewPanel.svelte';
   export let seed;
   export let features = {};
+  let pageEl;
 
   const defaultSeedText = `
   {
@@ -168,7 +169,7 @@
   const toggleHeaderExpanded = () => {
     headerExpanded = !headerExpanded;
     if (!headerExpanded) {
-      const searchInput = document.getElementById('search');
+      const searchInput = pageEl?.parentElement?.querySelector?.('#search');
       if (searchInput && searchInput.value) {
         searchInput.value = '';
         searchInput.dispatchEvent(new Event('input', { bubbles: true }));
@@ -196,7 +197,7 @@
   };
 
   onMount(() => {
-    initBlockscape(features);
+    initBlockscape(features, { host: pageEl?.parentElement || document });
     applyZoom();
 
     const handleZoomKeys = (event) => {
@@ -227,7 +228,7 @@
   <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
 </svelte:head>
 
-<div class="pf-v5-c-page">
+<div class="pf-v5-c-page" bind:this={pageEl}>
   <header class="pf-v5-c-page__header" hidden={!showHeader}>
     <div class="pf-v5-c-masthead pf-m-display-inline blockscape-masthead">
       <div class="pf-v5-c-masthead__content">

@@ -97,7 +97,7 @@ The map only appears when visualized using blockscape.
 The maps is created from a model (JSON) using the following rules:
 
 - categories are listed from first to last, meaning a top category provides more visible value than a lower category.
-- items are listed from left to right, meaning first (left most) item (component) is more mature than later (right) items.
+- items are listed from left to right, meaning first (left most) item (component) is less mature than later (right) items.
 
 
 Why JSON and not mermaid/plantuml/d2 etc?
