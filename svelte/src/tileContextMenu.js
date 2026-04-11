@@ -11,6 +11,8 @@ export function createTileContextMenu({
   escapeHtml,
   onEditItem,
   onChangeColor,
+  canCopyItemLink,
+  onCopyItemLink,
   selectItem,
   colorPresets = [],
 } = {}) {
@@ -141,6 +143,16 @@ export function createTileContextMenu({
     if (typeof onEditItem === "function") {
       list.appendChild(
         makeMenuButton("Edit", () => onEditItem(meta.id))
+      );
+    }
+
+    if (
+      typeof onCopyItemLink === "function" &&
+      meta.id &&
+      (typeof canCopyItemLink !== "function" || canCopyItemLink(meta.id))
+    ) {
+      list.appendChild(
+        makeMenuButton("Copy item link", () => onCopyItemLink(meta.id))
       );
     }
 

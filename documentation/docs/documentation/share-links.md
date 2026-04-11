@@ -27,6 +27,23 @@ python encode-bs-share.py path/to/model.bs
 
 The script prints a full URL containing a Base64 token. Open it in a browser to load the map without uploading a file. You can also copy just the token if you need to embed it elsewhere.
 
+## Highlight an item when loading from a URL
+
+If you are loading a map with the `?load=` pattern, append `&item=<item-id>` to select and scroll to a specific item after the map loads.
+
+Example:
+
+```text
+https://example.com/blockscape/?load=https%3A%2F%2Fexample.com%2Fmaps%2Fdemo.bs&item=foo
+```
+
+If the loaded file is a series, append `&map=<map-id>` to reopen a specific map in the series before selecting the item.
+
+Example:
+
+```text
+https://example.com/blockscape/?load=https%3A%2F%2Fexample.com%2Fmaps%2Fdemo-series.bs&map=map-3&item=foo
+```
 
 ## Tips and caveats
 

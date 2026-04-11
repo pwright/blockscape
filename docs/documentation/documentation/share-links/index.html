@@ -229,6 +229,10 @@
               <ul class="nav flex-column">
               </ul>
             </li>
+            <li class="nav-item" data-bs-level="2"><a href="#highlight-an-item-when-loading-from-a-url" class="nav-link">Highlight an item when loading from a URL</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
             <li class="nav-item" data-bs-level="2"><a href="#tips-and-caveats" class="nav-link">Tips and caveats</a>
               <ul class="nav flex-column">
               </ul>
@@ -254,6 +258,15 @@ Bookmark it or send that url to anyone to share.</p>
 <pre><code class="language-sh">python encode-bs-share.py path/to/model.bs
 </code></pre>
 <p>The script prints a full URL containing a Base64 token. Open it in a browser to load the map without uploading a file. You can also copy just the token if you need to embed it elsewhere.</p>
+<h2 id="highlight-an-item-when-loading-from-a-url">Highlight an item when loading from a URL</h2>
+<p>If you are loading a map with the <code>?load=</code> pattern, append <code>&amp;item=&lt;item-id&gt;</code> to select and scroll to a specific item after the map loads.</p>
+<p>Example:</p>
+<pre><code class="language-text">https://example.com/blockscape/?load=https%3A%2F%2Fexample.com%2Fmaps%2Fdemo.bs&amp;item=foo
+</code></pre>
+<p>If the loaded file is a series, append <code>&amp;map=&lt;map-id&gt;</code> to reopen a specific map in the series before selecting the item.</p>
+<p>Example:</p>
+<pre><code class="language-text">https://example.com/blockscape/?load=https%3A%2F%2Fexample.com%2Fmaps%2Fdemo-series.bs&amp;map=map-3&amp;item=foo
+</code></pre>
 <h2 id="tips-and-caveats">Tips and caveats</h2>
 <ul>
 <li>Tokens grow with file size; keep shared models concise when possible.</li>

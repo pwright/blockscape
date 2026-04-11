@@ -1069,6 +1069,124 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
     }
   }
 
+  function buildBaseAppUrl() {
+    if (typeof window === "undefined" || !window.location) return null;
+    const url = new URL(window.location.href);
+    const normalizedPath = url.pathname.replace(/\/+$/, "");
+    const segments = normalizedPath.split("/").filter(Boolean);
+    const serverIndex = segments.findIndex(
+      (segment) => segment.toLowerCase() === "server"
+    );
+    const baseSegments =
+      serverIndex === -1 ? segments : segments.slice(0, serverIndex);
+    url.pathname = (baseSegments.length ? `/${baseSegments.join("/")}` : "/")
+      .replace(/\/+/g, "/");
+    url.hash = "";
+    return url;
+  }
+
+  function buildServerPathUrl(relPath, { modelId, mapId, itemId } = {}) {
+    if (typeof window === "undefined" || !window.location || !relPath) {
+      return null;
+    }
+    const normalized = normalizeLocalSavePath(relPath);
+    if (!normalized) return null;
+    const encodedPathSegments = normalized
+      .split("/")
+      .filter(Boolean)
+      .map((part) => encodeURIComponent(part));
+    const encodedModel = modelId ? encodeURIComponent(modelId) : null;
+    const encodedItem = itemId ? encodeURIComponent(itemId) : null;
+    const url = buildBaseAppUrl();
+    if (!url) return null;
+    const cleanedSearch = new URLSearchParams(url.search);
+    cleanedSearch.delete("load");
+    cleanedSearch.delete("share");
+    cleanedSearch.delete("map");
+    cleanedSearch.delete("item");
+    if (mapId) {
+      cleanedSearch.set("map", mapId);
+    }
+    url.pathname = [
+      "",
+      "server",
+      ...encodedPathSegments,
+      ...(encodedModel ? [encodedModel] : []),
+      ...(encodedItem ? [encodedItem] : []),
+    ]
+      .join("/")
+      .replace(/\/+/g, "/");
+    url.search = cleanedSearch.toString() ? `?${cleanedSearch.toString()}` : "";
+    return url;
+  }
+
+  function buildRemoteLoadUrl(sourceUrl, { mapId, itemId } = {}) {
+    const normalizedSource = normalizeLoadTargetUrl(sourceUrl);
+    if (!normalizedSource) return null;
+    const url = buildBaseAppUrl();
+    if (!url) return null;
+    const cleanedSearch = new URLSearchParams(url.search);
+    cleanedSearch.delete("share");
+    cleanedSearch.delete("load");
+    cleanedSearch.delete("map");
+    cleanedSearch.delete("item");
+    cleanedSearch.set("load", normalizedSource);
+    if (mapId) {
+      cleanedSearch.set("map", mapId);
+    }
+    if (itemId) {
+      cleanedSearch.set("item", itemId);
+    }
+    url.search = cleanedSearch.toString() ? `?${cleanedSearch.toString()}` : "";
+    url.hash = "";
+    return url;
+  }
+
+  function getSeriesMapId(entry) {
+    if ((entry?.apicurioVersions?.length || 0) <= 1) return null;
+    const candidate = entry?.data?.id;
+    if (!candidate) return null;
+    const trimmed = candidate.toString().trim();
+    return trimmed || null;
+  }
+
+  function getShareableItemUrl(itemId) {
+    const active = models[activeIndex];
+    if (!active || !itemId) return null;
+    const mapId = getSeriesMapId(active);
+    if (active.sourcePath) {
+      return (
+        buildServerPathUrl(active.sourcePath, {
+          modelId: getModelId(active),
+          mapId,
+          itemId,
+        })?.toString() || null
+      );
+    }
+    if (active.sourceUrl) {
+      return (
+        buildRemoteLoadUrl(active.sourceUrl, { mapId, itemId })?.toString() ||
+        null
+      );
+    }
+    return null;
+  }
+
+  async function copyShareableItemUrl(itemId) {
+    const shareUrl = getShareableItemUrl(itemId);
+    if (!shareUrl) {
+      showNotice("No shareable item link is available for this map.", 2200);
+      return false;
+    }
+    const copied = await writeTextToClipboard(shareUrl);
+    if (copied) {
+      showNotice("Item link copied to clipboard.", 2200);
+      return true;
+    }
+    window.prompt("Copy this item URL:", shareUrl);
+    return true;
+  }
+
   function notifyLocalSavePath(path, { origin } = {}) {
     if (typeof window === "undefined" || !path) return;
     try {
@@ -3651,6 +3769,8 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
     escapeHtml,
     onEditItem: (id) => itemEditor.open(id),
     onChangeColor: (id, color) => setItemColor(id, color),
+    canCopyItemLink: (id) => !!getShareableItemUrl(id),
+    onCopyItemLink: (id) => copyShareableItemUrl(id),
     selectItem: (id) => select(id),
     colorPresets,
   });
@@ -3801,6 +3921,8 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
     target.data = entry.data;
     target.title = getModelTitle(entry) || target.title;
     target.isSeries = true;
+    if (entry.sourcePath) target.sourcePath = entry.sourcePath;
+    if (entry.sourceUrl) target.sourceUrl = entry.sourceUrl;
     const seriesName = target.title || getModelTitle(target);
     ensureSeriesId(target, { seriesName, fallbackTitle: seriesName });
     return existingIndex;
@@ -4888,34 +5010,47 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
   }
 
   async function consumeLoadParam() {
-    const hash = window.location.hash || "";
+    const hashParams = new URLSearchParams(
+      (window.location.hash || "").replace(/^#/, "")
+    );
+    const searchParams = new URLSearchParams(window.location.search);
     let target = null;
+    let mapId = null;
+    let itemId = null;
 
-    const hashMatch = hash.match(/load=([^&]+)/);
-    if (hashMatch) {
-      try {
-        target = decodeURIComponent(hashMatch[1]);
-      } catch {
-        target = hashMatch[1];
-      }
+    if (hashParams.has("load")) {
+      target = hashParams.get("load");
+      mapId = (hashParams.get("map") || "").trim() || null;
+      itemId = (hashParams.get("item") || "").trim() || null;
     }
 
-    if (!target) {
-      const params = new URLSearchParams(window.location.search);
-      if (params.has("load")) {
-        target = params.get("load");
-      }
+    if (!target && searchParams.has("load")) {
+      target = searchParams.get("load");
+      mapId = (searchParams.get("map") || "").trim() || null;
+      itemId = (searchParams.get("item") || "").trim() || null;
     }
 
     if (!target) return null;
 
     try {
       const idx = await loadFromUrl(target);
-      return typeof idx === "number" ? idx : null;
+      return typeof idx === "number" ? { modelIndex: idx, mapId, itemId } : null;
     } catch (err) {
       console.warn("[Blockscape] load param failed", err);
       return null;
     }
+  }
+
+  function consumeMapParam() {
+    const hashParams = new URLSearchParams(
+      (window.location.hash || "").replace(/^#/, "")
+    );
+    const searchParams = new URLSearchParams(window.location.search);
+    return (
+      (hashParams.get("map") || "").trim() ||
+      (searchParams.get("map") || "").trim() ||
+      null
+    );
   }
 
   function parse(mObj) {
@@ -4993,6 +5128,15 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
     if (idx === -1) return null;
     const versionEntry = entry.apicurioVersions[idx];
     return versionEntry?.version ?? null;
+  }
+
+  function findSeriesVersionIndexByMapId(entry, mapId) {
+    const normalized = (mapId ?? "").toString().trim().toLowerCase();
+    if (!normalized || !entry?.apicurioVersions?.length) return -1;
+    return entry.apicurioVersions.findIndex((version) => {
+      const candidate = (version?.data?.id ?? "").toString().trim().toLowerCase();
+      return !!candidate && candidate === normalized;
+    });
   }
 
   function getThumbScrollKey(entry, fallback = "active") {
@@ -9363,6 +9507,7 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
           {
             ...payload,
             title: dataTitle || payload.title || fallbackTitle,
+            sourceUrl: resolvedUrl,
             apicurioArtifactName:
               payload.apicurioArtifactName ||
               seriesName ||
@@ -9427,8 +9572,13 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
       typeof serverPathResult?.modelIndex === "number"
         ? serverPathResult.modelIndex
         : null;
-    const loadIndex = await consumeLoadParam();
+    const loadResult = await consumeLoadParam();
+    const loadIndex =
+      typeof loadResult?.modelIndex === "number"
+        ? loadResult.modelIndex
+        : null;
     const shareIndex = consumeShareLink();
+    const initialMapId = consumeMapParam();
     const initialIndex =
       typeof serverPathIndex === "number"
         ? serverPathIndex
@@ -9438,16 +9588,37 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
         ? shareIndex
         : firstSeedIndex ?? 0;
     setActive(initialIndex);
-    if (
+    if (initialMapId && activeIndex === initialIndex) {
+      const mapTargetIndex = findSeriesVersionIndexByMapId(
+        models[initialIndex],
+        loadResult?.mapId || initialMapId
+      );
+      if (mapTargetIndex !== -1) {
+        setActiveApicurioVersion(initialIndex, mapTargetIndex);
+      }
+    }
+    const initialItemTarget =
       serverPathResult?.itemId &&
       typeof serverPathResult.modelIndex === "number" &&
       serverPathResult.modelIndex === initialIndex
-    ) {
+        ? {
+            modelIndex: serverPathResult.modelIndex,
+            itemId: serverPathResult.itemId,
+          }
+        : loadResult?.itemId &&
+          typeof loadResult.modelIndex === "number" &&
+          loadResult.modelIndex === initialIndex
+        ? {
+            modelIndex: loadResult.modelIndex,
+            itemId: loadResult.itemId,
+          }
+        : null;
+    if (initialItemTarget) {
       requestAnimationFrame(() => {
-        if (activeIndex !== serverPathResult.modelIndex) return;
-        const tile = index.get(serverPathResult.itemId)?.el;
+        if (activeIndex !== initialItemTarget.modelIndex) return;
+        const tile = index.get(initialItemTarget.itemId)?.el;
         if (!tile) return;
-        select(serverPathResult.itemId);
+        select(initialItemTarget.itemId);
         tile.scrollIntoView({
           behavior: "smooth",
           block: "center",
