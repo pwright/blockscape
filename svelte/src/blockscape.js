@@ -1213,9 +1213,46 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
     }
   }
 
-  function extractServerFilePathFromUrl() {
+  function extractLoadTargetFromUrl(urlLike = window.location.href) {
+    if (typeof window === "undefined" || !window.location) {
+      return { target: null, mapId: null, itemId: null };
+    }
+    let url;
+    try {
+      url =
+        urlLike instanceof URL
+          ? new URL(urlLike.toString())
+          : new URL(urlLike, window.location.href);
+    } catch {
+      return { target: null, mapId: null, itemId: null };
+    }
+    const hashParams = new URLSearchParams((url.hash || "").replace(/^#/, ""));
+    const searchParams = new URLSearchParams(url.search);
+    let target = null;
+    let mapId = null;
+    let itemId = null;
+
+    if (hashParams.has("load")) {
+      target = hashParams.get("load");
+      mapId = (hashParams.get("map") || "").trim() || null;
+      itemId = (hashParams.get("item") || "").trim() || null;
+    }
+
+    if (!target && searchParams.has("load")) {
+      target = searchParams.get("load");
+      mapId = (searchParams.get("map") || "").trim() || null;
+      itemId = (searchParams.get("item") || "").trim() || null;
+    }
+
+    return { target: target || null, mapId, itemId };
+  }
+
+  function extractServerFilePathFromUrl(urlLike = window.location.href) {
     if (typeof window === "undefined" || !window.location) return null;
-    const url = new URL(window.location.href);
+    const url =
+      urlLike instanceof URL
+        ? new URL(urlLike.toString())
+        : new URL(urlLike, window.location.href);
     const normalizedPath = url.pathname.replace(/\/+$/, "");
     const segments = normalizedPath.split("/").filter(Boolean);
     const serverIndex = segments.findIndex(
@@ -1245,6 +1282,139 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
     const modelId = decodedExtras[0] ? decodedExtras[0].trim() : null;
     const itemId = decodedExtras[1] ? decodedExtras[1].trim() : null;
     return { path: normalized, modelId: modelId || null, itemId: itemId || null };
+  }
+
+  function resolveBlockscapeAppLinkTarget(href) {
+    if (typeof window === "undefined" || !window.location || !href) return null;
+    try {
+      const parsed = new URL(href, window.location.href);
+      if (parsed.origin !== window.location.origin) return null;
+      const { target, mapId, itemId } = extractLoadTargetFromUrl(parsed);
+      if (target) {
+        return {
+          kind: "remote-load",
+          href: parsed.toString(),
+          target,
+          mapId,
+          itemId,
+        };
+      }
+      const serverPath = extractServerFilePathFromUrl(parsed);
+      if (!serverPath?.path) return null;
+      const searchParams = new URLSearchParams(parsed.search);
+      return {
+        kind: "server-path",
+        href: parsed.toString(),
+        ...serverPath,
+        mapId: (searchParams.get("map") || "").trim() || null,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  function activateLoadedModel(modelIndex, { mapId, itemId } = {}) {
+    if (typeof modelIndex !== "number" || modelIndex < 0 || !models[modelIndex]) {
+      return false;
+    }
+    setActive(modelIndex);
+    if (mapId && activeIndex === modelIndex) {
+      const mapTargetIndex = findSeriesVersionIndexByMapId(
+        models[modelIndex],
+        mapId
+      );
+      if (mapTargetIndex !== -1) {
+        setActiveApicurioVersion(modelIndex, mapTargetIndex);
+      }
+    }
+    if (itemId) {
+      requestAnimationFrame(() => {
+        if (activeIndex !== modelIndex) return;
+        const tile = index.get(itemId)?.el;
+        if (!tile) return;
+        select(itemId);
+        tile.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+          inline: "center",
+        });
+        tile.focus({ preventScroll: true });
+      });
+    }
+    return true;
+  }
+
+  async function loadServerPathTarget(serverPath) {
+    if (!serverPath?.path) return null;
+    const { path: relPath, modelId, itemId } = serverPath;
+    try {
+      const backendReady = await isLocalBackendReady();
+      if (!backendReady) {
+        console.log(
+          "[Blockscape] local backend not ready; skipping server-path autoload"
+        );
+        return null;
+      }
+      const result = await importLocalBackendFile(relPath);
+      if (typeof result?.firstIndex !== "number") return null;
+      if (typeof localBackend?.highlightSource === "function") {
+        localBackend.highlightSource(relPath);
+      }
+      let modelIndex = result.firstIndex;
+      if (modelId) {
+        const found = findModelIndexByIdOrSource(modelId);
+        if (found !== -1) {
+          modelIndex = found;
+        }
+      }
+      return {
+        path: relPath,
+        modelIndex,
+        itemId: itemId || null,
+        modelId: modelId || null,
+      };
+    } catch (err) {
+      console.warn("[Blockscape] server-path autoload failed", err);
+      return null;
+    }
+  }
+
+  async function consumeBlockscapeAppLinkTarget(target) {
+    if (!target) return false;
+    if (target.kind === "remote-load") {
+      const modelIndex = await loadFromUrl(target.target);
+      if (typeof modelIndex !== "number") return true;
+      activateLoadedModel(modelIndex, {
+        mapId: target.mapId,
+        itemId: target.itemId,
+      });
+      const nextUrl = buildRemoteLoadUrl(target.target, {
+        mapId: target.mapId,
+        itemId: target.itemId,
+      });
+      if (nextUrl) {
+        window.history.replaceState({}, document.title, nextUrl.toString());
+      }
+      return true;
+    }
+    if (target.kind === "server-path") {
+      const result = await loadServerPathTarget(target);
+      if (!result) return false;
+      activateLoadedModel(result.modelIndex, {
+        mapId: target.mapId,
+        itemId: result.itemId,
+      });
+      const nextUrl = buildServerPathUrl(result.path, {
+        modelId: result.modelId || getModelId(models[result.modelIndex]),
+        mapId: target.mapId,
+        itemId: result.itemId,
+      });
+      if (nextUrl) {
+        window.history.replaceState({}, document.title, nextUrl.toString());
+      }
+      return true;
+    }
+    return false;
   }
 
   function clearServerPathFromUrl() {
@@ -4977,59 +5147,11 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
   }
 
   async function consumeServerPathLoad() {
-    const serverPath = extractServerFilePathFromUrl();
-    if (!serverPath?.path) return null;
-    const { path: relPath, modelId, itemId } = serverPath;
-    try {
-      const backendReady = await isLocalBackendReady();
-      if (!backendReady) {
-        console.log(
-          "[Blockscape] local backend not ready; skipping server-path autoload"
-        );
-        return null;
-      }
-      const result = await importLocalBackendFile(relPath);
-      if (typeof result?.firstIndex === "number") {
-        if (typeof localBackend?.highlightSource === "function") {
-          localBackend.highlightSource(relPath);
-        }
-        let modelIndex = result.firstIndex;
-        if (modelId) {
-          const found = findModelIndexByIdOrSource(modelId);
-          if (found !== -1) {
-            modelIndex = found;
-          }
-        }
-        return { modelIndex, itemId: itemId || null, modelId: modelId || null };
-      }
-      return null;
-    } catch (err) {
-      console.warn("[Blockscape] server-path autoload failed", err);
-      return null;
-    }
+    return await loadServerPathTarget(extractServerFilePathFromUrl());
   }
 
   async function consumeLoadParam() {
-    const hashParams = new URLSearchParams(
-      (window.location.hash || "").replace(/^#/, "")
-    );
-    const searchParams = new URLSearchParams(window.location.search);
-    let target = null;
-    let mapId = null;
-    let itemId = null;
-
-    if (hashParams.has("load")) {
-      target = hashParams.get("load");
-      mapId = (hashParams.get("map") || "").trim() || null;
-      itemId = (hashParams.get("item") || "").trim() || null;
-    }
-
-    if (!target && searchParams.has("load")) {
-      target = searchParams.get("load");
-      mapId = (searchParams.get("map") || "").trim() || null;
-      itemId = (searchParams.get("item") || "").trim() || null;
-    }
-
+    const { target, mapId, itemId } = extractLoadTargetFromUrl();
     if (!target) return null;
 
     try {
@@ -7716,14 +7838,24 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
   }
 
   function createExternalLinkButton(url) {
+    const appTarget = resolveBlockscapeAppLinkTarget(url);
     const button = document.createElement("button");
     button.type = "button";
     button.className = "external-link";
-    button.setAttribute("aria-label", "Open external reference in a new tab");
-    button.title = url;
+    button.setAttribute(
+      "aria-label",
+      appTarget
+        ? "Load linked model in this tab"
+        : "Open external reference in a new tab"
+    );
+    button.title = appTarget ? "Load linked model in this tab" : url;
     button.textContent = "↗";
-    button.addEventListener("click", (event) => {
+    button.addEventListener("click", async (event) => {
       event.stopPropagation();
+      if (appTarget) {
+        const handled = await consumeBlockscapeAppLinkTarget(appTarget);
+        if (handled) return;
+      }
       openExternalUrl(url);
     });
     button.addEventListener("keydown", (event) => event.stopPropagation());
@@ -9142,12 +9274,19 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
     searchResults.hidden = true;
   });
 
-  document.addEventListener("click", (event) => {
+  document.addEventListener("click", async (event) => {
     const anchor = event.target?.closest?.("a[href]");
     if (!anchor) return;
     if (anchor.classList?.contains("blockscape-gist-link")) return;
     if (anchor.hasAttribute("download")) return;
     const href = anchor.getAttribute("href");
+    const appTarget = resolveBlockscapeAppLinkTarget(href);
+    if (appTarget) {
+      event.preventDefault();
+      event.stopPropagation();
+      await consumeBlockscapeAppLinkTarget(appTarget);
+      return;
+    }
     if (!isExternalHref(href)) return;
     event.preventDefault();
     event.stopPropagation();
