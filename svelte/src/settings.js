@@ -16,6 +16,7 @@ export const STORAGE_KEYS = {
   autoIdFromName: "blockscape:autoIdFromName",
   seriesNavDoubleClickMs: "blockscape:seriesNavDoubleClickMs",
   centerItems: "blockscape:centerItems",
+  centerNoStageItems: "blockscape:centerNoStageItems",
   linkThickness: "blockscape:linkThickness",
   stripParentheticalNames: "blockscape:stripParentheticalNames",
 };
@@ -50,6 +51,7 @@ export const DEFAULTS = {
   seriesNavDoubleClickMin: 300,
   seriesNavDoubleClickMax: 4000,
   centerItems: false,
+  centerNoStageItems: true,
   linkThickness: "m",
   stripParentheticalNames: true,
 };
@@ -117,6 +119,7 @@ export function buildSettingsSnapshot(current, { localBackend } = {}) {
     seriesNavDoubleClickMs: current.seriesNavDoubleClickWaitMs,
     showSecondaryLinks: current.showSecondaryLinks,
     centerItems: current.centerItems,
+    centerNoStageItems: current.centerNoStageItems,
     showReusedInMap: current.showReusedInMap,
     colorPresets: current.colorPresets,
     depColor: current.depColor,
@@ -168,6 +171,8 @@ export function applySettingsSnapshot(snapshot = {}, ctx) {
     persistSeriesNavDoubleClickWait,
     applyCenterItems,
     persistCenterItems,
+    applyCenterNoStageItems,
+    persistCenterNoStageItems,
     applyStripParentheticalNames,
     persistStripParentheticalNames,
     applyShowSeriesPanel,
@@ -398,8 +403,23 @@ export function applySettingsSnapshot(snapshot = {}, ctx) {
   if (snapshot.centerItems != null) {
     const applied = applyCenterItems?.(asBool(snapshot.centerItems));
     persistCenterItems?.(applied);
-    if (ui?.tabCenterToggle) ui.tabCenterToggle.checked = applied;
+    if (applied) {
+      persistCenterNoStageItems?.(false);
+    }
+    if (ui?.wardleyToggle) ui.wardleyToggle.checked = applied;
+    if (ui?.tabCenterToggle) ui.tabCenterToggle.checked = false;
     appliedKeys.push("centerItems");
+  }
+
+  if (snapshot.centerNoStageItems != null) {
+    const applied = applyCenterNoStageItems?.(asBool(snapshot.centerNoStageItems));
+    persistCenterNoStageItems?.(applied);
+    if (applied) {
+      persistCenterItems?.(false);
+    }
+    if (ui?.tabCenterToggle) ui.tabCenterToggle.checked = applied;
+    if (ui?.wardleyToggle) ui.wardleyToggle.checked = false;
+    appliedKeys.push("centerNoStageItems");
   }
 
   if (snapshot.showSecondaryLinks != null) {

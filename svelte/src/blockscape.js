@@ -208,6 +208,7 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
   const DEFAULT_STRIP_PARENTHESES = true;
   const COLOR_PRESETS_STORAGE_KEY = "blockscape:colorPresets";
   const CENTER_ITEMS_STORAGE_KEY = "blockscape:centerItems";
+  const CENTER_NO_STAGE_STORAGE_KEY = "blockscape:centerNoStageItems";
   const THEME_STORAGE_KEY = "blockscape:theme";
   const BG_IMAGE_STORAGE_KEY = "blockscape:bgImageUrl";
   const DEFAULT_BACKGROUND_URL =
@@ -223,6 +224,7 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
   const THEME_DARK = "dark";
   const CATEGORY_VIEW_VERSION_PREFIX = "cat:";
   const DEFAULT_CENTER_ITEMS = false;
+  const DEFAULT_CENTER_NO_STAGE_ITEMS = true;
   const DEFAULT_SIDEBAR_BG_ENABLED = false;
   const DEP_COLOR_STORAGE_KEY = "blockscape:depColor";
   const REVDEP_COLOR_STORAGE_KEY = "blockscape:revdepColor";
@@ -250,6 +252,7 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
   let backgroundImageOpacity = DEFAULT_BG_OPACITY;
   let colorPresets = [];
   let centerItems = DEFAULT_CENTER_ITEMS;
+  let centerNoStageItems = DEFAULT_CENTER_NO_STAGE_ITEMS;
   let sidebarBgEnabled = DEFAULT_SIDEBAR_BG_ENABLED;
   let depColor = "";
   let revdepColor = "";
@@ -287,6 +290,7 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
     autoReloadValue: null,
     secondaryLinksToggle: null,
     reusedToggle: null,
+    wardleyToggle: null,
     themeToggle: null,
     tabThemeToggle: null,
     tabSeriesPanelToggle: null,
@@ -342,6 +346,7 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
   initializeSelectionDimEnabled();
   initializeAutoIdFromNameEnabled();
   initializeStripParentheticalNames();
+  initializeCenterNoStageItems();
   initializeCenterItems();
   initializeSidebarBgEnabled();
   syncSelectionClass();
@@ -629,31 +634,90 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
     }
   }
 
-  function applyCenterItems(enabled) {
-    centerItems = !!enabled;
+  function persistCenterNoStageItems(enabled) {
+    if (typeof window === "undefined" || !window.localStorage) return;
+    try {
+      window.localStorage.setItem(
+        CENTER_NO_STAGE_STORAGE_KEY,
+        enabled ? "true" : "false"
+      );
+    } catch (error) {
+      console.warn("[Blockscape] failed to persist center-no-stage items", error);
+    }
+  }
+
+  function isCenterLayoutActive() {
+    return centerItems || centerNoStageItems;
+  }
+
+  function syncCenterModeUi() {
+    if (settingsUi.wardleyToggle) {
+      settingsUi.wardleyToggle.checked = centerItems;
+    }
+    if (settingsUi.tabCenterToggle) {
+      settingsUi.tabCenterToggle.checked = centerNoStageItems;
+    }
+  }
+
+  function applyCenterLayoutMode() {
+    const centered = isCenterLayoutActive();
     if (app) {
-      app.classList.toggle("is-center-mode", centerItems);
+      app.classList.toggle("is-center-mode", centered);
       app.querySelectorAll(".grid").forEach((grid) => {
-        grid.classList.toggle("is-centered", centerItems);
+        grid.classList.toggle("is-centered", centered);
       });
       app.querySelectorAll(".tile-add").forEach((btn) => {
-        btn.hidden = centerItems;
-        btn.tabIndex = centerItems ? -1 : 0;
-        btn.setAttribute("aria-hidden", centerItems ? "true" : "false");
+        btn.hidden = centered;
+        btn.tabIndex = centered ? -1 : 0;
+        btn.setAttribute("aria-hidden", centered ? "true" : "false");
       });
       app.querySelectorAll(".category-add").forEach((btn) => {
-        btn.hidden = centerItems;
-        btn.tabIndex = centerItems ? -1 : 0;
-        btn.setAttribute("aria-hidden", centerItems ? "true" : "false");
+        btn.hidden = centered;
+        btn.tabIndex = centered ? -1 : 0;
+        btn.setAttribute("aria-hidden", centered ? "true" : "false");
       });
     }
     syncStageGuidesVisibility();
-    applyStageLayout();
     if (model) {
-      reflowRects();
-      drawLinks();
+      rebuildFromActive();
+    } else {
+      applyStageLayout();
     }
+    return centered;
+  }
+
+  function applyCenterItems(enabled) {
+    centerItems = !!enabled;
+    if (centerItems) {
+      centerNoStageItems = false;
+    }
+    syncCenterModeUi();
+    applyCenterLayoutMode();
     return centerItems;
+  }
+
+  function applyCenterNoStageItems(enabled) {
+    centerNoStageItems = !!enabled;
+    if (centerNoStageItems) {
+      centerItems = false;
+    }
+    syncCenterModeUi();
+    applyCenterLayoutMode();
+    return centerNoStageItems;
+  }
+
+  function initializeCenterNoStageItems() {
+    if (typeof window === "undefined" || !window.localStorage) {
+      return applyCenterNoStageItems(DEFAULT_CENTER_NO_STAGE_ITEMS);
+    }
+    try {
+      const stored = window.localStorage.getItem(CENTER_NO_STAGE_STORAGE_KEY);
+      if (stored == null) return applyCenterNoStageItems(DEFAULT_CENTER_NO_STAGE_ITEMS);
+      return applyCenterNoStageItems(stored === "true" || stored === "1");
+    } catch (error) {
+      console.warn("[Blockscape] failed to read center-no-stage pref", error);
+      return applyCenterNoStageItems(DEFAULT_CENTER_NO_STAGE_ITEMS);
+    }
   }
 
   function initializeCenterItems() {
@@ -3027,6 +3091,7 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
       showSecondaryLinks,
       stripParentheticalNames,
       centerItems,
+      centerNoStageItems,
       showReusedInMap,
       theme,
       colorPresets,
@@ -3085,6 +3150,8 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
       setColorPresets,
       applyCenterItems,
       persistCenterItems,
+      applyCenterNoStageItems,
+      persistCenterNoStageItems,
       current: getCurrentSettingsState(),
     });
   }
@@ -3422,7 +3489,7 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
         ["Shift", "Arrow Right"],
       ],
       description:
-        "Reorder the selected item inside its category (cycles item.stage in Center view).",
+        "Reorder the selected item inside its category (cycles item.stage in Wardley view).",
     },
     {
       keys: [
@@ -6208,16 +6275,20 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
       applyTheme(isDark ? THEME_DARK : THEME_LIGHT);
     };
 
-    const syncCenterSwitches = (checked) => {
-      if (settingsUi.tabCenterToggle) {
-        settingsUi.tabCenterToggle.checked = checked;
+    const applyCenterPreference = (checked) => {
+      const applied = applyCenterItems(checked);
+      persistCenterItems(applied);
+      if (applied) {
+        persistCenterNoStageItems(false);
       }
     };
 
-    const applyCenterPreference = (checked) => {
-      const applied = applyCenterItems(checked);
-      syncCenterSwitches(applied);
-      persistCenterItems(applied);
+    const applyCenterNoStagePreference = (checked) => {
+      const applied = applyCenterNoStageItems(checked);
+      persistCenterNoStageItems(applied);
+      if (applied) {
+        persistCenterItems(false);
+      }
     };
 
     const syncSecondaryLinkSwitches = (checked) => {
@@ -6312,9 +6383,9 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
 
     const { row: tabCenterToggleRow, input: tabCenterToggleInput } = createTabToggle({
       id: "tabToggleCenterItems",
-      label: "Wardley",
-      checked: centerItems,
-      onChange: (checked) => applyCenterPreference(checked),
+      label: "Center",
+      checked: centerNoStageItems,
+      onChange: (checked) => applyCenterNoStagePreference(checked),
     });
     tabActions.appendChild(tabCenterToggleRow);
     settingsUi.tabCenterToggle = tabCenterToggleInput;
@@ -6601,6 +6672,18 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
       });
     settingsPanel.appendChild(secondaryToggleRow);
     settingsUi.secondaryLinksToggle = secondaryToggleInput;
+
+    const { row: centerToggleRow, input: centerToggleInput } =
+      createSettingsToggle({
+        id: "toggleCenterItems",
+        label: "Wardley",
+        hint: "Center items into Wardley-style stage columns.",
+        checked: centerItems,
+        className: "map-controls__toggle",
+        onChange: (checked) => applyCenterPreference(checked),
+      });
+    settingsPanel.appendChild(centerToggleRow);
+    settingsUi.wardleyToggle = centerToggleInput;
 
     const { row: reusedToggleRow, input: reusedToggleInput } = createSettingsToggle({
       id: "toggleReusedInMap",
@@ -7226,7 +7309,7 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
         ? resolveVersionIndexFromCategory(cat, seriesIdLookup)
         : null;
 
-      const hasStage = (cat.items || []).some((it) =>
+      const hasStage = centerItems && (cat.items || []).some((it) =>
         normalizeStageValue(it.stage)
       );
       const head = document.createElement("div");
@@ -7302,7 +7385,7 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
       section.appendChild(head);
 
       const grid = document.createElement("div");
-      grid.className = "grid" + (centerItems ? " is-centered" : "");
+      grid.className = "grid" + (isCenterLayoutActive() ? " is-centered" : "");
       section.appendChild(grid);
 
       (cat.items || []).forEach((it) => {
@@ -7340,11 +7423,9 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
         }
 
         const stage = normalizeStageValue(it.stage);
-        if (stage) {
+        if (stage && centerItems) {
           tile.dataset.stage = String(stage);
-          if (centerItems) {
-            tile.style.gridColumn = String(stage);
-          }
+          tile.style.gridColumn = String(stage);
         }
 
         if (!activeIsCategoryView) {
@@ -7375,7 +7456,7 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
         idLine.textContent = it.id || "";
 
         let stageLabel = null;
-        if (stage) {
+        if (stage && centerItems) {
           stageLabel = document.createElement("div");
           stageLabel.className = "tile-stage";
           stageLabel.textContent = String(stage);
@@ -7422,9 +7503,12 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
         addTile.className = "tile-add";
         addTile.innerHTML =
           '<span class="tile-add__icon" aria-hidden="true">+</span><span class="tile-add__label"></span>';
-        addTile.hidden = centerItems;
-        addTile.tabIndex = centerItems ? -1 : 0;
-        addTile.setAttribute("aria-hidden", centerItems ? "true" : "false");
+        addTile.hidden = isCenterLayoutActive();
+        addTile.tabIndex = isCenterLayoutActive() ? -1 : 0;
+        addTile.setAttribute(
+          "aria-hidden",
+          isCenterLayoutActive() ? "true" : "false"
+        );
         addTile.addEventListener("click", () => addItemToCategory(cat.id));
         grid.appendChild(addTile);
       }
@@ -7441,7 +7525,7 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
       renderHost.appendChild(addCategoryButton);
     }
 
-    if (addCategoryButton && centerItems) {
+    if (addCategoryButton && isCenterLayoutActive()) {
       addCategoryButton.hidden = true;
       addCategoryButton.tabIndex = -1;
       addCategoryButton.setAttribute("aria-hidden", "true");
