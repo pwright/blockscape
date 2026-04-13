@@ -55,6 +55,8 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
   const previewClose = preview.querySelector(".item-preview__close");
   const downloadButton = byId("downloadJson");
   const shareButton = byId("shareModel");
+  const openAllLinksButton = byId("openAllLinks");
+  const removeModelButton = byId("removeModel");
   const createVersionButton = byId("createVersion");
   const copyJsonButton = byId("copyJson");
   const copySeriesButton = byId("copySeries");
@@ -1313,6 +1315,54 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
     }
   }
 
+  function getModelLoadableAppLinks(entry) {
+    const categories = Array.isArray(entry?.data?.categories)
+      ? entry.data.categories
+      : [];
+    const links = [];
+    const seen = new Set();
+
+    categories.forEach((category) => {
+      (category?.items || []).forEach((item) => {
+        const externalMeta = resolveExternalMeta(item?.external);
+        if (!externalMeta.url) return;
+        const target = resolveBlockscapeAppLinkTarget(externalMeta.url);
+        if (!target) return;
+        const dedupeKey =
+          target.kind === "remote-load"
+            ? `remote:${normalizeLoadTargetUrl(target.target) || target.target}`
+            : `server:${normalizeLocalSavePath(target.path) || target.path}`;
+        if (seen.has(dedupeKey)) return;
+        seen.add(dedupeKey);
+        links.push({
+          itemId: item?.id || null,
+          itemName: item?.name || item?.id || dedupeKey,
+          target,
+        });
+      });
+    });
+
+    return links;
+  }
+
+  function getActiveModelLoadableAppLinks() {
+    if (activeIndex < 0 || activeIndex >= models.length) return [];
+    return getModelLoadableAppLinks(models[activeIndex]);
+  }
+
+  function updateModelActionButtons() {
+    if (removeModelButton) {
+      removeModelButton.disabled = activeIndex < 0 || activeIndex >= models.length;
+    }
+    if (openAllLinksButton) {
+      const links = getActiveModelLoadableAppLinks();
+      openAllLinksButton.disabled = !links.length;
+      openAllLinksButton.title = links.length
+        ? `Load ${links.length} linked model${links.length === 1 ? "" : "s"} into this session`
+        : "No loadable linked models in the active map";
+    }
+  }
+
   function activateLoadedModel(modelIndex, { mapId, itemId } = {}) {
     if (typeof modelIndex !== "number" || modelIndex < 0 || !models[modelIndex]) {
       return false;
@@ -1379,42 +1429,124 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
     }
   }
 
-  async function consumeBlockscapeAppLinkTarget(target) {
-    if (!target) return false;
+  async function consumeBlockscapeAppLinkTarget(
+    target,
+    { activate = true, updateUrl = true } = {}
+  ) {
+    if (!target) return { handled: false, loaded: false };
     if (target.kind === "remote-load") {
       const modelIndex = await loadFromUrl(target.target);
-      if (typeof modelIndex !== "number") return true;
-      activateLoadedModel(modelIndex, {
-        mapId: target.mapId,
-        itemId: target.itemId,
-      });
-      const nextUrl = buildRemoteLoadUrl(target.target, {
-        mapId: target.mapId,
-        itemId: target.itemId,
-      });
-      if (nextUrl) {
-        window.history.replaceState({}, document.title, nextUrl.toString());
+      if (typeof modelIndex !== "number") {
+        return { handled: true, loaded: false };
       }
-      return true;
+      if (activate) {
+        activateLoadedModel(modelIndex, {
+          mapId: target.mapId,
+          itemId: target.itemId,
+        });
+      }
+      if (updateUrl) {
+        const nextUrl = buildRemoteLoadUrl(target.target, {
+          mapId: target.mapId,
+          itemId: target.itemId,
+        });
+        if (nextUrl) {
+          window.history.replaceState({}, document.title, nextUrl.toString());
+        }
+      }
+      return { handled: true, loaded: true };
     }
     if (target.kind === "server-path") {
       const result = await loadServerPathTarget(target);
-      if (!result) return false;
-      activateLoadedModel(result.modelIndex, {
-        mapId: target.mapId,
-        itemId: result.itemId,
-      });
-      const nextUrl = buildServerPathUrl(result.path, {
-        modelId: result.modelId || getModelId(models[result.modelIndex]),
-        mapId: target.mapId,
-        itemId: result.itemId,
-      });
-      if (nextUrl) {
-        window.history.replaceState({}, document.title, nextUrl.toString());
+      if (!result) {
+        return { handled: true, loaded: false };
       }
-      return true;
+      if (activate) {
+        activateLoadedModel(result.modelIndex, {
+          mapId: target.mapId,
+          itemId: result.itemId,
+        });
+      }
+      if (updateUrl) {
+        const nextUrl = buildServerPathUrl(result.path, {
+          modelId: result.modelId || getModelId(models[result.modelIndex]),
+          mapId: target.mapId,
+          itemId: result.itemId,
+        });
+        if (nextUrl) {
+          window.history.replaceState({}, document.title, nextUrl.toString());
+        }
+      }
+      return { handled: true, loaded: true };
     }
-    return false;
+    return { handled: false, loaded: false };
+  }
+
+  async function openAllLoadableLinksFromActiveModel() {
+    if (activeIndex < 0 || activeIndex >= models.length) {
+      alert("Select or load a model before opening linked models.");
+      return;
+    }
+    const links = getActiveModelLoadableAppLinks();
+    if (!links.length) {
+      showNotice("No loadable linked models in the active map.", 2200);
+      return;
+    }
+
+    const originalModel = models[activeIndex];
+    const originalSelection = selection;
+    let loaded = 0;
+    let alreadyLoaded = 0;
+    let failed = 0;
+
+    if (openAllLinksButton) {
+      openAllLinksButton.disabled = true;
+      openAllLinksButton.setAttribute("aria-busy", "true");
+    }
+
+    try {
+      for (const link of links) {
+        if (findModelIndexByAppLinkTarget(link.target) !== -1) {
+          alreadyLoaded += 1;
+          continue;
+        }
+        const result = await consumeBlockscapeAppLinkTarget(link.target, {
+          activate: false,
+          updateUrl: false,
+        });
+        if (result.loaded) {
+          loaded += 1;
+        } else if (result.handled) {
+          failed += 1;
+        }
+      }
+    } finally {
+      if (openAllLinksButton) {
+        openAllLinksButton.removeAttribute("aria-busy");
+      }
+    }
+
+    const restoreIndex = models.indexOf(originalModel);
+    if (restoreIndex !== -1) {
+      setActive(restoreIndex);
+      if (originalSelection && index.has(originalSelection)) {
+        select(originalSelection);
+      }
+    } else {
+      updateModelActionButtons();
+    }
+
+    const parts = [];
+    if (loaded) {
+      parts.push(`Loaded ${loaded} linked model${loaded === 1 ? "" : "s"}`);
+    }
+    if (alreadyLoaded) {
+      parts.push(`${alreadyLoaded} already in this session`);
+    }
+    if (failed) {
+      parts.push(`${failed} failed`);
+    }
+    showNotice(parts.join(" · ") || "No linked models were loaded.", 2800);
   }
 
   function clearServerPathFromUrl() {
@@ -3465,6 +3597,30 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
     }
   }
 
+  function findModelIndexByAppLinkTarget(target) {
+    if (!target) return -1;
+    if (target.kind === "remote-load") {
+      const normalizedTarget = normalizeLoadTargetUrl(target.target);
+      if (!normalizedTarget) return -1;
+      return models.findIndex((entry) => {
+        const sourceUrl = normalizeLoadTargetUrl(entry?.sourceUrl);
+        return sourceUrl === normalizedTarget;
+      });
+    }
+    if (target.kind === "server-path") {
+      if (target.modelId) {
+        const byId = findModelIndexByIdOrSource(target.modelId);
+        if (byId !== -1) return byId;
+      }
+      const normalizedPath = normalizeLocalSavePath(target.path);
+      if (!normalizedPath) return -1;
+      return models.findIndex(
+        (entry) => normalizeLocalSavePath(entry?.sourcePath) === normalizedPath
+      );
+    }
+    return -1;
+  }
+
   function formatIdForDisplay(id) {
     if (!id) return null;
     return id.toString().replace(/-series$/i, "");
@@ -4669,6 +4825,7 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
       empty.className = "model-nav-empty";
       empty.textContent = "No models loaded yet.";
       modelList.appendChild(empty);
+      updateModelActionButtons();
       return;
     }
 
@@ -4724,6 +4881,7 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
     });
 
     apicurio.updateAvailability();
+    updateModelActionButtons();
   }
 
   function loadActiveIntoEditor() {
@@ -7853,8 +8011,8 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
     button.addEventListener("click", async (event) => {
       event.stopPropagation();
       if (appTarget) {
-        const handled = await consumeBlockscapeAppLinkTarget(appTarget);
-        if (handled) return;
+        const result = await consumeBlockscapeAppLinkTarget(appTarget);
+        if (result.handled) return;
       }
       openExternalUrl(url);
     });
@@ -9219,8 +9377,14 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
     setActive(i);
   });
 
+  if (openAllLinksButton) {
+    openAllLinksButton.onclick = () => {
+      openAllLoadableLinksFromActiveModel();
+    };
+  }
+
   // Remove selected model
-  byId("removeModel").onclick = () => {
+  removeModelButton.onclick = () => {
     if (activeIndex < 0) return;
     const title = getModelTitle(models[activeIndex]);
     const ok = window.confirm(`Remove "${title}" from this session?`);
@@ -9238,6 +9402,7 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
       jsonBox.value = "";
       renderModelList();
       syncDocumentTitle();
+      updateModelActionButtons();
       return;
     }
     const next = Math.min(activeIndex, models.length - 1);

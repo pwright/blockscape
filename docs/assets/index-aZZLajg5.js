@@ -2821,6 +2821,8 @@ function initBlockscape(featureOverrides = {}, { host = document } = {}) {
   const previewClose = preview.querySelector(".item-preview__close");
   const downloadButton = byId("downloadJson");
   const shareButton = byId("shareModel");
+  const openAllLinksButton = byId("openAllLinks");
+  const removeModelButton = byId("removeModel");
   const createVersionButton = byId("createVersion");
   const copyJsonButton = byId("copyJson");
   const copySeriesButton = byId("copySeries");
@@ -3930,6 +3932,43 @@ function initBlockscape(featureOverrides = {}, { host = document } = {}) {
       return null;
     }
   }
+  function getModelLoadableAppLinks(entry) {
+    var _a;
+    const categories = Array.isArray((_a = entry == null ? void 0 : entry.data) == null ? void 0 : _a.categories) ? entry.data.categories : [];
+    const links = [];
+    const seen = /* @__PURE__ */ new Set();
+    categories.forEach((category) => {
+      ((category == null ? void 0 : category.items) || []).forEach((item) => {
+        const externalMeta = resolveExternalMeta(item == null ? void 0 : item.external);
+        if (!externalMeta.url) return;
+        const target2 = resolveBlockscapeAppLinkTarget(externalMeta.url);
+        if (!target2) return;
+        const dedupeKey = target2.kind === "remote-load" ? `remote:${normalizeLoadTargetUrl(target2.target) || target2.target}` : `server:${normalizeLocalSavePath(target2.path) || target2.path}`;
+        if (seen.has(dedupeKey)) return;
+        seen.add(dedupeKey);
+        links.push({
+          itemId: (item == null ? void 0 : item.id) || null,
+          itemName: (item == null ? void 0 : item.name) || (item == null ? void 0 : item.id) || dedupeKey,
+          target: target2
+        });
+      });
+    });
+    return links;
+  }
+  function getActiveModelLoadableAppLinks() {
+    if (activeIndex < 0 || activeIndex >= models.length) return [];
+    return getModelLoadableAppLinks(models[activeIndex]);
+  }
+  function updateModelActionButtons() {
+    if (removeModelButton) {
+      removeModelButton.disabled = activeIndex < 0 || activeIndex >= models.length;
+    }
+    if (openAllLinksButton) {
+      const links = getActiveModelLoadableAppLinks();
+      openAllLinksButton.disabled = !links.length;
+      openAllLinksButton.title = links.length ? `Load ${links.length} linked model${links.length === 1 ? "" : "s"} into this session` : "No loadable linked models in the active map";
+    }
+  }
   function activateLoadedModel(modelIndex, { mapId, itemId } = {}) {
     if (typeof modelIndex !== "number" || modelIndex < 0 || !models[modelIndex]) {
       return false;
@@ -3995,42 +4034,115 @@ function initBlockscape(featureOverrides = {}, { host = document } = {}) {
       return null;
     }
   }
-  async function consumeBlockscapeAppLinkTarget(target2) {
-    if (!target2) return false;
+  async function consumeBlockscapeAppLinkTarget(target2, { activate = true, updateUrl = true } = {}) {
+    if (!target2) return { handled: false, loaded: false };
     if (target2.kind === "remote-load") {
       const modelIndex = await loadFromUrl(target2.target);
-      if (typeof modelIndex !== "number") return true;
-      activateLoadedModel(modelIndex, {
-        mapId: target2.mapId,
-        itemId: target2.itemId
-      });
-      const nextUrl = buildRemoteLoadUrl(target2.target, {
-        mapId: target2.mapId,
-        itemId: target2.itemId
-      });
-      if (nextUrl) {
-        window.history.replaceState({}, document.title, nextUrl.toString());
+      if (typeof modelIndex !== "number") {
+        return { handled: true, loaded: false };
       }
-      return true;
+      if (activate) {
+        activateLoadedModel(modelIndex, {
+          mapId: target2.mapId,
+          itemId: target2.itemId
+        });
+      }
+      if (updateUrl) {
+        const nextUrl = buildRemoteLoadUrl(target2.target, {
+          mapId: target2.mapId,
+          itemId: target2.itemId
+        });
+        if (nextUrl) {
+          window.history.replaceState({}, document.title, nextUrl.toString());
+        }
+      }
+      return { handled: true, loaded: true };
     }
     if (target2.kind === "server-path") {
       const result = await loadServerPathTarget(target2);
-      if (!result) return false;
-      activateLoadedModel(result.modelIndex, {
-        mapId: target2.mapId,
-        itemId: result.itemId
-      });
-      const nextUrl = buildServerPathUrl(result.path, {
-        modelId: result.modelId || getModelId(models[result.modelIndex]),
-        mapId: target2.mapId,
-        itemId: result.itemId
-      });
-      if (nextUrl) {
-        window.history.replaceState({}, document.title, nextUrl.toString());
+      if (!result) {
+        return { handled: true, loaded: false };
       }
-      return true;
+      if (activate) {
+        activateLoadedModel(result.modelIndex, {
+          mapId: target2.mapId,
+          itemId: result.itemId
+        });
+      }
+      if (updateUrl) {
+        const nextUrl = buildServerPathUrl(result.path, {
+          modelId: result.modelId || getModelId(models[result.modelIndex]),
+          mapId: target2.mapId,
+          itemId: result.itemId
+        });
+        if (nextUrl) {
+          window.history.replaceState({}, document.title, nextUrl.toString());
+        }
+      }
+      return { handled: true, loaded: true };
     }
-    return false;
+    return { handled: false, loaded: false };
+  }
+  async function openAllLoadableLinksFromActiveModel() {
+    if (activeIndex < 0 || activeIndex >= models.length) {
+      alert("Select or load a model before opening linked models.");
+      return;
+    }
+    const links = getActiveModelLoadableAppLinks();
+    if (!links.length) {
+      showNotice("No loadable linked models in the active map.", 2200);
+      return;
+    }
+    const originalModel = models[activeIndex];
+    const originalSelection = selection;
+    let loaded = 0;
+    let alreadyLoaded = 0;
+    let failed = 0;
+    if (openAllLinksButton) {
+      openAllLinksButton.disabled = true;
+      openAllLinksButton.setAttribute("aria-busy", "true");
+    }
+    try {
+      for (const link of links) {
+        if (findModelIndexByAppLinkTarget(link.target) !== -1) {
+          alreadyLoaded += 1;
+          continue;
+        }
+        const result = await consumeBlockscapeAppLinkTarget(link.target, {
+          activate: false,
+          updateUrl: false
+        });
+        if (result.loaded) {
+          loaded += 1;
+        } else if (result.handled) {
+          failed += 1;
+        }
+      }
+    } finally {
+      if (openAllLinksButton) {
+        openAllLinksButton.removeAttribute("aria-busy");
+      }
+    }
+    const restoreIndex = models.indexOf(originalModel);
+    if (restoreIndex !== -1) {
+      setActive(restoreIndex);
+      if (originalSelection && index.has(originalSelection)) {
+        select(originalSelection);
+      }
+    } else {
+      updateModelActionButtons();
+    }
+    const parts = [];
+    if (loaded) {
+      parts.push(`Loaded ${loaded} linked model${loaded === 1 ? "" : "s"}`);
+    }
+    if (alreadyLoaded) {
+      parts.push(`${alreadyLoaded} already in this session`);
+    }
+    if (failed) {
+      parts.push(`${failed} failed`);
+    }
+    showNotice(parts.join(" · ") || "No linked models were loaded.", 2800);
   }
   function clearServerPathFromUrl() {
     if (typeof window === "undefined" || !window.location) return;
@@ -5838,6 +5950,29 @@ function initBlockscape(featureOverrides = {}, { host = document } = {}) {
       return entry.sourcePath.replace(/\.bs$/i, "");
     }
   }
+  function findModelIndexByAppLinkTarget(target2) {
+    if (!target2) return -1;
+    if (target2.kind === "remote-load") {
+      const normalizedTarget = normalizeLoadTargetUrl(target2.target);
+      if (!normalizedTarget) return -1;
+      return models.findIndex((entry) => {
+        const sourceUrl = normalizeLoadTargetUrl(entry == null ? void 0 : entry.sourceUrl);
+        return sourceUrl === normalizedTarget;
+      });
+    }
+    if (target2.kind === "server-path") {
+      if (target2.modelId) {
+        const byId2 = findModelIndexByIdOrSource(target2.modelId);
+        if (byId2 !== -1) return byId2;
+      }
+      const normalizedPath = normalizeLocalSavePath(target2.path);
+      if (!normalizedPath) return -1;
+      return models.findIndex(
+        (entry) => normalizeLocalSavePath(entry == null ? void 0 : entry.sourcePath) === normalizedPath
+      );
+    }
+    return -1;
+  }
   function formatIdForDisplay(id) {
     if (!id) return null;
     return id.toString().replace(/-series$/i, "");
@@ -6919,6 +7054,7 @@ function initBlockscape(featureOverrides = {}, { host = document } = {}) {
       empty.className = "model-nav-empty";
       empty.textContent = "No models loaded yet.";
       modelList.appendChild(empty);
+      updateModelActionButtons();
       return;
     }
     models.forEach((m, i) => {
@@ -6960,6 +7096,7 @@ function initBlockscape(featureOverrides = {}, { host = document } = {}) {
       modelList.appendChild(li);
     });
     apicurio.updateAvailability();
+    updateModelActionButtons();
   }
   function loadActiveIntoEditor() {
     if (activeIndex < 0) {
@@ -9528,8 +9665,8 @@ ${text2}` : text2;
     button.addEventListener("click", async (event) => {
       event.stopPropagation();
       if (appTarget) {
-        const handled = await consumeBlockscapeAppLinkTarget(appTarget);
-        if (handled) return;
+        const result = await consumeBlockscapeAppLinkTarget(appTarget);
+        if (result.handled) return;
       }
       openExternalUrl(url);
     });
@@ -10729,7 +10866,12 @@ ${text2}` : text2;
     if (!Number.isInteger(i)) return;
     setActive(i);
   });
-  byId("removeModel").onclick = () => {
+  if (openAllLinksButton) {
+    openAllLinksButton.onclick = () => {
+      openAllLoadableLinksFromActiveModel();
+    };
+  }
+  removeModelButton.onclick = () => {
     if (activeIndex < 0) return;
     const title = getModelTitle(models[activeIndex]);
     const ok = window.confirm(`Remove "${title}" from this session?`);
@@ -10747,6 +10889,7 @@ ${text2}` : text2;
       jsonBox.value = "";
       renderModelList();
       syncDocumentTitle();
+      updateModelActionButtons();
       return;
     }
     const next = Math.min(activeIndex, models.length - 1);
@@ -11858,48 +12001,48 @@ function create_fragment$1(ctx) {
   let ul;
   let t38;
   let div12;
-  let t42;
+  let t44;
   let section0;
   let div14;
-  let t46;
-  let p0;
   let t48;
+  let p0;
+  let t50;
   let div17;
   let label3;
-  let t50;
+  let t52;
   let div15;
   let label4;
-  let t52;
+  let t54;
   let select0;
   let option;
-  let t54;
+  let t56;
   let select1;
-  let t55;
+  let t57;
   let div16;
-  let t61;
+  let t63;
   let div19;
   let aside_hidden_value;
-  let t68;
+  let t70;
   let div24;
-  let t94;
+  let t96;
   let footer;
   let div26;
   let footer_hidden_value;
-  let t96;
+  let t98;
   let html_tag;
   let raw_value = `<script id="seed" type="application/json">${/*seedText*/
   ctx[6]}<\/script>`;
-  let t97;
-  let svg1;
-  let t98;
-  let div28;
   let t99;
-  let div29;
+  let svg1;
   let t100;
+  let div28;
+  let t101;
+  let div29;
+  let t102;
   let div34;
-  let t107;
+  let t109;
   let shortcuthelp;
-  let t108;
+  let t110;
   let newpanel;
   let current;
   let mounted;
@@ -11974,59 +12117,59 @@ function create_fragment$1(ctx) {
       ul = element("ul");
       t38 = space();
       div12 = element("div");
-      div12.innerHTML = `<button id="removeModel" class="pf-v5-c-button pf-m-tertiary" type="button" title="Remove selected model">Remove active</button> <button id="clear" class="pf-v5-c-button pf-m-tertiary" type="button">Clear selection</button>`;
-      t42 = space();
+      div12.innerHTML = `<button id="openAllLinks" class="pf-v5-c-button pf-m-tertiary" type="button" disabled="" title="Load all linked Blockscape models from the active map">Open all</button> <button id="removeModel" class="pf-v5-c-button pf-m-tertiary" type="button" title="Remove selected model">Remove active</button> <button id="clear" class="pf-v5-c-button pf-m-tertiary" type="button">Clear selection</button>`;
+      t44 = space();
       section0 = element("section");
       div14 = element("div");
       div14.innerHTML = `<div class="sidebar-heading">Local files</div> <button id="toggleServerSidebar" class="pf-v5-c-button pf-m-tertiary" type="button" aria-pressed="false" hidden="">Wide menu</button>`;
-      t46 = space();
+      t48 = space();
       p0 = element("p");
       p0.textContent = "Checking for local server…";
-      t48 = space();
+      t50 = space();
       div17 = element("div");
       label3 = element("label");
       label3.textContent = "Blockscape files under ~/blockscape";
-      t50 = space();
+      t52 = space();
       div15 = element("div");
       label4 = element("label");
       label4.textContent = "Folder";
-      t52 = space();
+      t54 = space();
       select0 = element("select");
       option = element("option");
       option.textContent = "Root (~/blockscape)";
-      t54 = space();
+      t56 = space();
       select1 = element("select");
-      t55 = space();
+      t57 = space();
       div16 = element("div");
       div16.innerHTML = `<button id="refreshLocalFiles" class="pf-v5-c-button pf-m-tertiary" type="button">Refresh</button> <button id="loadLocalFile" class="pf-v5-c-button pf-m-secondary" type="button">Load</button> <button id="deleteLocalFile" class="pf-v5-c-button pf-m-danger" type="button">Delete</button>`;
-      t61 = space();
+      t63 = space();
       div19 = element("div");
       div19.innerHTML = `<label for="localSavePath">Save active map to ~/blockscape</label> <input id="localSavePath" class="pf-v5-c-form-control" type="text" placeholder="my-map.bs"/> <div class="local-backend__save-actions"><button id="saveLocalFile" class="pf-v5-c-button pf-m-primary" type="button">Save</button> <button id="saveLocalFileAs" class="pf-v5-c-button pf-m-secondary" type="button">Save as</button></div>`;
-      t68 = space();
+      t70 = space();
       div24 = element("div");
       div24.innerHTML = `<section class="pf-v5-c-page__main-section blockscape-json-panel" hidden="" aria-label="Model source JSON editor"><p class="blockscape-json-panel__title">Paste / edit JSON for the <b>active</b> model (schema below)</p> <div class="muted">Schema: <code>{ id, title, abstract?, categories:[{id,title,items:[{id,name,deps?:[],logo?,external?:url,color?,stage?:1-4,...}}], ... }</code><br/>
             You can paste multiple objects separated by <code>---</code> or <code>%%%</code>, or a JSON array of models, to append several models.
             A single object replaces only when you click “Replace active with JSON”. Tip: with no input focused, press
             Cmd/Ctrl+V anywhere on the page to append clipboard JSON instantly.</div> <div class="blockscape-json-controls"><textarea id="jsonBox" class="pf-v5-c-form-control" aria-label="JSON editor for the active model"></textarea> <div class="blockscape-json-actions"><button id="copyJson" class="pf-v5-c-button pf-m-tertiary" type="button" title="Copy the current JSON to your clipboard">Copy</button> <button id="copySeries" class="pf-v5-c-button pf-m-tertiary" type="button" title="Copy every version in this series as an array">Copy series</button> <button id="pasteJson" class="pf-v5-c-button pf-m-tertiary" type="button" title="Paste clipboard JSON to replace the editor contents">Paste</button> <button id="appendFromBox" class="pf-v5-c-button pf-m-primary" type="button">Append model(s)</button> <button id="replaceActive" class="pf-v5-c-button pf-m-secondary" type="button">Replace active with
                 JSON</button> <button id="createVersion" class="pf-v5-c-button pf-m-secondary" type="button" title="Create a new version from the current map">New version</button></div></div></section> <section class="pf-v5-c-page__main-section blockscape-main-section"><div id="app" aria-live="polite"></div></section>`;
-      t94 = space();
+      t96 = space();
       footer = element("footer");
       div26 = element("div");
       div26.innerHTML = `<a href="https://pwright.github.io/backscape/" target="_blank" rel="noreferrer noopener">Old versions</a>`;
-      t96 = space();
-      html_tag = new HtmlTag(false);
-      t97 = space();
-      svg1 = svg_element("svg");
       t98 = space();
-      div28 = element("div");
+      html_tag = new HtmlTag(false);
       t99 = space();
-      div29 = element("div");
+      svg1 = svg_element("svg");
       t100 = space();
+      div28 = element("div");
+      t101 = space();
+      div29 = element("div");
+      t102 = space();
       div34 = element("div");
       div34.innerHTML = `<div class="item-preview__header"><span class="item-preview__title">Preview</span> <div class="item-preview__actions" hidden=""></div> <button type="button" class="item-preview__close" aria-label="Close preview">×</button></div> <div class="item-preview__body"><div class="item-preview__status">Right-click a tile to see related notes.</div></div>`;
-      t107 = space();
+      t109 = space();
       create_component(shortcuthelp.$$.fragment);
-      t108 = space();
+      t110 = space();
       create_component(newpanel.$$.fragment);
       document_1.title = "Blockscape — simple landscape-style tiles";
       attr(link, "rel", "icon");
@@ -12138,7 +12281,7 @@ function create_fragment$1(ctx) {
       footer.hidden = footer_hidden_value = !/*showFooter*/
       ctx[3];
       attr(div27, "class", "pf-v5-c-page");
-      html_tag.a = t97;
+      html_tag.a = t99;
       attr(svg1, "id", "overlay");
       attr(svg1, "class", "svg-layer");
       attr(div28, "id", "tabTooltip");
@@ -12204,45 +12347,45 @@ function create_fragment$1(ctx) {
       append(aside, ul);
       append(aside, t38);
       append(aside, div12);
-      append(aside, t42);
+      append(aside, t44);
       append(aside, section0);
       append(section0, div14);
-      append(section0, t46);
-      append(section0, p0);
       append(section0, t48);
+      append(section0, p0);
+      append(section0, t50);
       append(section0, div17);
       append(div17, label3);
-      append(div17, t50);
+      append(div17, t52);
       append(div17, div15);
       append(div15, label4);
-      append(div15, t52);
+      append(div15, t54);
       append(div15, select0);
       append(select0, option);
-      append(div17, t54);
+      append(div17, t56);
       append(div17, select1);
-      append(div17, t55);
+      append(div17, t57);
       append(div17, div16);
-      append(section0, t61);
+      append(section0, t63);
       append(section0, div19);
-      append(div25, t68);
+      append(div25, t70);
       append(div25, div24);
-      append(div27, t94);
+      append(div27, t96);
       append(div27, footer);
       append(footer, div26);
       ctx[14](div27);
-      insert(target2, t96, anchor);
-      html_tag.m(raw_value, target2, anchor);
-      insert(target2, t97, anchor);
-      insert(target2, svg1, anchor);
       insert(target2, t98, anchor);
-      insert(target2, div28, anchor);
+      html_tag.m(raw_value, target2, anchor);
       insert(target2, t99, anchor);
-      insert(target2, div29, anchor);
+      insert(target2, svg1, anchor);
       insert(target2, t100, anchor);
+      insert(target2, div28, anchor);
+      insert(target2, t101, anchor);
+      insert(target2, div29, anchor);
+      insert(target2, t102, anchor);
       insert(target2, div34, anchor);
-      insert(target2, t107, anchor);
+      insert(target2, t109, anchor);
       mount_component(shortcuthelp, target2, anchor);
-      insert(target2, t108, anchor);
+      insert(target2, t110, anchor);
       mount_component(newpanel, target2, anchor);
       current = true;
       if (!mounted) {
@@ -12342,18 +12485,18 @@ function create_fragment$1(ctx) {
       if (detaching) {
         detach(t0);
         detach(div27);
-        detach(t96);
-        html_tag.d();
-        detach(t97);
-        detach(svg1);
         detach(t98);
-        detach(div28);
+        html_tag.d();
         detach(t99);
-        detach(div29);
+        detach(svg1);
         detach(t100);
+        detach(div28);
+        detach(t101);
+        detach(div29);
+        detach(t102);
         detach(div34);
-        detach(t107);
-        detach(t108);
+        detach(t109);
+        detach(t110);
       }
       detach(link);
       ctx[14](null);

@@ -327,6 +327,8 @@
         <div class="sidebar-heading">Models</div>
         <ul id="modelList" class="model-nav-list"></ul>
         <div class="model-actions">
+          <button id="openAllLinks" class="pf-v5-c-button pf-m-tertiary" type="button" disabled
+            title="Load all linked Blockscape models from the active map">Open all</button>
           <button id="removeModel" class="pf-v5-c-button pf-m-tertiary" type="button"
             title="Remove selected model">Remove active</button>
           <button id="clear" class="pf-v5-c-button pf-m-tertiary" type="button">Clear selection</button>
