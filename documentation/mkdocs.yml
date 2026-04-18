@@ -16,6 +16,7 @@ nav:
       - Features: documentation/features.md
       - Series: documentation/series.md
       - Models: documentation/models.md
+      - Query reference: documentation/query.md
       - Build patterns: documentation/build-patterns.md
       - LLM generation: documentation/llm-generation.md
       - Evolution: documentation/evolution.md

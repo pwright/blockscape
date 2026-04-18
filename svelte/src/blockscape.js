@@ -1,9 +1,27 @@
 import { createApicurioIntegration } from "./apicurio";
 import {
-  collectAllItemIds,
   createItemEditor,
   updateItemReferences,
 } from "./itemEditor";
+import {
+  buildModelIndex,
+  cloneModelData,
+  collectAllItemIds,
+  computeJsonFingerprint,
+  ensureModelMetadata,
+  findItemAndCategoryById as findItemAndCategoryByIdInModel,
+  formatValidationErrors,
+  makeDownloadName,
+  normalizeStageValue,
+  validateModel,
+} from "./blockscapeModel";
+import {
+  cloneGlobalRegistry,
+  createGlobalRegistry,
+  materialize as materializeGlobalMap,
+  normalizeInto,
+} from "./blockscapeGlobal";
+import { buildSciSeriesContext, requestAiProposal, runSci } from "./sciRuntime";
 import { createTileContextMenu } from "./tileContextMenu";
 import { ensureSeriesId, getSeriesId, makeSeriesId } from "./series";
 import {
@@ -115,6 +133,7 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
   /** @type {{id:string,title:string,data:any}[]} */
   let models = [];
   let activeIndex = -1;
+  let globalRegistry = createGlobalRegistry();
   const apicurio = createApicurioIntegration({
     models,
     getActiveIndex: () => activeIndex,
@@ -139,6 +158,15 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
   let activeViewIsCategory = false;
   let showReusedInMap = false;
   let lastActiveTabId = "map";
+  let queryCode = "(list-items model)";
+  let queryResultValue = null;
+  let queryResultText = "";
+  let queryError = "";
+  let queryTimingMs = null;
+  let queryApplyValidation = null;
+  let querySourceFingerprint = null;
+  let queryContextLabel = "";
+  let queryIsRunning = false;
   let lastDeletedItem = null;
   let lastDeletedCategory = null;
   let shortcutHelpListBuilt = false;
@@ -766,15 +794,6 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
       console.warn("[Blockscape] failed to read sidebar background pref", error);
       return applySidebarBgEnabled(DEFAULT_SIDEBAR_BG_ENABLED);
     }
-  }
-
-  function normalizeStageValue(stage) {
-    if (stage == null) return null;
-    const num = Number(stage);
-    if (!Number.isFinite(num)) return null;
-    const rounded = Math.round(num);
-    if (rounded < STAGE_MIN || rounded > STAGE_MAX) return null;
-    return rounded;
   }
 
   function applyStageLayout() {
@@ -2572,17 +2591,6 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
     return navigator.clipboard.readText();
   }
 
-  function makeDownloadName(base) {
-    return (
-      (base || "blockscape")
-        .trim()
-        .toLowerCase()
-        .replace(/[^a-z0-9._-]+/g, "-")
-        .replace(/-+/g, "-")
-        .replace(/^-|-$/g, "") || "blockscape"
-    );
-  }
-
   function normalizeLocalSavePath(raw) {
     const cleaned = (raw || "")
       .trim()
@@ -3418,48 +3426,6 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
     return true;
   }
 
-  function stableStringify(value) {
-    if (value === null || typeof value !== "object")
-      return JSON.stringify(value);
-    if (Array.isArray(value))
-      return `[${value.map((v) => stableStringify(v)).join(",")}]`;
-    const keys = Object.keys(value).sort();
-    const parts = keys.map(
-      (k) => `${JSON.stringify(k)}:${stableStringify(value[k])}`
-    );
-    return `{${parts.join(",")}}`;
-  }
-
-  function canonicalizeJson(value) {
-    try {
-      return stableStringify(value);
-    } catch {
-      return "";
-    }
-  }
-
-  function computeJsonFingerprint(input) {
-    try {
-      const value = typeof input === "string" ? JSON.parse(input) : input;
-      const fp = canonicalizeJson(value);
-      if (fp) return fp;
-    } catch (err) {
-      console.warn("[Blockscape] fingerprint parse failed (first pass)", err);
-    }
-    try {
-      const clone = JSON.parse(JSON.stringify(input));
-      const fp = canonicalizeJson(clone);
-      if (fp) return fp;
-    } catch (err) {
-      console.warn("[Blockscape] fingerprint failed for value", err);
-    }
-    try {
-      return JSON.stringify(input) || "";
-    } catch {
-      return "";
-    }
-  }
-
   const SHORTCUT_CONFIG = [
 
     // --- NAVIGATION ---
@@ -3545,29 +3511,6 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
 
     { keys: [["Escape"]], description: "Unselect item or close the open preview popover." },
   ];
-  function ensureModelMetadata(
-    data,
-    { titleHint = "Untitled Model", idHint } = {}
-  ) {
-    if (!data || typeof data !== "object") return data;
-    const trimmedTitle = (data.title ?? "").toString().trim();
-    data.title = trimmedTitle || titleHint || "Untitled Model";
-
-    const trimmedId = (data.id ?? "").toString().trim();
-    if (!trimmedId) {
-      const base = idHint || data.title || titleHint || "model";
-      const slug = makeDownloadName(base).replace(/\./g, "-");
-      data.id = slug || `model-${uid()}`;
-    } else {
-      data.id = trimmedId;
-    }
-
-    if (typeof data.abstract !== "string") {
-      data.abstract = data.abstract == null ? "" : String(data.abstract);
-    }
-    return data;
-  }
-
   function deriveNextModelIdForVersion(entry) {
     const parseId = (value) => {
       const str = (value ?? "").toString().trim();
@@ -3618,10 +3561,6 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
     return `${base}-${String(maxSuffix + 1).padStart(2, "0")}`;
   }
 
-  function cloneModelData(data) {
-    return JSON.parse(JSON.stringify(data));
-  }
-
   function getModelTitle(entry, fallback = "Untitled Model") {
     if (!entry) return fallback;
     const candidate = (entry.data?.title ?? entry.title ?? "")
@@ -3651,6 +3590,100 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
     if (!candidate) return null;
     const trimmed = candidate.toString().trim();
     return trimmed || null;
+  }
+
+  function isDerivedCategoryVersion(version) {
+    const versionId = (version?.version ?? "").toString().trim();
+    return Boolean(
+      version?.isCategoryView ||
+        versionId.startsWith(CATEGORY_VIEW_VERSION_PREFIX)
+    );
+  }
+
+  function ensureStandaloneEntrySynced(entry, { logger = console.debug } = {}) {
+    if (!entry?.data) return null;
+    ensureModelMetadata(entry.data, {
+      titleHint: entry.title || getModelTitle(entry),
+      idHint: entry.data?.id || entry.title || "map",
+      uid,
+    });
+    const globalMapId = entry.globalMapId || `map-${uid()}`;
+    entry.globalMapId = globalMapId;
+    globalRegistry = normalizeInto(globalRegistry, entry.data, {
+      mapId: globalMapId,
+      logger,
+    });
+    const materialized = materializeGlobalMap(globalRegistry, globalMapId);
+    if (materialized) {
+      entry.data = materialized;
+      if (!entry.title) entry.title = materialized.title || entry.title;
+    }
+    return materialized;
+  }
+
+  function ensureVersionSynced(entry, version, { logger = console.debug } = {}) {
+    if (!version?.data || isDerivedCategoryVersion(version)) {
+      return version?.data || null;
+    }
+    ensureModelMetadata(version.data, {
+      titleHint: version.data?.title || entry?.title || "Untitled Model",
+      idHint: version.data?.id || entry?.title || "map",
+      uid,
+    });
+    const globalMapId = version.globalMapId || `map-${uid()}`;
+    version.globalMapId = globalMapId;
+    globalRegistry = normalizeInto(globalRegistry, version.data, {
+      mapId: globalMapId,
+      logger,
+    });
+    const materialized = materializeGlobalMap(globalRegistry, globalMapId);
+    if (materialized) {
+      version.data = materialized;
+    }
+    return materialized;
+  }
+
+  function ensureEntrySynced(entry, { logger = console.debug } = {}) {
+    if (!entry) return null;
+    if (Array.isArray(entry.apicurioVersions) && entry.apicurioVersions.length) {
+      entry.apicurioVersions.forEach((version) => {
+        ensureVersionSynced(entry, version, { logger });
+      });
+      const activeVerIdx = getActiveApicurioVersionIndex(entry);
+      const activeVersion = entry.apicurioVersions[activeVerIdx];
+      if (activeVersion?.data) {
+        entry.data = activeVersion.data;
+      }
+      return entry.data || null;
+    }
+    return ensureStandaloneEntrySynced(entry, { logger });
+  }
+
+  function getMaterializedEntryData(entry) {
+    if (!entry) return null;
+    if (Array.isArray(entry.apicurioVersions) && entry.apicurioVersions.length) {
+      const activeVerIdx = getActiveApicurioVersionIndex(entry);
+      const activeVersion = entry.apicurioVersions[activeVerIdx];
+      if (activeVersion?.globalMapId) {
+        const materialized = materializeGlobalMap(
+          globalRegistry,
+          activeVersion.globalMapId
+        );
+        if (materialized) {
+          activeVersion.data = materialized;
+          entry.data = materialized;
+          return materialized;
+        }
+      }
+    }
+    if (entry.globalMapId) {
+      const materialized = materializeGlobalMap(globalRegistry, entry.globalMapId);
+      if (materialized) {
+        entry.data = materialized;
+        return materialized;
+      }
+    }
+    return entry.data || null;
   }
 
   function getModelSourceLabel(entry) {
@@ -3731,32 +3764,154 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
     const activeVerIdx = getActiveApicurioVersionIndex(entry);
     if (activeVerIdx >= 0 && entry.apicurioVersions?.[activeVerIdx]) {
       entry.apicurioVersions[activeVerIdx].data = parsed;
+      ensureVersionSynced(entry, entry.apicurioVersions[activeVerIdx]);
+      entry.data = entry.apicurioVersions[activeVerIdx].data;
+      return true;
     }
+    ensureStandaloneEntrySynced(entry);
     return true;
   }
 
-  function collectAllItemIds(modelData) {
-    const ids = new Set();
-    (modelData?.categories || []).forEach((cat) =>
-      (cat.items || []).forEach((it) => {
-        if (it?.id) ids.add(it.id);
-      })
+  function formatQueryResult(value) {
+    if (value === undefined) return "undefined";
+    if (typeof value === "string") return JSON.stringify(value);
+    try {
+      return JSON.stringify(value, null, 2);
+    } catch (error) {
+      console.warn("[Blockscape] failed to stringify query result", error);
+      return String(value);
+    }
+  }
+
+  function looksLikeModelResult(value) {
+    return Boolean(value) &&
+      typeof value === "object" &&
+      !Array.isArray(value) &&
+      ("categories" in value || "id" in value || "title" in value);
+  }
+
+  function clearQueryResultState({ preserveCode = true } = {}) {
+    if (!preserveCode) queryCode = "(list-items model)";
+    queryResultValue = null;
+    queryResultText = "";
+    queryError = "";
+    queryTimingMs = null;
+    queryApplyValidation = null;
+    querySourceFingerprint = null;
+    queryContextLabel = "";
+    queryIsRunning = false;
+  }
+
+  function isCurrentActiveCategoryView() {
+    if (activeIndex < 0) return false;
+    const entry = models[activeIndex];
+    const versionIdx = getActiveApicurioVersionIndex(entry);
+    const version = entry?.apicurioVersions?.[versionIdx] || null;
+    return Boolean(
+      version?.isCategoryView ||
+        (version?.version || "").startsWith(CATEGORY_VIEW_VERSION_PREFIX)
     );
-    return ids;
+  }
+
+  function isQueryResultStale() {
+    if (activeIndex < 0 || !querySourceFingerprint) return false;
+    const currentFingerprint = computeJsonFingerprint(models[activeIndex].data);
+    return currentFingerprint !== querySourceFingerprint;
+  }
+
+  function updateQueryResultState(outcome) {
+    queryTimingMs = outcome?.timingMs ?? null;
+    queryError = outcome?.ok ? "" : outcome?.error || "SCI evaluation failed.";
+    queryResultValue = outcome?.ok ? outcome.value : null;
+    queryResultText = outcome?.ok ? formatQueryResult(outcome.value) : "";
+    queryApplyValidation = null;
+    querySourceFingerprint =
+      activeIndex >= 0 ? computeJsonFingerprint(models[activeIndex].data) : null;
+    queryContextLabel =
+      activeIndex >= 0
+        ? getModelId(models[activeIndex]) || getModelTitle(models[activeIndex])
+        : "";
+
+    if (outcome?.ok && looksLikeModelResult(outcome.value)) {
+      queryApplyValidation = validateModel(outcome.value);
+    }
+  }
+
+  async function executeQueryCode() {
+    if (activeIndex < 0 || !models[activeIndex]?.data) {
+      updateQueryResultState({
+        ok: false,
+        error: "No active model is available to query.",
+        value: null,
+        timingMs: 0,
+      });
+      return false;
+    }
+
+    const entry = models[activeIndex];
+    ensureEntrySynced(entry);
+    const outcome = await runSci(queryCode, {
+      map: cloneModelData(getMaterializedEntryData(entry)),
+      series: buildSciSeriesContext(entry),
+      global: cloneGlobalRegistry(globalRegistry),
+    });
+    updateQueryResultState(outcome);
+    return outcome.ok;
+  }
+
+  function applyModelToActive(nextData) {
+    if (activeIndex < 0) {
+      return { ok: false, error: "No active model selected." };
+    }
+    if (isCurrentActiveCategoryView()) {
+      return {
+        ok: false,
+        error:
+          "Query results cannot be applied while viewing a derived category view. Switch to a concrete map version first.",
+      };
+    }
+
+    const entry = models[activeIndex];
+    const next = cloneModelData(nextData);
+    ensureModelMetadata(next, {
+      titleHint: getModelTitle(entry),
+      idHint: getModelId(entry) || getModelTitle(entry),
+      uid,
+    });
+    const validation = validateModel(next);
+    if (!validation.ok) {
+      return { ok: false, validation };
+    }
+
+    entry.data = next;
+    entry.title = next.title || entry.title;
+    const activeVerIdx = getActiveApicurioVersionIndex(entry);
+    if (activeVerIdx >= 0 && entry.apicurioVersions?.[activeVerIdx]) {
+      entry.apicurioVersions[activeVerIdx].data = next;
+      ensureVersionSynced(entry, entry.apicurioVersions[activeVerIdx]);
+      entry.data = entry.apicurioVersions[activeVerIdx].data;
+    } else {
+      ensureStandaloneEntrySynced(entry);
+    }
+    if (entry.apicurioVersions?.length > 1 || entry.isSeries) {
+      syncCategoryViewVersions(entry);
+    }
+
+    syncDocumentTitle();
+    renderModelList();
+    loadActiveIntoEditor();
+    rebuildFromActive();
+    apicurio.updateAvailability();
+
+    querySourceFingerprint = computeJsonFingerprint(next);
+    queryContextLabel = getModelId(entry) || getModelTitle(entry);
+    queryApplyValidation = validation;
+    return { ok: true, validation };
   }
 
   function findItemAndCategoryById(itemId) {
     if (activeIndex < 0 || !itemId) return null;
-    const mobj = models[activeIndex].data;
-    const categories = mobj?.categories || [];
-    for (const cat of categories) {
-      const items = cat.items || [];
-      const found = items.find((it) => it.id === itemId);
-      if (found) {
-        return { category: cat, item: found, modelData: mobj };
-      }
-    }
-    return null;
+    return findItemAndCategoryByIdInModel(models[activeIndex].data, itemId);
   }
 
   function setItemColor(itemId, color) {
@@ -4192,6 +4347,7 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
     const initialVersion = {
       version: versionLabel,
       data: entry.data,
+      globalMapId: entry.globalMapId || null,
       createdOn: createdOn || new Date().toISOString(),
     };
     entry.apicurioVersions = [initialVersion];
@@ -4262,6 +4418,7 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
   }
 
   function addModelEntry(entry, { versionLabel, createdOn } = {}) {
+    ensureEntrySynced(entry);
     if (entry?.isSeries || entry?.apicurioVersions?.length > 1) {
       const name = entry.title || getModelTitle(entry);
       ensureSeriesId(entry, { seriesName: name, fallbackTitle: name });
@@ -4294,6 +4451,7 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
         {
           version: "1",
           data: target.data,
+          globalMapId: target.globalMapId || null,
           createdOn: target.apicurioVersions?.[0]?.createdOn,
         },
       ];
@@ -4308,6 +4466,7 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
     target.apicurioVersions.push({
       version: label,
       data: entry.data,
+      globalMapId: entry.globalMapId || null,
       createdOn: createdOn || new Date().toISOString(),
     });
     target.apicurioActiveVersionIndex = target.apicurioVersions.length - 1;
@@ -4318,6 +4477,8 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
     if (entry.sourceUrl) target.sourceUrl = entry.sourceUrl;
     const seriesName = target.title || getModelTitle(target);
     ensureSeriesId(target, { seriesName, fallbackTitle: seriesName });
+    ensureEntrySynced(target);
+    syncCategoryViewVersions(target);
     return existingIndex;
   }
 
@@ -4350,11 +4511,13 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
     const newVersion = {
       version: label,
       data: copy,
+      globalMapId: `map-${uid()}`,
       createdOn: new Date().toISOString(),
     };
     target.apicurioVersions.push(newVersion);
     target.apicurioActiveVersionIndex = target.apicurioVersions.length - 1;
-    target.data = copy;
+    ensureVersionSynced(target, newVersion);
+    target.data = newVersion.data;
     target.isSeries = true;
     const seriesName = target.title || getModelTitle(target);
     ensureSeriesId(target, { seriesName, fallbackTitle: seriesName });
@@ -4370,6 +4533,7 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
 
   function buildSeriesPayload(entry) {
     if (!entry) return null;
+    ensureEntrySynced(entry);
     syncCategoryViewVersions(entry);
     const versions = entry.apicurioVersions;
     if (!Array.isArray(versions) || versions.length <= 1) return null;
@@ -4389,7 +4553,12 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
       return true;
     });
     return filtered.map((ver) => {
-      if (ver && typeof ver === "object" && "data" in ver) return ver.data;
+      if (ver && typeof ver === "object" && "data" in ver) {
+        if (ver.globalMapId) {
+          return materializeGlobalMap(globalRegistry, ver.globalMapId) || ver.data;
+        }
+        return ver.data;
+      }
       return ver;
     });
   }
@@ -4867,6 +5036,7 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
       "(index",
       i + " )"
     );
+    ensureEntrySynced(models[i]);
     // Apply model-scoped background image
     applyBackgroundImage(getModelBackground(models[i]));
     if (typeof localBackend?.highlightSource === "function") {
@@ -4958,7 +5128,8 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
       return;
     }
     const active = models[activeIndex];
-    jsonBox.value = JSON.stringify(active.data, null, 2);
+    const materialized = getMaterializedEntryData(active);
+    jsonBox.value = JSON.stringify(materialized || active.data, null, 2);
     if (copySeriesButton) {
       copySeriesButton.disabled = !buildSeriesPayload(active);
     }
@@ -5405,27 +5576,7 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
       "[Blockscape] parsing model; categories=",
       (mObj?.categories || []).length
     );
-    const fwd = new Map();
-    const rev = new Map();
-    const seen = new Set();
-
-    (mObj.categories || []).forEach((c) =>
-      (c.items || []).forEach((it) => {
-        seen.add(it.id);
-        const deps = new Set(it.deps || []);
-        fwd.set(it.id, deps);
-        deps.forEach((d) => {
-          if (!rev.has(d)) rev.set(d, new Set());
-          rev.get(d).add(it.id);
-        });
-      })
-    );
-
-    const reusedLocal = new Set();
-    rev.forEach((dependents, node) => {
-      if ((dependents?.size || 0) >= 2) reusedLocal.add(node);
-    });
-    return { m: mObj, fwd, rev, reusedLocal, seen };
+    return buildModelIndex(mObj);
   }
 
   // --- MODIFIED: color-aware letter image ---
@@ -5952,6 +6103,7 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
 
     const mapPanel = document.createElement("div");
     const abstractPanel = document.createElement("div");
+    const queryPanel = document.createElement("div");
     const settingsTabPanel = document.createElement("div");
     const sourcePanel = document.createElement("div");
     const apicurioPanel = document.createElement("div");
@@ -5980,6 +6132,7 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
     const tabDefs = [
       { id: "map", label: "Map", panel: mapPanel },
       { id: "abstract", label: "Info", panel: abstractPanel },
+      { id: "query", label: "Query", panel: queryPanel },
       { id: "settings", label: "Settings", panel: settingsTabPanel },
       { id: "source", label: "Source", panel: sourcePanel },
       { id: "apicurio", label: "Apicurio", panel: apicurioPanel },
@@ -7242,7 +7395,7 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
         const parsed = JSON.parse(raw);
         const snapshot = parsed?.settings || parsed;
         const result = applyImportedSettings(snapshot || {}, { refreshObsidianLinks });
-        const appliedCount = result.applied?.length || 0;
+        const appliedCount = result?.applied?.length || 0;
         showNotice(
           appliedCount
             ? `Loaded ${appliedCount} setting${appliedCount === 1 ? "" : "s"} from ${file.name}.`
@@ -7298,6 +7451,174 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
       sourceWrapper.appendChild(missing);
     }
     sourcePanel.appendChild(sourceWrapper);
+
+    const queryWrapper = document.createElement("div");
+    queryWrapper.className = "blockscape-query-panel";
+
+    const queryIntro = document.createElement("div");
+    queryIntro.className = "blockscape-query-intro";
+    queryIntro.innerHTML =
+      '<strong>Run Clojure queries and transforms against the active map.</strong> Results stay local until you explicitly apply a valid model result.';
+    queryWrapper.appendChild(queryIntro);
+
+    const queryEditor = document.createElement("textarea");
+    queryEditor.id = "queryEditor";
+    queryEditor.className = "pf-v5-c-form-control blockscape-query-editor";
+    queryEditor.rows = 10;
+    queryEditor.spellcheck = false;
+    queryEditor.setAttribute("aria-label", "SCI query editor");
+    queryEditor.value = queryCode;
+    queryWrapper.appendChild(queryEditor);
+
+    const queryActions = document.createElement("div");
+    queryActions.className = "blockscape-query-actions";
+
+    const runQueryButton = document.createElement("button");
+    runQueryButton.type = "button";
+    runQueryButton.id = "runQuery";
+    runQueryButton.className = "pf-v5-c-button pf-m-primary";
+    runQueryButton.textContent = queryIsRunning ? "Running…" : "Run query";
+    runQueryButton.disabled = queryIsRunning;
+
+    const applyQueryButton = document.createElement("button");
+    applyQueryButton.type = "button";
+    applyQueryButton.id = "applyQueryResult";
+    applyQueryButton.className = "pf-v5-c-button pf-m-secondary";
+
+    const aiProposalButton = document.createElement("button");
+    aiProposalButton.type = "button";
+    aiProposalButton.id = "requestAiProposal";
+    aiProposalButton.className = "pf-v5-c-button pf-m-tertiary";
+    aiProposalButton.textContent = "AI proposal";
+    aiProposalButton.title = "AI integration is a stub in this slice.";
+    aiProposalButton.addEventListener("click", async () => {
+      try {
+        await requestAiProposal();
+      } catch (error) {
+        showNotice(error?.message || "AI proposal flow is not implemented.", 2600);
+      }
+    });
+
+    queryActions.append(runQueryButton, applyQueryButton, aiProposalButton);
+    queryWrapper.appendChild(queryActions);
+
+    const queryMeta = document.createElement("div");
+    queryMeta.className = "blockscape-query-meta";
+    const queryStale = isQueryResultStale();
+    const validationErrors =
+      queryApplyValidation && !queryApplyValidation.ok
+        ? formatValidationErrors(queryApplyValidation.errors)
+        : [];
+    const queryCanApply = Boolean(queryApplyValidation?.ok) &&
+      !queryStale &&
+      !activeIsCategoryView;
+
+    if (queryTimingMs != null) {
+      const timing = document.createElement("span");
+      timing.className = "blockscape-query-pill";
+      timing.textContent = `${queryTimingMs}ms`;
+      queryMeta.appendChild(timing);
+    }
+    if (queryContextLabel) {
+      const context = document.createElement("span");
+      context.className = "blockscape-query-pill";
+      context.textContent = `Context: ${queryContextLabel}`;
+      queryMeta.appendChild(context);
+    }
+    if (queryStale) {
+      const stale = document.createElement("span");
+      stale.className = "blockscape-query-pill is-warning";
+      stale.textContent = "Result is stale";
+      queryMeta.appendChild(stale);
+    }
+    if (queryApplyValidation?.ok) {
+      const valid = document.createElement("span");
+      valid.className = "blockscape-query-pill is-success";
+      valid.textContent = "Valid model";
+      queryMeta.appendChild(valid);
+    } else if (validationErrors.length) {
+      const invalid = document.createElement("span");
+      invalid.className = "blockscape-query-pill is-danger";
+      invalid.textContent = "Invalid model result";
+      queryMeta.appendChild(invalid);
+    }
+    queryWrapper.appendChild(queryMeta);
+
+    const queryInfo = document.createElement("div");
+    queryInfo.className = "blockscape-query-note";
+    if (activeIsCategoryView) {
+      queryInfo.textContent =
+        "Queries can run on derived category views, but apply is disabled until you switch to a concrete map version.";
+    } else if (queryStale) {
+      queryInfo.textContent =
+        "The active map changed after the last run. Re-run the query before applying.";
+    } else if (queryApplyValidation?.ok) {
+      queryInfo.textContent =
+        "This result validates as a Blockscape model and can replace the active map.";
+    } else {
+      queryInfo.textContent =
+        "Allowed helpers: find-dependents, extract-subgraph, filter-category, list-items, get-item. The active model is bound as model and map; prefer model when you want to use the core map function. The normalized in-memory registry is bound as global, and series metadata is bound as series.";
+    }
+    queryWrapper.appendChild(queryInfo);
+
+    const queryErrorEl = document.createElement("div");
+    queryErrorEl.id = "queryError";
+    queryErrorEl.className = "blockscape-query-error";
+    queryErrorEl.hidden = !queryError;
+    queryErrorEl.textContent = queryError || "";
+    queryWrapper.appendChild(queryErrorEl);
+
+    if (validationErrors.length) {
+      const validationList = document.createElement("ul");
+      validationList.className = "blockscape-query-errors";
+      validationErrors.forEach((message) => {
+        const item = document.createElement("li");
+        item.textContent = message;
+        validationList.appendChild(item);
+      });
+      queryWrapper.appendChild(validationList);
+    }
+
+    const queryResult = document.createElement("pre");
+    queryResult.id = "queryResult";
+    queryResult.className = "blockscape-query-result";
+    queryResult.textContent = queryResultText || "No query has been run yet.";
+    queryWrapper.appendChild(queryResult);
+
+    applyQueryButton.textContent = activeIsCategoryView
+      ? "Switch to map version to apply"
+      : "Apply to map";
+    applyQueryButton.disabled = !queryCanApply;
+
+    runQueryButton.addEventListener("click", async () => {
+      queryCode = queryEditor.value;
+      queryIsRunning = true;
+      runQueryButton.disabled = true;
+      runQueryButton.textContent = "Running…";
+      try {
+        await executeQueryCode();
+      } finally {
+        queryIsRunning = false;
+        rebuildFromActive();
+      }
+    });
+
+    applyQueryButton.addEventListener("click", () => {
+      if (!queryCanApply) return;
+      const result = applyModelToActive(queryResultValue);
+      if (!result.ok) {
+        queryError = result.error || formatValidationErrors(result.validation?.errors || []).join("\n");
+        rebuildFromActive();
+        return;
+      }
+      showNotice("Query result applied to the active map.", 2200);
+    });
+
+    queryEditor.addEventListener("input", () => {
+      queryCode = queryEditor.value;
+    });
+
+    queryPanel.appendChild(queryWrapper);
     apicurio.mount(apicurioPanel);
 
     let tileCounter = 0;
@@ -9238,31 +9559,17 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
     }
     try {
       const obj = JSON.parse(jsonBox.value);
-      ensureModelMetadata(obj, {
-        titleHint: getModelTitle(models[activeIndex]),
-        idHint:
-          getModelId(models[activeIndex]) || getModelTitle(models[activeIndex]),
-      });
-      models[activeIndex].data = obj;
-      models[activeIndex].title = obj.title || models[activeIndex].title;
-      if (
-        models[activeIndex].isSeries ||
-        models[activeIndex].apicurioVersions?.length > 1
-      ) {
-        const seriesName =
-          models[activeIndex].title || getModelTitle(models[activeIndex]);
-        ensureSeriesId(models[activeIndex], {
-          seriesName,
-          fallbackTitle: seriesName,
-        });
+      const applied = applyModelToActive(obj);
+      if (!applied.ok) {
+        const errorText = applied.error || formatValidationErrors(applied.validation?.errors || []).join("\n");
+        alert(errorText || "Model validation failed.");
+        return;
       }
       syncDocumentTitle();
       console.log(
         "[Blockscape] replaced active model:",
         getModelTitle(models[activeIndex])
       );
-      rebuildFromActive();
-      apicurio.updateAvailability();
     } catch (e) {
       console.error("[Blockscape] replace error:", e);
       alert("JSON parse error (see console).");
@@ -9581,8 +9888,9 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
   function rebuildFromActive() {
     if (activeIndex < 0) return;
     try {
+      ensureEntrySynced(models[activeIndex]);
       syncCategoryViewVersions(models[activeIndex]);
-      const parsed = parse(models[activeIndex].data);
+      const parsed = parse(getMaterializedEntryData(models[activeIndex]));
       model = parsed;
       render();
     } catch (e) {
