@@ -115,6 +115,46 @@ describe("blockscapeGlobal", () => {
     expect(roundTripped).toEqual(createModel());
   });
 
+  it("updates an existing normalized map when items are added later", () => {
+    let globalRegistry = normalizeInto(createGlobalRegistry(), createModel(), {
+      mapId: "map-1",
+    });
+    const edited = createModel();
+    edited.categories[0].items.push({
+      id: "worker",
+      name: "Worker",
+      deps: ["api"],
+    });
+
+    globalRegistry = normalizeInto(globalRegistry, edited, { mapId: "map-1" });
+
+    const roundTripped = materialize(globalRegistry, "map-1");
+    expect(roundTripped.categories[0].items.map((item) => item.id)).toEqual([
+      "frontend",
+      "worker",
+    ]);
+  });
+
+  it("updates an existing normalized map when items move between categories", () => {
+    let globalRegistry = normalizeInto(createGlobalRegistry(), createModel(), {
+      mapId: "map-1",
+    });
+    const edited = createModel();
+    const [frontend] = edited.categories[0].items.splice(0, 1);
+    edited.categories[1].items.splice(1, 0, frontend);
+
+    globalRegistry = normalizeInto(globalRegistry, edited, { mapId: "map-1" });
+
+    const roundTripped = materialize(globalRegistry, "map-1");
+    expect(roundTripped.categories[0].items).toEqual([]);
+    expect(roundTripped.categories[1].items.map((item) => item.id)).toEqual([
+      "api",
+      "frontend",
+      "db",
+      "cache",
+    ]);
+  });
+
   it("supports graph helpers over the normalized registry", () => {
     const globalRegistry = normalizeInto(createGlobalRegistry(), createModel(), {
       mapId: "map-1",

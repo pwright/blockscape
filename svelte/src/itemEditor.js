@@ -286,10 +286,17 @@ export function createItemEditor({
     form.appendChild(makeField('Logo URL', logoInput, 'Optional image URL.'));
 
     const externalInput = document.createElement('input');
-    externalInput.type = 'url';
+    externalInput.type = 'text';
     externalInput.inputMode = 'url';
     externalInput.placeholder = 'https://…';
-    form.appendChild(makeField('External link', externalInput, 'Shown with ↗ icon and in preview.'));
+    externalInput.spellcheck = false;
+    form.appendChild(
+      makeField(
+        'External link',
+        externalInput,
+        'Optional. Accepts full URLs and relative paths; shown with ↗ icon and in preview.'
+      )
+    );
 
     const externalToggle = document.createElement('div');
     externalToggle.className = 'item-editor__checkbox';

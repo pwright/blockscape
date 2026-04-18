@@ -5128,6 +5128,9 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
       return;
     }
     const active = models[activeIndex];
+    // Direct edit actions mutate the active entry in memory first. Persist those
+    // changes into the normalized registry before rematerializing the JSON view.
+    ensureEntrySynced(active);
     const materialized = getMaterializedEntryData(active);
     jsonBox.value = JSON.stringify(materialized || active.data, null, 2);
     if (copySeriesButton) {
