@@ -31,7 +31,12 @@ import {
   downloadJson,
   tokens,
 } from "./settings";
-import { isExternalHref, openExternalUrl, resolveHref } from "./externalLinks";
+import {
+  isExternalHref,
+  normalizeExternalHref,
+  openExternalUrl,
+  resolveHref,
+} from "./externalLinks";
 
 const ASSET_BASE =
   (typeof import.meta !== "undefined" && import.meta.env?.BASE_URL) || "";
@@ -8351,7 +8356,7 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
 
   function resolveExternalMeta(value) {
     if (typeof value === "string") {
-      const trimmed = value.trim();
+      const trimmed = normalizeExternalHref(value);
       if (!trimmed) return { isExternal: false, url: "" };
       try {
         const url = new URL(trimmed);
