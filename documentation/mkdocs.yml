@@ -45,9 +45,20 @@ nav:
 markdown_extensions:
   - mkdocs_blockscape.extension
 
-extra_css:
-  - site_assets/blockscape/blockscape.css
+# Runtime switch:
+# New standalone lite runtime is active by default.
+# To switch back to the old Svelte embed runtime:
+# 1. Change `extra_css: []` to:
+#      extra_css:
+#        - site_assets/blockscape/blockscape.css
+# 2. Comment out `site_assets/blockscape/lite.js` below.
+# 3. Uncomment `blockscape.js` and `mount.js` below.
+extra_css: []
 
 extra_javascript:
-  - site_assets/blockscape/blockscape.js
-  - site_assets/blockscape/mount.js
+  # Old Svelte embed runtime:
+  # - site_assets/blockscape/blockscape.js
+  # - site_assets/blockscape/mount.js
+
+  # New standalone lite runtime:
+  - site_assets/blockscape/lite.js

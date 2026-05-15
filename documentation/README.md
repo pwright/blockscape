@@ -5,10 +5,15 @@ This folder contains a working MkDocs project that renders Blockscape maps from 
 To use the extension in another repo:
 
 1) Copy `mkdocs_blockscape/` into your MkDocs project (any path is fine as long as Python can import it).
-2) Copy the built assets from this repo’s `documentation/docs/site_assets/blockscape/` into your project’s `docs/site_assets/blockscape/` (or another folder you reference in `mkdocs.yml`).
+2) Copy the assets for the runtime you want from this repo’s `documentation/docs/site_assets/blockscape/` into your project’s `docs/site_assets/blockscape/` (or another folder you reference in `mkdocs.yml`).
 3) Update your `mkdocs.yml`:
    - Add the extension: `markdown_extensions: [ ..., mkdocs_blockscape.extension ]`
-   - Include the assets: 
+   - Include one runtime or the other:
+     ```yaml
+     extra_javascript:
+       - site_assets/blockscape/lite.js
+     ```
+     or:
      ```yaml
      extra_css:
        - site_assets/blockscape/blockscape.css
@@ -18,7 +23,7 @@ To use the extension in another repo:
      ```
 4) Author maps with fenced code blocks using the `blockscape` language (see below), then `mkdocs serve`.
 
-When you need updated assets, run `npm run export` in this repo and re-copy the three files.
+When you need updated Svelte assets, run `npm run export` in this repo and re-copy the three files. The standalone `lite.js` runtime can be copied directly without that export step.
 
 ## Prerequisites
 

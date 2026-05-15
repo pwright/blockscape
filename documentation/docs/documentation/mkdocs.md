@@ -7,6 +7,15 @@ Blockscape ships with an example MkDocs site that renders maps from fenced code 
 - Node 20+ (repo uses `npm run export` to build the assets)
 - Python 3 with MkDocs and the provided extension (`pip install -r documentation/requirements.txt`)
 
+## Choose a runtime
+
+The MkDocs extension only emits `.blockscape-root` plus embedded JSON. The actual runtime is selected in `documentation/mkdocs.yml`.
+
+- New lightweight runtime: `site_assets/blockscape/lite.js`
+- Old Svelte runtime: `site_assets/blockscape/blockscape.js` plus `site_assets/blockscape/mount.js`
+
+To switch, edit `extra_css` and `extra_javascript` in `documentation/mkdocs.yml` and comment out one runtime block while enabling the other.
+
 ## Build the assets for MkDocs
 
 From the repo root:
@@ -16,7 +25,7 @@ npm install            # first run
 npm run export         # refreshes blockscape.js/.css and mount.js under documentation/docs/site_assets/blockscape/
 ```
 
-You only need to rerun `npm run export` when the Svelte UI changes.
+You only need to rerun `npm run export` when using the old Svelte runtime and the Svelte UI changes. The new `lite.js` runtime does not depend on that export.
 
 ## Run or build the MkDocs site
 
@@ -89,4 +98,3 @@ Here is the same code, but with the mkdocs extension `blockscape` codefence:
 }
 
 ```
-

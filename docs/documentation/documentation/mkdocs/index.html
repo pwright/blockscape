@@ -17,7 +17,6 @@
         <link href="../../css/base.css" rel="stylesheet">
         <link id="hljs-light" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" >
         <link id="hljs-dark" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github-dark.min.css" disabled>
-        <link href="../../site_assets/blockscape/blockscape.css" rel="stylesheet">
         <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
         <script>hljs.highlightAll();</script> 
     </head>
@@ -221,6 +220,10 @@
               <ul class="nav flex-column">
               </ul>
             </li>
+            <li class="nav-item" data-bs-level="2"><a href="#choose-a-runtime" class="nav-link">Choose a runtime</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
             <li class="nav-item" data-bs-level="2"><a href="#build-the-assets-for-mkdocs" class="nav-link">Build the assets for MkDocs</a>
               <ul class="nav flex-column">
               </ul>
@@ -247,12 +250,19 @@
 <li>Node 20+ (repo uses <code>npm run export</code> to build the assets)</li>
 <li>Python 3 with MkDocs and the provided extension (<code>pip install -r documentation/requirements.txt</code>)</li>
 </ul>
+<h2 id="choose-a-runtime">Choose a runtime</h2>
+<p>The MkDocs extension only emits <code>.blockscape-root</code> plus embedded JSON. The actual runtime is selected in <code>documentation/mkdocs.yml</code>.</p>
+<ul>
+<li>New lightweight runtime: <code>site_assets/blockscape/lite.js</code></li>
+<li>Old Svelte runtime: <code>site_assets/blockscape/blockscape.js</code> plus <code>site_assets/blockscape/mount.js</code></li>
+</ul>
+<p>To switch, edit <code>extra_css</code> and <code>extra_javascript</code> in <code>documentation/mkdocs.yml</code> and comment out one runtime block while enabling the other.</p>
 <h2 id="build-the-assets-for-mkdocs">Build the assets for MkDocs</h2>
 <p>From the repo root:</p>
 <pre><code class="language-sh">npm install            # first run
 npm run export         # refreshes blockscape.js/.css and mount.js under documentation/docs/site_assets/blockscape/
 </code></pre>
-<p>You only need to rerun <code>npm run export</code> when the Svelte UI changes.</p>
+<p>You only need to rerun <code>npm run export</code> when using the old Svelte runtime and the Svelte UI changes. The new <code>lite.js</code> runtime does not depend on that export.</p>
 <h2 id="run-or-build-the-mkdocs-site">Run or build the MkDocs site</h2>
 <p>From <code>documentation/</code>:</p>
 <pre><code class="language-sh">PYTHONPATH=documentation mkdocs serve   # live reload at http://127.0.0.1:8000/
@@ -326,8 +336,7 @@ PYTHONPATH=documentation mkdocs build   # static output to docs/documentation/
                 shortcuts = {"help": 191, "next": 78, "previous": 80, "search": 83};
         </script>
         <script src="../../js/base.js"></script>
-        <script src="../../site_assets/blockscape/blockscape.js"></script>
-        <script src="../../site_assets/blockscape/mount.js"></script>
+        <script src="../../site_assets/blockscape/lite.js"></script>
         <script src="../../search/main.js"></script>
 
         <div class="modal" id="mkdocs_search_modal" tabindex="-1" role="dialog" aria-labelledby="searchModalLabel" aria-hidden="true">
