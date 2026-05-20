@@ -9696,22 +9696,32 @@ ${text2}` : text2;
     const targetText = getObsidianTargetText(item);
     return buildObsidianUrl(targetText);
   }
+  function extractExternalUrlCandidate(value) {
+    if (typeof value !== "string") return value;
+    const trimmed = value.trim();
+    if (!trimmed) return "";
+    const markdownLinkMatch = trimmed.match(/^\[[^\]]*\]\((https?:\/\/[^)\s]+)\)$/i);
+    if (markdownLinkMatch) return markdownLinkMatch[1];
+    const autoLinkMatch = trimmed.match(/^<(https?:\/\/[^>\s]+)>$/i);
+    if (autoLinkMatch) return autoLinkMatch[1];
+    return trimmed;
+  }
   function resolveExternalMeta(value) {
     var _a;
     if (typeof value === "string") {
-      const trimmed = value.trim();
-      if (!trimmed) return { isExternal: false, url: "" };
+      const candidate = extractExternalUrlCandidate(value);
+      if (!candidate) return { isExternal: false, url: "" };
       try {
-        const url = new URL(trimmed);
+        const url = new URL(candidate);
         if (!/^https?:/i.test(url.protocol))
           return { isExternal: false, url: "" };
         return { isExternal: true, url: url.toString() };
       } catch (error) {
       }
-      if (!/^[a-z][a-z0-9+.-]*:/i.test(trimmed)) {
+      if (!/^[a-z][a-z0-9+.-]*:/i.test(candidate)) {
         try {
           const base = typeof window !== "undefined" && ((_a = window.location) == null ? void 0 : _a.href) ? window.location.href : void 0;
-          const resolved = base ? new URL(trimmed, base).toString() : trimmed;
+          const resolved = base ? new URL(candidate, base).toString() : candidate;
           return { isExternal: true, url: resolved };
         } catch (error) {
           console.warn(

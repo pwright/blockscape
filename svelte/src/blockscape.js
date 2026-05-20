@@ -8025,26 +8025,44 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
     return buildObsidianUrl(targetText);
   }
 
+  function extractExternalUrlCandidate(value) {
+    if (typeof value !== "string") return value;
+    const trimmed = value.trim();
+    if (!trimmed) return "";
+
+    // Recover common LLM mistakes such as "[label](https://example.com)".
+    const markdownLinkMatch = trimmed.match(/^\[[^\]]*\]\((https?:\/\/[^)\s]+)\)$/i);
+    if (markdownLinkMatch) return markdownLinkMatch[1];
+
+    // Recover markdown-style autolinks such as "<https://example.com>".
+    const autoLinkMatch = trimmed.match(/^<(https?:\/\/[^>\s]+)>$/i);
+    if (autoLinkMatch) return autoLinkMatch[1];
+
+    return trimmed;
+  }
+
   function resolveExternalMeta(value) {
     if (typeof value === "string") {
-      const trimmed = value.trim();
-      if (!trimmed) return { isExternal: false, url: "" };
+      const candidate = extractExternalUrlCandidate(value);
+      if (!candidate) return { isExternal: false, url: "" };
       try {
-        const url = new URL(trimmed);
+        const url = new URL(candidate);
         if (!/^https?:/i.test(url.protocol))
           return { isExternal: false, url: "" };
         return { isExternal: true, url: url.toString() };
       } catch (error) {
         // Continue to relative resolution below.
       }
-      if (!/^[a-z][a-z0-9+.-]*:/i.test(trimmed)) {
+      if (!/^[a-z][a-z0-9+.-]*:/i.test(candidate)) {
         // Treat bare/relative paths as external links, resolving against the current page when possible.
         try {
           const base =
             typeof window !== "undefined" && window.location?.href
               ? window.location.href
               : undefined;
-          const resolved = base ? new URL(trimmed, base).toString() : trimmed;
+          const resolved = base
+            ? new URL(candidate, base).toString()
+            : candidate;
           return { isExternal: true, url: resolved };
         } catch (error) {
           console.warn(
