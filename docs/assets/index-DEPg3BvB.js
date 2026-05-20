@@ -12611,142 +12611,290 @@ function instance$1($$self, $$props, $$invalidate) {
   const defaultSeedText = `
   {
   "id": "blockscape",
-  "title": "Blockscape (AI maps)",
-  "abstract": "Blockscape (pronounced BYK-shed) visualizes value chains and dependencies using a BS file. Inspired by Wardley maps, these maps emphasizes the topology that makes maps useful.",
+  "title": "Blockscape: maps for thinking",
+  "abstract": "Blockscape turns messy thinking into saved, navigable maps. Capture anything, connect the parts, move through the map with the keyboard, and use focused highlighting to understand dependencies, decisions, and next steps. See https://www.wardleymaps.com/",
   "backgroundUrl": "https://upload.wikimedia.org/wikipedia/commons/4/44/Blured_black_keyboard.jpg",
   "categories": [
     {
-      "id": "communication",
-      "title": "Communication",
+      "id": "situations",
+      "title": "Map Any Situation",
       "items": [
         {
-          "id": "gestalt",
-          "name": "Visualise to understand",
-          "logo": "./logos/block-mind-blown.gif",
-          "deps": []
+          "id": "video-capture",
+          "name": "Capture a video",
+          "external": "https://www.youtube.com/",
+          "logo": "https://favicon.im/youtube.com",
+          "deps": [
+            "generate-first-map",
+            "source-backed-items"
+          ]
         },
         {
-          "id": "value-chain",
-          "name": "Visible value chain (y-axis)",
-          "deps": []
+          "id": "product-thinking",
+          "name": "Shape a product",
+          "deps": [
+            "see-problem-shape",
+            "compare-options",
+            "save-map"
+          ]
         },
         {
-          "id": "evolution",
-          "name": "Evolution and maturity (x-axis)",
-          "deps": []
+          "id": "decision-making",
+          "name": "Make a decision",
+          "deps": [
+            "focus-lens",
+            "dependency-topology",
+            "compare-options"
+          ]
         },
         {
-          "id": "relational-awareness",
-          "name": "Relations",
+          "id": "system-understanding",
+          "name": "Understand a system",
+          "deps": [
+            "dependency-topology",
+            "source-backed-items",
+            "map-collection"
+          ]
+        },
+        {
+          "id": "knowledge-sharing",
+          "name": "Share understanding",
+          "deps": [
+            "share-map",
+            "source-backed-items",
+            "narrative-from-map"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "thinking",
+      "title": "Think With The Map",
+      "items": [
+        {
+          "id": "see-problem-shape",
+          "name": "See the problem shape",
+          "deps": [
+            "visible-value",
+            "dependency-topology"
+          ]
+        },
+        {
+          "id": "focus-lens",
+          "name": "Focus lens",
           "logo": "./logos/relations.png",
-          "deps": []
-        },
-        {
-          "id": "icons",
-          "name": "Icons",
-          "deps": []
-        }
-      ]
-    },
-    {
-      "id": "experience",
-      "title": "User Experience",
-      "items": [
-        {
-          "id": "paste-bs-file",
-          "name": "Paste (cmd-v)",
           "deps": [
-            "bs-format-simple"
+            "keyboard-navigation",
+            "related-item-highlighting",
+            "dependency-topology"
           ]
         },
         {
-          "id": "load-multidoc-file",
-          "name": "Series",
+          "id": "compare-options",
+          "name": "Compare options",
           "deps": [
-            "bs-format-simple"
+            "map-series",
+            "visible-value",
+            "maturity-position"
           ]
         },
         {
-          "id": "create-gist-multidoc",
-          "name": "Gist",
+          "id": "find-gaps",
+          "name": "Find gaps",
           "deps": [
-            "gists",
-            "bs-format-simple"
+            "dependency-topology",
+            "llm-review-map"
           ]
         },
         {
-          "id": "abstract-gist-loading",
-          "name": "Links",
+          "id": "narrative-from-map",
+          "name": "Explain the map",
           "deps": [
-            "gists",
-            "bs-format-simple"
-          ]
-        },
-        {
-          "id": "model-collection",
-          "name": "Portfolio",
-          "deps": [
-            "apicurio",
-            "bs-format-simple"
+            "simple-json-model",
+            "llm-review-map"
           ]
         }
       ]
     },
     {
-      "id": "authoring-ai",
-      "title": "Authoring (LLM)",
+      "id": "map-semantics",
+      "title": "Map Semantics",
       "items": [
         {
-          "id": "bs-format-simple",
-          "name": "BS Schema",
+          "id": "visible-value",
+          "name": "Visible value",
           "deps": []
         },
         {
-          "id": "editor-human-terms",
-          "name": "Edit",
+          "id": "dependency-topology",
+          "name": "Dependency topology",
+          "deps": []
+        },
+        {
+          "id": "related-item-highlighting",
+          "name": "Related items light up",
           "deps": [
-            "bs-format-simple",
-            "gestalt"
+            "dependency-topology"
           ]
         },
         {
-          "id": "llm-generate-bs",
-          "name": "LLM generates BS",
+          "id": "maturity-position",
+          "name": "Maturity position",
+          "deps": []
+        },
+        {
+          "id": "source-backed-items",
+          "name": "Best source per tile",
+          "deps": [
+            "external-links",
+            "source-logos"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "capture-and-author",
+      "title": "Capture And Author",
+      "items": [
+        {
+          "id": "generate-first-map",
+          "name": "Generate a first map",
           "external": "https://github.com/pwright/blockscape/blob/main/map-generation-prompt.md",
+          "logo": "https://favicon.im/github.com",
           "deps": [
-            "bs-format-simple"
+            "simple-json-model",
+            "llm-map-prompt"
           ]
         },
         {
-          "id": "llm-consume-bs",
-          "name": "LLM consumes BS",
+          "id": "edit-human-terms",
+          "name": "Edit in human terms",
           "deps": [
-            "bs-format-simple"
+            "simple-json-model",
+            "move-items"
+          ]
+        },
+        {
+          "id": "llm-review-map",
+          "name": "Ask AI about the map",
+          "external": "https://github.com/pwright/blockscape/blob/main/map-generation-prompt.md",
+          "logo": "https://favicon.im/github.com",
+          "deps": [
+            "simple-json-model",
+            "llm-map-prompt"
           ]
         },
         {
           "id": "move-items",
-          "name": "Move (shift - arrow keys)",
+          "name": "Move ideas as judgement changes",
           "logo": "./logos/block-swap.gif",
-          "deps": []
+          "deps": [
+            "keyboard-navigation"
+          ]
+        },
+        {
+          "id": "llm-map-prompt",
+          "name": "Promptable map rules",
+          "external": "https://github.com/pwright/blockscape/blob/main/map-generation-prompt.md",
+          "logo": "https://favicon.im/github.com",
+          "deps": [
+            "simple-json-model"
+          ]
         }
       ]
     },
     {
-      "id": "platforms",
-      "title": "Platforms",
+      "id": "save-and-navigate",
+      "title": "Save And Navigate",
       "items": [
         {
-          "id": "gists",
-          "name": "Gist",
+          "id": "save-map",
+          "name": "Save map (cmd-s)",
+          "deps": [
+            "simple-json-model"
+          ]
+        },
+        {
+          "id": "load-map",
+          "name": "Load map",
+          "deps": [
+            "simple-json-model"
+          ]
+        },
+        {
+          "id": "keyboard-navigation",
+          "name": "Keyboard navigation",
+          "deps": [
+            "simple-json-model"
+          ]
+        },
+        {
+          "id": "share-map",
+          "name": "Share map",
+          "deps": [
+            "gist-backed-map",
+            "external-links"
+          ]
+        },
+        {
+          "id": "map-series",
+          "name": "Series of maps",
+          "deps": [
+            "simple-json-model"
+          ]
+        },
+        {
+          "id": "map-collection",
+          "name": "Map collection",
+          "deps": [
+            "simple-json-model",
+            "gist-backed-map"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "substrate",
+      "title": "Substrate",
+      "items": [
+        {
+          "id": "simple-json-model",
+          "name": "Simple JSON model",
+          "external": "https://github.com/pwright/blockscape/blob/main/map-generation-prompt.md",
           "logo": "https://favicon.im/github.com",
           "deps": []
         },
         {
-          "id": "apicurio",
-          "name": "Apicurio",
-          "logo": "https://www.google.com/s2/favicons?domain=apicur.io&sz=96",
+          "id": "external-links",
+          "name": "External links",
+          "external": "https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/a",
+          "logo": "https://favicon.im/developer.mozilla.org",
           "deps": []
+        },
+        {
+          "id": "source-logos",
+          "name": "Source logos",
+          "external": "https://favicon.im/",
+          "logo": "https://favicon.im/favicon.im",
+          "deps": []
+        },
+        {
+          "id": "gist-backed-map",
+          "name": "Gist-backed map",
+          "external": "https://gist.github.com/",
+          "logo": "https://favicon.im/github.com",
+          "deps": [
+            "simple-json-model"
+          ]
+        },
+        {
+          "id": "browser-app",
+          "name": "Browser app",
+          "external": "https://pwright.github.io/blockscape/",
+          "logo": "https://favicon.im/github.io",
+          "deps": [
+            "simple-json-model"
+          ]
         }
       ]
     }
