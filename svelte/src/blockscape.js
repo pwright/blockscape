@@ -247,7 +247,7 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
   let obsidianVaultName = "";
   let autoIdFromNameEnabled = DEFAULT_AUTO_ID_FROM_NAME;
   let stripParentheticalNames = DEFAULT_STRIP_PARENTHESES;
-  let theme = THEME_LIGHT;
+  let theme = THEME_DARK;
   let backgroundImageUrl = "";
   let backgroundImageOpacity = DEFAULT_BG_OPACITY;
   let colorPresets = [];
@@ -486,12 +486,12 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
 
   function readStoredTheme() {
     if (typeof window === "undefined" || !window.localStorage)
-      return THEME_LIGHT;
+      return THEME_DARK;
     try {
       const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
-      return stored === THEME_DARK ? THEME_DARK : THEME_LIGHT;
+      return stored === THEME_LIGHT ? THEME_LIGHT : THEME_DARK;
     } catch (err) {
-      return THEME_LIGHT;
+      return THEME_DARK;
     }
   }
 
@@ -7438,8 +7438,9 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
 
         const img = document.createElement("img");
         img.className = "logo";
-        if (it.logo) {
-          img.src = it.logo;
+        const logoUrl = resolveLogoUrl(it.logo);
+        if (logoUrl) {
+          img.src = logoUrl;
           img.alt = it.name || it.id;
         } else {
           img.alt = "";
@@ -8025,25 +8026,44 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
     return buildObsidianUrl(targetText);
   }
 
-  function extractExternalUrlCandidate(value) {
+  function extractUrlCandidate(value) {
     if (typeof value !== "string") return value;
     const trimmed = value.trim();
     if (!trimmed) return "";
 
-    // Recover common LLM mistakes such as "[label](https://example.com)".
-    const markdownLinkMatch = trimmed.match(/^\[[^\]]*\]\((https?:\/\/[^)\s]+)\)$/i);
+    // Recover common LLM mistakes such as "[label](logos/example.svg)".
+    const markdownLinkMatch = trimmed.match(/^\[[^\]]*\]\(([^)\s]+)\)$/);
     if (markdownLinkMatch) return markdownLinkMatch[1];
 
-    // Recover markdown-style autolinks such as "<https://example.com>".
-    const autoLinkMatch = trimmed.match(/^<(https?:\/\/[^>\s]+)>$/i);
+    // Recover markdown-style autolinks such as "<logos/example.svg>".
+    const autoLinkMatch = trimmed.match(/^<([^>\s]+)>$/);
     if (autoLinkMatch) return autoLinkMatch[1];
 
     return trimmed;
   }
 
+  function resolveUrlCandidate(candidate) {
+    try {
+      const base =
+        typeof window !== "undefined" && window.location?.href
+          ? window.location.href
+          : undefined;
+      return base ? new URL(candidate, base).toString() : candidate;
+    } catch (error) {
+      return "";
+    }
+  }
+
+  function resolveLogoUrl(value) {
+    const candidate = extractUrlCandidate(value);
+    if (!candidate || typeof candidate !== "string") return "";
+    if (/^javascript:/i.test(candidate)) return "";
+    return resolveUrlCandidate(candidate) || candidate;
+  }
+
   function resolveExternalMeta(value) {
     if (typeof value === "string") {
-      const candidate = extractExternalUrlCandidate(value);
+      const candidate = extractUrlCandidate(value);
       if (!candidate) return { isExternal: false, url: "" };
       try {
         const url = new URL(candidate);
@@ -8055,23 +8075,12 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
       }
       if (!/^[a-z][a-z0-9+.-]*:/i.test(candidate)) {
         // Treat bare/relative paths as external links, resolving against the current page when possible.
-        try {
-          const base =
-            typeof window !== "undefined" && window.location?.href
-              ? window.location.href
-              : undefined;
-          const resolved = base
-            ? new URL(candidate, base).toString()
-            : candidate;
+        const resolved = resolveUrlCandidate(candidate);
+        if (resolved) {
           return { isExternal: true, url: resolved };
-        } catch (error) {
-          console.warn(
-            "[Blockscape] invalid external url skipped",
-            value,
-            error
-          );
-          return { isExternal: false, url: "" };
         }
+        console.warn("[Blockscape] invalid external url skipped", value);
+        return { isExternal: false, url: "" };
       }
       console.warn("[Blockscape] invalid external url skipped", value);
       return { isExternal: false, url: "" };
