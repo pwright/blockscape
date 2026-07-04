@@ -33,8 +33,10 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
     seriesNavMinVersions: 1,
     initialSettings: null,
     initialSettingsUrl: null,
+    readOnly: false,
     ...featureOverrides,
   };
+  const isReadOnly = features.readOnly === true;
 
   const scope =
     host && typeof host.querySelector === "function" ? host : document;
@@ -3760,6 +3762,7 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
   }
 
   function setItemColor(itemId, color) {
+    if (isReadOnly) return false;
     const match = findItemAndCategoryById(itemId);
     if (!match) return false;
     if (color) {
@@ -4160,8 +4163,8 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
     previewActionsEl: previewActions,
     previewCloseEl: previewClose,
     escapeHtml,
-    onEditItem: (id) => itemEditor.open(id),
-    onChangeColor: (id, color) => setItemColor(id, color),
+    onEditItem: isReadOnly ? null : (id) => itemEditor.open(id),
+    onChangeColor: isReadOnly ? null : (id, color) => setItemColor(id, color),
     canCopyItemLink: (id) => !!getShareableItemUrl(id),
     onCopyItemLink: (id) => copyShareableItemUrl(id),
     selectItem: (id) => select(id),
@@ -4322,6 +4325,9 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
   }
 
   function createNewVersionFromActive({ versionLabel } = {}) {
+    if (isReadOnly) {
+      throw new Error("This Blockscape view is read-only.");
+    }
     if (activeIndex < 0 || !models[activeIndex]) {
       throw new Error("Load or select a model before creating a version.");
     }
@@ -5631,6 +5637,7 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
   }
 
   function removeApicurioVersion(entryIndex, versionIndex) {
+    if (isReadOnly) return false;
     clearSeriesNavNotice();
     if (entryIndex < 0 || entryIndex >= models.length) return false;
     const entry = models[entryIndex];
@@ -5681,18 +5688,20 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
       entry.apicurioArtifactId ||
       getModelId(entry) ||
       "Artifact";
-    title.title = "Double-click to rename this series";
-    title.setAttribute("role", "button");
-    title.tabIndex = 0;
-    title.addEventListener("dblclick", () => {
-      const target = models[activeIndex];
-      if (!target?.apicurioVersions?.length) return;
-      const renamed = renameSeries(target);
-      if (!renamed) return;
-      renderModelList();
-      loadActiveIntoEditor();
-      rebuildFromActive();
-    });
+    if (!isReadOnly) {
+      title.title = "Double-click to rename this series";
+      title.setAttribute("role", "button");
+      title.tabIndex = 0;
+      title.addEventListener("dblclick", () => {
+        const target = models[activeIndex];
+        if (!target?.apicurioVersions?.length) return;
+        const renamed = renameSeries(target);
+        if (!renamed) return;
+        renderModelList();
+        loadActiveIntoEditor();
+        rebuildFromActive();
+      });
+    }
     nav.appendChild(title);
 
     const status = document.createElement("div");
@@ -5757,7 +5766,7 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
       lbl.appendChild(lblText);
       btn.appendChild(lbl);
       registerThumbLabel(lbl, lblText);
-      if (entry.apicurioVersions.length > 1 && !ver?.isCategoryView) {
+      if (!isReadOnly && entry.apicurioVersions.length > 1 && !ver?.isCategoryView) {
         const removeBtn = document.createElement("span");
         removeBtn.className = "version-nav__thumb-remove";
         removeBtn.title = `Remove ${labelValue} from this series`;
@@ -5786,23 +5795,25 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
       thumbs.appendChild(btn);
     });
 
-    const addThumb = document.createElement("button");
-    addThumb.type = "button";
-    addThumb.className = "version-nav__thumb version-nav__thumb--add";
-    addThumb.title = "Create a new version from this map";
-    addThumb.addEventListener("click", () => {
-      try {
-        const idx = createNewVersionFromActive({ versionLabel: "manual" });
-        setActive(idx);
-      } catch (err) {
-        alert(err?.message || "Unable to create a new version right now.");
-      }
-    });
-    const addIcon = document.createElement("span");
-    addIcon.className = "version-nav__thumb-add-icon";
-    addIcon.textContent = "+";
-    addThumb.appendChild(addIcon);
-    thumbs.appendChild(addThumb);
+    if (!isReadOnly) {
+      const addThumb = document.createElement("button");
+      addThumb.type = "button";
+      addThumb.className = "version-nav__thumb version-nav__thumb--add";
+      addThumb.title = "Create a new version from this map";
+      addThumb.addEventListener("click", () => {
+        try {
+          const idx = createNewVersionFromActive({ versionLabel: "manual" });
+          setActive(idx);
+        } catch (err) {
+          alert(err?.message || "Unable to create a new version right now.");
+        }
+      });
+      const addIcon = document.createElement("span");
+      addIcon.className = "version-nav__thumb-add-icon";
+      addIcon.textContent = "+";
+      addThumb.appendChild(addIcon);
+      thumbs.appendChild(addThumb);
+    }
 
     nav.appendChild(thumbs);
 
@@ -7403,7 +7414,7 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
         if (externalMeta.url) {
           tile.dataset.externalUrl = externalMeta.url;
         }
-        if (!activeIsCategoryView) {
+        if (!isReadOnly && !activeIsCategoryView) {
           let targetSeriesIndex = null;
           if (seriesIdLookup.has(it.id)) {
             targetSeriesIndex = seriesIdLookup.get(it.id);
@@ -8991,6 +9002,7 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
   }
 
   function restoreItemDeletion(deleted) {
+    if (isReadOnly) return false;
     const activeModel = models[activeIndex];
     const activeModelId =
       getModelId(activeModel) || (activeModel ? activeModel.id : null);
@@ -9021,6 +9033,7 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
   }
 
   function restoreCategoryDeletion(deleted) {
+    if (isReadOnly) return false;
     const activeModel = models[activeIndex];
     const activeModelId =
       getModelId(activeModel) || (activeModel ? activeModel.id : null);
@@ -9047,6 +9060,7 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
   }
 
   function deleteSelectedItem() {
+    if (isReadOnly) return false;
     if (!selection || activeIndex < 0) return false;
     const mobj = models[activeIndex].data;
     const categories = mobj.categories || [];
@@ -9119,6 +9133,7 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
   }
 
   function deleteSelectedCategory() {
+    if (isReadOnly) return false;
     const catId = getCurrentCategoryId();
     if (!catId || activeIndex < 0) return false;
     const mobj = models[activeIndex].data;
@@ -9157,6 +9172,7 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
   }
 
   function deleteItemById(id) {
+    if (isReadOnly) return false;
     if (!id) return false;
     const previousSelection = selection;
     selection = id;
@@ -9202,7 +9218,7 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
     });
   }
 
-  if (pasteJsonButton) {
+  if (!isReadOnly && pasteJsonButton) {
     pasteJsonButton.addEventListener("click", async () => {
       try {
         const text = await readTextFromClipboard();
@@ -9222,6 +9238,7 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
   }
 
   // Append models from textarea
+  if (!isReadOnly) {
     byId("appendFromBox").onclick = async () => {
     try {
       const autoSave = await isLocalBackendReady();
@@ -9256,8 +9273,10 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
       alert("Append error (see console).");
     }
   };
+  }
 
   // Replace active model data with JSON from textarea
+  if (!isReadOnly) {
   byId("replaceActive").onclick = () => {
     if (activeIndex < 0) {
       alert("No active model selected.");
@@ -9295,8 +9314,10 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
       alert("JSON parse error (see console).");
     }
   };
+  }
 
   // Load files: each text may be single object, array, or ---/%%% separated
+  if (!isReadOnly) {
   byId("file").onchange = async (e) => {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
@@ -9358,11 +9379,15 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
       e.target.value = ""; // allow re-selecting the same files
     }
   };
+  }
 
   // Paste JSON anywhere to append new models
-  document.addEventListener("paste", handleClipboardPaste);
+  if (!isReadOnly) {
+    document.addEventListener("paste", handleClipboardPaste);
+  }
 
   async function handleClipboardPaste(event) {
+    if (isReadOnly) return;
     if (!shouldHandleGlobalPaste()) return;
     const text =
       event.clipboardData?.getData("text/plain") ||

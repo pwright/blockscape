@@ -965,6 +965,12 @@
       isolation: isolate;
     }
 
+    .pf-v5-c-page__header[hidden],
+    .blockscape-sidebar[hidden],
+    .pf-v5-c-page__footer[hidden] {
+      display: none !important;
+    }
+
     .blockscape-sidebar::before {
       content: "";
       position: absolute;

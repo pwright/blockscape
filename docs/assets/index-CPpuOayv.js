@@ -2818,8 +2818,10 @@ function initBlockscape(featureOverrides = {}, { host = document } = {}) {
     seriesNavMinVersions: 1,
     initialSettings: null,
     initialSettingsUrl: null,
+    readOnly: false,
     ...featureOverrides
   };
+  const isReadOnly = features.readOnly === true;
   const scope = host && typeof host.querySelector === "function" ? host : document;
   const byId = (id) => scope.querySelector(`#${id}`);
   const jsonBox = byId("jsonBox");
@@ -6119,6 +6121,7 @@ function initBlockscape(featureOverrides = {}, { host = document } = {}) {
     return null;
   }
   function setItemColor(itemId, color) {
+    if (isReadOnly) return false;
     const match = findItemAndCategoryById(itemId);
     if (!match) return false;
     if (color) {
@@ -6488,8 +6491,8 @@ function initBlockscape(featureOverrides = {}, { host = document } = {}) {
     previewActionsEl: previewActions,
     previewCloseEl: previewClose,
     escapeHtml,
-    onEditItem: (id) => itemEditor.open(id),
-    onChangeColor: (id, color) => setItemColor(id, color),
+    onEditItem: isReadOnly ? null : (id) => itemEditor.open(id),
+    onChangeColor: isReadOnly ? null : (id, color) => setItemColor(id, color),
     canCopyItemLink: (id) => !!getShareableItemUrl(id),
     onCopyItemLink: (id) => copyShareableItemUrl(id),
     selectItem: (id) => select(id),
@@ -6633,6 +6636,9 @@ function initBlockscape(featureOverrides = {}, { host = document } = {}) {
   }
   function createNewVersionFromActive({ versionLabel } = {}) {
     var _a;
+    if (isReadOnly) {
+      throw new Error("This Blockscape view is read-only.");
+    }
     if (activeIndex < 0 || !models[activeIndex]) {
       throw new Error("Load or select a model before creating a version.");
     }
@@ -7708,6 +7714,7 @@ function initBlockscape(featureOverrides = {}, { host = document } = {}) {
     return setActiveApicurioVersion(activeIndex, current + step);
   }
   function removeApicurioVersion(entryIndex, versionIndex) {
+    if (isReadOnly) return false;
     clearSeriesNavNotice();
     if (entryIndex < 0 || entryIndex >= models.length) return false;
     const entry = models[entryIndex];
@@ -7747,19 +7754,21 @@ function initBlockscape(featureOverrides = {}, { host = document } = {}) {
     const title = document.createElement("div");
     title.className = "version-nav__title";
     title.textContent = entry.apicurioArtifactName || entry.apicurioArtifactId || getModelId(entry) || "Artifact";
-    title.title = "Double-click to rename this series";
-    title.setAttribute("role", "button");
-    title.tabIndex = 0;
-    title.addEventListener("dblclick", () => {
-      var _a;
-      const target2 = models[activeIndex];
-      if (!((_a = target2 == null ? void 0 : target2.apicurioVersions) == null ? void 0 : _a.length)) return;
-      const renamed = renameSeries(target2);
-      if (!renamed) return;
-      renderModelList();
-      loadActiveIntoEditor();
-      rebuildFromActive();
-    });
+    if (!isReadOnly) {
+      title.title = "Double-click to rename this series";
+      title.setAttribute("role", "button");
+      title.tabIndex = 0;
+      title.addEventListener("dblclick", () => {
+        var _a;
+        const target2 = models[activeIndex];
+        if (!((_a = target2 == null ? void 0 : target2.apicurioVersions) == null ? void 0 : _a.length)) return;
+        const renamed = renameSeries(target2);
+        if (!renamed) return;
+        renderModelList();
+        loadActiveIntoEditor();
+        rebuildFromActive();
+      });
+    }
     nav.appendChild(title);
     const status = document.createElement("div");
     status.className = "version-nav__status";
@@ -7816,7 +7825,7 @@ function initBlockscape(featureOverrides = {}, { host = document } = {}) {
       lbl.appendChild(lblText);
       btn.appendChild(lbl);
       registerThumbLabel(lbl, lblText);
-      if (entry.apicurioVersions.length > 1 && !(ver == null ? void 0 : ver.isCategoryView)) {
+      if (!isReadOnly && entry.apicurioVersions.length > 1 && !(ver == null ? void 0 : ver.isCategoryView)) {
         const removeBtn = document.createElement("span");
         removeBtn.className = "version-nav__thumb-remove";
         removeBtn.title = `Remove ${labelValue} from this series`;
@@ -7845,23 +7854,25 @@ function initBlockscape(featureOverrides = {}, { host = document } = {}) {
       attachSeriesPreviewHover(btn, ver);
       thumbs.appendChild(btn);
     });
-    const addThumb = document.createElement("button");
-    addThumb.type = "button";
-    addThumb.className = "version-nav__thumb version-nav__thumb--add";
-    addThumb.title = "Create a new version from this map";
-    addThumb.addEventListener("click", () => {
-      try {
-        const idx = createNewVersionFromActive({ versionLabel: "manual" });
-        setActive(idx);
-      } catch (err) {
-        alert((err == null ? void 0 : err.message) || "Unable to create a new version right now.");
-      }
-    });
-    const addIcon = document.createElement("span");
-    addIcon.className = "version-nav__thumb-add-icon";
-    addIcon.textContent = "+";
-    addThumb.appendChild(addIcon);
-    thumbs.appendChild(addThumb);
+    if (!isReadOnly) {
+      const addThumb = document.createElement("button");
+      addThumb.type = "button";
+      addThumb.className = "version-nav__thumb version-nav__thumb--add";
+      addThumb.title = "Create a new version from this map";
+      addThumb.addEventListener("click", () => {
+        try {
+          const idx = createNewVersionFromActive({ versionLabel: "manual" });
+          setActive(idx);
+        } catch (err) {
+          alert((err == null ? void 0 : err.message) || "Unable to create a new version right now.");
+        }
+      });
+      const addIcon = document.createElement("span");
+      addIcon.className = "version-nav__thumb-add-icon";
+      addIcon.textContent = "+";
+      addThumb.appendChild(addIcon);
+      thumbs.appendChild(addThumb);
+    }
     nav.appendChild(thumbs);
     const scrollKey = getThumbScrollKey(entry, "active");
     const savedScroll = versionThumbScroll.get(scrollKey);
@@ -9175,7 +9186,7 @@ ${text2}` : text2;
         if (externalMeta.url) {
           tile.dataset.externalUrl = externalMeta.url;
         }
-        if (!activeIsCategoryView) {
+        if (!isReadOnly && !activeIsCategoryView) {
           let targetSeriesIndex = null;
           if (seriesIdLookup.has(it.id)) {
             targetSeriesIndex = seriesIdLookup.get(it.id);
@@ -10539,6 +10550,7 @@ ${text2}` : text2;
     return false;
   }
   function restoreItemDeletion(deleted) {
+    if (isReadOnly) return false;
     const activeModel = models[activeIndex];
     const activeModelId = getModelId(activeModel) || (activeModel ? activeModel.id : null);
     if (!activeModel || activeModelId !== deleted.modelId) return false;
@@ -10565,6 +10577,7 @@ ${text2}` : text2;
     return true;
   }
   function restoreCategoryDeletion(deleted) {
+    if (isReadOnly) return false;
     const activeModel = models[activeIndex];
     const activeModelId = getModelId(activeModel) || (activeModel ? activeModel.id : null);
     if (!activeModel || activeModelId !== deleted.modelId) return false;
@@ -10589,6 +10602,7 @@ ${text2}` : text2;
     return true;
   }
   function deleteSelectedItem() {
+    if (isReadOnly) return false;
     if (!selection || activeIndex < 0) return false;
     const mobj = models[activeIndex].data;
     const categories = mobj.categories || [];
@@ -10655,6 +10669,7 @@ ${text2}` : text2;
   }
   function deleteSelectedCategory() {
     var _a, _b;
+    if (isReadOnly) return false;
     const catId = getCurrentCategoryId();
     if (!catId || activeIndex < 0) return false;
     const mobj = models[activeIndex].data;
@@ -10688,6 +10703,7 @@ ${text2}` : text2;
     return true;
   }
   function deleteItemById(id) {
+    if (isReadOnly) return false;
     if (!id) return false;
     const previousSelection = selection;
     selection = id;
@@ -10728,7 +10744,7 @@ ${text2}` : text2;
       }
     });
   }
-  if (pasteJsonButton) {
+  if (!isReadOnly && pasteJsonButton) {
     pasteJsonButton.addEventListener("click", async () => {
       try {
         const text2 = await readTextFromClipboard();
@@ -10746,131 +10762,140 @@ ${text2}` : text2;
       }
     });
   }
-  byId("appendFromBox").onclick = async () => {
-    try {
-      const autoSave = await isLocalBackendReady();
-      const appended = normalizeToModelsFromText(jsonBox.value, "Pasted", {
-        promptForSeriesName: !autoSave
-      });
-      if (!appended.length) {
-        alert("No valid JSON found to append.");
+  if (!isReadOnly) {
+    byId("appendFromBox").onclick = async () => {
+      try {
+        const autoSave = await isLocalBackendReady();
+        const appended = normalizeToModelsFromText(jsonBox.value, "Pasted", {
+          promptForSeriesName: !autoSave
+        });
+        if (!appended.length) {
+          alert("No valid JSON found to append.");
+          return;
+        }
+        console.log("[Blockscape] appending", appended.length, "model(s)");
+        let firstIndex = null;
+        const addedIndices = [];
+        appended.forEach((entry, idx) => {
+          const idxResult = addModelEntry(entry, {
+            versionLabel: appended.length > 1 ? `paste #${idx + 1}` : "paste"
+          });
+          if (firstIndex == null) firstIndex = idxResult;
+          addedIndices.push(idxResult);
+        });
+        if (activeIndex === -1 && firstIndex != null) setActive(firstIndex);
+        else {
+          renderModelList();
+        }
+        if (autoSave) {
+          await autoSaveNewLocalFilesForModels(addedIndices, {
+            origin: "append"
+          });
+        }
+      } catch (e) {
+        console.error("[Blockscape] append error:", e);
+        alert("Append error (see console).");
+      }
+    };
+  }
+  if (!isReadOnly) {
+    byId("replaceActive").onclick = () => {
+      var _a;
+      if (activeIndex < 0) {
+        alert("No active model selected.");
         return;
       }
-      console.log("[Blockscape] appending", appended.length, "model(s)");
-      let firstIndex = null;
-      const addedIndices = [];
-      appended.forEach((entry, idx) => {
-        const idxResult = addModelEntry(entry, {
-          versionLabel: appended.length > 1 ? `paste #${idx + 1}` : "paste"
+      try {
+        const obj = JSON.parse(jsonBox.value);
+        ensureModelMetadata(obj, {
+          titleHint: getModelTitle(models[activeIndex]),
+          idHint: getModelId(models[activeIndex]) || getModelTitle(models[activeIndex])
         });
-        if (firstIndex == null) firstIndex = idxResult;
-        addedIndices.push(idxResult);
-      });
-      if (activeIndex === -1 && firstIndex != null) setActive(firstIndex);
-      else {
-        renderModelList();
-      }
-      if (autoSave) {
-        await autoSaveNewLocalFilesForModels(addedIndices, {
-          origin: "append"
-        });
-      }
-    } catch (e) {
-      console.error("[Blockscape] append error:", e);
-      alert("Append error (see console).");
-    }
-  };
-  byId("replaceActive").onclick = () => {
-    var _a;
-    if (activeIndex < 0) {
-      alert("No active model selected.");
-      return;
-    }
-    try {
-      const obj = JSON.parse(jsonBox.value);
-      ensureModelMetadata(obj, {
-        titleHint: getModelTitle(models[activeIndex]),
-        idHint: getModelId(models[activeIndex]) || getModelTitle(models[activeIndex])
-      });
-      models[activeIndex].data = obj;
-      models[activeIndex].title = obj.title || models[activeIndex].title;
-      if (models[activeIndex].isSeries || ((_a = models[activeIndex].apicurioVersions) == null ? void 0 : _a.length) > 1) {
-        const seriesName = models[activeIndex].title || getModelTitle(models[activeIndex]);
-        ensureSeriesId(models[activeIndex], {
-          seriesName,
-          fallbackTitle: seriesName
-        });
-      }
-      syncDocumentTitle();
-      console.log(
-        "[Blockscape] replaced active model:",
-        getModelTitle(models[activeIndex])
-      );
-      rebuildFromActive();
-      apicurio.updateAvailability();
-    } catch (e) {
-      console.error("[Blockscape] replace error:", e);
-      alert("JSON parse error (see console).");
-    }
-  };
-  byId("file").onchange = async (e) => {
-    const files = Array.from(e.target.files || []);
-    if (!files.length) return;
-    try {
-      console.log("[Blockscape] reading", files.length, "file(s)");
-      let firstIndex = null;
-      for (const f of files) {
-        const txt = await f.text();
-        const baseName = f.name.replace(/\.[^.]+$/, "") || "File";
-        const entries = normalizeToModelsFromText(txt, baseName, {
-          seriesTitleOverride: `${baseName} series`
-        });
-        if (!entries.length) {
-          console.warn("[Blockscape] no models in file:", f.name);
-          continue;
+        models[activeIndex].data = obj;
+        models[activeIndex].title = obj.title || models[activeIndex].title;
+        if (models[activeIndex].isSeries || ((_a = models[activeIndex].apicurioVersions) == null ? void 0 : _a.length) > 1) {
+          const seriesName = models[activeIndex].title || getModelTitle(models[activeIndex]);
+          ensureSeriesId(models[activeIndex], {
+            seriesName,
+            fallbackTitle: seriesName
+          });
         }
-        entries.forEach((en, i) => {
-          var _a;
-          const dataTitle = (((_a = en.data) == null ? void 0 : _a.title) ?? "").toString().trim();
-          const fallbackTitle = entries.length > 1 ? `${f.name} #${i + 1}` : f.name;
-          const fileSeriesName = `${baseName} series`;
-          const seriesName = en.isSeries ? fileSeriesName : null;
-          let payload = { ...en };
-          if (en.isSeries) {
-            const seriesTitle = seriesName || dataTitle || en.title || fallbackTitle || "unknown";
-            payload.title = seriesTitle;
-            const forcedSlug = makeSeriesId(seriesTitle || "unknown");
-            applySeriesSlug(payload, forcedSlug);
-            ensureSeriesId(payload, {
-              seriesName: seriesTitle,
-              fallbackTitle: "unknown"
-            });
-            payload.apicurioArtifactName = payload.apicurioArtifactName || seriesTitle;
-          } else {
-            payload.title = dataTitle || fallbackTitle;
-          }
-          const idxResult = addModelEntry(
-            {
-              ...payload,
-              apicurioArtifactName: payload.apicurioArtifactName || seriesName || payload.apicurioArtifactName
-            },
-            { versionLabel: f.name }
-          );
-          if (firstIndex == null) firstIndex = idxResult;
-        });
+        syncDocumentTitle();
+        console.log(
+          "[Blockscape] replaced active model:",
+          getModelTitle(models[activeIndex])
+        );
+        rebuildFromActive();
+        apicurio.updateAvailability();
+      } catch (e) {
+        console.error("[Blockscape] replace error:", e);
+        alert("JSON parse error (see console).");
       }
-      if (activeIndex === -1 && firstIndex != null) setActive(firstIndex);
-      else renderModelList();
-    } catch (err) {
-      console.error("[Blockscape] file load error:", err);
-      alert("File load error (see console).");
-    } finally {
-      e.target.value = "";
-    }
-  };
-  document.addEventListener("paste", handleClipboardPaste);
+    };
+  }
+  if (!isReadOnly) {
+    byId("file").onchange = async (e) => {
+      const files = Array.from(e.target.files || []);
+      if (!files.length) return;
+      try {
+        console.log("[Blockscape] reading", files.length, "file(s)");
+        let firstIndex = null;
+        for (const f of files) {
+          const txt = await f.text();
+          const baseName = f.name.replace(/\.[^.]+$/, "") || "File";
+          const entries = normalizeToModelsFromText(txt, baseName, {
+            seriesTitleOverride: `${baseName} series`
+          });
+          if (!entries.length) {
+            console.warn("[Blockscape] no models in file:", f.name);
+            continue;
+          }
+          entries.forEach((en, i) => {
+            var _a;
+            const dataTitle = (((_a = en.data) == null ? void 0 : _a.title) ?? "").toString().trim();
+            const fallbackTitle = entries.length > 1 ? `${f.name} #${i + 1}` : f.name;
+            const fileSeriesName = `${baseName} series`;
+            const seriesName = en.isSeries ? fileSeriesName : null;
+            let payload = { ...en };
+            if (en.isSeries) {
+              const seriesTitle = seriesName || dataTitle || en.title || fallbackTitle || "unknown";
+              payload.title = seriesTitle;
+              const forcedSlug = makeSeriesId(seriesTitle || "unknown");
+              applySeriesSlug(payload, forcedSlug);
+              ensureSeriesId(payload, {
+                seriesName: seriesTitle,
+                fallbackTitle: "unknown"
+              });
+              payload.apicurioArtifactName = payload.apicurioArtifactName || seriesTitle;
+            } else {
+              payload.title = dataTitle || fallbackTitle;
+            }
+            const idxResult = addModelEntry(
+              {
+                ...payload,
+                apicurioArtifactName: payload.apicurioArtifactName || seriesName || payload.apicurioArtifactName
+              },
+              { versionLabel: f.name }
+            );
+            if (firstIndex == null) firstIndex = idxResult;
+          });
+        }
+        if (activeIndex === -1 && firstIndex != null) setActive(firstIndex);
+        else renderModelList();
+      } catch (err) {
+        console.error("[Blockscape] file load error:", err);
+        alert("File load error (see console).");
+      } finally {
+        e.target.value = "";
+      }
+    };
+  }
+  if (!isReadOnly) {
+    document.addEventListener("paste", handleClipboardPaste);
+  }
   async function handleClipboardPaste(event) {
     var _a;
+    if (isReadOnly) return;
     if (!shouldHandleGlobalPaste()) return;
     const text2 = ((_a = event.clipboardData) == null ? void 0 : _a.getData("text/plain")) || window.clipboardData && window.clipboardData.getData("Text") || "";
     if (!looksLikeModelJson(text2)) return;

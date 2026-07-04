@@ -85,6 +85,11 @@ build-bs-mkdocs:
     cd {{BS_MKDOCS_DIR}} && mkdocs build
 
 
+build-quartz-blockscape:
+    npm run build:tokens
+    cd quartz-blockscape && npm install && npm run build
+
+
 serve-bs-mkdocs:
     cd {{BS_MKDOCS_DIR}} && mkdocs serve
 
