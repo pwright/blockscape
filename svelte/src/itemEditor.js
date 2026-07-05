@@ -69,7 +69,9 @@ export function createItemEditor({
   select,
   onSelectionRenamed,
   makeSlug = defaultMakeSlug,
-  isAutoIdFromNameEnabled = () => true
+  isAutoIdFromNameEnabled = () => true,
+  classTarget = document.body,
+  modalHost = document.body
 } = {}) {
   assertFn(findItemAndCategoryById, 'findItemAndCategoryById');
   assertFn(collectAllItemIds, 'collectAllItemIds');
@@ -110,14 +112,14 @@ export function createItemEditor({
     state.categoryId = null;
     state.itemId = null;
     state.modelData = null;
-    document.body.classList.remove('item-editor-open');
+    classTarget?.classList?.remove('item-editor-open');
   }
 
   function show() {
     if (!state.wrapper) return;
     state.wrapper.hidden = false;
     state.wrapper.setAttribute('aria-hidden', 'false');
-    document.body.classList.add('item-editor-open');
+    classTarget?.classList?.add('item-editor-open');
     requestAnimationFrame(() => {
       state.fields.nameInput?.focus();
       state.fields.nameInput?.select();
@@ -398,7 +400,7 @@ export function createItemEditor({
       }
     });
 
-    document.body.appendChild(wrapper);
+    modalHost?.appendChild?.(wrapper);
     return wrapper;
   }
 

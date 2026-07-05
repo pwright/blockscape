@@ -1,6 +1,6 @@
 @import "./generated/tokens.css";
 
-:root {
+:where(.blockscape-root, .blockscape-app-root) {
   color-scheme: light;
   --blockscape-scale: 1;
   --blockscape-tile-base: 6.5rem;
@@ -14,8 +14,7 @@
   --blockscape-bg-opacity: 0;
   --blockscape-bg-preview-height: 160px;
 }
-
-    :root {
+    :where(.blockscape-root, .blockscape-app-root) {
       --blockscape-sidebar-bg-opacity: 0;
       --blockscape-tile: calc(var(--blockscape-tile-base) * var(--blockscape-scale));
       --blockscape-gap: calc(var(--blockscape-gap-base) * var(--blockscape-scale));
@@ -25,19 +24,15 @@
       --blockscape-tile-padding-x: calc(var(--blockscape-tile-padding-x-base) * var(--blockscape-scale));
   --blockscape-tile-gap-inner: calc(var(--blockscape-tile-gap-inner-base) * var(--blockscape-scale));
 }
-
-    *,
-    *::before,
-    *::after {
+    .blockscape-root *,
+    .blockscape-root *::before,
+    .blockscape-root *::after,
+    .blockscape-app-root *,
+    .blockscape-app-root *::before,
+    .blockscape-app-root *::after {
       box-sizing: border-box;
     }
-
-    html,
-    body {
-      height: 100%;
-    }
-
-    body {
+    :where(.blockscape-root, .blockscape-app-root) {
       margin: 0;
       background: var(--color-surface-subtle);
       color: var(--color-text);
@@ -87,18 +82,20 @@
       filter: saturate(1.05);
       display: none;
     }
-
-    a {
+    .blockscape-root a,
+    .blockscape-app-root a {
       color: inherit;
     }
 
-    .pf-v5-c-page {
+    .blockscape-root .pf-v5-c-page,
+    .blockscape-app-root .pf-v5-c-page {
       min-height: 100%;
       display: flex;
       flex-direction: column;
     }
 
-    .pf-v5-c-page__header {
+    .blockscape-root .pf-v5-c-page__header,
+    .blockscape-app-root .pf-v5-c-page__header {
       position: sticky;
       top: 0;
       z-index: 100;
@@ -660,7 +657,8 @@
       cursor: pointer;
     }
 
-    .pf-v5-c-button {
+    .blockscape-root .pf-v5-c-button,
+    .blockscape-app-root .pf-v5-c-button {
       appearance: none;
       display: inline-flex;
       align-items: center;
@@ -678,62 +676,73 @@
       color: var(--blockscape-foreground);
     }
 
-    .pf-v5-c-button:hover {
+    .blockscape-root .pf-v5-c-button:hover,
+    .blockscape-app-root .pf-v5-c-button:hover {
       box-shadow: 0 8px 18px -12px rgba(15, 23, 42, 0.4);
     }
 
-    .pf-v5-c-button:focus-visible {
+    .blockscape-root .pf-v5-c-button:focus-visible,
+    .blockscape-app-root .pf-v5-c-button:focus-visible {
       outline: none;
       box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.25);
     }
 
-    .pf-v5-c-button.pf-m-primary {
+    .blockscape-root .pf-v5-c-button.pf-m-primary,
+    .blockscape-app-root .pf-v5-c-button.pf-m-primary {
       background: var(--color-primary);
       border-color: var(--color-primary);
       color: var(--color-white);
     }
 
-    .pf-v5-c-button.pf-m-primary:hover {
+    .blockscape-root .pf-v5-c-button.pf-m-primary:hover,
+    .blockscape-app-root .pf-v5-c-button.pf-m-primary:hover {
       background: var(--color-primary-hover);
       border-color: var(--color-primary-hover);
     }
 
-    .pf-v5-c-button.pf-m-secondary {
+    .blockscape-root .pf-v5-c-button.pf-m-secondary,
+    .blockscape-app-root .pf-v5-c-button.pf-m-secondary {
       background: var(--color-surface-muted);
       border-color: var(--color-border-strong);
       color: var(--blockscape-foreground);
     }
 
-    .pf-v5-c-button.pf-m-secondary:hover {
+    .blockscape-root .pf-v5-c-button.pf-m-secondary:hover,
+    .blockscape-app-root .pf-v5-c-button.pf-m-secondary:hover {
       background: var(--color-surface-hover);
     }
 
-    .pf-v5-c-button.pf-m-tertiary {
+    .blockscape-root .pf-v5-c-button.pf-m-tertiary,
+    .blockscape-app-root .pf-v5-c-button.pf-m-tertiary {
       background: transparent;
       border-color: var(--color-border);
       color: var(--color-muted);
     }
 
-    .pf-v5-c-button.pf-m-tertiary:hover {
+    .blockscape-root .pf-v5-c-button.pf-m-tertiary:hover,
+    .blockscape-app-root .pf-v5-c-button.pf-m-tertiary:hover {
       color: var(--blockscape-foreground);
       border-color: var(--color-border-strong);
       background: var(--color-surface-muted);
     }
 
-    .pf-v5-c-button.pf-m-plain {
+    .blockscape-root .pf-v5-c-button.pf-m-plain,
+    .blockscape-app-root .pf-v5-c-button.pf-m-plain {
       border: none;
       padding: 0.35rem;
       color: var(--color-muted);
       border-radius: 50%;
     }
 
-    .pf-v5-c-button.pf-m-plain:hover {
+    .blockscape-root .pf-v5-c-button.pf-m-plain:hover,
+    .blockscape-app-root .pf-v5-c-button.pf-m-plain:hover {
       background: var(--color-surface-muted);
       color: var(--blockscape-foreground);
       box-shadow: none;
     }
 
-    .pf-v5-c-form-control {
+    .blockscape-root .pf-v5-c-form-control,
+    .blockscape-app-root .pf-v5-c-form-control {
       height: 2.5rem;
       padding: 0 0.85rem;
       border-radius: 999px;
@@ -745,12 +754,14 @@
       transition: border-color var(--transition), box-shadow var(--transition);
     }
 
-    .pf-v5-c-form-control::placeholder {
+    .blockscape-root .pf-v5-c-form-control::placeholder,
+    .blockscape-app-root .pf-v5-c-form-control::placeholder {
       color: var(--color-muted);
       opacity: 0.75;
     }
 
-    .pf-v5-c-form-control:focus-visible {
+    .blockscape-root .pf-v5-c-form-control:focus-visible,
+    .blockscape-app-root .pf-v5-c-form-control:focus-visible {
       outline: none;
       border-color: var(--color-primary);
       box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
@@ -908,7 +919,8 @@
       border-color: var(--blockscape-external);
     }
 
-    .pf-v5-c-page__main {
+    .blockscape-root .pf-v5-c-page__main,
+    .blockscape-app-root .pf-v5-c-page__main {
       flex: 1 1 auto;
     }
 
@@ -965,9 +977,11 @@
       isolation: isolate;
     }
 
-    .pf-v5-c-page__header[hidden],
+    .blockscape-root .pf-v5-c-page__header[hidden],
+    .blockscape-app-root .pf-v5-c-page__header[hidden],
     .blockscape-sidebar[hidden],
-    .pf-v5-c-page__footer[hidden] {
+    .blockscape-root .pf-v5-c-page__footer[hidden],
+    .blockscape-app-root .pf-v5-c-page__footer[hidden] {
       display: none !important;
     }
 
@@ -3124,11 +3138,13 @@
       line-height: 1.5;
     }
 
-    .shortcut-help-open {
+    .blockscape-root.shortcut-help-open,
+    .blockscape-app-root.shortcut-help-open {
       overflow: hidden;
     }
 
-    .item-editor-open {
+    .blockscape-root.item-editor-open,
+    .blockscape-app-root.item-editor-open {
       overflow: hidden;
     }
 
@@ -3283,15 +3299,18 @@
     }
 
     @media (max-width: 1024px) {
-      .pf-v5-c-page__main {
+      .blockscape-root .pf-v5-c-page__main,
+      .blockscape-app-root .pf-v5-c-page__main {
         order: 0;
       }
 
-      .pf-v5-c-page__header {
+      .blockscape-root .pf-v5-c-page__header,
+      .blockscape-app-root .pf-v5-c-page__header {
         order: 1;
       }
 
-      .pf-v5-c-page__footer {
+      .blockscape-root .pf-v5-c-page__footer,
+      .blockscape-app-root .pf-v5-c-page__footer {
         order: 2;
       }
 

@@ -90,6 +90,7 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
     host && typeof host.getBoundingClientRect === "function"
       ? host
       : app?.closest(".blockscape-root") || app?.parentElement || document.body;
+  const styleScope = root;
   let overlayRoot = root;
   const SERVER_SIDEBAR_WIDE_STORAGE_KEY = "blockscape:serverSidebarWide";
   const defaultDocumentTitle = document.title;
@@ -509,8 +510,8 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
   function applyTheme(nextTheme) {
     const normalized = nextTheme === THEME_DARK ? THEME_DARK : THEME_LIGHT;
     theme = normalized;
-    if (typeof document !== "undefined") {
-      document.documentElement.setAttribute("data-theme", normalized);
+    if (styleScope?.setAttribute) {
+      styleScope.setAttribute("data-blockscape-theme", normalized);
     }
     persistTheme(normalized);
     return theme;
@@ -537,9 +538,10 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
 
   function ensureBgPreview() {
     if (bgPreview) return bgPreview;
+    if (isReadOnly) return null;
     bgPreview = document.createElement("div");
     bgPreview.className = "blockscape-bg-preview";
-    document.body.appendChild(bgPreview);
+    styleScope?.appendChild?.(bgPreview);
     return bgPreview;
   }
 
@@ -554,20 +556,10 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
       "--blockscape-sidebar-bg-opacity",
       String(sidebarOpacity)
     );
-    if (typeof document !== "undefined") {
-      document.documentElement.style.setProperty("--blockscape-bg-image", imageValue);
-      document.documentElement.style.setProperty(
-        "--blockscape-bg-opacity",
-        String(appliedOpacity)
-      );
-      document.documentElement.style.setProperty(
-        "--blockscape-sidebar-bg-opacity",
-        String(sidebarOpacity)
-      );
-    }
   }
 
   function updateBackgroundPreview() {
+    if (isReadOnly) return;
     if (!backgroundImageUrl) {
       if (bgPreview) bgPreview.style.opacity = "0";
       return;
@@ -866,13 +858,12 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
 
   function getCssVarValue(varName) {
     if (typeof window === "undefined") return "";
-    const styles = getComputedStyle(document.documentElement);
+    const styles = getComputedStyle(styleScope || document.documentElement);
     return styles.getPropertyValue(varName).trim();
   }
 
   function setCssVarValue(varName, value) {
-    if (typeof document === "undefined") return;
-    document.documentElement.style.setProperty(varName, value);
+    styleScope?.style?.setProperty(varName, value);
   }
 
   function normalizeHexColor(value, fallback) {
@@ -1685,8 +1676,7 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
   }
 
   function applyServerSidebarWide(value) {
-    if (typeof document === "undefined") return;
-    document.body?.classList.toggle(
+    styleScope?.classList?.toggle(
       "blockscape-server-sidebar-wide",
       !!value
     );
@@ -1744,8 +1734,8 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
     }
 
     const optIn = isLocalBackendOptIn();
-    if (optIn && typeof document !== "undefined") {
-      document.body?.classList.add("blockscape-server-mode");
+    if (optIn) {
+      styleScope?.classList?.add("blockscape-server-mode");
     }
     setupServerSidebarToggle(optIn);
     if (!optIn || !localBackendPanel || !localBackendStatus) {
@@ -2699,7 +2689,7 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
 
   function applyTileHoverScale(scale) {
     tileHoverScale = clampHoverScale(scale);
-    document.documentElement.style.setProperty(
+    styleScope?.style?.setProperty(
       "--blockscape-tile-hover-scale",
       tileHoverScale
     );
@@ -2716,12 +2706,12 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
 
   function applySelectionDimOpacity(value) {
     selectionDimOpacity = clampSelectionDimOpacity(value);
-    document.documentElement.style.setProperty(
+    styleScope?.style?.setProperty(
       "--blockscape-selection-dim-opacity",
       selectionDimOpacity
     );
     const appliedOpacity = selectionDimEnabled ? selectionDimOpacity : 1;
-    document.documentElement.style.setProperty(
+    styleScope?.style?.setProperty(
       "--blockscape-selection-dim-applied-opacity",
       appliedOpacity
     );
@@ -2738,7 +2728,7 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
 
   function applyTileCompactness(value) {
     tileCompactness = clampTileCompactness(value);
-    document.documentElement.style.setProperty(
+    styleScope?.style?.setProperty(
       "--blockscape-tile-compactness",
       tileCompactness
     );
@@ -2756,7 +2746,7 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
 
   function applyTitleHoverWidthMultiplier(value) {
     titleHoverWidthMultiplier = clampTitleHoverWidthMultiplier(value);
-    document.documentElement.style.setProperty(
+    styleScope?.style?.setProperty(
       "--blockscape-title-hover-width-multiplier",
       titleHoverWidthMultiplier
     );
@@ -2773,7 +2763,7 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
 
   function applyTitleHoverTextPortion(value) {
     titleHoverTextPortion = clampTitleHoverTextPortion(value);
-    document.documentElement.style.setProperty(
+    styleScope?.style?.setProperty(
       "--blockscape-tile-hover-text-portion",
       titleHoverTextPortion
     );
@@ -2785,11 +2775,11 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
     titleWrapMode = normalized;
     const whiteSpace = normalized === "nowrap" ? "nowrap" : "normal";
     const textWrap = normalized === "nowrap" ? "nowrap" : "normal";
-    document.documentElement.style.setProperty(
+    styleScope?.style?.setProperty(
       "--blockscape-title-white-space",
       whiteSpace
     );
-    document.documentElement.style.setProperty(
+    styleScope?.style?.setProperty(
       "--blockscape-title-text-wrap",
       textWrap
     );
@@ -2852,7 +2842,7 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
   function applySelectionDimEnabled(enabled) {
     selectionDimEnabled = !!enabled;
     const appliedOpacity = selectionDimEnabled ? selectionDimOpacity : 1;
-    document.documentElement.style.setProperty(
+    styleScope?.style?.setProperty(
       "--blockscape-selection-dim-applied-opacity",
       appliedOpacity
     );
@@ -3852,6 +3842,8 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
     },
     makeSlug: makeDownloadName,
     isAutoIdFromNameEnabled: () => autoIdFromNameEnabled,
+    classTarget: styleScope,
+    modalHost: styleScope,
   });
 
   function createCategoryEditor({
@@ -3888,14 +3880,14 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
       setError("");
       state.categoryId = null;
       state.modelData = null;
-      document.body.classList.remove("category-editor-open");
+      styleScope?.classList?.remove("category-editor-open");
     };
 
     const show = () => {
       if (!state.wrapper) return;
       state.wrapper.hidden = false;
       state.wrapper.setAttribute("aria-hidden", "false");
-      document.body.classList.add("category-editor-open");
+      styleScope?.classList?.add("category-editor-open");
       requestAnimationFrame(() => {
         state.fields.titleInput?.focus();
         state.fields.titleInput?.select();
@@ -4088,7 +4080,7 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
         }
       });
 
-      document.body.appendChild(wrapper);
+      styleScope?.appendChild?.(wrapper);
 
       state.wrapper = wrapper;
       state.fields = {
@@ -4490,7 +4482,7 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
     noticeTextEl.className = "series-nav-notice__text";
     noticeEl.appendChild(dot);
     noticeEl.appendChild(noticeTextEl);
-    document.body.appendChild(noticeEl);
+    styleScope?.appendChild?.(noticeEl);
   }
 
   function clearNotice() {
@@ -4634,7 +4626,7 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
     lastShortcutTrigger = document.activeElement;
     shortcutHelp.hidden = false;
     shortcutHelp.setAttribute("aria-hidden", "false");
-    document.body.classList.add("shortcut-help-open");
+    styleScope?.classList?.add("shortcut-help-open");
     const panel = shortcutHelp.querySelector(".shortcut-help__panel");
     panel?.focus({ preventScroll: true });
   }
@@ -4643,7 +4635,7 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
     if (!shortcutHelp || shortcutHelp.hidden) return;
     shortcutHelp.hidden = true;
     shortcutHelp.setAttribute("aria-hidden", "true");
-    document.body.classList.remove("shortcut-help-open");
+    styleScope?.classList?.remove("shortcut-help-open");
     const target = lastShortcutTrigger;
     if (target?.focus) {
       target.focus({ preventScroll: true });
@@ -4656,7 +4648,7 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
     if (!newPanel) return;
     newPanel.hidden = false;
     newPanel.setAttribute("aria-hidden", "false");
-    document.body.classList.add("shortcut-help-open");
+    styleScope?.classList?.add("shortcut-help-open");
     const panel = newPanel.querySelector(".shortcut-help__panel");
     panel?.focus({ preventScroll: true });
   }
@@ -4665,7 +4657,7 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
     if (!newPanel || newPanel.hidden) return;
     newPanel.hidden = true;
     newPanel.setAttribute("aria-hidden", "true");
-    document.body.classList.remove("shortcut-help-open");
+    styleScope?.classList?.remove("shortcut-help-open");
     if (newPanelButton?.focus) {
       newPanelButton.focus({ preventScroll: true });
     }

@@ -6,4 +6,6 @@
   export let features = {};
 </script>
 
-<App {seed} {features} />
+<div class="blockscape-app-root">
+  <App {seed} {features} />
+</div>

@@ -327,7 +327,7 @@
 
   const applyZoom = () => {
     const scale = SIZE_PRESETS[sizeIndex].value;
-    document.documentElement.style.setProperty('--blockscape-scale', String(scale));
+    pageEl?.parentElement?.style?.setProperty('--blockscape-scale', String(scale));
     window.dispatchEvent(new CustomEvent('blockscape:zoom', { detail: { scale } }));
   };
 
