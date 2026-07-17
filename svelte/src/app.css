@@ -767,6 +767,12 @@
       box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
     }
 
+    .blockscape-root textarea.pf-v5-c-form-control,
+    .blockscape-app-root textarea.pf-v5-c-form-control {
+      border-radius: var(--radius-md);
+      height: auto;
+    }
+
     .search-results {
       position: absolute;
       top: calc(100% + 0.35rem);
