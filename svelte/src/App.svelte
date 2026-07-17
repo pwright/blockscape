@@ -400,7 +400,7 @@
                 <span class="blockscape-toolbar__toggle-icon" aria-hidden="true">▾</span>
               </button>
               <button id="newPanelButton" class="pf-v5-c-button pf-m-primary" type="button" title="Create something new">New</button>
-              <label class="pf-v5-c-button pf-m-primary blockscape-file">
+              <label class="pf-v5-c-button pf-m-secondary blockscape-file">
                 <span>Open</span>
                 <input id="file" type="file" accept=".bs,.json,.txt" multiple />
               </label>
@@ -432,6 +432,9 @@
                   +
                 </button>
               </div>
+
+              <button id="toolbarCopy" class="pf-v5-c-button pf-m-secondary" type="button" title="Copy active map or series to clipboard">Copy</button>
+              <button id="toolbarPaste" class="pf-v5-c-button pf-m-primary" type="button" title="Paste map or series from clipboard">Paste</button>
 
               <button id="shareModel" class="pf-v5-c-button pf-m-secondary" type="button" title="Copy a shareable URL for this model">Share</button>
               <button id="helpButton" class="pf-v5-c-button pf-m-primary" type="button" title="Show keyboard shortcuts">Help</button>
