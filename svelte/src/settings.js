@@ -465,4 +465,14 @@ export function downloadJson(filename, data) {
   URL.revokeObjectURL(url);
 }
 
+export function downloadHtml(filename, html) {
+  const blob = new Blob([html], { type: "text/html" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export { tokens };

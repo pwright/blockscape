@@ -437,6 +437,7 @@
               <button id="toolbarPaste" class="pf-v5-c-button pf-m-primary" type="button" title="Paste map or series from clipboard">Paste</button>
 
               <button id="shareModel" class="pf-v5-c-button pf-m-secondary" type="button" title="Copy a shareable URL for this model">Share</button>
+              <button id="saveHtml" class="pf-v5-c-button pf-m-secondary" type="button" title="Save as a self-contained HTML page">Save HTML</button>
               <button id="helpButton" class="pf-v5-c-button pf-m-primary" type="button" title="Show keyboard shortcuts">Help</button>
             </div>
 

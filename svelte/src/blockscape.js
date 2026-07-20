@@ -11,9 +11,13 @@ import {
   buildSettingsSnapshot,
   formatSettings,
   downloadJson,
+  downloadHtml,
   tokens,
 } from "./settings";
 import { isExternalHref, openExternalUrl, resolveHref } from "./externalLinks";
+import liteJsSource from "../../bs-mkdocs/site_assets/blockscape/lite.js?raw";
+import fullBundleJs from "../../documentation/docs/site_assets/blockscape/blockscape.js?raw";
+import fullBundleCss from "../../documentation/docs/site_assets/blockscape/blockscape.css?raw";
 
 const ASSET_BASE =
   (typeof import.meta !== "undefined" && import.meta.env?.BASE_URL) || "";
@@ -57,6 +61,7 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
   const previewClose = preview.querySelector(".item-preview__close");
   const downloadButton = byId("downloadJson");
   const shareButton = byId("shareModel");
+  const saveHtmlButton = byId("saveHtml");
   const openAllLinksButton = byId("openAllLinks");
   const removeModelButton = byId("removeModel");
   const createVersionButton = byId("createVersion");
@@ -252,6 +257,7 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
   let obsidianVaultName = "";
   let autoIdFromNameEnabled = DEFAULT_AUTO_ID_FROM_NAME;
   let stripParentheticalNames = DEFAULT_STRIP_PARENTHESES;
+  let saveSimpleHtml = localStorage.getItem("blockscape:saveSimpleHtml") === "true";
   let theme = THEME_DARK;
   let backgroundImageUrl = "";
   let backgroundImageOpacity = DEFAULT_BG_OPACITY;
@@ -4239,6 +4245,7 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
       ],
       apicurioActiveVersionIndex: 0,
       isSeries: true,
+      settings: buildSettingsSnapshot(getCurrentSettingsState(), { localBackend }),
     };
     applySeriesSlug(entry, seriesId);
     ensureSeriesId(entry, {
@@ -4356,6 +4363,9 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
     target.apicurioActiveVersionIndex = target.apicurioVersions.length - 1;
     target.data = copy;
     target.isSeries = true;
+    if (!target.settings) {
+      target.settings = buildSettingsSnapshot(getCurrentSettingsState(), { localBackend });
+    }
     const seriesName = target.title || getModelTitle(target);
     ensureSeriesId(target, { seriesName, fallbackTitle: seriesName });
     return activeIndex;
@@ -4388,10 +4398,17 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
       }
       return true;
     });
-    return filtered.map((ver) => {
+    const maps = filtered.map((ver) => {
       if (ver && typeof ver === "object" && "data" in ver) return ver.data;
       return ver;
     });
+    const settings = buildSettingsSnapshot(getCurrentSettingsState(), { localBackend });
+    return {
+      blockscapeVersion: 1,
+      title: seriesName,
+      settings,
+      maps,
+    };
   }
 
   function getActiveSeriesJson() {
@@ -4428,6 +4445,148 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
     download(filename, payloadText);
     console.log(`[Blockscape] saved JSON (${source}):`, filename);
     return true;
+  }
+
+  async function fetchImageAsDataUri(url) {
+    try {
+      const resp = await fetch(url);
+      if (!resp.ok) return url;
+      const blob = await resp.blob();
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.onerror = () => resolve(url);
+        reader.readAsDataURL(blob);
+      });
+    } catch {
+      return url;
+    }
+  }
+
+  async function embedImagesInData(data) {
+    const clone = JSON.parse(JSON.stringify(data));
+    const models = Array.isArray(clone) ? clone : [clone];
+    const urlMap = new Map();
+
+    for (const model of models) {
+      if (model.backgroundUrl && !model.backgroundUrl.startsWith("data:")) {
+        const resolved = resolveLogoUrl(model.backgroundUrl);
+        if (resolved) urlMap.set(resolved, model);
+      }
+      for (const cat of model.categories || []) {
+        for (const item of cat.items || []) {
+          if (item.logo && !item.logo.startsWith("data:")) {
+            const resolved = resolveLogoUrl(item.logo);
+            if (resolved) urlMap.set(resolved, null);
+          }
+        }
+      }
+    }
+
+    if (urlMap.size === 0) return clone;
+
+    const urls = [...urlMap.keys()];
+    const results = await Promise.all(urls.map((u) => fetchImageAsDataUri(u)));
+    const resolved = new Map();
+    urls.forEach((u, i) => resolved.set(u, results[i]));
+
+    for (const model of models) {
+      if (model.backgroundUrl && !model.backgroundUrl.startsWith("data:")) {
+        const key = resolveLogoUrl(model.backgroundUrl);
+        if (key && resolved.has(key)) model.backgroundUrl = resolved.get(key);
+      }
+      for (const cat of model.categories || []) {
+        for (const item of cat.items || []) {
+          if (item.logo && !item.logo.startsWith("data:")) {
+            const key = resolveLogoUrl(item.logo);
+            if (key && resolved.has(key)) item.logo = resolved.get(key);
+          }
+        }
+      }
+    }
+
+    return clone;
+  }
+
+  async function downloadCurrentHtml() {
+    if (activeIndex < 0 || !models[activeIndex]) {
+      alert("Select or load a model before saving as HTML.");
+      return;
+    }
+    const active = models[activeIndex];
+    const seriesEnvelope = buildSeriesPayload(active);
+    const rawMaps = seriesEnvelope ? seriesEnvelope.maps : null;
+    const rawData = rawMaps || active.data;
+    const titleText =
+      getSeriesId(active) || getModelId(active) || getModelTitle(active, "blockscape");
+    const filename = `${makeDownloadName(titleText)}.html`;
+    const escapedTitle = titleText.replace(/</g, "&lt;");
+
+    const embeddedData = await embedImagesInData(rawData);
+    const data = seriesEnvelope
+      ? { ...seriesEnvelope, maps: Array.isArray(embeddedData) ? embeddedData : [embeddedData] }
+      : embeddedData;
+    const json = JSON.stringify(data, null, 2);
+
+    let html;
+    if (saveSimpleHtml) {
+      html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${escapedTitle}</title>
+</head>
+<body>
+<div class="blockscape-root">
+<script type="application/json" class="blockscape-seed">
+${json}
+<\/script>
+</div>
+<script>
+${liteJsSource}
+<\/script>
+</body>
+</html>`;
+    } else {
+      html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${escapedTitle}</title>
+<style>
+${fullBundleCss}
+</style>
+</head>
+<body>
+<div class="blockscape-root">
+<script type="application/json">
+${json}
+<\/script>
+</div>
+<script>
+${fullBundleJs}
+<\/script>
+<script>
+(function () {
+  var B = window.Blockscape && (window.Blockscape.default || window.Blockscape);
+  if (!B) { console.error("Blockscape bundle not loaded"); return; }
+  var root = document.querySelector(".blockscape-root");
+  var script = root.querySelector('script[type="application/json"]');
+  var seed = JSON.parse(script.textContent);
+  new B({ target: root, props: {
+    seed: seed,
+    features: { localBackend: false, autoLoadFromDir: false, fileOpen: true }
+  }});
+})();
+<\/script>
+</body>
+</html>`;
+    }
+
+    downloadHtml(filename, html);
+    console.log("[Blockscape] saved HTML:", filename);
   }
 
   // --- NEW: letter → color mapping and helpers ---
@@ -4859,6 +5018,9 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
       console.warn("[Blockscape] setActive called with out-of-range index:", i);
       return;
     }
+    if (activeIndex >= 0 && models[activeIndex]?.isSeries) {
+      models[activeIndex].settings = buildSettingsSnapshot(getCurrentSettingsState(), { localBackend });
+    }
     pendingInfoPreview = true;
     activeIndex = i;
     console.log(
@@ -4867,7 +5029,9 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
       "(index",
       i + " )"
     );
-    // Apply model-scoped background image
+    if (models[i].settings) {
+      applyImportedSettings(models[i].settings);
+    }
     applyBackgroundImage(getModelBackground(models[i]));
     if (typeof localBackend?.highlightSource === "function") {
       const targetPath = models[i]?.sourcePath || null;
@@ -5181,6 +5345,9 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
       apicurioActiveVersionIndex: 0,
       isSeries: true,
     };
+    if (options.envelopeSettings) {
+      entry.settings = options.envelopeSettings;
+    }
     const seriesId = ensureSeriesId(entry, {
       seriesName: seriesTitle,
       fallbackTitle: seriesTitle,
@@ -5199,6 +5366,15 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
       return buildSeriesEntry(value, titleBase, options);
     }
     if (!value || typeof value !== "object") return [];
+    if (Array.isArray(value.maps)) {
+      const envelopeTitle = value.title || titleBase;
+      const envelopeSettings = value.settings || null;
+      return buildSeriesEntry(value.maps, envelopeTitle, {
+        ...options,
+        seriesTitleOverride: envelopeTitle,
+        envelopeSettings,
+      });
+    }
     ensureModelMetadata(value, { titleHint: `${titleBase} #1` });
     if (options.defaultBackgroundUrl && !value.backgroundUrl) {
       value.backgroundUrl = options.defaultBackgroundUrl;
@@ -6796,6 +6972,19 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
     });
     settingsPanel.appendChild(stripParenRow);
     settingsUi.stripParentheticalToggle = stripParenInput;
+
+    const { row: saveSimpleHtmlRow } = createSettingsToggle({
+      id: "toggleSaveSimpleHtml",
+      label: "Save simple HTML",
+      hint: "Use a lightweight renderer when saving HTML instead of the full interactive experience.",
+      checked: saveSimpleHtml,
+      className: "map-controls__toggle",
+      onChange: (checked) => {
+        saveSimpleHtml = checked;
+        localStorage.setItem("blockscape:saveSimpleHtml", String(checked));
+      },
+    });
+    settingsPanel.appendChild(saveSimpleHtmlRow);
 
     if (OBSIDIAN_FEATURE_ENABLED) {
       const obsidianModeInputs = [];
@@ -8398,6 +8587,20 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
     });
   }
 
+  if (saveHtmlButton) {
+    saveHtmlButton.addEventListener("click", async () => {
+      saveHtmlButton.disabled = true;
+      const label = saveHtmlButton.textContent;
+      saveHtmlButton.textContent = "Saving…";
+      try {
+        await downloadCurrentHtml();
+      } finally {
+        saveHtmlButton.disabled = false;
+        saveHtmlButton.textContent = label;
+      }
+    });
+  }
+
   if (createVersionButton) {
     createVersionButton.addEventListener("click", () => {
       if (activeIndex < 0) {
@@ -8420,9 +8623,11 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
         alert("Select or load a model before sharing.");
         return;
       }
+      const active = models[activeIndex];
+      const seriesEnvelope = buildSeriesPayload(active);
       const payload = {
-        title: getModelTitle(models[activeIndex], "Shared Model"),
-        data: models[activeIndex].data,
+        title: getModelTitle(active, "Shared Model"),
+        data: seriesEnvelope || active.data,
       };
       let encoded;
       try {
