@@ -47,6 +47,7 @@ class BlockscapeRenderer {
     this.model = normalizeMap(map);
     this.tileById = new Map();
     this.edgeById = new Map();
+    this.edgeMarkerById = new Map();
     this.selectedId = null;
     this.resize = () => window.requestAnimationFrame(() => this.drawEdges());
   }
@@ -130,6 +131,7 @@ class BlockscapeRenderer {
     if (!this.grid || !this.svg) return;
     this.svg.innerHTML = "";
     this.edgeById.clear();
+    this.edgeMarkerById.clear();
 
     const gridRect = this.grid.getBoundingClientRect();
     this.svg.setAttribute("viewBox", `0 0 ${gridRect.width} ${gridRect.height}`);
@@ -154,7 +156,17 @@ class BlockscapeRenderer {
         path.dataset.to = String(depId);
         path.setAttribute("d", `M ${startX} ${startY} C ${curveX} ${startY}, ${curveX} ${endY}, ${endX} ${endY}`);
         this.svg.appendChild(path);
-        this.edgeById.set(edgeKey(item.id, depId), path);
+        const marker = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+        marker.classList.add("blockscape-view__edge-start");
+        marker.dataset.from = String(item.id);
+        marker.dataset.to = String(depId);
+        marker.setAttribute("cx", String(startX));
+        marker.setAttribute("cy", String(startY));
+        marker.setAttribute("r", "4");
+        this.svg.appendChild(marker);
+        const key = edgeKey(item.id, depId);
+        this.edgeById.set(key, path);
+        this.edgeMarkerById.set(key, marker);
       });
     });
 
@@ -187,12 +199,19 @@ class BlockscapeRenderer {
       tile.classList.toggle("is-dimmed", !!this.selectedId && !selected && !dep && !revDep);
     });
 
+    const applyEdgeSelection = (element) => {
+      const dep = this.selectedId && element.dataset.from === this.selectedId;
+      const revDep = this.selectedId && element.dataset.to === this.selectedId;
+      element.classList.toggle("is-dep", !!dep);
+      element.classList.toggle("is-revdep", !!revDep);
+      element.classList.toggle("is-dimmed", !!this.selectedId && !dep && !revDep);
+    };
+
     this.edgeById.forEach((path) => {
-      const dep = this.selectedId && path.dataset.from === this.selectedId;
-      const revDep = this.selectedId && path.dataset.to === this.selectedId;
-      path.classList.toggle("is-dep", !!dep);
-      path.classList.toggle("is-revdep", !!revDep);
-      path.classList.toggle("is-dimmed", !!this.selectedId && !dep && !revDep);
+      applyEdgeSelection(path);
+    });
+    this.edgeMarkerById.forEach((marker) => {
+      applyEdgeSelection(marker);
     });
   }
 
@@ -201,6 +220,7 @@ class BlockscapeRenderer {
     this.container.innerHTML = "";
     this.tileById.clear();
     this.edgeById.clear();
+    this.edgeMarkerById.clear();
   }
 }
 

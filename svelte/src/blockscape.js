@@ -61,7 +61,7 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
   const previewClose = preview.querySelector(".item-preview__close");
   const downloadButton = byId("downloadJson");
   const shareButton = byId("shareModel");
-  const saveHtmlButton = byId("saveHtml");
+  const saveFileMenu = byId("saveFileMenu");
   const openAllLinksButton = byId("openAllLinks");
   const removeModelButton = byId("removeModel");
   const createVersionButton = byId("createVersion");
@@ -4508,7 +4508,7 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
     return clone;
   }
 
-  async function downloadCurrentHtml() {
+  async function downloadCurrentHtml({ simple = saveSimpleHtml } = {}) {
     if (activeIndex < 0 || !models[activeIndex]) {
       alert("Select or load a model before saving as HTML.");
       return;
@@ -4529,7 +4529,7 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
     const json = JSON.stringify(data, null, 2);
 
     let html;
-    if (saveSimpleHtml) {
+    if (simple) {
       html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -8137,6 +8137,23 @@ ${fullBundleJs}
       if (edge.depth > 1) path.setAttribute("stroke-dasharray", "4 3");
       path.setAttribute("vector-effect", "non-scaling-stroke");
       overlay.appendChild(path);
+
+      const markerPoint = edge.type === "revdep" ? end : start;
+      const marker = document.createElementNS(
+        "http://www.w3.org/2000/svg",
+        "circle"
+      );
+      marker.setAttribute("cx", markerPoint.x);
+      marker.setAttribute("cy", markerPoint.y);
+      marker.setAttribute("r", edge.depth === 1 ? "4" : "3");
+      marker.setAttribute(
+        "fill",
+        edge.type === "dep"
+          ? "var(--blockscape-dep)"
+          : "var(--blockscape-revdep)"
+      );
+      marker.setAttribute("fill-opacity", edge.depth === 1 ? "0.85" : "0.5");
+      overlay.appendChild(marker);
     });
   }
 
@@ -8587,17 +8604,36 @@ ${fullBundleJs}
     });
   }
 
-  if (saveHtmlButton) {
-    saveHtmlButton.addEventListener("click", async () => {
-      saveHtmlButton.disabled = true;
-      const label = saveHtmlButton.textContent;
-      saveHtmlButton.textContent = "Saving…";
+  if (saveFileMenu) {
+    saveFileMenu.addEventListener("click", async (event) => {
+      const item = event.target?.closest?.("[data-save-action]");
+      if (!item || !saveFileMenu.contains(item)) return;
+      const action = item.dataset.saveAction;
+      if (!action) return;
+      saveFileMenu.classList.add("is-saving");
+      saveFileMenu.querySelectorAll("[data-save-action]").forEach((button) => {
+        button.disabled = true;
+      });
       try {
-        await downloadCurrentHtml();
+        if (action === "html") {
+          await downloadCurrentHtml({ simple: false });
+        } else if (action === "simple-html") {
+          await downloadCurrentHtml({ simple: true });
+        } else if (action === "bs") {
+          downloadCurrentJson("save-menu", true);
+        }
       } finally {
-        saveHtmlButton.disabled = false;
-        saveHtmlButton.textContent = label;
+        saveFileMenu.open = false;
+        saveFileMenu.classList.remove("is-saving");
+        saveFileMenu.querySelectorAll("[data-save-action]").forEach((button) => {
+          button.disabled = false;
+        });
       }
+    });
+
+    document.addEventListener("click", (event) => {
+      if (!saveFileMenu.open || saveFileMenu.contains(event.target)) return;
+      saveFileMenu.open = false;
     });
   }
 

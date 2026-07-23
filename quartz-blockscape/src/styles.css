@@ -76,9 +76,19 @@
   opacity: 0.45;
 }
 
+.blockscape-view__edge-start {
+  fill: #64748b;
+  opacity: 0.65;
+}
+
 .blockscape-view__edge.is-dep {
   stroke: var(--bsq-dep);
   opacity: 0.9;
+}
+
+.blockscape-view__edge-start.is-dep {
+  fill: var(--bsq-dep);
+  opacity: 0.95;
 }
 
 .blockscape-view__edge.is-revdep {
@@ -86,7 +96,16 @@
   opacity: 0.9;
 }
 
+.blockscape-view__edge-start.is-revdep {
+  fill: var(--bsq-revdep);
+  opacity: 0.95;
+}
+
 .blockscape-view__edge.is-dimmed {
+  opacity: 0.1;
+}
+
+.blockscape-view__edge-start.is-dimmed {
   opacity: 0.1;
 }
 

@@ -437,7 +437,14 @@
               <button id="toolbarPaste" class="pf-v5-c-button pf-m-primary" type="button" title="Paste map or series from clipboard">Paste</button>
 
               <button id="shareModel" class="pf-v5-c-button pf-m-secondary" type="button" title="Copy a shareable URL for this model">Share</button>
-              <button id="saveHtml" class="pf-v5-c-button pf-m-secondary" type="button" title="Save as a self-contained HTML page">Save HTML</button>
+              <details id="saveFileMenu" class="blockscape-save-menu">
+                <summary class="pf-v5-c-button pf-m-secondary" title="Save the active map or series">Save</summary>
+                <div class="blockscape-save-menu__list" role="menu" aria-label="Save options">
+                  <button class="blockscape-save-menu__item" type="button" role="menuitem" data-save-action="html">Save HTML</button>
+                  <button class="blockscape-save-menu__item" type="button" role="menuitem" data-save-action="simple-html">Save simple HTML</button>
+                  <button class="blockscape-save-menu__item" type="button" role="menuitem" data-save-action="bs">Save .bs file</button>
+                </div>
+              </details>
               <button id="helpButton" class="pf-v5-c-button pf-m-primary" type="button" title="Show keyboard shortcuts">Help</button>
             </div>
 

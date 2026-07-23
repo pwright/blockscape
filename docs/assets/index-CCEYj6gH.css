@@ -311,6 +311,69 @@
       align-items: center;
       gap: var(--space-sm);
     }
+.blockscape-save-menu {
+      position: relative;
+      display: inline-block;
+      flex: 0 0 auto;
+      min-width: 8rem;
+      max-width: 100%;
+    }
+.blockscape-save-menu > summary {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      list-style: none;
+      cursor: pointer;
+    }
+.blockscape-save-menu > summary::-webkit-details-marker {
+      display: none;
+    }
+.blockscape-save-menu > summary::after {
+      content: "▾";
+      margin-left: var(--space-2xs);
+      font-size: 0.9em;
+      line-height: 1;
+    }
+.blockscape-save-menu[open] > summary::after {
+      transform: rotate(180deg);
+    }
+.blockscape-save-menu__list {
+      position: absolute;
+      z-index: 150;
+      top: calc(100% + var(--space-2xs));
+      left: 0;
+      min-width: 11rem;
+      padding: var(--space-2xs);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      background: var(--color-surface);
+      box-shadow: var(--shadow-md);
+    }
+.blockscape-save-menu__item {
+      display: block;
+      width: 100%;
+      padding: var(--space-xs) var(--space-sm);
+      border: 0;
+      border-radius: var(--radius-sm);
+      background: transparent;
+      color: var(--blockscape-foreground);
+      font: inherit;
+      font-size: var(--font-size-sm);
+      line-height: 1.2;
+      text-align: left;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+.blockscape-save-menu__item:hover,
+    .blockscape-save-menu__item:focus-visible {
+      background: var(--color-surface-muted);
+      outline: none;
+    }
+.blockscape-save-menu__item:disabled {
+      cursor: wait;
+      opacity: 0.65;
+    }
 .blockscape-zoom {
       display: inline-flex;
       align-items: center;
@@ -3122,6 +3185,16 @@
       .blockscape-toolbar__controls .pf-v5-c-form-control,
       .blockscape-toolbar__controls .pf-v5-c-button {
         flex: 1 1 auto;
+      }
+
+      .blockscape-save-menu,
+      .blockscape-save-menu > summary {
+        width: 100%;
+      }
+
+      .blockscape-save-menu__list {
+        right: 0;
+        min-width: 100%;
       }
 
       .blockscape-toolbar__toggle {
