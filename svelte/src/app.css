@@ -1755,7 +1755,7 @@
     .blockscape-tabactions {
       display: inline-flex;
       align-items: center;
-      gap: var(--space-sm);
+      gap: 2rem;
       margin-left: auto;
       padding-bottom: var(--space-2xs);
     }

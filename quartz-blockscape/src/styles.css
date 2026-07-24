@@ -139,10 +139,12 @@
   position: relative;
   z-index: 1;
   display: grid;
-  gap: 0.25rem;
+  grid-template-rows: auto auto 1fr;
+  align-content: start;
+  gap: 0.4rem;
   width: 7.5rem;
   min-height: 4.5rem;
-  padding: 0.55rem;
+  padding: 0.65rem 0.55rem 0.55rem;
   border: 1px solid var(--bsq-border);
   border-radius: 8px;
   background: var(--bsq-surface);

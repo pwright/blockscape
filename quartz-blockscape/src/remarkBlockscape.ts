@@ -59,6 +59,19 @@ export function validateBlockscapePayload(value: unknown, filePath = "unknown ma
     value.forEach((map, index) => validateBlockscapeMap(map, filePath, `series[${index}]`))
     return
   }
+
+  // Check if this is a series object with settings and maps array
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    const obj = value as Record<string, unknown>
+    if (Array.isArray(obj.maps)) {
+      if (!obj.maps.length) {
+        throw new Error(`Invalid Blockscape JSON in ${filePath}: series.maps array must contain at least one map`)
+      }
+      obj.maps.forEach((map, index) => validateBlockscapeMap(map, filePath, `maps[${index}]`))
+      return
+    }
+  }
+
   validateBlockscapeMap(value, filePath)
 }
 

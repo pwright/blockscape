@@ -49,6 +49,16 @@ function validateBlockscapePayload(value, filePath = "unknown markdown file") {
     value.forEach((map, index) => validateBlockscapeMap(map, filePath, `series[${index}]`));
     return;
   }
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    const obj = value;
+    if (Array.isArray(obj.maps)) {
+      if (!obj.maps.length) {
+        throw new Error(`Invalid Blockscape JSON in ${filePath}: series.maps array must contain at least one map`);
+      }
+      obj.maps.forEach((map, index) => validateBlockscapeMap(map, filePath, `maps[${index}]`));
+      return;
+    }
+  }
   validateBlockscapeMap(value, filePath);
 }
 function normalizeRenderer(value, fallback) {
