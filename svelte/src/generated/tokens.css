@@ -99,7 +99,7 @@
   --blockscape-title-text-wrap: normal;
   --blockscape-tile-compactness: 1;
   --blockscape-logo-size: 40px;
-  --blockscape-tile-padding-top: var(--space-xs);
+  --blockscape-tile-padding-top: var(--space-md);
   --blockscape-tile-padding-bottom: var(--space-sm);
   --blockscape-tile-padding-x: var(--space-md);
   --blockscape-tile-gap-inner: calc(var(--space-2xs) * 0.5);
