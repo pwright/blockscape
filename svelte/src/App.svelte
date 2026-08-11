@@ -497,6 +497,10 @@
           <p id="browserAutosaveStatus" class="browser-autosave__status muted" aria-live="polite">
             Choose a folder to browse .bs files or save the active map.
           </p>
+          <div id="browserAutosaveRecent" class="browser-autosave__recent" hidden>
+            <div class="browser-autosave__recent-label">Recent folders</div>
+            <div id="browserAutosaveRecentList" class="browser-autosave__recent-list"></div>
+          </div>
           <div class="browser-autosave__actions">
             <button id="connectBrowserAutosave" class="pf-v5-c-button pf-m-primary" type="button">Open folder</button>
             <button id="reconnectBrowserAutosave" class="pf-v5-c-button pf-m-secondary" type="button" hidden>Reconnect</button>

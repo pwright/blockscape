@@ -92,6 +92,8 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
   const reconnectBrowserAutosaveButton = byId("reconnectBrowserAutosave");
   const disconnectBrowserAutosaveButton = byId("disconnectBrowserAutosave");
   const saveBrowserAutosaveNowButton = byId("saveBrowserAutosaveNow");
+  const browserAutosaveRecent = byId("browserAutosaveRecent");
+  const browserAutosaveRecentList = byId("browserAutosaveRecentList");
   const localFileList = byId("localFileList");
   const localDirSelect = byId("localDirSelect");
   const refreshLocalFilesButton = byId("refreshLocalFiles");
@@ -355,6 +357,8 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
           reconnectButton: reconnectBrowserAutosaveButton,
           disconnectButton: disconnectBrowserAutosaveButton,
           saveNowButton: saveBrowserAutosaveNowButton,
+          recentContainer: browserAutosaveRecent,
+          recentListEl: browserAutosaveRecentList,
           getActiveEntry: () => models[activeIndex] || null,
           getPayloadText: (entry) => getBrowserAutosavePayloadText(entry),
           getSuggestedFilename: (entry) => getBrowserAutosavePath(entry),

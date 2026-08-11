@@ -2,7 +2,8 @@ const DB_NAME = "blockscape-browser-autosave";
 const DB_VERSION = 1;
 const HANDLE_STORE = "handles";
 const DRAFT_STORE = "drafts";
-const DIRECTORY_KEY = "workspace";
+const RECENT_KEY = "recent-folders";
+const MAX_RECENT_FOLDERS = 5;
 const DEFAULT_DEBOUNCE_MS = 700;
 
 function openDb() {
@@ -95,6 +96,8 @@ export function createBrowserAutosave({
   reconnectButton,
   disconnectButton,
   saveNowButton,
+  recentContainer,
+  recentListEl,
   refreshButton: initialRefreshButton,
   loadButton: initialLoadButton,
   fileTableEl: initialFileTableEl,
@@ -125,6 +128,7 @@ export function createBrowserAutosave({
   let fileTableBodyEl = initialFileTableBodyEl || null;
   let sortKey = "path";
   let sortDirection = "asc";
+  let recentFolders = [];
 
   function setStatus(message, state = "idle") {
     if (!statusEl) return;
@@ -174,17 +178,98 @@ export function createBrowserAutosave({
         !directoryHandle || permissionState !== "granted" || !files.length
       );
     }
+    if (recentContainer) {
+      recentContainer.hidden = !recentFolders.length;
+    }
     notifyConnectionChange();
   }
 
-  async function persistHandle(handle) {
-    if (!db) return;
-    await idbPut(db, HANDLE_STORE, DIRECTORY_KEY, handle);
+  function makeRecentId() {
+    return `${Date.now().toString(36)}-${Math.random()
+      .toString(36)
+      .slice(2, 8)}`;
   }
 
-  async function clearHandle() {
+  function sameHandle(a, b) {
+    return !!a && !!b && typeof a.isSameEntry === "function"
+      ? a.isSameEntry(b).catch(() => false)
+      : Promise.resolve(false);
+  }
+
+  async function loadRecentFolders() {
+    if (!db) return [];
+    try {
+      const raw = await new Promise((resolve, reject) => {
+        const tx = db.transaction(HANDLE_STORE, "readonly");
+        const request = tx.objectStore(HANDLE_STORE).get(RECENT_KEY);
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+      recentFolders = Array.isArray(raw) ? raw.slice(0, MAX_RECENT_FOLDERS) : [];
+    } catch (error) {
+      console.warn("[Blockscape] failed to load recent folders", error);
+      recentFolders = [];
+    }
+    renderRecentFolders();
+    return recentFolders;
+  }
+
+  async function persistRecentFolders() {
     if (!db) return;
-    await idbDelete(db, HANDLE_STORE, DIRECTORY_KEY);
+    await idbPut(db, HANDLE_STORE, RECENT_KEY, recentFolders);
+  }
+
+  async function rememberRecentFolder(handle) {
+    if (!handle) return;
+    let matchIndex = -1;
+    for (let i = 0; i < recentFolders.length; i += 1) {
+      if (await sameHandle(recentFolders[i].handle, handle)) {
+        matchIndex = i;
+        break;
+      }
+    }
+    const existing = matchIndex >= 0 ? recentFolders[matchIndex] : null;
+    const next = {
+      id: existing?.id || makeRecentId(),
+      name: handle.name || existing?.name || "Folder",
+      handle,
+      lastUsedAt: Date.now(),
+    };
+    recentFolders = [
+      next,
+      ...recentFolders.filter((_, idx) => idx !== matchIndex),
+    ].slice(0, MAX_RECENT_FOLDERS);
+    await persistRecentFolders();
+    renderRecentFolders();
+  }
+
+  function formatRecentTime(value) {
+    const time = Number(value);
+    if (!Number.isFinite(time) || time <= 0) return "";
+    return new Date(time).toLocaleString();
+  }
+
+  function renderRecentFolders() {
+    if (!recentListEl) {
+      syncUi();
+      return;
+    }
+    recentListEl.innerHTML = "";
+    recentFolders.forEach((folder) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "browser-autosave__recent-item";
+      button.dataset.recentFolderId = folder.id;
+      const name = document.createElement("span");
+      name.className = "browser-autosave__recent-name";
+      name.textContent = folder.name || "Folder";
+      const meta = document.createElement("span");
+      meta.className = "browser-autosave__recent-meta";
+      meta.textContent = formatRecentTime(folder.lastUsedAt);
+      button.append(name, meta);
+      recentListEl.appendChild(button);
+    });
+    syncUi();
   }
 
   async function rememberDraft(filename, text) {
@@ -218,7 +303,7 @@ export function createBrowserAutosave({
         syncUi();
         return false;
       }
-      await persistHandle(handle);
+      await rememberRecentFolder(handle);
       setStatus(`Autosave connected to "${handle.name}".`, "saved");
       showNotice(`Autosave connected to "${handle.name}".`, 2200);
       await refreshFiles({ silent: true });
@@ -265,7 +350,6 @@ export function createBrowserAutosave({
     files = [];
     selectedPath = "";
     renderFiles();
-    await clearHandle();
     setStatus("Autosave folder disconnected.");
     syncUi();
   }
@@ -621,11 +705,38 @@ export function createBrowserAutosave({
     return result !== false;
   }
 
+  async function connectRecentFolder(id) {
+    const record = recentFolders.find((folder) => folder.id === id);
+    if (!record?.handle) return false;
+    try {
+      directoryHandle = record.handle;
+      permissionState = (await verifyPermission(directoryHandle, true))
+        ? "granted"
+        : "denied";
+      if (permissionState !== "granted") {
+        setStatus(`Permission required for "${record.name}".`, "error");
+        syncUi();
+        return false;
+      }
+      await rememberRecentFolder(directoryHandle);
+      setStatus(`Autosave connected to "${directoryHandle.name}".`, "saved");
+      await refreshFiles({ silent: true });
+      syncUi();
+      return true;
+    } catch (error) {
+      console.warn("[Blockscape] recent folder reconnect failed", error);
+      setStatus(`Could not open "${record.name}": ${error.message}`, "error");
+      syncUi();
+      return false;
+    }
+  }
+
   async function init() {
     syncUi();
     if (!supported) return false;
     try {
       db = await openDb();
+      await loadRecentFolders();
       setStatus("Choose a folder to browse .bs files or save the active map.");
       syncUi();
       return true;
@@ -643,6 +754,11 @@ export function createBrowserAutosave({
   saveNowButton?.addEventListener("click", saveAs);
   refreshButton?.addEventListener("click", () => refreshFiles());
   loadButton?.addEventListener("click", loadSelectedFile);
+  recentListEl?.addEventListener("click", (event) => {
+    const button = event.target?.closest?.("[data-recent-folder-id]");
+    if (!button || !recentListEl.contains(button)) return;
+    connectRecentFolder(button.dataset.recentFolderId);
+  });
   fileTableEl?.addEventListener("click", (event) => {
     const sortButton = event.target?.closest?.("[data-browser-file-sort]");
     if (sortButton && fileTableEl.contains(sortButton)) {
@@ -730,6 +846,7 @@ export function createBrowserAutosave({
     schedule,
     flushNow,
     saveAs,
+    connectRecentFolder,
     refreshFiles,
     loadSelectedFile,
     mountFileBrowser,
