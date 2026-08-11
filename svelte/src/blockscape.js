@@ -92,6 +92,9 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
   const reconnectBrowserAutosaveButton = byId("reconnectBrowserAutosave");
   const disconnectBrowserAutosaveButton = byId("disconnectBrowserAutosave");
   const saveBrowserAutosaveNowButton = byId("saveBrowserAutosaveNow");
+  const refreshBrowserAutosaveFilesButton = byId("refreshBrowserAutosaveFiles");
+  const loadBrowserAutosaveFileButton = byId("loadBrowserAutosaveFile");
+  const browserAutosaveFileList = byId("browserAutosaveFileList");
   const localFileList = byId("localFileList");
   const localDirSelect = byId("localDirSelect");
   const refreshLocalFilesButton = byId("refreshLocalFiles");
@@ -353,9 +356,13 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
           reconnectButton: reconnectBrowserAutosaveButton,
           disconnectButton: disconnectBrowserAutosaveButton,
           saveNowButton: saveBrowserAutosaveNowButton,
+          refreshButton: refreshBrowserAutosaveFilesButton,
+          loadButton: loadBrowserAutosaveFileButton,
+          fileListEl: browserAutosaveFileList,
           getActiveEntry: () => models[activeIndex] || null,
           getPayloadText: (entry) => getBrowserAutosavePayloadText(entry),
-          getSuggestedFilename: (entry) => getBrowserAutosaveFilename(entry),
+          getSuggestedFilename: (entry) => getBrowserAutosavePath(entry),
+          onLoadFile: ({ path, text }) => loadFromBrowserAutosaveFile(path, text),
           showNotice,
         })
       : null;
@@ -4471,16 +4478,16 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
     }
   }
 
-  function getBrowserAutosaveFilename(entry) {
+  function getBrowserAutosavePath(entry) {
     if (!entry) return "blockscape.bs";
-    if (entry.browserAutosaveName) return entry.browserAutosaveName;
+    if (entry.browserAutosavePath) return entry.browserAutosavePath;
     const seriesPayload = buildSeriesPayload(entry);
     const seriesId = getSeriesId(entry);
     const modelId = getModelId(entry);
     const title = seriesId || modelId || getModelTitle(entry, "blockscape");
     const suffix = seriesPayload ? "-series" : "";
     const filename = `${makeDownloadName(title)}${suffix}.bs`;
-    entry.browserAutosaveName = filename;
+    entry.browserAutosavePath = filename;
     return filename;
   }
 
@@ -10206,6 +10213,68 @@ ${fullBundleJs}
     anchor.addEventListener("click", (event) =>
       handleGistLinkClick(event, url, anchor)
     );
+  }
+
+  async function loadFromBrowserAutosaveFile(path, text) {
+    if (!path || !text) return null;
+    const rawName = path.split("/").pop() || path;
+    const baseName = rawName.replace(/\.[^.]+$/, "") || "Folder Model";
+    let entries;
+    try {
+      entries = normalizeToModelsFromText(text, baseName, {
+        seriesTitleOverride: `${baseName} series`,
+      });
+    } catch (parseError) {
+      throw new Error(`Invalid JSON payload: ${parseError.message}`);
+    }
+    if (!entries.length) {
+      throw new Error("No Blockscape models found in file.");
+    }
+
+    let firstIndex = null;
+    entries.forEach((entry, idx) => {
+      const dataTitle = (entry.data?.title ?? "").toString().trim();
+      const fallbackTitle =
+        entries.length > 1 ? `${rawName} #${idx + 1}` : rawName;
+      const fileSeriesName = `${baseName} series`;
+      let payload = { ...entry };
+      if (entry.isSeries) {
+        const seriesTitle =
+          fileSeriesName || dataTitle || entry.title || fallbackTitle;
+        payload.title = seriesTitle;
+        const forcedSlug = makeSeriesId(seriesTitle || "unknown");
+        applySeriesSlug(payload, forcedSlug);
+        ensureSeriesId(payload, {
+          seriesName: seriesTitle,
+          fallbackTitle: "unknown",
+        });
+        payload.apicurioArtifactName =
+          payload.apicurioArtifactName || seriesTitle;
+      } else {
+        payload.title = dataTitle || fallbackTitle;
+      }
+      const idxResult = addModelEntry(
+        {
+          ...payload,
+          browserAutosavePath: path,
+          apicurioArtifactName:
+            payload.apicurioArtifactName || payload.title,
+        },
+        { versionLabel: path }
+      );
+      if (firstIndex == null) firstIndex = idxResult;
+      if (models[idxResult]) {
+        models[idxResult].browserAutosavePath = path;
+      }
+    });
+
+    if (firstIndex != null) {
+      setActive(firstIndex);
+      showNotice(`Loaded ${path}.`, 2200);
+    } else {
+      renderModelList();
+    }
+    return firstIndex;
   }
 
   async function handleGistLinkClick(event, url, anchor) {

@@ -497,9 +497,13 @@
           <p id="browserAutosaveStatus" class="browser-autosave__status muted" aria-live="polite">
             Choose a folder to autosave active maps as .bs files.
           </p>
+          <select id="browserAutosaveFileList" class="browser-autosave__files" size="8"
+            aria-label="Blockscape files in opened browser folder"></select>
           <div class="browser-autosave__actions">
             <button id="connectBrowserAutosave" class="pf-v5-c-button pf-m-primary" type="button">Open folder</button>
             <button id="reconnectBrowserAutosave" class="pf-v5-c-button pf-m-secondary" type="button" hidden>Reconnect</button>
+            <button id="refreshBrowserAutosaveFiles" class="pf-v5-c-button pf-m-tertiary" type="button">Refresh</button>
+            <button id="loadBrowserAutosaveFile" class="pf-v5-c-button pf-m-secondary" type="button">Load</button>
             <button id="saveBrowserAutosaveNow" class="pf-v5-c-button pf-m-secondary" type="button">Save now</button>
             <button id="disconnectBrowserAutosave" class="pf-v5-c-button pf-m-tertiary" type="button" hidden>Disconnect</button>
           </div>

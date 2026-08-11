@@ -72,6 +72,24 @@ function sanitizeFilename(name) {
   return `${base || "blockscape"}.bs`;
 }
 
+function normalizeRelativePath(path) {
+  const raw = (path || "").toString().trim().replace(/\\/g, "/");
+  if (!raw) return "";
+  const parts = raw.split("/").filter(Boolean);
+  if (!parts.length || parts.some((part) => part === "." || part === "..")) {
+    return "";
+  }
+  const filename = parts[parts.length - 1];
+  if (!filename.toLowerCase().endsWith(".bs")) return "";
+  return parts.join("/");
+}
+
+function resolveSavePath(candidate) {
+  const normalized = normalizeRelativePath(candidate);
+  if (normalized) return normalized;
+  return sanitizeFilename(candidate);
+}
+
 async function verifyPermission(handle, readWrite) {
   const options = readWrite ? { mode: "readwrite" } : {};
   if ((await handle.queryPermission(options)) === "granted") return true;
@@ -86,9 +104,13 @@ export function createBrowserAutosave({
   reconnectButton,
   disconnectButton,
   saveNowButton,
+  refreshButton,
+  loadButton,
+  fileListEl,
   getActiveEntry,
   getPayloadText,
   getSuggestedFilename,
+  onLoadFile,
   showNotice = () => {},
   debounceMs = DEFAULT_DEBOUNCE_MS,
 } = {}) {
@@ -100,6 +122,8 @@ export function createBrowserAutosave({
   let permissionState = "unknown";
   let lastSavedAt = null;
   let pendingSave = null;
+  let files = [];
+  let selectedPath = "";
 
   function setStatus(message, state = "idle") {
     if (!statusEl) return;
@@ -112,7 +136,7 @@ export function createBrowserAutosave({
     if (!supported) {
       panel.hidden = false;
       setStatus("Browser folder autosave needs Chromium with File System Access.", "error");
-      [connectButton, reconnectButton, disconnectButton, saveNowButton].forEach((button) => {
+      [connectButton, reconnectButton, disconnectButton, saveNowButton, refreshButton, loadButton].forEach((button) => {
         if (button) button.disabled = true;
       });
       return;
@@ -126,6 +150,17 @@ export function createBrowserAutosave({
     if (disconnectButton) disconnectButton.hidden = !directoryHandle;
     if (saveNowButton) {
       saveNowButton.disabled = !directoryHandle || permissionState !== "granted";
+    }
+    if (refreshButton) {
+      refreshButton.disabled = !directoryHandle || permissionState !== "granted";
+    }
+    if (loadButton) {
+      loadButton.disabled =
+        !directoryHandle || permissionState !== "granted" || !selectedPath;
+    }
+    if (fileListEl) {
+      fileListEl.disabled =
+        !directoryHandle || permissionState !== "granted" || !files.length;
     }
   }
 
@@ -166,6 +201,7 @@ export function createBrowserAutosave({
       });
       if (permissionState === "granted") {
         setStatus(`Autosave connected to "${directoryHandle.name}".`, "saved");
+        await refreshFiles({ silent: true });
       } else {
         setStatus(`Reconnect "${directoryHandle.name}" to resume autosave.`, "warn");
       }
@@ -199,6 +235,7 @@ export function createBrowserAutosave({
       await persistHandle(handle);
       setStatus(`Autosave connected to "${handle.name}".`, "saved");
       showNotice(`Autosave connected to "${handle.name}".`, 2200);
+      await refreshFiles({ silent: true });
       syncUi();
       await flushNow();
       return true;
@@ -224,6 +261,7 @@ export function createBrowserAutosave({
         return false;
       }
       setStatus(`Autosave connected to "${directoryHandle.name}".`, "saved");
+      await refreshFiles({ silent: true });
       syncUi();
       await flushNow();
       return true;
@@ -240,9 +278,24 @@ export function createBrowserAutosave({
     pendingSave = null;
     directoryHandle = null;
     permissionState = "unknown";
+    files = [];
+    selectedPath = "";
+    renderFileList();
     await clearHandle();
     setStatus("Autosave folder disconnected.");
     syncUi();
+  }
+
+  async function getDirectoryForPath(path, { create = false } = {}) {
+    const normalized = normalizeRelativePath(path);
+    if (!normalized) throw new Error(`Invalid autosave path: ${path}`);
+    const parts = normalized.split("/");
+    const filename = parts.pop();
+    let dir = directoryHandle;
+    for (const part of parts) {
+      dir = await dir.getDirectoryHandle(part, { create });
+    }
+    return { dir, filename, path: normalized };
   }
 
   async function writeTextFile(filename, text) {
@@ -250,17 +303,19 @@ export function createBrowserAutosave({
     if (permissionState !== "granted") {
       throw new Error("Autosave folder permission is required.");
     }
-    await rememberDraft(filename, text);
-    const fileHandle = await directoryHandle.getFileHandle(filename, {
+    const target = await getDirectoryForPath(filename, { create: true });
+    await rememberDraft(target.path, text);
+    const fileHandle = await target.dir.getFileHandle(target.filename, {
       create: true,
     });
     const writable = await fileHandle.createWritable();
     try {
       await writable.write(text);
       await writable.close();
-      await clearDraft(filename);
+      await clearDraft(target.path);
+      upsertFile(target.path);
       lastSavedAt = new Date();
-      setStatus(`Saved ${filename} at ${lastSavedAt.toLocaleTimeString()}.`, "saved");
+      setStatus(`Saved ${target.path} at ${lastSavedAt.toLocaleTimeString()}.`, "saved");
     } catch (error) {
       try {
         await writable.abort();
@@ -276,8 +331,120 @@ export function createBrowserAutosave({
     if (!entry) return null;
     const text = getPayloadText?.(entry);
     if (!text || !text.trim()) return null;
-    const filename = sanitizeFilename(getSuggestedFilename?.(entry));
+    const filename = resolveSavePath(getSuggestedFilename?.(entry));
     return { filename, text };
+  }
+
+  function renderFileList() {
+    if (!fileListEl) return;
+    fileListEl.innerHTML = "";
+    if (!files.length) {
+      const option = document.createElement("option");
+      option.disabled = true;
+      option.textContent = directoryHandle
+        ? "No .bs files found"
+        : "Open a folder to list .bs files";
+      fileListEl.appendChild(option);
+      selectedPath = "";
+      syncUi();
+      return;
+    }
+    files.forEach((file) => {
+      const option = document.createElement("option");
+      option.value = file.path;
+      option.textContent = file.path;
+      fileListEl.appendChild(option);
+    });
+    if (!files.some((file) => file.path === selectedPath)) {
+      selectedPath = files[0]?.path || "";
+    }
+    fileListEl.value = selectedPath;
+    syncUi();
+  }
+
+  function upsertFile(path) {
+    const normalized = normalizeRelativePath(path);
+    if (!normalized) return;
+    if (!files.some((file) => file.path === normalized)) {
+      files = [...files, { path: normalized }].sort((a, b) =>
+        a.path.localeCompare(b.path)
+      );
+    }
+    selectedPath = normalized;
+    renderFileList();
+  }
+
+  async function collectBsFiles(handle, prefix = "", result = []) {
+    for await (const [name, child] of handle.entries()) {
+      const path = prefix ? `${prefix}/${name}` : name;
+      if (child.kind === "file") {
+        if (name.toLowerCase().endsWith(".bs")) {
+          result.push({ path });
+        }
+        continue;
+      }
+      if (child.kind === "directory") {
+        await collectBsFiles(child, path, result);
+      }
+    }
+    return result;
+  }
+
+  async function refreshFiles({ silent = false } = {}) {
+    if (!supported || !directoryHandle || permissionState !== "granted") {
+      syncUi();
+      return [];
+    }
+    if (!silent) setStatus("Scanning folder for .bs files...", "saving");
+    if (refreshButton) refreshButton.disabled = true;
+    try {
+      files = (await collectBsFiles(directoryHandle)).sort((a, b) =>
+        a.path.localeCompare(b.path)
+      );
+      if (!files.some((file) => file.path === selectedPath)) {
+        selectedPath = files[0]?.path || "";
+      }
+      renderFileList();
+      if (!silent) {
+        const label = files.length === 1 ? "file" : "files";
+        setStatus(`Found ${files.length} .bs ${label}.`, "saved");
+      }
+      return files;
+    } catch (error) {
+      console.warn("[Blockscape] browser autosave folder scan failed", error);
+      setStatus(`Folder scan failed: ${error.message}`, "error");
+      syncUi();
+      return [];
+    }
+  }
+
+  async function readTextFile(path) {
+    if (!directoryHandle) throw new Error("No autosave folder is connected.");
+    if (permissionState !== "granted") {
+      throw new Error("Autosave folder permission is required.");
+    }
+    const target = await getDirectoryForPath(path);
+    const fileHandle = await target.dir.getFileHandle(target.filename);
+    const file = await fileHandle.getFile();
+    return await file.text();
+  }
+
+  async function loadSelectedFile() {
+    const path = selectedPath || fileListEl?.value || "";
+    if (!path) return false;
+    try {
+      setStatus(`Loading ${path}...`, "saving");
+      const text = await readTextFile(path);
+      await onLoadFile?.({ path, text });
+      selectedPath = path;
+      renderFileList();
+      setStatus(`Loaded ${path}.`, "saved");
+      return true;
+    } catch (error) {
+      console.warn("[Blockscape] browser autosave file load failed", error);
+      setStatus(`Load failed: ${error.message}`, "error");
+      return false;
+    }
   }
 
   function schedule() {
@@ -341,6 +508,13 @@ export function createBrowserAutosave({
   reconnectButton?.addEventListener("click", reconnect);
   disconnectButton?.addEventListener("click", disconnect);
   saveNowButton?.addEventListener("click", flushNow);
+  refreshButton?.addEventListener("click", () => refreshFiles());
+  loadButton?.addEventListener("click", loadSelectedFile);
+  fileListEl?.addEventListener("change", () => {
+    selectedPath = fileListEl.value || "";
+    syncUi();
+  });
+  fileListEl?.addEventListener("dblclick", loadSelectedFile);
 
   return {
     init,
@@ -349,6 +523,8 @@ export function createBrowserAutosave({
     disconnect,
     schedule,
     flushNow,
+    refreshFiles,
+    loadSelectedFile,
     isConnected: () => !!directoryHandle && permissionState === "granted",
   };
 }
