@@ -500,7 +500,7 @@
           <div class="browser-autosave__actions">
             <button id="connectBrowserAutosave" class="pf-v5-c-button pf-m-primary" type="button">Open folder</button>
             <button id="reconnectBrowserAutosave" class="pf-v5-c-button pf-m-secondary" type="button" hidden>Reconnect</button>
-            <button id="saveBrowserAutosaveNow" class="pf-v5-c-button pf-m-secondary" type="button">Save now</button>
+            <button id="saveBrowserAutosaveNow" class="pf-v5-c-button pf-m-secondary" type="button">Save as</button>
             <button id="disconnectBrowserAutosave" class="pf-v5-c-button pf-m-tertiary" type="button" hidden>Disconnect</button>
           </div>
         </section>

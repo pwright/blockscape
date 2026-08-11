@@ -358,7 +358,17 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
           getActiveEntry: () => models[activeIndex] || null,
           getPayloadText: (entry) => getBrowserAutosavePayloadText(entry),
           getSuggestedFilename: (entry) => getBrowserAutosavePath(entry),
+          getSaveAsFilename: (entry) => getBrowserAutosaveDefaultPath(entry),
           onLoadFile: ({ path, text }) => loadFromBrowserAutosaveFile(path, text),
+          onSaveAsPath: (entry, path) => {
+            if (entry && path) {
+              entry.browserAutosavePath = path;
+              browserAutosaveFingerprints.set(
+                entry,
+                computeJsonFingerprint(getBrowserAutosavePayload(entry) || {})
+              );
+            }
+          },
           onConnectionChange: (connected) => {
             if (typeof syncBrowserFilesTabVisibility === "function") {
               syncBrowserFilesTabVisibility(connected);
@@ -4480,16 +4490,17 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
   }
 
   function getBrowserAutosavePath(entry) {
+    return entry?.browserAutosavePath || "";
+  }
+
+  function getBrowserAutosaveDefaultPath(entry) {
     if (!entry) return "blockscape.bs";
-    if (entry.browserAutosavePath) return entry.browserAutosavePath;
     const seriesPayload = buildSeriesPayload(entry);
     const seriesId = getSeriesId(entry);
     const modelId = getModelId(entry);
     const title = seriesId || modelId || getModelTitle(entry, "blockscape");
     const suffix = seriesPayload ? "-series" : "";
-    const filename = `${makeDownloadName(title)}${suffix}.bs`;
-    entry.browserAutosavePath = filename;
-    return filename;
+    return `${makeDownloadName(title)}${suffix}.bs`;
   }
 
   function scheduleBrowserAutosave({ force = false } = {}) {
@@ -4503,6 +4514,7 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
       return;
     }
     const entry = models[activeIndex];
+    if (!entry.browserAutosavePath) return;
     const payload = getBrowserAutosavePayload(entry);
     if (!payload) return;
     const fingerprint = computeJsonFingerprint(payload);

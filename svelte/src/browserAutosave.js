@@ -111,7 +111,9 @@ export function createBrowserAutosave({
   getActiveEntry,
   getPayloadText,
   getSuggestedFilename,
+  getSaveAsFilename,
   onLoadFile,
+  onSaveAsPath,
   onConnectionChange,
   showNotice = () => {},
   debounceMs = DEFAULT_DEBOUNCE_MS,
@@ -163,7 +165,10 @@ export function createBrowserAutosave({
     }
     if (disconnectButton) disconnectButton.hidden = !directoryHandle;
     if (saveNowButton) {
-      saveNowButton.disabled = !directoryHandle || permissionState !== "granted";
+      saveNowButton.disabled =
+        !directoryHandle ||
+        permissionState !== "granted" ||
+        !getActiveEntry?.();
     }
     if (refreshButton) {
       refreshButton.disabled = !directoryHandle || permissionState !== "granted";
@@ -254,7 +259,6 @@ export function createBrowserAutosave({
       showNotice(`Autosave connected to "${handle.name}".`, 2200);
       await refreshFiles({ silent: true });
       syncUi();
-      await flushNow();
       return true;
     } catch (error) {
       if (error?.name !== "AbortError") {
@@ -280,7 +284,6 @@ export function createBrowserAutosave({
       setStatus(`Autosave connected to "${directoryHandle.name}".`, "saved");
       await refreshFiles({ silent: true });
       syncUi();
-      await flushNow();
       return true;
     } catch (error) {
       console.warn("[Blockscape] browser autosave reconnect failed", error);
@@ -351,8 +354,30 @@ export function createBrowserAutosave({
     if (!entry) return null;
     const text = getPayloadText?.(entry);
     if (!text || !text.trim()) return null;
-    const filename = resolveSavePath(getSuggestedFilename?.(entry));
+    const filename = normalizeRelativePath(getSuggestedFilename?.(entry));
+    if (!filename) return null;
     return { filename, text };
+  }
+
+  function resolveSaveAs() {
+    const entry = getActiveEntry?.();
+    if (!entry) return null;
+    const text = getPayloadText?.(entry);
+    if (!text || !text.trim()) return null;
+    const defaultName =
+      normalizeRelativePath(getSuggestedFilename?.(entry)) ||
+      resolveSavePath(getSaveAsFilename?.(entry));
+    if (typeof window === "undefined" || typeof window.prompt !== "function") {
+      return { filename: defaultName, text, entry };
+    }
+    const response = window.prompt(
+      "Save active map as .bs file in the connected folder:",
+      defaultName
+    );
+    if (response == null) return null;
+    const filename = resolveSavePath(response);
+    if (!filename) return null;
+    return { filename, text, entry };
   }
 
   function getFileName(path) {
@@ -605,6 +630,33 @@ export function createBrowserAutosave({
     return result !== false;
   }
 
+  async function saveAs() {
+    if (!supported || !directoryHandle) return false;
+    if (permissionState !== "granted") {
+      setStatus("Reconnect the folder before saving.", "warn");
+      syncUi();
+      return false;
+    }
+    const next = resolveSaveAs();
+    if (!next) return false;
+    clearTimeout(saveTimer);
+    pendingSave = null;
+    setStatus(`Saving ${next.filename}...`, "saving");
+    saveQueue = saveQueue
+      .then(async () => {
+        await writeTextFile(next.filename, next.text);
+        onSaveAsPath?.(next.entry, next.filename);
+        return true;
+      })
+      .catch((error) => {
+        console.warn("[Blockscape] browser save-as failed", error);
+        setStatus(`Save failed: ${error.message}`, "error");
+        return false;
+      });
+    const result = await saveQueue;
+    return result !== false;
+  }
+
   async function init() {
     syncUi();
     if (!supported) return false;
@@ -623,7 +675,7 @@ export function createBrowserAutosave({
   connectButton?.addEventListener("click", connect);
   reconnectButton?.addEventListener("click", reconnect);
   disconnectButton?.addEventListener("click", disconnect);
-  saveNowButton?.addEventListener("click", flushNow);
+  saveNowButton?.addEventListener("click", saveAs);
   refreshButton?.addEventListener("click", () => refreshFiles());
   loadButton?.addEventListener("click", loadSelectedFile);
   fileTableEl?.addEventListener("click", (event) => {
@@ -712,6 +764,7 @@ export function createBrowserAutosave({
     disconnect,
     schedule,
     flushNow,
+    saveAs,
     refreshFiles,
     loadSelectedFile,
     mountFileBrowser,
