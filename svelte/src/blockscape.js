@@ -92,9 +92,6 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
   const reconnectBrowserAutosaveButton = byId("reconnectBrowserAutosave");
   const disconnectBrowserAutosaveButton = byId("disconnectBrowserAutosave");
   const saveBrowserAutosaveNowButton = byId("saveBrowserAutosaveNow");
-  const refreshBrowserAutosaveFilesButton = byId("refreshBrowserAutosaveFiles");
-  const loadBrowserAutosaveFileButton = byId("loadBrowserAutosaveFile");
-  const browserAutosaveFileList = byId("browserAutosaveFileList");
   const localFileList = byId("localFileList");
   const localDirSelect = byId("localDirSelect");
   const refreshLocalFilesButton = byId("refreshLocalFiles");
@@ -180,6 +177,8 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
   let bgPreview = null;
   let autosaveSuppressed = false;
   const browserAutosaveFingerprints = new WeakMap();
+  let syncBrowserFilesTabVisibility = null;
+  let activateCurrentTab = null;
   const versionThumbScroll = new Map(); // key -> scrollLeft
   let apicurioSettingsToggle = null;
   let activeSeriesPreviewTarget = null;
@@ -356,13 +355,15 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
           reconnectButton: reconnectBrowserAutosaveButton,
           disconnectButton: disconnectBrowserAutosaveButton,
           saveNowButton: saveBrowserAutosaveNowButton,
-          refreshButton: refreshBrowserAutosaveFilesButton,
-          loadButton: loadBrowserAutosaveFileButton,
-          fileListEl: browserAutosaveFileList,
           getActiveEntry: () => models[activeIndex] || null,
           getPayloadText: (entry) => getBrowserAutosavePayloadText(entry),
           getSuggestedFilename: (entry) => getBrowserAutosavePath(entry),
           onLoadFile: ({ path, text }) => loadFromBrowserAutosaveFile(path, text),
+          onConnectionChange: (connected) => {
+            if (typeof syncBrowserFilesTabVisibility === "function") {
+              syncBrowserFilesTabVisibility(connected);
+            }
+          },
           showNotice,
         })
       : null;
@@ -5106,7 +5107,15 @@ ${fullBundleJs}
     });
   }
 
+  function showMapTab() {
+    lastActiveTabId = "map";
+    if (typeof activateCurrentTab === "function") {
+      activateCurrentTab("map");
+    }
+  }
+
   function setActive(i) {
+    showMapTab();
     hidePreview();
     clearSeriesNavNotice();
     lastDeletedItem = null;
@@ -6242,6 +6251,7 @@ ${fullBundleJs}
     const settingsTabPanel = document.createElement("div");
     const sourcePanel = document.createElement("div");
     const apicurioPanel = document.createElement("div");
+    const browserFilesPanel = document.createElement("div");
     let infoTooltipHtml = "";
     const seriesIdLookup = buildModelIdToVersionIndex(models[activeIndex]);
     const activeSeriesIndex = getActiveApicurioVersionIndex(
@@ -6269,10 +6279,12 @@ ${fullBundleJs}
       { id: "abstract", label: "Info", panel: abstractPanel },
       { id: "settings", label: "Settings", panel: settingsTabPanel },
       { id: "source", label: "Source", panel: sourcePanel },
+      { id: "browser-files", label: "Browser Files", panel: browserFilesPanel },
       { id: "apicurio", label: "Apicurio", panel: apicurioPanel },
     ];
     const apicurioInitiallyEnabled =
       typeof apicurio.isEnabled === "function" ? apicurio.isEnabled() : false;
+    const browserFilesInitiallyEnabled = !!browserAutosave?.isConnected?.();
 
     const handleTabVisibility = (tabId) => {
       if (!overlay) return;
@@ -6301,6 +6313,12 @@ ${fullBundleJs}
         button.setAttribute("aria-hidden", "true");
         button.style.display = "none";
       }
+      if (tab.id === "browser-files" && !browserFilesInitiallyEnabled) {
+        button.hidden = true;
+        button.tabIndex = -1;
+        button.setAttribute("aria-hidden", "true");
+        button.style.display = "none";
+      }
       tab.button = button;
       tabList.appendChild(button);
 
@@ -6324,8 +6342,41 @@ ${fullBundleJs}
       });
       handleTabVisibility(targetId);
     };
+    activateCurrentTab = activateTab;
 
     const apicurioTab = tabDefs.find((t) => t.id === "apicurio");
+    const browserFilesTab = tabDefs.find((t) => t.id === "browser-files");
+    syncBrowserFilesTabVisibility = (enabled) => {
+      if (!browserFilesTab?.button || !browserFilesTab?.panel) return;
+      const show = !!enabled;
+      browserFilesTab.button.hidden = !show;
+      browserFilesTab.button.tabIndex = show ? 0 : -1;
+      browserFilesTab.button.setAttribute(
+        "aria-hidden",
+        show ? "false" : "true"
+      );
+      browserFilesTab.button.style.display = show ? "" : "none";
+      if (!show) {
+        const wasActive = browserFilesTab.panel.classList.contains("is-active");
+        browserFilesTab.button.classList.remove("is-active");
+        browserFilesTab.button.setAttribute("aria-selected", "false");
+        browserFilesTab.panel.classList.remove("is-active");
+        browserFilesTab.panel.hidden = true;
+        if (wasActive) {
+          const fallback = tabDefs.find((t) => t.id !== "browser-files");
+          if (fallback) activateTab(fallback.id);
+        }
+      } else {
+        const isActive = lastActiveTabId === "browser-files";
+        browserFilesTab.button.classList.toggle("is-active", isActive);
+        browserFilesTab.button.setAttribute(
+          "aria-selected",
+          isActive ? "true" : "false"
+        );
+        browserFilesTab.panel.classList.toggle("is-active", isActive);
+        browserFilesTab.panel.hidden = !isActive;
+      }
+    };
     const syncApicurioTabVisibility = (enabled) => {
       if (!apicurioTab || !apicurioTab.button || !apicurioTab.panel) return;
       const show = !!enabled;
@@ -6378,16 +6429,23 @@ ${fullBundleJs}
 
     const resolveInitialTabId = (apicurioEnabled) => {
       const preferred = tabDefs.find((t) => t.id === lastActiveTabId);
-      if (preferred && (preferred.id !== "apicurio" || apicurioEnabled))
+      if (
+        preferred &&
+        (preferred.id !== "apicurio" || apicurioEnabled) &&
+        (preferred.id !== "browser-files" || browserFilesInitiallyEnabled)
+      )
         return preferred.id;
       const firstVisible = tabDefs.find(
-        (t) => t.id !== "apicurio" || apicurioEnabled
+        (t) =>
+          (t.id !== "apicurio" || apicurioEnabled) &&
+          (t.id !== "browser-files" || browserFilesInitiallyEnabled)
       );
       return firstVisible?.id || tabDefs[0].id;
     };
 
     const initialTabId = resolveInitialTabId(apicurioInitiallyEnabled);
     activateTab(initialTabId);
+    syncBrowserFilesTabVisibility(browserFilesInitiallyEnabled);
     syncApicurioTabVisibility(apicurioInitiallyEnabled);
     if (typeof apicurio.onEnabledChange === "function") {
       apicurio.onEnabledChange(syncApicurioTabVisibility);
@@ -6462,7 +6520,7 @@ ${fullBundleJs}
     abstractInput.placeholder = "Abstract (supports basic HTML)";
     abstractInput.value = model.m.abstract || "";
 
-    const applyInfoChanges = () => {
+    const applyInfoChanges = ({ activateMap = false } = {}) => {
       if (activeIndex < 0) return;
       const entry = models[activeIndex];
       const nextTitle = (titleInput.value || "").trim();
@@ -6492,7 +6550,11 @@ ${fullBundleJs}
         changed = true;
       }
 
-      if (!changed) return;
+      if (!changed) {
+        if (activateMap) showMapTab();
+        return;
+      }
+      if (activateMap) showMapTab();
       renderModelList();
       loadActiveIntoEditor();
       rebuildFromActive();
@@ -6503,7 +6565,7 @@ ${fullBundleJs}
     abstractInput.addEventListener("blur", applyInfoChanges);
     infoForm.addEventListener("submit", (event) => {
       event.preventDefault();
-      applyInfoChanges();
+      applyInfoChanges({ activateMap: true });
     });
 
     controls.append(
@@ -7598,6 +7660,75 @@ ${fullBundleJs}
       sourceWrapper.appendChild(missing);
     }
     sourcePanel.appendChild(sourceWrapper);
+
+    const browserFilesWrapper = document.createElement("div");
+    browserFilesWrapper.className = "blockscape-browser-files-panel";
+
+    const browserFilesHeader = document.createElement("div");
+    browserFilesHeader.className = "blockscape-registry-header";
+    const browserFilesTitle = document.createElement("h2");
+    browserFilesTitle.textContent = "Browser folder files";
+    const browserFilesHint = document.createElement("p");
+    browserFilesHint.textContent =
+      "Select a .bs file from the connected folder. Subdirectories are scanned recursively.";
+    browserFilesHeader.append(browserFilesTitle, browserFilesHint);
+
+    const browserFilesTableWrap = document.createElement("div");
+    browserFilesTableWrap.className = "browser-autosave-table-wrap";
+    const browserFilesTable = document.createElement("table");
+    browserFilesTable.className = "browser-autosave-table";
+    browserFilesTable.setAttribute(
+      "aria-label",
+      "Blockscape files in opened browser folder"
+    );
+    const browserFilesHead = document.createElement("thead");
+    const browserFilesHeadRow = document.createElement("tr");
+    [
+      ["name", "Name"],
+      ["path", "Path"],
+      ["size", "Size"],
+      ["modified", "Last modified"],
+    ].forEach(([key, label]) => {
+      const th = document.createElement("th");
+      const button = document.createElement("button");
+      button.type = "button";
+      button.dataset.browserFileSort = key;
+      button.setAttribute("aria-sort", key === "path" ? "asc" : "none");
+      button.dataset.sortDirection = key === "path" ? "asc" : "none";
+      button.textContent = label;
+      th.appendChild(button);
+      browserFilesHeadRow.appendChild(th);
+    });
+    browserFilesHead.appendChild(browserFilesHeadRow);
+    const browserFilesBody = document.createElement("tbody");
+    browserFilesTable.append(browserFilesHead, browserFilesBody);
+    browserFilesTableWrap.appendChild(browserFilesTable);
+
+    const browserFileActions = document.createElement("div");
+    browserFileActions.className = "blockscape-browser-files-actions";
+    const refreshBrowserFilesButton = document.createElement("button");
+    refreshBrowserFilesButton.type = "button";
+    refreshBrowserFilesButton.className = "pf-v5-c-button pf-m-tertiary";
+    refreshBrowserFilesButton.textContent = "Refresh";
+    const loadBrowserFileButton = document.createElement("button");
+    loadBrowserFileButton.type = "button";
+    loadBrowserFileButton.className = "pf-v5-c-button pf-m-secondary";
+    loadBrowserFileButton.textContent = "Load";
+    browserFileActions.append(refreshBrowserFilesButton, loadBrowserFileButton);
+
+    browserFilesWrapper.append(
+      browserFilesHeader,
+      browserFilesTableWrap,
+      browserFileActions
+    );
+    browserFilesPanel.appendChild(browserFilesWrapper);
+    browserAutosave?.mountFileBrowser?.({
+      fileTableEl: browserFilesTable,
+      fileTableBodyEl: browserFilesBody,
+      refreshButton: refreshBrowserFilesButton,
+      loadButton: loadBrowserFileButton,
+    });
+
     apicurio.mount(apicurioPanel);
 
     let tileCounter = 0;
@@ -9666,6 +9797,7 @@ ${fullBundleJs}
         if (firstIndex == null) firstIndex = idxResult;
         addedIndices.push(idxResult);
       });
+      showMapTab();
       if (activeIndex === -1 && firstIndex != null) setActive(firstIndex);
       else {
         renderModelList();
@@ -9714,6 +9846,7 @@ ${fullBundleJs}
         "[Blockscape] replaced active model:",
         getModelTitle(models[activeIndex])
       );
+      showMapTab();
       rebuildFromActive();
       apicurio.updateAvailability();
     } catch (e) {
@@ -9777,6 +9910,7 @@ ${fullBundleJs}
           if (firstIndex == null) firstIndex = idxResult;
         });
       }
+      showMapTab();
       if (activeIndex === -1 && firstIndex != null) setActive(firstIndex);
       else renderModelList();
     } catch (err) {

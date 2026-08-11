@@ -104,13 +104,15 @@ export function createBrowserAutosave({
   reconnectButton,
   disconnectButton,
   saveNowButton,
-  refreshButton,
-  loadButton,
-  fileListEl,
+  refreshButton: initialRefreshButton,
+  loadButton: initialLoadButton,
+  fileTableEl: initialFileTableEl,
+  fileTableBodyEl: initialFileTableBodyEl,
   getActiveEntry,
   getPayloadText,
   getSuggestedFilename,
   onLoadFile,
+  onConnectionChange,
   showNotice = () => {},
   debounceMs = DEFAULT_DEBOUNCE_MS,
 } = {}) {
@@ -124,11 +126,23 @@ export function createBrowserAutosave({
   let pendingSave = null;
   let files = [];
   let selectedPath = "";
+  let refreshButton = initialRefreshButton || null;
+  let loadButton = initialLoadButton || null;
+  let fileTableEl = initialFileTableEl || null;
+  let fileTableBodyEl = initialFileTableBodyEl || null;
+  let sortKey = "path";
+  let sortDirection = "asc";
 
   function setStatus(message, state = "idle") {
     if (!statusEl) return;
     statusEl.textContent = message;
     statusEl.dataset.state = state;
+  }
+
+  function notifyConnectionChange() {
+    if (typeof onConnectionChange === "function") {
+      onConnectionChange(!!directoryHandle && permissionState === "granted");
+    }
   }
 
   function syncUi() {
@@ -158,10 +172,13 @@ export function createBrowserAutosave({
       loadButton.disabled =
         !directoryHandle || permissionState !== "granted" || !selectedPath;
     }
-    if (fileListEl) {
-      fileListEl.disabled =
-        !directoryHandle || permissionState !== "granted" || !files.length;
+    if (fileTableEl) {
+      fileTableEl.classList.toggle(
+        "is-disabled",
+        !directoryHandle || permissionState !== "granted" || !files.length
+      );
     }
+    notifyConnectionChange();
   }
 
   async function persistHandle(handle) {
@@ -280,7 +297,7 @@ export function createBrowserAutosave({
     permissionState = "unknown";
     files = [];
     selectedPath = "";
-    renderFileList();
+    renderFiles();
     await clearHandle();
     setStatus("Autosave folder disconnected.");
     syncUi();
@@ -313,7 +330,10 @@ export function createBrowserAutosave({
       await writable.write(text);
       await writable.close();
       await clearDraft(target.path);
-      upsertFile(target.path);
+      upsertFile(target.path, {
+        size: new Blob([text]).size,
+        lastModified: Date.now(),
+      });
       lastSavedAt = new Date();
       setStatus(`Saved ${target.path} at ${lastSavedAt.toLocaleTimeString()}.`, "saved");
     } catch (error) {
@@ -335,43 +355,130 @@ export function createBrowserAutosave({
     return { filename, text };
   }
 
-  function renderFileList() {
-    if (!fileListEl) return;
-    fileListEl.innerHTML = "";
+  function getFileName(path) {
+    return (path || "").split("/").filter(Boolean).pop() || path || "";
+  }
+
+  function formatBytes(value) {
+    const bytes = Number(value);
+    if (!Number.isFinite(bytes) || bytes < 0) return "";
+    if (bytes < 1024) return `${bytes} B`;
+    const units = ["KB", "MB", "GB"];
+    let next = bytes / 1024;
+    for (let i = 0; i < units.length; i += 1) {
+      if (next < 1024 || i === units.length - 1) {
+        return `${next.toFixed(next < 10 ? 1 : 0)} ${units[i]}`;
+      }
+      next /= 1024;
+    }
+    return `${bytes} B`;
+  }
+
+  function formatModified(value) {
+    const time = Number(value);
+    if (!Number.isFinite(time) || time <= 0) return "";
+    return new Date(time).toLocaleString();
+  }
+
+  function sortedFiles() {
+    const direction = sortDirection === "desc" ? -1 : 1;
+    return [...files].sort((a, b) => {
+      let left;
+      let right;
+      if (sortKey === "name") {
+        left = getFileName(a.path).toLowerCase();
+        right = getFileName(b.path).toLowerCase();
+      } else if (sortKey === "size") {
+        left = Number(a.size) || 0;
+        right = Number(b.size) || 0;
+      } else if (sortKey === "modified") {
+        left = Number(a.lastModified) || 0;
+        right = Number(b.lastModified) || 0;
+      } else {
+        left = (a.path || "").toLowerCase();
+        right = (b.path || "").toLowerCase();
+      }
+      if (left < right) return -1 * direction;
+      if (left > right) return 1 * direction;
+      return (a.path || "").localeCompare(b.path || "");
+    });
+  }
+
+  function syncSortHeaders() {
+    if (!fileTableEl) return;
+    fileTableEl.querySelectorAll("[data-browser-file-sort]").forEach((button) => {
+      const active = button.dataset.browserFileSort === sortKey;
+      button.setAttribute("aria-sort", active ? sortDirection : "none");
+      button.dataset.sortDirection = active ? sortDirection : "none";
+    });
+  }
+
+  function renderFileTable() {
+    if (!fileTableBodyEl) return;
+    fileTableBodyEl.innerHTML = "";
     if (!files.length) {
-      const option = document.createElement("option");
-      option.disabled = true;
-      option.textContent = directoryHandle
+      const row = document.createElement("tr");
+      const cell = document.createElement("td");
+      cell.colSpan = 4;
+      cell.className = "browser-autosave-table__empty";
+      cell.textContent = directoryHandle
         ? "No .bs files found"
         : "Open a folder to list .bs files";
-      fileListEl.appendChild(option);
+      row.appendChild(cell);
+      fileTableBodyEl.appendChild(row);
       selectedPath = "";
+      syncSortHeaders();
       syncUi();
       return;
     }
-    files.forEach((file) => {
-      const option = document.createElement("option");
-      option.value = file.path;
-      option.textContent = file.path;
-      fileListEl.appendChild(option);
+
+    sortedFiles().forEach((file) => {
+      const row = document.createElement("tr");
+      row.className =
+        "browser-autosave-table__row" +
+        (file.path === selectedPath ? " is-selected" : "");
+      row.dataset.path = file.path;
+      row.tabIndex = 0;
+
+      const nameCell = document.createElement("td");
+      nameCell.textContent = getFileName(file.path);
+      const pathCell = document.createElement("td");
+      pathCell.textContent = file.path;
+      const sizeCell = document.createElement("td");
+      sizeCell.className = "browser-autosave-table__numeric";
+      sizeCell.textContent = formatBytes(file.size);
+      const modifiedCell = document.createElement("td");
+      modifiedCell.textContent = formatModified(file.lastModified);
+      row.append(nameCell, pathCell, sizeCell, modifiedCell);
+      fileTableBodyEl.appendChild(row);
     });
+
     if (!files.some((file) => file.path === selectedPath)) {
-      selectedPath = files[0]?.path || "";
+      selectedPath = sortedFiles()[0]?.path || "";
+      renderFileTable();
+      return;
     }
-    fileListEl.value = selectedPath;
+    syncSortHeaders();
     syncUi();
   }
 
-  function upsertFile(path) {
+  function renderFiles() {
+    renderFileTable();
+  }
+
+  function upsertFile(path, metadata = {}) {
     const normalized = normalizeRelativePath(path);
     if (!normalized) return;
-    if (!files.some((file) => file.path === normalized)) {
-      files = [...files, { path: normalized }].sort((a, b) =>
+    const existing = files.find((file) => file.path === normalized);
+    if (existing) {
+      Object.assign(existing, metadata);
+    } else {
+      files = [...files, { path: normalized, ...metadata }].sort((a, b) =>
         a.path.localeCompare(b.path)
       );
     }
     selectedPath = normalized;
-    renderFileList();
+    renderFiles();
   }
 
   async function collectBsFiles(handle, prefix = "", result = []) {
@@ -379,7 +486,16 @@ export function createBrowserAutosave({
       const path = prefix ? `${prefix}/${name}` : name;
       if (child.kind === "file") {
         if (name.toLowerCase().endsWith(".bs")) {
-          result.push({ path });
+          try {
+            const file = await child.getFile();
+            result.push({
+              path,
+              size: file.size,
+              lastModified: file.lastModified,
+            });
+          } catch {
+            result.push({ path });
+          }
         }
         continue;
       }
@@ -404,7 +520,7 @@ export function createBrowserAutosave({
       if (!files.some((file) => file.path === selectedPath)) {
         selectedPath = files[0]?.path || "";
       }
-      renderFileList();
+      renderFiles();
       if (!silent) {
         const label = files.length === 1 ? "file" : "files";
         setStatus(`Found ${files.length} .bs ${label}.`, "saved");
@@ -430,14 +546,14 @@ export function createBrowserAutosave({
   }
 
   async function loadSelectedFile() {
-    const path = selectedPath || fileListEl?.value || "";
+    const path = selectedPath || "";
     if (!path) return false;
     try {
       setStatus(`Loading ${path}...`, "saving");
       const text = await readTextFile(path);
       await onLoadFile?.({ path, text });
       selectedPath = path;
-      renderFileList();
+      renderFiles();
       setStatus(`Loaded ${path}.`, "saved");
       return true;
     } catch (error) {
@@ -510,11 +626,84 @@ export function createBrowserAutosave({
   saveNowButton?.addEventListener("click", flushNow);
   refreshButton?.addEventListener("click", () => refreshFiles());
   loadButton?.addEventListener("click", loadSelectedFile);
-  fileListEl?.addEventListener("change", () => {
-    selectedPath = fileListEl.value || "";
-    syncUi();
+  fileTableEl?.addEventListener("click", (event) => {
+    const sortButton = event.target?.closest?.("[data-browser-file-sort]");
+    if (sortButton && fileTableEl.contains(sortButton)) {
+      const nextKey = sortButton.dataset.browserFileSort;
+      if (nextKey === sortKey) {
+        sortDirection = sortDirection === "asc" ? "desc" : "asc";
+      } else {
+        sortKey = nextKey;
+        sortDirection = nextKey === "modified" ? "desc" : "asc";
+      }
+      renderFileTable();
+      return;
+    }
+    const row = event.target?.closest?.("[data-path]");
+    if (!row || !fileTableEl.contains(row)) return;
+    selectedPath = row.dataset.path || "";
+    renderFileTable();
   });
-  fileListEl?.addEventListener("dblclick", loadSelectedFile);
+  fileTableEl?.addEventListener("dblclick", (event) => {
+    const row = event.target?.closest?.("[data-path]");
+    if (!row || !fileTableEl.contains(row)) return;
+    selectedPath = row.dataset.path || "";
+    loadSelectedFile();
+  });
+  fileTableEl?.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter") return;
+    const row = event.target?.closest?.("[data-path]");
+    if (!row || !fileTableEl.contains(row)) return;
+    selectedPath = row.dataset.path || "";
+    loadSelectedFile();
+  });
+
+  function mountFileBrowser({
+    fileTableEl: nextFileTableEl,
+    fileTableBodyEl: nextFileTableBodyEl,
+    refreshButton: nextRefreshButton,
+    loadButton: nextLoadButton,
+  } = {}) {
+    fileTableEl = nextFileTableEl || null;
+    fileTableBodyEl = nextFileTableBodyEl || null;
+    refreshButton = nextRefreshButton || null;
+    loadButton = nextLoadButton || null;
+    refreshButton?.addEventListener("click", () => refreshFiles());
+    loadButton?.addEventListener("click", loadSelectedFile);
+    fileTableEl?.addEventListener("click", (event) => {
+      const sortButton = event.target?.closest?.("[data-browser-file-sort]");
+      if (sortButton && fileTableEl.contains(sortButton)) {
+        const nextKey = sortButton.dataset.browserFileSort;
+        if (nextKey === sortKey) {
+          sortDirection = sortDirection === "asc" ? "desc" : "asc";
+        } else {
+          sortKey = nextKey;
+          sortDirection = nextKey === "modified" ? "desc" : "asc";
+        }
+        renderFileTable();
+        return;
+      }
+      const row = event.target?.closest?.("[data-path]");
+      if (!row || !fileTableEl.contains(row)) return;
+      selectedPath = row.dataset.path || "";
+      renderFileTable();
+    });
+    fileTableEl?.addEventListener("dblclick", (event) => {
+      const row = event.target?.closest?.("[data-path]");
+      if (!row || !fileTableEl.contains(row)) return;
+      selectedPath = row.dataset.path || "";
+      loadSelectedFile();
+    });
+    fileTableEl?.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter") return;
+      const row = event.target?.closest?.("[data-path]");
+      if (!row || !fileTableEl.contains(row)) return;
+      selectedPath = row.dataset.path || "";
+      loadSelectedFile();
+    });
+    renderFiles();
+    syncUi();
+  }
 
   return {
     init,
@@ -525,6 +714,7 @@ export function createBrowserAutosave({
     flushNow,
     refreshFiles,
     loadSelectedFile,
+    mountFileBrowser,
     isConnected: () => !!directoryHandle && permissionState === "granted",
   };
 }

@@ -1231,34 +1231,92 @@
       color: var(--color-danger-strong);
     }
 
-    .browser-autosave__files {
-      width: 100%;
-      min-height: 9rem;
-      max-height: 16rem;
+    .browser-autosave-table-wrap {
+      max-height: 28rem;
       overflow: auto;
-      padding: var(--space-2xs) var(--space-xs);
-      border-radius: 0;
       border: 1px solid var(--color-border);
       background: var(--color-surface-muted);
-      color: var(--blockscape-foreground);
+    }
+
+    .browser-autosave-table {
+      width: 100%;
+      border-collapse: collapse;
       font-size: var(--font-size-sm);
-      font-family: inherit;
       line-height: 1.3;
-      appearance: none;
-      -webkit-appearance: none;
-      -moz-appearance: none;
-      box-shadow: none;
+    }
+
+    .browser-autosave-table th {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      padding: 0;
+      border-bottom: 1px solid var(--color-border);
+      background: var(--color-surface);
+      text-align: left;
+      font-weight: var(--font-weight-semibold);
+    }
+
+    .browser-autosave-table th button {
+      width: 100%;
+      padding: var(--space-xs) var(--space-sm);
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      color: var(--blockscape-muted-strong);
+      font: inherit;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .browser-autosave-table th button:hover,
+    .browser-autosave-table th button:focus-visible {
+      background: var(--color-surface-muted);
+      color: var(--color-text);
       outline: none;
     }
 
-    .browser-autosave__files:focus-visible {
-      border-color: var(--color-primary);
-      box-shadow: inset 0 0 0 1px var(--color-primary);
+    .browser-autosave-table th button[data-sort-direction="asc"]::after {
+      content: " ↑";
     }
 
-    .browser-autosave__files option {
-      padding: 2px var(--space-2xs);
-      border-radius: 0;
+    .browser-autosave-table th button[data-sort-direction="desc"]::after {
+      content: " ↓";
+    }
+
+    .browser-autosave-table td {
+      padding: var(--space-2xs) var(--space-sm);
+      border-bottom: 1px solid var(--color-border-muted);
+      color: var(--blockscape-foreground);
+      vertical-align: top;
+      word-break: break-word;
+    }
+
+    .browser-autosave-table__numeric {
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    .browser-autosave-table__row {
+      cursor: pointer;
+    }
+
+    .browser-autosave-table__row:hover,
+    .browser-autosave-table__row:focus-visible {
+      background: var(--color-surface);
+      outline: none;
+    }
+
+    .browser-autosave-table__row.is-selected {
+      background: var(--color-primary-soft);
+    }
+
+    .browser-autosave-table__empty {
+      color: var(--blockscape-muted);
+      text-align: center;
+    }
+
+    .browser-autosave-table.is-disabled {
+      opacity: 0.65;
     }
 
     .browser-autosave__actions {
@@ -1941,6 +1999,23 @@
       border: 1px solid var(--color-border);
       border-radius: var(--radius-md);
       box-shadow: var(--shadow-lg);
+    }
+
+    .blockscape-browser-files-panel {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-md);
+      padding: var(--space-lg);
+      background: var(--blockscape-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-lg);
+    }
+
+    .blockscape-browser-files-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: var(--space-xs);
     }
 
     .blockscape-registry-header {
