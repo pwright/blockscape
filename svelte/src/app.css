@@ -1195,6 +1195,52 @@
       width: 100%;
     }
 
+    .browser-autosave {
+      margin-top: var(--space-lg);
+      padding: var(--space-sm);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      background: var(--color-surface);
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-sm);
+    }
+
+    .browser-autosave[hidden] {
+      display: none !important;
+    }
+
+    .browser-autosave__status {
+      margin: 0;
+      font-size: var(--font-size-xs);
+    }
+
+    .browser-autosave__status[data-state="saving"] {
+      color: var(--color-primary);
+    }
+
+    .browser-autosave__status[data-state="saved"] {
+      color: var(--color-success);
+    }
+
+    .browser-autosave__status[data-state="warn"] {
+      color: var(--color-warning);
+    }
+
+    .browser-autosave__status[data-state="error"] {
+      color: var(--color-danger-strong);
+    }
+
+    .browser-autosave__actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-xs);
+    }
+
+    .browser-autosave__actions .pf-v5-c-button {
+      flex: 1 1 100px;
+    }
+
     .local-backend {
       margin-top: var(--space-lg);
       padding: var(--space-sm);

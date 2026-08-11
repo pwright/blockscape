@@ -492,6 +492,18 @@
             title="Remove selected model">Remove active</button>
           <button id="clear" class="pf-v5-c-button pf-m-tertiary" type="button">Clear selection</button>
         </div>
+        <section id="browserAutosavePanel" class="browser-autosave" aria-label="Browser folder autosave">
+          <div class="sidebar-heading">Browser autosave</div>
+          <p id="browserAutosaveStatus" class="browser-autosave__status muted" aria-live="polite">
+            Choose a folder to autosave active maps as .bs files.
+          </p>
+          <div class="browser-autosave__actions">
+            <button id="connectBrowserAutosave" class="pf-v5-c-button pf-m-primary" type="button">Open folder</button>
+            <button id="reconnectBrowserAutosave" class="pf-v5-c-button pf-m-secondary" type="button" hidden>Reconnect</button>
+            <button id="saveBrowserAutosaveNow" class="pf-v5-c-button pf-m-secondary" type="button">Save now</button>
+            <button id="disconnectBrowserAutosave" class="pf-v5-c-button pf-m-tertiary" type="button" hidden>Disconnect</button>
+          </div>
+        </section>
         <section id="localBackendPanel" class="local-backend" hidden>
           <div class="local-backend__header">
             <div class="sidebar-heading">Local files</div>

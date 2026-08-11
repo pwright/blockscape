@@ -5,6 +5,7 @@ import {
   updateItemReferences,
 } from "./itemEditor";
 import { createTileContextMenu } from "./tileContextMenu";
+import { createBrowserAutosave } from "./browserAutosave";
 import { ensureSeriesId, getSeriesId, makeSeriesId } from "./series";
 import {
   applySettingsSnapshot,
@@ -34,6 +35,7 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
     showSidebar: true,
     showFooter: true,
     showModelMeta: true,
+    browserAutosave: true,
     seriesNavMinVersions: 1,
     initialSettings: null,
     initialSettingsUrl: null,
@@ -84,6 +86,12 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
   const searchResults = byId("searchResults");
   const localBackendPanel = byId("localBackendPanel");
   const localBackendStatus = byId("localBackendStatus");
+  const browserAutosavePanel = byId("browserAutosavePanel");
+  const browserAutosaveStatus = byId("browserAutosaveStatus");
+  const connectBrowserAutosaveButton = byId("connectBrowserAutosave");
+  const reconnectBrowserAutosaveButton = byId("reconnectBrowserAutosave");
+  const disconnectBrowserAutosaveButton = byId("disconnectBrowserAutosave");
+  const saveBrowserAutosaveNowButton = byId("saveBrowserAutosaveNow");
   const localFileList = byId("localFileList");
   const localDirSelect = byId("localDirSelect");
   const refreshLocalFilesButton = byId("refreshLocalFiles");
@@ -167,6 +175,8 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
   let pendingInfoPreview = false;
   let infoTabTwinkleTimer = null;
   let bgPreview = null;
+  let autosaveSuppressed = false;
+  const browserAutosaveFingerprints = new WeakMap();
   const versionThumbScroll = new Map(); // key -> scrollLeft
   let apicurioSettingsToggle = null;
   let activeSeriesPreviewTarget = null;
@@ -334,8 +344,29 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
   const localBackend = features.localBackend
     ? createLocalBackend()
     : disabledLocalBackend;
+  const browserAutosave =
+    features.browserAutosave && !isReadOnly
+      ? createBrowserAutosave({
+          panel: browserAutosavePanel,
+          statusEl: browserAutosaveStatus,
+          connectButton: connectBrowserAutosaveButton,
+          reconnectButton: reconnectBrowserAutosaveButton,
+          disconnectButton: disconnectBrowserAutosaveButton,
+          saveNowButton: saveBrowserAutosaveNowButton,
+          getActiveEntry: () => models[activeIndex] || null,
+          getPayloadText: (entry) => getBrowserAutosavePayloadText(entry),
+          getSuggestedFilename: (entry) => getBrowserAutosaveFilename(entry),
+          showNotice,
+        })
+      : null;
+  if (!browserAutosavePanel || !features.browserAutosave || isReadOnly) {
+    if (browserAutosavePanel) browserAutosavePanel.hidden = true;
+  }
   const initialBackendCheck = features.localBackend
     ? localBackend.detect()
+    : Promise.resolve(false);
+  const initialBrowserAutosaveCheck = browserAutosave
+    ? browserAutosave.init()
     : Promise.resolve(false);
   apicurio.hydrateConfig();
   applyTheme(readStoredTheme());
@@ -4423,6 +4454,67 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
     }
   }
 
+  function getBrowserAutosavePayload(entry) {
+    if (!entry) return null;
+    const seriesPayload = buildSeriesPayload(entry);
+    return seriesPayload || entry.data || null;
+  }
+
+  function getBrowserAutosavePayloadText(entry) {
+    const payload = getBrowserAutosavePayload(entry);
+    if (!payload) return "";
+    try {
+      return JSON.stringify(payload, null, 2);
+    } catch (error) {
+      console.warn("[Blockscape] browser autosave stringify failed", error);
+      return "";
+    }
+  }
+
+  function getBrowserAutosaveFilename(entry) {
+    if (!entry) return "blockscape.bs";
+    if (entry.browserAutosaveName) return entry.browserAutosaveName;
+    const seriesPayload = buildSeriesPayload(entry);
+    const seriesId = getSeriesId(entry);
+    const modelId = getModelId(entry);
+    const title = seriesId || modelId || getModelTitle(entry, "blockscape");
+    const suffix = seriesPayload ? "-series" : "";
+    const filename = `${makeDownloadName(title)}${suffix}.bs`;
+    entry.browserAutosaveName = filename;
+    return filename;
+  }
+
+  function scheduleBrowserAutosave({ force = false } = {}) {
+    if (
+      autosaveSuppressed ||
+      isReadOnly ||
+      !browserAutosave ||
+      activeIndex < 0 ||
+      !models[activeIndex]
+    ) {
+      return;
+    }
+    const entry = models[activeIndex];
+    const payload = getBrowserAutosavePayload(entry);
+    if (!payload) return;
+    const fingerprint = computeJsonFingerprint(payload);
+    if (!force && browserAutosaveFingerprints.get(entry) === fingerprint) {
+      return;
+    }
+    browserAutosaveFingerprints.set(entry, fingerprint);
+    browserAutosave.schedule();
+  }
+
+  function withBrowserAutosaveSuppressed(fn) {
+    const previous = autosaveSuppressed;
+    autosaveSuppressed = true;
+    try {
+      return fn();
+    } finally {
+      autosaveSuppressed = previous;
+    }
+  }
+
   function downloadCurrentJson(source = "shortcut", preferSeries = false) {
     const text = jsonBox.value || "";
     if (!text.trim()) {
@@ -5038,9 +5130,15 @@ ${fullBundleJs}
       localBackend.highlightSource(targetPath);
     }
     syncDocumentTitle();
-    renderModelList();
-    loadActiveIntoEditor();
-    rebuildFromActive();
+    withBrowserAutosaveSuppressed(() => {
+      renderModelList();
+      loadActiveIntoEditor();
+      rebuildFromActive();
+    });
+    browserAutosaveFingerprints.set(
+      models[i],
+      computeJsonFingerprint(getBrowserAutosavePayload(models[i]) || {})
+    );
     if (searchInput) {
       handleSearchInput(searchInput.value || "");
     }
@@ -5126,6 +5224,7 @@ ${fullBundleJs}
     if (copySeriesButton) {
       copySeriesButton.disabled = !buildSeriesPayload(active);
     }
+    scheduleBrowserAutosave();
   }
 
   function tryParseJson(txt) {
@@ -10301,6 +10400,7 @@ ${fullBundleJs}
     await applyInitialSettings();
 
     const hasLocalBackend = await initialBackendCheck;
+    await initialBrowserAutosaveCheck;
 
     // Try to load JSON files from same directory only when no local backend
     if (!hasLocalBackend && features.autoLoadFromDir) {
