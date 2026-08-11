@@ -22,15 +22,6 @@ function openDb() {
   });
 }
 
-function idbGet(db, storeName, key) {
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(storeName, "readonly");
-    const request = tx.objectStore(storeName).get(key);
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-}
-
 function idbPut(db, storeName, keyOrValue, maybeValue) {
   return new Promise((resolve, reject) => {
     const tx = db.transaction(storeName, "readwrite");
@@ -208,33 +199,6 @@ export function createBrowserAutosave({
   async function clearDraft(filename) {
     if (!db || !filename) return;
     await idbDelete(db, DRAFT_STORE, filename);
-  }
-
-  async function restoreHandle() {
-    if (!db) return;
-    try {
-      directoryHandle = await idbGet(db, HANDLE_STORE, DIRECTORY_KEY);
-      if (!directoryHandle) {
-        setStatus("Choose a folder to autosave active maps as .bs files.");
-        return;
-      }
-      permissionState = await directoryHandle.queryPermission({
-        mode: "readwrite",
-      });
-      if (permissionState === "granted") {
-        setStatus(`Autosave connected to "${directoryHandle.name}".`, "saved");
-        await refreshFiles({ silent: true });
-      } else {
-        setStatus(`Reconnect "${directoryHandle.name}" to resume autosave.`, "warn");
-      }
-    } catch (error) {
-      directoryHandle = null;
-      permissionState = "unknown";
-      console.warn("[Blockscape] browser autosave restore failed", error);
-      setStatus("Could not restore the previous autosave folder.", "error");
-    } finally {
-      syncUi();
-    }
   }
 
   async function connect() {
@@ -662,7 +626,8 @@ export function createBrowserAutosave({
     if (!supported) return false;
     try {
       db = await openDb();
-      await restoreHandle();
+      setStatus("Choose a folder to browse .bs files or save the active map.");
+      syncUi();
       return true;
     } catch (error) {
       console.warn("[Blockscape] browser autosave init failed", error);

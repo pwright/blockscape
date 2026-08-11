@@ -495,7 +495,7 @@
         <section id="browserAutosavePanel" class="browser-autosave" aria-label="Browser folder autosave">
           <div class="sidebar-heading">Browser autosave</div>
           <p id="browserAutosaveStatus" class="browser-autosave__status muted" aria-live="polite">
-            Choose a folder to autosave active maps as .bs files.
+            Choose a folder to browse .bs files or save the active map.
           </p>
           <div class="browser-autosave__actions">
             <button id="connectBrowserAutosave" class="pf-v5-c-button pf-m-primary" type="button">Open folder</button>
