@@ -1,7 +1,23 @@
+import {
+  createBrowserFileProvider,
+  isBrowserFileProviderSupported,
+} from "./localFiles/browserFileProvider.js";
+import { createFileAutosaveController } from "./localFiles/fileAutosaveController.js";
+import { createFileSafetyService } from "./localFiles/fileSafetyService.js";
+import {
+  createBrowserFileBinding,
+  ensureBrowserFileBinding,
+} from "./localFiles/fileBinding.js";
+import {
+  createIndexedDbDraftAdapter,
+  createRecoveryDraftStore,
+  RECOVERY_DRAFT_STORE,
+} from "./localFiles/recoveryDraftStore.js";
+import { normalizeProviderRelativePath } from "./localFiles/pathPolicy.js";
+
 const DB_NAME = "blockscape-browser-autosave";
 const DB_VERSION = 1;
 const HANDLE_STORE = "handles";
-const DRAFT_STORE = "drafts";
 const RECENT_KEY = "recent-folders";
 const MAX_RECENT_FOLDERS = 5;
 const DEFAULT_DEBOUNCE_MS = 700;
@@ -14,8 +30,8 @@ function openDb() {
       if (!db.objectStoreNames.contains(HANDLE_STORE)) {
         db.createObjectStore(HANDLE_STORE);
       }
-      if (!db.objectStoreNames.contains(DRAFT_STORE)) {
-        db.createObjectStore(DRAFT_STORE, { keyPath: "filename" });
+      if (!db.objectStoreNames.contains(RECOVERY_DRAFT_STORE)) {
+        db.createObjectStore(RECOVERY_DRAFT_STORE, { keyPath: "filename" });
       }
     };
     request.onsuccess = () => resolve(request.result);
@@ -36,21 +52,8 @@ function idbPut(db, storeName, keyOrValue, maybeValue) {
   });
 }
 
-function idbDelete(db, storeName, key) {
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(storeName, "readwrite");
-    const request = tx.objectStore(storeName).delete(key);
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-}
-
 function isSupported() {
-  return (
-    typeof window !== "undefined" &&
-    typeof window.showDirectoryPicker === "function" &&
-    typeof indexedDB !== "undefined"
-  );
+  return isBrowserFileProviderSupported();
 }
 
 function sanitizeFilename(name) {
@@ -65,28 +68,13 @@ function sanitizeFilename(name) {
 }
 
 function normalizeRelativePath(path) {
-  const raw = (path || "").toString().trim().replace(/\\/g, "/");
-  if (!raw) return "";
-  const parts = raw.split("/").filter(Boolean);
-  if (!parts.length || parts.some((part) => part === "." || part === "..")) {
-    return "";
-  }
-  const filename = parts[parts.length - 1];
-  if (!filename.toLowerCase().endsWith(".bs")) return "";
-  return parts.join("/");
+  return normalizeProviderRelativePath(path);
 }
 
 function resolveSavePath(candidate) {
   const normalized = normalizeRelativePath(candidate);
   if (normalized) return normalized;
   return sanitizeFilename(candidate);
-}
-
-async function verifyPermission(handle, readWrite) {
-  const options = readWrite ? { mode: "readwrite" } : {};
-  if ((await handle.queryPermission(options)) === "granted") return true;
-  if ((await handle.requestPermission(options)) === "granted") return true;
-  return false;
 }
 
 export function createBrowserAutosave({
@@ -98,8 +86,11 @@ export function createBrowserAutosave({
   saveNowButton,
   recentContainer,
   recentListEl,
+  activeBindingEl,
+  activeStateEl,
   refreshButton: initialRefreshButton,
   loadButton: initialLoadButton,
+  deleteButton: initialDeleteButton,
   fileTableEl: initialFileTableEl,
   fileTableBodyEl: initialFileTableBodyEl,
   getActiveEntry,
@@ -113,17 +104,16 @@ export function createBrowserAutosave({
   debounceMs = DEFAULT_DEBOUNCE_MS,
 } = {}) {
   const supported = isSupported();
+  const provider = createBrowserFileProvider();
   let db = null;
-  let directoryHandle = null;
-  let saveTimer = null;
-  let saveQueue = Promise.resolve();
-  let permissionState = "unknown";
+  let recoveryDrafts = null;
+  let autosaveController = null;
   let lastSavedAt = null;
-  let pendingSave = null;
   let files = [];
   let selectedPath = "";
   let refreshButton = initialRefreshButton || null;
   let loadButton = initialLoadButton || null;
+  let deleteButton = initialDeleteButton || null;
   let fileTableEl = initialFileTableEl || null;
   let fileTableBodyEl = initialFileTableBodyEl || null;
   let sortKey = "path";
@@ -138,7 +128,24 @@ export function createBrowserAutosave({
 
   function notifyConnectionChange() {
     if (typeof onConnectionChange === "function") {
-      onConnectionChange(!!directoryHandle && permissionState === "granted");
+      onConnectionChange(provider.isConnected());
+    }
+  }
+
+  function updateActiveBindingUi() {
+    const entry = getActiveEntry?.();
+    const path =
+      entry?.fileBinding?.target?.path || entry?.browserAutosavePath || "";
+    if (activeBindingEl) {
+      activeBindingEl.textContent = path || "Not file-backed";
+      activeBindingEl.title = path || "";
+    }
+    if (activeStateEl) {
+      let state = "Unbound";
+      if (path && provider.isConnected()) state = "File-backed";
+      if (path && !provider.isConnected()) state = "Disconnected";
+      activeStateEl.textContent = state;
+      activeStateEl.dataset.state = state.toLowerCase().replace(/\s+/g, "-");
     }
   }
 
@@ -146,41 +153,54 @@ export function createBrowserAutosave({
     if (!panel) return;
     if (!supported) {
       panel.hidden = false;
-      setStatus("Browser folder autosave needs Chromium with File System Access.", "error");
+      setStatus("Local files need Chromium with File System Access.", "error");
       [connectButton, reconnectButton, disconnectButton, saveNowButton, refreshButton, loadButton].forEach((button) => {
         if (button) button.disabled = true;
       });
       return;
     }
     panel.hidden = false;
-    if (connectButton) connectButton.hidden = !!directoryHandle;
+    const workspace = provider.getWorkspace();
+    if (connectButton) connectButton.hidden = !!workspace.handle;
     if (reconnectButton) {
       reconnectButton.hidden =
-        !directoryHandle || permissionState === "granted";
+        !workspace.handle || workspace.permissionState === "granted";
     }
-    if (disconnectButton) disconnectButton.hidden = !directoryHandle;
+    if (disconnectButton) disconnectButton.hidden = !workspace.handle;
     if (saveNowButton) {
       saveNowButton.disabled =
-        !directoryHandle ||
-        permissionState !== "granted" ||
+        !workspace.handle ||
+        workspace.permissionState !== "granted" ||
         !getActiveEntry?.();
     }
     if (refreshButton) {
-      refreshButton.disabled = !directoryHandle || permissionState !== "granted";
+      refreshButton.disabled =
+        !workspace.handle || workspace.permissionState !== "granted";
     }
     if (loadButton) {
       loadButton.disabled =
-        !directoryHandle || permissionState !== "granted" || !selectedPath;
+        !workspace.handle ||
+        workspace.permissionState !== "granted" ||
+        !selectedPath;
+    }
+    if (deleteButton) {
+      deleteButton.disabled =
+        !workspace.handle ||
+        workspace.permissionState !== "granted" ||
+        !selectedPath;
     }
     if (fileTableEl) {
       fileTableEl.classList.toggle(
         "is-disabled",
-        !directoryHandle || permissionState !== "granted" || !files.length
+        !workspace.handle ||
+          workspace.permissionState !== "granted" ||
+          !files.length
       );
     }
     if (recentContainer) {
       recentContainer.hidden = !recentFolders.length;
     }
+    updateActiveBindingUi();
     notifyConnectionChange();
   }
 
@@ -272,47 +292,25 @@ export function createBrowserAutosave({
     syncUi();
   }
 
-  async function rememberDraft(filename, text) {
-    if (!db || !filename || typeof text !== "string") return;
-    await idbPut(db, DRAFT_STORE, {
-      filename,
-      text,
-      updatedAt: Date.now(),
-    });
-  }
-
-  async function clearDraft(filename) {
-    if (!db || !filename) return;
-    await idbDelete(db, DRAFT_STORE, filename);
-  }
-
   async function connect() {
     if (!supported) return false;
     try {
-      const handle = await window.showDirectoryPicker({
-        id: "blockscape-text-workspace",
-        mode: "readwrite",
-        startIn: "documents",
-      });
-      directoryHandle = handle;
-      permissionState = (await verifyPermission(handle, true))
-        ? "granted"
-        : "denied";
-      if (permissionState !== "granted") {
-        setStatus("Folder permission was not granted.", "error");
+      const workspace = await provider.connectWorkspace();
+      if (workspace.permissionState !== "granted") {
+        setStatus("Workspace permission was not granted.", "error");
         syncUi();
         return false;
       }
-      await rememberRecentFolder(handle);
-      setStatus(`Autosave connected to "${handle.name}".`, "saved");
-      showNotice(`Autosave connected to "${handle.name}".`, 2200);
+      await rememberRecentFolder(workspace.handle);
+      setStatus(`Local files connected to "${workspace.name}".`, "saved");
+      showNotice(`Local files connected to "${workspace.name}".`, 2200);
       await refreshFiles({ silent: true });
       syncUi();
       return true;
     } catch (error) {
       if (error?.name !== "AbortError") {
         console.warn("[Blockscape] browser autosave connect failed", error);
-        setStatus(`Autosave folder connection failed: ${error.message}`, "error");
+        setStatus(`Workspace connection failed: ${error.message}`, "error");
       }
       syncUi();
       return false;
@@ -320,17 +318,15 @@ export function createBrowserAutosave({
   }
 
   async function reconnect() {
-    if (!directoryHandle) return connect();
+    if (!provider.getWorkspaceHandle()) return connect();
     try {
-      permissionState = (await verifyPermission(directoryHandle, true))
-        ? "granted"
-        : "denied";
-      if (permissionState !== "granted") {
+      const workspace = await provider.reconnectWorkspace();
+      if (workspace.permissionState !== "granted") {
         setStatus("Folder permission is still required.", "error");
         syncUi();
         return false;
       }
-      setStatus(`Autosave connected to "${directoryHandle.name}".`, "saved");
+      setStatus(`Local files connected to "${workspace.name}".`, "saved");
       await refreshFiles({ silent: true });
       syncUi();
       return true;
@@ -343,58 +339,66 @@ export function createBrowserAutosave({
   }
 
   async function disconnect() {
-    clearTimeout(saveTimer);
-    pendingSave = null;
-    directoryHandle = null;
-    permissionState = "unknown";
+    autosaveController?.dispose();
+    provider.disconnectWorkspace();
     files = [];
     selectedPath = "";
     renderFiles();
-    setStatus("Autosave folder disconnected.");
+    setStatus("Local files disconnected.");
     syncUi();
   }
 
-  async function getDirectoryForPath(path, { create = false } = {}) {
-    const normalized = normalizeRelativePath(path);
-    if (!normalized) throw new Error(`Invalid autosave path: ${path}`);
-    const parts = normalized.split("/");
-    const filename = parts.pop();
-    let dir = directoryHandle;
-    for (const part of parts) {
-      dir = await dir.getDirectoryHandle(part, { create });
+  async function writeTextFile(filename, text, entry) {
+    const normalized = normalizeRelativePath(filename);
+    if (!normalized) throw new Error(`Invalid autosave path: ${filename}`);
+    await recoveryDrafts?.remember({
+      entry,
+      path: normalized,
+      text,
+      metadata: {
+        displayPath: normalized,
+      },
+    });
+    const result = await provider.writeFile(normalized, text);
+    await recoveryDrafts?.clearAfterSuccessfulWrite({
+      entry,
+      path: normalized,
+      writtenPath: result.path,
+    });
+    if (entry) {
+      entry.fileBinding = createBrowserFileBinding(result.path, {
+        revision: result.revision,
+      });
     }
-    return { dir, filename, path: normalized };
+    markSaved(result.path, text, result.revision);
+    return result;
   }
 
-  async function writeTextFile(filename, text) {
-    if (!directoryHandle) throw new Error("No autosave folder is connected.");
-    if (permissionState !== "granted") {
-      throw new Error("Autosave folder permission is required.");
-    }
-    const target = await getDirectoryForPath(filename, { create: true });
-    await rememberDraft(target.path, text);
-    const fileHandle = await target.dir.getFileHandle(target.filename, {
-      create: true,
-    });
-    const writable = await fileHandle.createWritable();
-    try {
-      await writable.write(text);
-      await writable.close();
-      await clearDraft(target.path);
-      upsertFile(target.path, {
-        size: new Blob([text]).size,
-        lastModified: Date.now(),
+  function getFileRevision(path) {
+    return files.find((file) => file.path === path)?.revision || null;
+  }
+
+  function getActiveEntryForAutosave() {
+    const entry = getActiveEntry?.();
+    if (!entry) return null;
+    if (entry.browserAutosavePath && !entry.fileBinding) {
+      ensureBrowserFileBinding(entry, {
+        revision: getFileRevision(entry.browserAutosavePath),
       });
-      lastSavedAt = new Date();
-      setStatus(`Saved ${target.path} at ${lastSavedAt.toLocaleTimeString()}.`, "saved");
-    } catch (error) {
-      try {
-        await writable.abort();
-      } catch {
-        // Ignore abort failures; the original write error is more useful.
-      }
-      throw error;
     }
+    return entry;
+  }
+
+  function markSaved(path, text, revision) {
+    upsertFile(path, {
+      size:
+        revision?.size ??
+        (typeof Blob === "function" ? new Blob([text]).size : text.length),
+      lastModified: revision?.lastModified ?? Date.now(),
+      revision,
+    });
+    lastSavedAt = new Date();
+    setStatus(`Saved ${path} at ${lastSavedAt.toLocaleTimeString()}.`, "saved");
   }
 
   function resolveCurrentSave() {
@@ -404,7 +408,7 @@ export function createBrowserAutosave({
     if (!text || !text.trim()) return null;
     const filename = normalizeRelativePath(getSuggestedFilename?.(entry));
     if (!filename) return null;
-    return { filename, text };
+    return { filename, text, entry };
   }
 
   function resolveSaveAs() {
@@ -419,7 +423,7 @@ export function createBrowserAutosave({
       return { filename: defaultName, text, entry };
     }
     const response = window.prompt(
-      "Save active map as .bs file in the connected folder:",
+      "Save active map as .bs file in the connected workspace:",
       defaultName
     );
     if (response == null) return null;
@@ -481,7 +485,17 @@ export function createBrowserAutosave({
     if (!fileTableEl) return;
     fileTableEl.querySelectorAll("[data-browser-file-sort]").forEach((button) => {
       const active = button.dataset.browserFileSort === sortKey;
-      button.setAttribute("aria-sort", active ? sortDirection : "none");
+      const header = button.closest("th");
+      if (header) {
+        header.setAttribute(
+          "aria-sort",
+          active
+            ? sortDirection === "desc"
+              ? "descending"
+              : "ascending"
+            : "none"
+        );
+      }
       button.dataset.sortDirection = active ? sortDirection : "none";
     });
   }
@@ -494,9 +508,9 @@ export function createBrowserAutosave({
       const cell = document.createElement("td");
       cell.colSpan = 4;
       cell.className = "browser-autosave-table__empty";
-      cell.textContent = directoryHandle
+      cell.textContent = provider.getWorkspaceHandle()
         ? "No .bs files found"
-        : "Open a folder to list .bs files";
+        : "Open a workspace to list .bs files";
       row.appendChild(cell);
       fileTableBodyEl.appendChild(row);
       selectedPath = "";
@@ -554,42 +568,15 @@ export function createBrowserAutosave({
     renderFiles();
   }
 
-  async function collectBsFiles(handle, prefix = "", result = []) {
-    for await (const [name, child] of handle.entries()) {
-      const path = prefix ? `${prefix}/${name}` : name;
-      if (child.kind === "file") {
-        if (name.toLowerCase().endsWith(".bs")) {
-          try {
-            const file = await child.getFile();
-            result.push({
-              path,
-              size: file.size,
-              lastModified: file.lastModified,
-            });
-          } catch {
-            result.push({ path });
-          }
-        }
-        continue;
-      }
-      if (child.kind === "directory") {
-        await collectBsFiles(child, path, result);
-      }
-    }
-    return result;
-  }
-
   async function refreshFiles({ silent = false } = {}) {
-    if (!supported || !directoryHandle || permissionState !== "granted") {
+    if (!supported || !provider.isConnected()) {
       syncUi();
       return [];
     }
-    if (!silent) setStatus("Scanning folder for .bs files...", "saving");
+    if (!silent) setStatus("Scanning workspace for .bs files...", "saving");
     if (refreshButton) refreshButton.disabled = true;
     try {
-      files = (await collectBsFiles(directoryHandle)).sort((a, b) =>
-        a.path.localeCompare(b.path)
-      );
+      files = await provider.listFiles();
       if (!files.some((file) => file.path === selectedPath)) {
         selectedPath = files[0]?.path || "";
       }
@@ -607,27 +594,21 @@ export function createBrowserAutosave({
     }
   }
 
-  async function readTextFile(path) {
-    if (!directoryHandle) throw new Error("No autosave folder is connected.");
-    if (permissionState !== "granted") {
-      throw new Error("Autosave folder permission is required.");
-    }
-    const target = await getDirectoryForPath(path);
-    const fileHandle = await target.dir.getFileHandle(target.filename);
-    const file = await fileHandle.getFile();
-    return await file.text();
-  }
-
   async function loadSelectedFile() {
     const path = selectedPath || "";
     if (!path) return false;
     try {
       setStatus(`Loading ${path}...`, "saving");
-      const text = await readTextFile(path);
-      await onLoadFile?.({ path, text });
+      const file = await provider.readFile(path);
+      await onLoadFile?.({
+        path,
+        text: file.text,
+        revision: file.revision,
+      });
       selectedPath = path;
       renderFiles();
       setStatus(`Loaded ${path}.`, "saved");
+      updateActiveBindingUi();
       return true;
     } catch (error) {
       console.warn("[Blockscape] browser autosave file load failed", error);
@@ -636,90 +617,103 @@ export function createBrowserAutosave({
     }
   }
 
+  async function deleteSelectedFile() {
+    const path = selectedPath || "";
+    if (!path || !provider.isConnected()) return false;
+    const confirmed =
+      typeof window === "undefined" ||
+      typeof window.confirm !== "function" ||
+      window.confirm(`Delete ${path} from the connected local workspace?`);
+    if (!confirmed) return false;
+    try {
+      setStatus(`Deleting ${path}...`, "saving");
+      await provider.deleteFile(path);
+      files = files.filter((file) => file.path !== path);
+      selectedPath = files[0]?.path || "";
+      renderFiles();
+      setStatus(`Deleted ${path}.`, "saved");
+      return true;
+    } catch (error) {
+      console.warn("[Blockscape] local file delete failed", error);
+      setStatus(`Delete failed: ${error.message}`, "error");
+      syncUi();
+      return false;
+    }
+  }
+
   function schedule() {
-    if (!supported || !directoryHandle || permissionState !== "granted") return;
+    if (!supported || !provider.isConnected() || !autosaveController) return;
     const next = resolveCurrentSave();
     if (!next) return;
-    pendingSave = next;
-    clearTimeout(saveTimer);
+    if (next.entry.browserAutosavePath && !next.entry.fileBinding) {
+      ensureBrowserFileBinding(next.entry, {
+        revision: getFileRevision(next.entry.browserAutosavePath),
+      });
+    }
     setStatus(`Saving ${next.filename}...`, "saving");
-    saveTimer = setTimeout(() => {
-      const target = pendingSave;
-      pendingSave = null;
-      saveQueue = saveQueue
-        .then(() => writeTextFile(target.filename, target.text))
-        .catch((error) => {
-          console.warn("[Blockscape] browser autosave failed", error);
-          setStatus(`Autosave failed: ${error.message}`, "error");
-        });
-    }, debounceMs);
+    autosaveController.schedule();
   }
 
   async function flushNow() {
-    if (!supported || !directoryHandle) return false;
-    if (permissionState !== "granted") {
-      setStatus("Reconnect the folder before saving.", "warn");
+    if (!supported || !provider.getWorkspaceHandle() || !autosaveController) return false;
+    if (!provider.isConnected()) {
+      setStatus("Reconnect the workspace before saving.", "warn");
       syncUi();
       return false;
     }
     const next = resolveCurrentSave();
     if (!next) return false;
-    clearTimeout(saveTimer);
-    pendingSave = null;
     setStatus(`Saving ${next.filename}...`, "saving");
-    saveQueue = saveQueue
-      .then(() => writeTextFile(next.filename, next.text))
-      .catch((error) => {
-        console.warn("[Blockscape] browser autosave failed", error);
-        setStatus(`Autosave failed: ${error.message}`, "error");
-        return false;
-      });
-    const result = await saveQueue;
-    return result !== false;
+    const result = await autosaveController.flushNow();
+    return Boolean(result?.saved);
   }
 
   async function saveAs() {
-    if (!supported || !directoryHandle) return false;
-    if (permissionState !== "granted") {
-      setStatus("Reconnect the folder before saving.", "warn");
+    if (!supported || !provider.getWorkspaceHandle()) return false;
+    if (!provider.isConnected()) {
+      setStatus("Reconnect the workspace before saving.", "warn");
       syncUi();
       return false;
     }
     const next = resolveSaveAs();
     if (!next) return false;
-    clearTimeout(saveTimer);
-    pendingSave = null;
+    autosaveController?.dispose();
     setStatus(`Saving ${next.filename}...`, "saving");
-    saveQueue = saveQueue
-      .then(async () => {
-        await writeTextFile(next.filename, next.text);
-        onSaveAsPath?.(next.entry, next.filename);
-        return true;
-      })
-      .catch((error) => {
-        console.warn("[Blockscape] browser save-as failed", error);
-        setStatus(`Save failed: ${error.message}`, "error");
-        return false;
-      });
-    const result = await saveQueue;
-    return result !== false;
+    try {
+      const result = await writeTextFile(next.filename, next.text, next.entry);
+      onSaveAsPath?.(next.entry, next.filename, result.revision);
+      return true;
+    } catch (error) {
+      console.warn("[Blockscape] browser save-as failed", error);
+      setStatus(`Save failed: ${error.message}`, "error");
+      return false;
+    }
+  }
+
+  async function saveCurrent() {
+    if (!supported) return false;
+    if (!provider.getWorkspaceHandle()) {
+      setStatus("Open a workspace before saving a local file.", "warn");
+      syncUi();
+      return false;
+    }
+    const current = resolveCurrentSave();
+    if (current) return flushNow();
+    return saveAs();
   }
 
   async function connectRecentFolder(id) {
     const record = recentFolders.find((folder) => folder.id === id);
     if (!record?.handle) return false;
     try {
-      directoryHandle = record.handle;
-      permissionState = (await verifyPermission(directoryHandle, true))
-        ? "granted"
-        : "denied";
-      if (permissionState !== "granted") {
+      const workspace = await provider.reconnectWorkspace(record.handle);
+      if (workspace.permissionState !== "granted") {
         setStatus(`Permission required for "${record.name}".`, "error");
         syncUi();
         return false;
       }
-      await rememberRecentFolder(directoryHandle);
-      setStatus(`Autosave connected to "${directoryHandle.name}".`, "saved");
+      await rememberRecentFolder(workspace.handle);
+      setStatus(`Autosave connected to "${workspace.name}".`, "saved");
       await refreshFiles({ silent: true });
       syncUi();
       return true;
@@ -736,13 +730,45 @@ export function createBrowserAutosave({
     if (!supported) return false;
     try {
       db = await openDb();
+      recoveryDrafts = createRecoveryDraftStore({
+        adapter: createIndexedDbDraftAdapter(db),
+      });
+      const fileSafety = createFileSafetyService({
+        provider,
+        recoveryDrafts,
+        isDirty: () => true,
+      });
+      autosaveController = createFileAutosaveController({
+        fileSafety,
+        getActiveEntry: getActiveEntryForAutosave,
+        getPayloadText,
+        debounceMs,
+        onStateChange: ({ state }) => {
+          if (state === "saving") setStatus("Saving file...", "saving");
+        },
+        onSaved: ({ entry, text, result }) => {
+          if (entry?.fileBinding && result?.revision) {
+            entry.fileBinding.revision = result.revision;
+          }
+          markSaved(result.path, text, result.revision);
+        },
+        onSkipped: ({ reason }) => {
+          if (reason === "conflicted" || reason === "disconnected") {
+            setStatus(`Autosave paused: ${reason}.`, "warn");
+          }
+        },
+        onError: ({ error }) => {
+          console.warn("[Blockscape] browser autosave failed", error);
+          setStatus(`Autosave failed: ${error.message}`, "error");
+        },
+      });
       await loadRecentFolders();
-      setStatus("Choose a folder to browse .bs files or save the active map.");
+      setStatus("Open a workspace to browse .bs files or save the active map.");
       syncUi();
       return true;
     } catch (error) {
       console.warn("[Blockscape] browser autosave init failed", error);
-      setStatus("Browser autosave could not start.", "error");
+      setStatus("Local files could not start.", "error");
       syncUi();
       return false;
     }
@@ -754,6 +780,7 @@ export function createBrowserAutosave({
   saveNowButton?.addEventListener("click", saveAs);
   refreshButton?.addEventListener("click", () => refreshFiles());
   loadButton?.addEventListener("click", loadSelectedFile);
+  deleteButton?.addEventListener("click", deleteSelectedFile);
   recentListEl?.addEventListener("click", (event) => {
     const button = event.target?.closest?.("[data-recent-folder-id]");
     if (!button || !recentListEl.contains(button)) return;
@@ -796,13 +823,16 @@ export function createBrowserAutosave({
     fileTableBodyEl: nextFileTableBodyEl,
     refreshButton: nextRefreshButton,
     loadButton: nextLoadButton,
+    deleteButton: nextDeleteButton,
   } = {}) {
     fileTableEl = nextFileTableEl || null;
     fileTableBodyEl = nextFileTableBodyEl || null;
     refreshButton = nextRefreshButton || null;
     loadButton = nextLoadButton || null;
+    deleteButton = nextDeleteButton || null;
     refreshButton?.addEventListener("click", () => refreshFiles());
     loadButton?.addEventListener("click", loadSelectedFile);
+    deleteButton?.addEventListener("click", deleteSelectedFile);
     fileTableEl?.addEventListener("click", (event) => {
       const sortButton = event.target?.closest?.("[data-browser-file-sort]");
       if (sortButton && fileTableEl.contains(sortButton)) {
@@ -843,13 +873,15 @@ export function createBrowserAutosave({
     connect,
     reconnect,
     disconnect,
+    refreshUi: syncUi,
     schedule,
     flushNow,
+    saveCurrent,
     saveAs,
     connectRecentFolder,
     refreshFiles,
     loadSelectedFile,
     mountFileBrowser,
-    isConnected: () => !!directoryHandle && permissionState === "granted",
+    isConnected: provider.isConnected,
   };
 }

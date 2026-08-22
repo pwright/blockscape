@@ -17,6 +17,7 @@
     "clean-docs": "node scripts/clean-docs.js",
     "preview": "vite preview",
     "server": "node server.js",
+    "test:local-files": "node --test svelte/src/localFiles/*.test.js",
     "cypress:open": "cypress open",
     "cypress:run": "cypress run",
     "cypress:report": "ELECTRON_RUN_AS_NODE= ELECTRON_NO_ATTACH_CONSOLE= cypress run --reporter json > cypress/results/report.json"

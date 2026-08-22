@@ -438,11 +438,12 @@
 
               <button id="shareModel" class="pf-v5-c-button pf-m-secondary" type="button" title="Copy a shareable URL for this model">Share</button>
               <details id="saveFileMenu" class="blockscape-save-menu">
-                <summary class="pf-v5-c-button pf-m-secondary" title="Save the active map or series">Save</summary>
-                <div class="blockscape-save-menu__list" role="menu" aria-label="Save options">
-                  <button class="blockscape-save-menu__item" type="button" role="menuitem" data-save-action="html">Save HTML</button>
-                  <button class="blockscape-save-menu__item" type="button" role="menuitem" data-save-action="simple-html">Save simple HTML</button>
-                  <button class="blockscape-save-menu__item" type="button" role="menuitem" data-save-action="bs">Save .bs file</button>
+                <summary class="pf-v5-c-button pf-m-secondary" title="Save to the active local file, or choose an export">Save</summary>
+                <div class="blockscape-save-menu__list" role="menu" aria-label="Save and export options">
+                  <button class="blockscape-save-menu__item" type="button" role="menuitem" data-save-action="save">Save</button>
+                  <button class="blockscape-save-menu__item" type="button" role="menuitem" data-save-action="bs">Download .bs</button>
+                  <button class="blockscape-save-menu__item" type="button" role="menuitem" data-save-action="html">Export HTML</button>
+                  <button class="blockscape-save-menu__item" type="button" role="menuitem" data-save-action="simple-html">Export simple HTML</button>
                 </div>
               </details>
               <button id="helpButton" class="pf-v5-c-button pf-m-primary" type="button" title="Show keyboard shortcuts">Help</button>
@@ -492,20 +493,40 @@
             title="Remove selected model">Remove active</button>
           <button id="clear" class="pf-v5-c-button pf-m-tertiary" type="button">Clear selection</button>
         </div>
-        <section id="browserAutosavePanel" class="browser-autosave" aria-label="Browser folder autosave">
-          <div class="sidebar-heading">Browser autosave</div>
+        <section id="browserAutosavePanel" class="browser-autosave local-files-panel" aria-label="Local files">
+          <div class="sidebar-heading">Local files</div>
           <p id="browserAutosaveStatus" class="browser-autosave__status muted" aria-live="polite">
-            Choose a folder to browse .bs files or save the active map.
+            Open a workspace to browse .bs files or save the active map.
           </p>
+          <div class="local-files-active">
+            <div class="local-files-active__label">Active file</div>
+            <div id="localFilesActiveBinding" class="local-files-active__value">Not file-backed</div>
+            <div id="localFilesActiveState" class="local-files-active__state">Unbound</div>
+          </div>
           <div id="browserAutosaveRecent" class="browser-autosave__recent" hidden>
-            <div class="browser-autosave__recent-label">Recent folders</div>
+            <div class="browser-autosave__recent-label">Recent workspaces</div>
             <div id="browserAutosaveRecentList" class="browser-autosave__recent-list"></div>
           </div>
           <div class="browser-autosave__actions">
-            <button id="connectBrowserAutosave" class="pf-v5-c-button pf-m-primary" type="button">Open folder</button>
+            <button id="connectBrowserAutosave" class="pf-v5-c-button pf-m-primary" type="button">Open workspace</button>
             <button id="reconnectBrowserAutosave" class="pf-v5-c-button pf-m-secondary" type="button" hidden>Reconnect</button>
-            <button id="saveBrowserAutosaveNow" class="pf-v5-c-button pf-m-secondary" type="button">Save as</button>
+            <button id="saveBrowserAutosaveNow" class="pf-v5-c-button pf-m-secondary" type="button">Save As</button>
             <button id="disconnectBrowserAutosave" class="pf-v5-c-button pf-m-tertiary" type="button" hidden>Disconnect</button>
+          </div>
+          <div class="local-files-actions-group" aria-label="Conflict actions">
+            <div class="local-files-actions-group__label">Conflict</div>
+            <div class="browser-autosave__actions">
+              <button id="localFilesReloadFromDisk" class="pf-v5-c-button pf-m-secondary" type="button" disabled>Reload from disk</button>
+              <button id="localFilesSaveCopy" class="pf-v5-c-button pf-m-secondary" type="button" disabled>Save copy</button>
+              <button id="localFilesOverwrite" class="pf-v5-c-button pf-m-danger" type="button" disabled>Overwrite</button>
+            </div>
+          </div>
+          <div class="local-files-actions-group" aria-label="Recovery draft actions">
+            <div class="local-files-actions-group__label">Recovery draft</div>
+            <div class="browser-autosave__actions">
+              <button id="localFilesRestoreDraft" class="pf-v5-c-button pf-m-secondary" type="button" disabled>Restore</button>
+              <button id="localFilesDiscardDraft" class="pf-v5-c-button pf-m-tertiary" type="button" disabled>Discard</button>
+            </div>
           </div>
         </section>
         <section id="localBackendPanel" class="local-backend" hidden>

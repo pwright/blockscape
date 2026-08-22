@@ -1206,6 +1206,10 @@
       gap: var(--space-sm);
     }
 
+    .local-files-panel {
+      background: var(--color-surface-muted);
+    }
+
     .browser-autosave[hidden] {
       display: none !important;
     }
@@ -1213,6 +1217,43 @@
     .browser-autosave__status {
       margin: 0;
       font-size: var(--font-size-xs);
+    }
+
+    .local-files-active {
+      display: grid;
+      gap: 2px;
+      padding: var(--space-xs);
+      border: 1px solid var(--color-border);
+      background: var(--color-surface);
+    }
+
+    .local-files-active__label,
+    .local-files-actions-group__label {
+      font-size: var(--font-size-xs);
+      color: var(--blockscape-muted);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .local-files-active__value {
+      min-width: 0;
+      overflow-wrap: anywhere;
+      font-size: var(--font-size-sm);
+      font-weight: var(--font-weight-semibold);
+      color: var(--blockscape-foreground);
+    }
+
+    .local-files-active__state {
+      font-size: var(--font-size-xs);
+      color: var(--blockscape-muted);
+    }
+
+    .local-files-active__state[data-state="file-backed"] {
+      color: var(--color-success);
+    }
+
+    .local-files-active__state[data-state="disconnected"] {
+      color: var(--color-warning);
     }
 
     .browser-autosave__status[data-state="saving"] {
@@ -1298,7 +1339,7 @@
     .browser-autosave-table {
       width: 100%;
       border-collapse: collapse;
-      font-size: var(--font-size-sm);
+      font-size: var(--font-size-xs);
       line-height: 1.3;
     }
 
@@ -1315,7 +1356,7 @@
 
     .browser-autosave-table th button {
       width: 100%;
-      padding: var(--space-xs) var(--space-sm);
+      padding: var(--space-2xs) var(--space-xs);
       border: 0;
       border-radius: 0;
       background: transparent;
@@ -1341,7 +1382,7 @@
     }
 
     .browser-autosave-table td {
-      padding: var(--space-2xs) var(--space-sm);
+      padding: var(--space-2xs) var(--space-xs);
       border-bottom: 1px solid var(--color-border-muted);
       color: var(--blockscape-foreground);
       vertical-align: top;
@@ -1384,6 +1425,63 @@
 
     .browser-autosave__actions .pf-v5-c-button {
       flex: 1 1 100px;
+    }
+
+    .local-files-actions-group {
+      display: grid;
+      gap: var(--space-2xs);
+      padding-top: var(--space-xs);
+      border-top: 1px solid var(--color-border-muted);
+    }
+
+    .local-files-map-strip {
+      display: flex;
+      align-items: center;
+      gap: var(--space-xs);
+      min-height: 2rem;
+      margin-bottom: var(--space-xs);
+      padding: var(--space-2xs) var(--space-sm);
+      border: 1px solid var(--color-border);
+      background: var(--color-surface);
+      color: var(--blockscape-foreground);
+      font-size: var(--font-size-xs);
+    }
+
+    .local-files-map-strip__label {
+      color: var(--blockscape-muted);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .local-files-map-strip__value {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-weight: var(--font-weight-semibold);
+    }
+
+    .local-files-browser-panel {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-md);
+      min-height: 26rem;
+      padding: var(--space-lg);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      background: var(--blockscape-surface);
+      box-shadow: var(--shadow-lg);
+    }
+
+    .local-files-browser-table-wrap {
+      max-height: min(56vh, 36rem);
+    }
+
+    .local-files-browser-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: var(--space-xs);
     }
 
     .local-backend {
@@ -2056,23 +2154,6 @@
       border: 1px solid var(--color-border);
       border-radius: var(--radius-md);
       box-shadow: var(--shadow-lg);
-    }
-
-    .blockscape-browser-files-panel {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-md);
-      padding: var(--space-lg);
-      background: var(--blockscape-surface);
-      border: 1px solid var(--color-border);
-      border-radius: var(--radius-md);
-      box-shadow: var(--shadow-lg);
-    }
-
-    .blockscape-browser-files-actions {
-      display: flex;
-      justify-content: flex-end;
-      gap: var(--space-xs);
     }
 
     .blockscape-registry-header {

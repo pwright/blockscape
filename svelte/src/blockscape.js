@@ -6,6 +6,11 @@ import {
 } from "./itemEditor";
 import { createTileContextMenu } from "./tileContextMenu";
 import { createBrowserAutosave } from "./browserAutosave";
+import {
+  createBrowserFileBinding,
+  ensureBrowserFileBinding,
+  getBrowserFileBindingPath,
+} from "./localFiles/fileBinding";
 import { ensureSeriesId, getSeriesId, makeSeriesId } from "./series";
 import {
   applySettingsSnapshot,
@@ -17,11 +22,10 @@ import {
 } from "./settings";
 import { isExternalHref, openExternalUrl, resolveHref } from "./externalLinks";
 import liteJsSource from "../../bs-mkdocs/site_assets/blockscape/lite.js?raw";
-import fullBundleJs from "../../documentation/docs/site_assets/blockscape/blockscape.js?raw";
-import fullBundleCss from "../../documentation/docs/site_assets/blockscape/blockscape.css?raw";
 
 const ASSET_BASE =
   (typeof import.meta !== "undefined" && import.meta.env?.BASE_URL) || "";
+const FULL_EXPORT_ASSET_BASE = "documentation/site_assets/blockscape/";
 
 export function initBlockscape(featureOverrides = {}, { host = document } = {}) {
   console.log("[Blockscape] init");
@@ -94,6 +98,8 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
   const saveBrowserAutosaveNowButton = byId("saveBrowserAutosaveNow");
   const browserAutosaveRecent = byId("browserAutosaveRecent");
   const browserAutosaveRecentList = byId("browserAutosaveRecentList");
+  const localFilesActiveBinding = byId("localFilesActiveBinding");
+  const localFilesActiveState = byId("localFilesActiveState");
   const localFileList = byId("localFileList");
   const localDirSelect = byId("localDirSelect");
   const refreshLocalFilesButton = byId("refreshLocalFiles");
@@ -179,7 +185,6 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
   let bgPreview = null;
   let autosaveSuppressed = false;
   const browserAutosaveFingerprints = new WeakMap();
-  let syncBrowserFilesTabVisibility = null;
   let activateCurrentTab = null;
   const versionThumbScroll = new Map(); // key -> scrollLeft
   let apicurioSettingsToggle = null;
@@ -359,25 +364,25 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
           saveNowButton: saveBrowserAutosaveNowButton,
           recentContainer: browserAutosaveRecent,
           recentListEl: browserAutosaveRecentList,
+          activeBindingEl: localFilesActiveBinding,
+          activeStateEl: localFilesActiveState,
           getActiveEntry: () => models[activeIndex] || null,
           getPayloadText: (entry) => getBrowserAutosavePayloadText(entry),
           getSuggestedFilename: (entry) => getBrowserAutosavePath(entry),
           getSaveAsFilename: (entry) => getBrowserAutosaveDefaultPath(entry),
-          onLoadFile: ({ path, text }) => loadFromBrowserAutosaveFile(path, text),
-          onSaveAsPath: (entry, path) => {
+          onLoadFile: ({ path, text, revision }) =>
+            loadFromBrowserAutosaveFile(path, text, { revision }),
+          onSaveAsPath: (entry, path, revision) => {
             if (entry && path) {
               entry.browserAutosavePath = path;
+              entry.fileBinding = createBrowserFileBinding(path, { revision });
               browserAutosaveFingerprints.set(
                 entry,
                 computeJsonFingerprint(getBrowserAutosavePayload(entry) || {})
               );
             }
           },
-          onConnectionChange: (connected) => {
-            if (typeof syncBrowserFilesTabVisibility === "function") {
-              syncBrowserFilesTabVisibility(connected);
-            }
-          },
+          onConnectionChange: () => {},
           showNotice,
         })
       : null;
@@ -4493,8 +4498,19 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
     }
   }
 
+  function ensureBrowserAutosaveBinding(entry, options = {}) {
+    if (!entry) return null;
+    if (entry.fileBinding) return entry.fileBinding;
+    if (!entry.browserAutosavePath) return null;
+    return ensureBrowserFileBinding(entry, options);
+  }
+
   function getBrowserAutosavePath(entry) {
-    return entry?.browserAutosavePath || "";
+    return (
+      getBrowserFileBindingPath(entry?.fileBinding) ||
+      entry?.browserAutosavePath ||
+      ""
+    );
   }
 
   function getBrowserAutosaveDefaultPath(entry) {
@@ -4518,7 +4534,9 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
       return;
     }
     const entry = models[activeIndex];
-    if (!entry.browserAutosavePath) return;
+    const savePath = getBrowserAutosavePath(entry);
+    if (!savePath) return;
+    ensureBrowserAutosaveBinding(entry);
     const payload = getBrowserAutosavePayload(entry);
     if (!payload) return;
     const fingerprint = computeJsonFingerprint(payload);
@@ -4561,6 +4579,20 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
     download(filename, payloadText);
     console.log(`[Blockscape] saved JSON (${source}):`, filename);
     return true;
+  }
+
+  async function saveCurrentLocalFile(source = "toolbar") {
+    if (!browserAutosave) {
+      alert("Local file saving is not available. Use Download .bs to export a copy.");
+      return false;
+    }
+    const saved = await browserAutosave.saveCurrent();
+    if (!saved) {
+      showNotice("Open a workspace or use Download .bs to export a copy.", 2600);
+    } else {
+      console.log(`[Blockscape] saved local file (${source}).`);
+    }
+    return saved;
   }
 
   async function fetchImageAsDataUri(url) {
@@ -4624,6 +4656,21 @@ export function initBlockscape(featureOverrides = {}, { host = document } = {}) 
     return clone;
   }
 
+  async function fetchExportAsset(filename) {
+    if (typeof window === "undefined" || typeof window.fetch !== "function") {
+      throw new Error("Export assets are only available in a browser.");
+    }
+    const assetUrl = new URL(
+      `${FULL_EXPORT_ASSET_BASE}${filename}`,
+      window.location.href
+    );
+    const response = await fetch(assetUrl, { cache: "no-store" });
+    if (!response.ok) {
+      throw new Error(`Unable to load export asset ${filename}: HTTP ${response.status}`);
+    }
+    return await response.text();
+  }
+
   async function downloadCurrentHtml({ simple = saveSimpleHtml } = {}) {
     if (activeIndex < 0 || !models[activeIndex]) {
       alert("Select or load a model before saving as HTML.");
@@ -4665,6 +4712,20 @@ ${liteJsSource}
 </body>
 </html>`;
     } else {
+      let fullBundleCss;
+      let fullBundleJs;
+      try {
+        [fullBundleCss, fullBundleJs] = await Promise.all([
+          fetchExportAsset("blockscape.css"),
+          fetchExportAsset("blockscape.js"),
+        ]);
+      } catch (error) {
+        console.warn("[Blockscape] full HTML export assets unavailable", error);
+        alert(
+          "Full HTML export assets are unavailable. Use Export simple HTML or run from a built site."
+        );
+        return;
+      }
       html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5175,6 +5236,7 @@ ${fullBundleJs}
       handleSearchInput(searchInput.value || "");
     }
     localBackend.updateActiveSavePlaceholder();
+    browserAutosave?.refreshUi?.();
     apicurio.updateAvailability();
     updateServerUrlFromActive();
   }
@@ -6264,10 +6326,10 @@ ${fullBundleJs}
 
     const mapPanel = document.createElement("div");
     const abstractPanel = document.createElement("div");
+    const localFilesPanel = document.createElement("div");
     const settingsTabPanel = document.createElement("div");
     const sourcePanel = document.createElement("div");
     const apicurioPanel = document.createElement("div");
-    const browserFilesPanel = document.createElement("div");
     let infoTooltipHtml = "";
     const seriesIdLookup = buildModelIdToVersionIndex(models[activeIndex]);
     const activeSeriesIndex = getActiveApicurioVersionIndex(
@@ -6292,15 +6354,14 @@ ${fullBundleJs}
 
     const tabDefs = [
       { id: "map", label: "Map", panel: mapPanel },
+      { id: "local-files", label: "Local Files", panel: localFilesPanel },
       { id: "abstract", label: "Info", panel: abstractPanel },
       { id: "settings", label: "Settings", panel: settingsTabPanel },
       { id: "source", label: "Source", panel: sourcePanel },
-      { id: "browser-files", label: "Browser Files", panel: browserFilesPanel },
       { id: "apicurio", label: "Apicurio", panel: apicurioPanel },
     ];
     const apicurioInitiallyEnabled =
       typeof apicurio.isEnabled === "function" ? apicurio.isEnabled() : false;
-    const browserFilesInitiallyEnabled = !!browserAutosave?.isConnected?.();
 
     const handleTabVisibility = (tabId) => {
       if (!overlay) return;
@@ -6324,12 +6385,6 @@ ${fullBundleJs}
       button.setAttribute("aria-selected", idx === 0 ? "true" : "false");
       button.textContent = tab.label;
       if (tab.id === "apicurio" && !apicurioInitiallyEnabled) {
-        button.hidden = true;
-        button.tabIndex = -1;
-        button.setAttribute("aria-hidden", "true");
-        button.style.display = "none";
-      }
-      if (tab.id === "browser-files" && !browserFilesInitiallyEnabled) {
         button.hidden = true;
         button.tabIndex = -1;
         button.setAttribute("aria-hidden", "true");
@@ -6361,38 +6416,6 @@ ${fullBundleJs}
     activateCurrentTab = activateTab;
 
     const apicurioTab = tabDefs.find((t) => t.id === "apicurio");
-    const browserFilesTab = tabDefs.find((t) => t.id === "browser-files");
-    syncBrowserFilesTabVisibility = (enabled) => {
-      if (!browserFilesTab?.button || !browserFilesTab?.panel) return;
-      const show = !!enabled;
-      browserFilesTab.button.hidden = !show;
-      browserFilesTab.button.tabIndex = show ? 0 : -1;
-      browserFilesTab.button.setAttribute(
-        "aria-hidden",
-        show ? "false" : "true"
-      );
-      browserFilesTab.button.style.display = show ? "" : "none";
-      if (!show) {
-        const wasActive = browserFilesTab.panel.classList.contains("is-active");
-        browserFilesTab.button.classList.remove("is-active");
-        browserFilesTab.button.setAttribute("aria-selected", "false");
-        browserFilesTab.panel.classList.remove("is-active");
-        browserFilesTab.panel.hidden = true;
-        if (wasActive) {
-          const fallback = tabDefs.find((t) => t.id !== "browser-files");
-          if (fallback) activateTab(fallback.id);
-        }
-      } else {
-        const isActive = lastActiveTabId === "browser-files";
-        browserFilesTab.button.classList.toggle("is-active", isActive);
-        browserFilesTab.button.setAttribute(
-          "aria-selected",
-          isActive ? "true" : "false"
-        );
-        browserFilesTab.panel.classList.toggle("is-active", isActive);
-        browserFilesTab.panel.hidden = !isActive;
-      }
-    };
     const syncApicurioTabVisibility = (enabled) => {
       if (!apicurioTab || !apicurioTab.button || !apicurioTab.panel) return;
       const show = !!enabled;
@@ -6447,27 +6470,37 @@ ${fullBundleJs}
       const preferred = tabDefs.find((t) => t.id === lastActiveTabId);
       if (
         preferred &&
-        (preferred.id !== "apicurio" || apicurioEnabled) &&
-        (preferred.id !== "browser-files" || browserFilesInitiallyEnabled)
+        (preferred.id !== "apicurio" || apicurioEnabled)
       )
         return preferred.id;
       const firstVisible = tabDefs.find(
-        (t) =>
-          (t.id !== "apicurio" || apicurioEnabled) &&
-          (t.id !== "browser-files" || browserFilesInitiallyEnabled)
+        (t) => t.id !== "apicurio" || apicurioEnabled
       );
       return firstVisible?.id || tabDefs[0].id;
     };
 
     const initialTabId = resolveInitialTabId(apicurioInitiallyEnabled);
     activateTab(initialTabId);
-    syncBrowserFilesTabVisibility(browserFilesInitiallyEnabled);
     syncApicurioTabVisibility(apicurioInitiallyEnabled);
     if (typeof apicurio.onEnabledChange === "function") {
       apicurio.onEnabledChange(syncApicurioTabVisibility);
     }
 
     app.appendChild(tabsWrapper);
+
+    const mapBindingStrip = document.createElement("div");
+    mapBindingStrip.className = "local-files-map-strip";
+    const mapBindingLabel = document.createElement("span");
+    mapBindingLabel.className = "local-files-map-strip__label";
+    mapBindingLabel.textContent = "Local file";
+    const mapBindingValue = document.createElement("span");
+    mapBindingValue.className = "local-files-map-strip__value";
+    const activeBrowserPath = getBrowserAutosavePath(models[activeIndex]);
+    mapBindingValue.textContent = activeBrowserPath || "Not file-backed";
+    mapBindingValue.title = activeBrowserPath || "";
+    mapBindingStrip.dataset.state = activeBrowserPath ? "bound" : "unbound";
+    mapBindingStrip.append(mapBindingLabel, mapBindingValue);
+    mapPanel.appendChild(mapBindingStrip);
 
     const renderHost = document.createElement("div");
     renderHost.className = "blockscape-render";
@@ -6494,6 +6527,83 @@ ${fullBundleJs}
     renderHost.appendChild(overlay);
     stageGuidesOverlay = stageGuides;
     mapPanel.appendChild(renderHost);
+
+    const localFilesWrapper = document.createElement("div");
+    localFilesWrapper.className = "local-files-browser-panel";
+
+    const localFilesHeader = document.createElement("div");
+    localFilesHeader.className = "blockscape-registry-header";
+    const localFilesTitle = document.createElement("h2");
+    localFilesTitle.textContent = "Local Files";
+    const localFilesHint = document.createElement("p");
+    localFilesHint.textContent =
+      "Browse .bs files in the connected workspace. Subdirectories are scanned recursively.";
+    localFilesHeader.append(localFilesTitle, localFilesHint);
+
+    const localFilesTableWrap = document.createElement("div");
+    localFilesTableWrap.className = "browser-autosave-table-wrap local-files-browser-table-wrap";
+    const localFilesTable = document.createElement("table");
+    localFilesTable.className = "browser-autosave-table";
+    localFilesTable.setAttribute(
+      "aria-label",
+      "Blockscape files in local workspace"
+    );
+    const localFilesHead = document.createElement("thead");
+    const localFilesHeadRow = document.createElement("tr");
+    [
+      ["name", "Name", "none", "none"],
+      ["path", "Path", "ascending", "asc"],
+      ["size", "Size", "none", "none"],
+      ["modified", "Modified", "none", "none"],
+    ].forEach(([key, label, ariaSort, direction]) => {
+      const th = document.createElement("th");
+      th.setAttribute("aria-sort", ariaSort);
+      const button = document.createElement("button");
+      button.type = "button";
+      button.dataset.browserFileSort = key;
+      button.dataset.sortDirection = direction;
+      button.textContent = label;
+      th.appendChild(button);
+      localFilesHeadRow.appendChild(th);
+    });
+    localFilesHead.appendChild(localFilesHeadRow);
+    const localFilesTableBody = document.createElement("tbody");
+    localFilesTable.append(localFilesHead, localFilesTableBody);
+    localFilesTableWrap.appendChild(localFilesTable);
+
+    const localFilesActions = document.createElement("div");
+    localFilesActions.className = "local-files-browser-actions";
+    const refreshLocalFilesButton = document.createElement("button");
+    refreshLocalFilesButton.type = "button";
+    refreshLocalFilesButton.className = "pf-v5-c-button pf-m-tertiary";
+    refreshLocalFilesButton.textContent = "Refresh";
+    const loadLocalFileButton = document.createElement("button");
+    loadLocalFileButton.type = "button";
+    loadLocalFileButton.className = "pf-v5-c-button pf-m-secondary";
+    loadLocalFileButton.textContent = "Load";
+    const deleteLocalFileButton = document.createElement("button");
+    deleteLocalFileButton.type = "button";
+    deleteLocalFileButton.className = "pf-v5-c-button pf-m-danger";
+    deleteLocalFileButton.textContent = "Delete";
+    localFilesActions.append(
+      refreshLocalFilesButton,
+      loadLocalFileButton,
+      deleteLocalFileButton
+    );
+
+    localFilesWrapper.append(
+      localFilesHeader,
+      localFilesTableWrap,
+      localFilesActions
+    );
+    localFilesPanel.appendChild(localFilesWrapper);
+    browserAutosave?.mountFileBrowser?.({
+      fileTableEl: localFilesTable,
+      fileTableBodyEl: localFilesTableBody,
+      refreshButton: refreshLocalFilesButton,
+      loadButton: loadLocalFileButton,
+      deleteButton: deleteLocalFileButton,
+    });
 
     const abstractWrapper = document.createElement("div");
     abstractWrapper.className = "blockscape-abstract-panel";
@@ -7677,74 +7787,6 @@ ${fullBundleJs}
     }
     sourcePanel.appendChild(sourceWrapper);
 
-    const browserFilesWrapper = document.createElement("div");
-    browserFilesWrapper.className = "blockscape-browser-files-panel";
-
-    const browserFilesHeader = document.createElement("div");
-    browserFilesHeader.className = "blockscape-registry-header";
-    const browserFilesTitle = document.createElement("h2");
-    browserFilesTitle.textContent = "Browser folder files";
-    const browserFilesHint = document.createElement("p");
-    browserFilesHint.textContent =
-      "Select a .bs file from the connected folder. Subdirectories are scanned recursively.";
-    browserFilesHeader.append(browserFilesTitle, browserFilesHint);
-
-    const browserFilesTableWrap = document.createElement("div");
-    browserFilesTableWrap.className = "browser-autosave-table-wrap";
-    const browserFilesTable = document.createElement("table");
-    browserFilesTable.className = "browser-autosave-table";
-    browserFilesTable.setAttribute(
-      "aria-label",
-      "Blockscape files in opened browser folder"
-    );
-    const browserFilesHead = document.createElement("thead");
-    const browserFilesHeadRow = document.createElement("tr");
-    [
-      ["name", "Name"],
-      ["path", "Path"],
-      ["size", "Size"],
-      ["modified", "Last modified"],
-    ].forEach(([key, label]) => {
-      const th = document.createElement("th");
-      const button = document.createElement("button");
-      button.type = "button";
-      button.dataset.browserFileSort = key;
-      button.setAttribute("aria-sort", key === "path" ? "asc" : "none");
-      button.dataset.sortDirection = key === "path" ? "asc" : "none";
-      button.textContent = label;
-      th.appendChild(button);
-      browserFilesHeadRow.appendChild(th);
-    });
-    browserFilesHead.appendChild(browserFilesHeadRow);
-    const browserFilesBody = document.createElement("tbody");
-    browserFilesTable.append(browserFilesHead, browserFilesBody);
-    browserFilesTableWrap.appendChild(browserFilesTable);
-
-    const browserFileActions = document.createElement("div");
-    browserFileActions.className = "blockscape-browser-files-actions";
-    const refreshBrowserFilesButton = document.createElement("button");
-    refreshBrowserFilesButton.type = "button";
-    refreshBrowserFilesButton.className = "pf-v5-c-button pf-m-tertiary";
-    refreshBrowserFilesButton.textContent = "Refresh";
-    const loadBrowserFileButton = document.createElement("button");
-    loadBrowserFileButton.type = "button";
-    loadBrowserFileButton.className = "pf-v5-c-button pf-m-secondary";
-    loadBrowserFileButton.textContent = "Load";
-    browserFileActions.append(refreshBrowserFilesButton, loadBrowserFileButton);
-
-    browserFilesWrapper.append(
-      browserFilesHeader,
-      browserFilesTableWrap,
-      browserFileActions
-    );
-    browserFilesPanel.appendChild(browserFilesWrapper);
-    browserAutosave?.mountFileBrowser?.({
-      fileTableEl: browserFilesTable,
-      fileTableBodyEl: browserFilesBody,
-      refreshButton: refreshBrowserFilesButton,
-      loadButton: loadBrowserFileButton,
-    });
-
     apicurio.mount(apicurioPanel);
 
     let tileCounter = 0;
@@ -8868,12 +8910,14 @@ ${fullBundleJs}
         button.disabled = true;
       });
       try {
-        if (action === "html") {
+        if (action === "save") {
+          await saveCurrentLocalFile("save-menu");
+        } else if (action === "html") {
           await downloadCurrentHtml({ simple: false });
         } else if (action === "simple-html") {
           await downloadCurrentHtml({ simple: true });
         } else if (action === "bs") {
-          downloadCurrentJson("save-menu", true);
+          downloadCurrentJson("export-menu", true);
         }
       } finally {
         saveFileMenu.open = false;
@@ -8979,9 +9023,7 @@ ${fullBundleJs}
 
     if ((event.ctrlKey || event.metaKey) && event.code === "KeyS") {
       event.preventDefault();
-      const active = models[activeIndex];
-      const preferSeries = !!(active?.apicurioVersions?.length > 1);
-      downloadCurrentJson("shortcut", preferSeries);
+      saveCurrentLocalFile("shortcut");
       return;
     }
 
@@ -10365,7 +10407,7 @@ ${fullBundleJs}
     );
   }
 
-  async function loadFromBrowserAutosaveFile(path, text) {
+  async function loadFromBrowserAutosaveFile(path, text, { revision = null } = {}) {
     if (!path || !text) return null;
     const rawName = path.split("/").pop() || path;
     const baseName = rawName.replace(/\.[^.]+$/, "") || "Folder Model";
@@ -10407,6 +10449,7 @@ ${fullBundleJs}
         {
           ...payload,
           browserAutosavePath: path,
+          fileBinding: createBrowserFileBinding(path, { revision }),
           apicurioArtifactName:
             payload.apicurioArtifactName || payload.title,
         },
@@ -10415,6 +10458,9 @@ ${fullBundleJs}
       if (firstIndex == null) firstIndex = idxResult;
       if (models[idxResult]) {
         models[idxResult].browserAutosavePath = path;
+        models[idxResult].fileBinding = createBrowserFileBinding(path, {
+          revision,
+        });
       }
     });
 
