@@ -9,4 +9,4 @@ site/
 .site-test/
 #mkdocs-blockscape/
 **/.tmp/
-__pycache__/
+__pycache__/.venv/
